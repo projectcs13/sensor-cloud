@@ -1,0 +1,69 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<!-- 
+	Simple HTML interface for GET POST UPDATE and DELETE of a "stream"-resource
+	for a RESTful API. The HTML page is written assuming you pass a json object
+	with the structure '{"name": name_of_stream }' for manipulating the resource.
+	It also assumes that the RESTful api will retreive a list of streams upon a
+	GET request.
+-->
+<html>
+<head>
+	<title>Awesome Stream Handler</title>
+	<meta http-equiv="content-type" 
+		content="text/html;charset=utf-8" />
+	<script>
+		/* 
+			The URL variable specifies where the stream resource is located
+			the following functions assume that the HTML page is hosted on
+			the same webserver as the resourse and that the resource is located
+			at a subdirectory relative to the HTML-page.
+
+			If the HTML page is hosted on a different server than the resource, 
+			the server hosting the resource must accept cross-domain request by 
+			specifying the Access-Control-Allow-Origin variable on the server hosting
+			the resource.
+		*/
+		//var URL = "http://localhost:8080/streams";
+		var URL = "/streams"
+
+		function post_stream() {
+			var stream_name = document.getElementById('name').value;
+			var conn = new XMLHttpRequest();
+			// Function for logging the response in the console of the browser
+			conn.onreadystatechange = function() {
+       				 if(conn.readyState == 4)
+       				 	console.log(conn.responseText);
+			}
+			var data = JSON.stringify({"name": stream_name});
+			conn.open("POST", URL, false);
+			conn.setRequestHeader("Content-type","application/json");
+			conn.send(data);
+		}
+		function get_stream() {
+			var conn = new XMLHttpRequest();
+			// Function for logging the response in the console of the browser
+			conn.onreadystatechange = function() {
+       				 if(conn.readyState == 4)
+       				 	console.log(conn.responseText);
+   				 
+			}
+			conn.open("GET", URL, false);
+			conn.send(null);
+		}
+	</script>
+</head>
+<body>
+	Create a new stream:
+	<form action="" onsubmit="mypost();">
+		Stream name:<input type="text" id="name">
+		<input type=submit value=Try it...>
+	</form>
+	<hr>
+	Fetch streams:
+	<form action="" onsubmit="myget();">
+		<input type=submit value="Fetch all streams!">
+	</form>
+</body>
+</html>
