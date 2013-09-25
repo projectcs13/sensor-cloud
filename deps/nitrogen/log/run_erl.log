@@ -1,0 +1,8 @@
+run_erl [6914] Wed Sep 25 10:25:48 2013
+Args before exec of shell:
+run_erl [6914] Wed Sep 25 10:25:48 2013
+argv[0] = sh
+run_erl [6914] Wed Sep 25 10:25:48 2013
+argv[1] = -c
+run_erl [6914] Wed Sep 25 10:25:48 2013
+argv[2] = exec /home/toma1029/git/sensor-cloud/deps/nitrogen/bin/nitrogen console \'\' 
