@@ -1,9 +1,4 @@
-egnine/ebin/
+engine/ebin/
 website/ebin/
-deps/nitrogen/lib/nitrogen_core/
-deps/nitrogen/lib/nprocreg
-deps/nitrogen/lib/simple_bridge
-deps/nitrogen/lib/sync
-deps/nitrogen/lib/yaws
 *~
 .project
