@@ -8,7 +8,7 @@ compile:
 
 clean: clean_emacs_vsn_files
 	./rebar clean
-	@rmdir ebin
+	-rmdir ebin
 
 clean_emacs_vsn_files:
 	rm -rf *~

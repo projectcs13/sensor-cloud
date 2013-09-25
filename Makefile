@@ -3,7 +3,7 @@ compile: compile_engine compile_website compile_deps
 clean: clean_engine clean_website clean_deps clean_emacs_vsn_files
 
 compile_deps:
-	cd deps/nitrogen; make
+	cd deps/ ; tar xvfz nitrogen-yaws.tar.gz ; cd nitrogen/ ; make
 
 compile_engine:
 	cd engine; make
