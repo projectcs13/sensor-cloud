@@ -15,7 +15,7 @@
 %% API functions
 %% ====================================================================
 -export([start/0, connect/2, createUser/2, init/0, traverse/1]).
--export([createUser/2, getUserByID/1, getUserByUsername/1]).
+-export([create_user/2, get_user_by_id/1, get_user_by_username/1]).
 -include_lib("stdlib/include/qlc.hrl").
 -include("include/database.hrl").
 
@@ -55,7 +55,7 @@ connect(ConnectStr, Options) ->
 %% Returns: ok | or {error, term()}
 %%
 %% @end
--spec createUser(string(), string()) -> {ok, term()} | {error, term()}.
+-spec create_user(string(), string()) -> {ok, term()} | {error, term()}.
 createUser(Username, Password) ->
 	%mnesia:wait_for_tables({user}, 5000),
 	Id = mnesia:dirty_update_counter(unique_ids, user, 1),
@@ -66,14 +66,14 @@ createUser(Username, Password) ->
 
 
 %% @doc
-%% Function: getUserByID/1
+%% Function: get_user_by_id/1
 %% Purpose: Retrieves a User from the system, given the ID
 %% Args: integer()
 %% Returns: user | {error, unknown_user}
 %%
 %% @end
--spec getUserByID(integer()) -> Record :: #user{}.
-getUserByID(ID) ->
+-spec get_user_by_id(integer()) -> Record :: #user{}.
+get_user_by_id(ID) ->
 	F = fun() -> 
 		mnesia:read({user, ID}) 
 	end,
@@ -89,10 +89,10 @@ end.
 %% Returns: user | {error, unknown_user}
 %%
 %% @end
--spec getUserByUsername(string()) ->  Record :: #user{}.
-getUserByUsername(Username) ->
-	Pattern = #user{_ = '_',
-								user_name = Username},
+-spec get_user_by_username(string()) ->  Record :: #user{}.
+get_user_by_username(Username) ->
+	Pattern = #user{ _ = '_',
+					 user_name = Username},
 	F = fun() -> 
 		mnesia:match_object(Pattern)
 	end,
