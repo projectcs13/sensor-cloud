@@ -1,5 +1,5 @@
-%% @author Tholsgård Gabriel
-%% @author Tomas Sävström <tosa7943@student.uu.se>
+%% @author Tholsgï¿½rd Gabriel
+%% @author Tomas Sï¿½vstrï¿½m <tosa7943@student.uu.se>
 %%   [www.csproj13.student.it.uu.se]
 %% @version 1.1
 %% @copyright [Copyright information]
@@ -20,7 +20,7 @@
 -export([start/0, connect/2,write_resource/1]). 
 
 %% @doc
-%% Function: register_resource/1
+%% Function: write_resource/1
 %% Purpose: used to add a new resource or update an exsisting one
 %% Returns: {atmoic,ok} | or {term(), term()}
 %%
@@ -53,7 +53,7 @@ start() ->
 %% @doc
 %% Function: connect/2
 %% Purpose: Establish a database connection
-%% Returns: ok | or {trem(), term()}
+%% Returns: ok | or {term(), term()}
 %%
 %% Side effects: Establishes a database connection
 %% @end
