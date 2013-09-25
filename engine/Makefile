@@ -19,5 +19,5 @@ clean_emacs_vsn_files:
 	rm -rf test/*~
 
 run:
-	erl -pa ebin
+	erl -pa ebin 
 
