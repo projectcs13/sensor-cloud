@@ -6,7 +6,9 @@
 %%
 %% @doc == db_api ==
 %% This module contains all the necessary functionality to connect
-%% to a db and query it.
+%% to a db and query it, erlang session will need to use the cookie
+%% database when starting the erlang shell, this is done by adding the
+%% flag "-setcookie database"
 %%
 %% @end
 
