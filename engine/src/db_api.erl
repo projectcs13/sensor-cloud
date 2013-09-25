@@ -53,7 +53,7 @@ start() ->
 %% @doc
 %% Function: connect/2
 %% Purpose: Establish a database connection
-%% Returns: ok | or {term(), term()}
+%% Returns: ok | or {error, term()}
 %%
 %% Side effects: Establishes a database connection
 %% @end
