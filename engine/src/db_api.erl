@@ -14,7 +14,7 @@
 %% ====================================================================
 %% API functions
 %% ====================================================================
--export([start/0, connect/2, createUser/2, init/0, traverse/1]).
+-export([start/0, connect/2, traverse/1]).
 -export([create_user/2, get_user_by_id/1, get_user_by_username/1]).
 -include_lib("stdlib/include/qlc.hrl").
 -include("include/database.hrl").
@@ -56,7 +56,7 @@ connect(ConnectStr, Options) ->
 %%
 %% @end
 -spec create_user(string(), string()) -> {ok, term()} | {error, term()}.
-createUser(Username, Password) ->
+create_user(Username, Password) ->
 	%mnesia:wait_for_tables({user}, 5000),
 	Id = mnesia:dirty_update_counter(unique_ids, user, 1),
 	F = fun() ->
