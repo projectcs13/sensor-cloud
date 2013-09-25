@@ -12,6 +12,8 @@
 -module(db_api_tests).
 
 -include_lib("eunit/include/eunit.hrl").
+-include_lib("stdlib/include/qlc.hrl").
+-include("include/database.hrl").
 
 %% ====================================================================
 %% API functions
@@ -46,3 +48,70 @@ start_test() ->
 %% @end
 -spec connect_test() -> ok | {error, term()}.
 connect_test() -> ok.
+
+
+%% @doc
+%% Function: create_user_test/0
+%% Purpose: Test if user creation works
+%% Returns: ok | {error, term()}
+%%
+%% Side effects: Inserts new user to the database
+%% @end
+-spec create_user_test() -> ok | {error, term()}.
+create_user_test() -> 
+	db_api:create_user("user1", "pass1"),
+	db_api:create_user("user2", "pass2"),	
+	?assertEqual(find_pass_by_username("user1"),["pass1"]),
+	?assertEqual(find_pass_by_username("user2"),["pass2"]).
+
+%% @doc
+%% Function: get_user_by_id_test/0
+%% Purpose: Test if get_user_by_id works
+%% Returns: ok | {error, term()}
+%%
+%% Side effects: Inserts new user to the database
+%% @end
+-spec get_user_by_id_test() -> ok | {error, term()}.
+get_user_by_id_test() -> 
+	db_api:create_user("user3", "pass3"),
+	db_api:create_user("user4", "pass4"),	
+	?assertEqual(db_api:get_user_by_id(3), db_api:get_user_by_username("user3")),
+	?assertEqual(db_api:get_user_by_id(4), db_api:get_user_by_username("user4")),
+	?assertEqual(db_api:get_user_by_id(5), {error, unknown_user}).
+
+%% @doc
+%% Function: get_user_by_username_test/0
+%% Purpose: Test if get_user_by_username works
+%% Returns: ok | {error, term()}
+%%
+%% Side effects: Inserts new user to the database
+%% @end
+-spec get_user_by_username_test() -> ok | {error, term()}.
+get_user_by_username_test() -> 
+	db_api:create_user("user5", "pass5"),
+	db_api:create_user("user6", "pass6"),	
+	?assertEqual(db_api:get_user_by_id(5), db_api:get_user_by_username("user5")),
+	?assertEqual(db_api:get_user_by_id(6), db_api:get_user_by_username("user6")),
+	?assertEqual(db_api:get_user_by_id(7), {error, unknown_user}).
+
+
+
+%% @doc
+%% Function: find_pass_by_username/1
+%% Purpose: returns the password of the user with the given username
+%% Args:   string()
+%% Returns: tuple()
+%% Side effects: Querys the local mnesia database
+%% @end
+
+-spec find_pass_by_username(Username::string()) -> string().
+find_pass_by_username(Username) ->
+    Pattern = #user{ _ = '_',
+					 user_name = Username},
+	F = fun() ->
+		Res = mnesia:match_object(Pattern),
+		[Password || #user{user_name=Username,
+			password=Password} <- Res]
+	end,
+	mnesia:activity(transaction, F).
+	
