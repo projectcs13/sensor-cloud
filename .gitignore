@@ -1,2 +1,5 @@
-egnine/ebin
+egnine/ebin/
+website/ebin/
+deps/nitrogen/site/ebin/
+*~
 .project
