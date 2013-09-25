@@ -35,7 +35,8 @@ init() ->
     mnesia:create_table(user,
                         [{attributes, record_info(fields, user)}]),
     mnesia:create_table(resource,
-                        [{attributes, record_info(fields, resource)}]).
-
+                        [{attributes, record_info(fields, resource)}]),
+	mnesia:create_table(unique_ids, 
+						[{attributes, record_info(fields, unique_ids)}]).
 
 
