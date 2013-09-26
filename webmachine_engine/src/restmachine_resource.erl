@@ -85,7 +85,7 @@ merge_lists([H|T], [A|B]) ->
 	end.
 
 json_to_stream(JsonData) ->
-	#streams{id = proplists:get_value(<<"id">>, JsonData),
+	#stream{id = proplists:get_value(<<"id">>, JsonData),
 		type = proplists:get_value(<<"type">>, JsonData), 
 		latitude = proplists:get_value(<<"latitude">>, JsonData),
 		longitude = proplists:get_value(<<"longitude">>, JsonData), 
