@@ -14,7 +14,7 @@
 	 json_get/2]).
 
 -include_lib("webmachine/include/webmachine.hrl").
--include("database.hrl").
+-include("include/database.hrl").
 
 init([]) -> 
 	{ok, undefined}.
@@ -51,19 +51,12 @@ delete_resource(ReqData, State) ->
 	{true, ReqData, State}.
 
 %% PUT
-%% 1. Parse the json object
-%% 2. Try to add it to the database
-%% 3. ???
-%% 4. Profit
 json_handler(ReqData, State) ->
 	[{Value,_ }] = mochiweb_util:parse_qs(wrq:req_body(ReqData)), 
 	{struct, JsonData} = mochijson2:decode(Value),
-	erlang:display("Proplist: ~p~n", [JsonData]),
 	Stream = json_to_stream(JsonData),
-	Json = stream_to_json(Stream),
-	erlang:display(Value),
-	erlang:display(Json),
-	{Json, ReqData, State}.
+	db_api:add_stream(Stream),
+	{true, ReqData, State}.
 
 stream_to_json(Record) ->
   [_ | Values] = tuple_to_list(Record),
@@ -110,10 +103,13 @@ json_get(ReqData, State) ->
 	case proplists:get_value('?', wrq:path_info(ReqData)) of
 		% Get all streams
 		undefined -> 
+			db_api:get_all_streams(),
 			{ "{'label':'Hello, World!'}", ReqData, State};
 		% Get specific stream
 		X -> 
-			{ "{'id':"++X++" 'label':'Hello, World!'}", ReqData, State}
+			Stream = db_api:get_stream_by_id(list_to_integer(X)),
+			
+			{ stream_to_json(Stream), ReqData, State}
 	end.
 
 %%parse_path(List) -> [{Key::String(), Value::String()}] | [{Error, Err}]

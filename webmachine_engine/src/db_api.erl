@@ -20,7 +20,7 @@
 
 -include_lib("database.hrl").
 
--define(MNESIA_DIR, "/home/gabriel/mnesia/").
+-define(MNESIA_DIR, "/home/kristian/mnesia/").
 -define(NODES, [node()]).
 
 
@@ -110,7 +110,7 @@ add_stream(Stream_record) when is_record(Stream_record, stream) ->
 %% Returns: {aborted, Reason} | {error, Reason} | [Record] (#stream)
 %%
 %% @end
--spec get_all_streams() -> {aborted, term()} | {error, term()} | record.
+-spec get_all_streams() -> {aborted, term()} | {error, term()} | [record].
 get_all_streams() ->
 	Trans = fun() ->
 					case mnesia:match_object(#stream{_='_'}) of
