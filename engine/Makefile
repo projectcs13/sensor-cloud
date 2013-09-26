@@ -30,9 +30,7 @@ clean_emacs_vsn_files:
 	rm -rf test/*~
 
 run: compile
-	erl -pa ebin -sname database -mnesia dir '"/home/database/Mnesia.Database"' -s database init
+	erl -pa ebin -sname database -setcookie database -mnesia dir '"/home/database/Mnesia.Database"' -s database init
 
 docs: compile_src
 	erl -pa ebin -s start doc
-
-
