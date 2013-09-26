@@ -48,6 +48,7 @@ process_post(ReqData, State) ->
 %% DELETE
 delete_resource(ReqData, State) ->
 	erlang:display("delete request"),
+	
 	{true, ReqData, State}.
 
 %% PUT
@@ -103,12 +104,12 @@ json_get(ReqData, State) ->
 	case proplists:get_value('?', wrq:path_info(ReqData)) of
 		% Get all streams
 		undefined -> 
-			db_api:get_all_streams(),
-			{ "{'label':'Hello, World!'}", ReqData, State};
+			List_of_streams = db_api:get_all_streams(),
+			Streams = lists:map(fun(X) -> stream_to_json(X) end, List_of_streams),
+			{ Streams, ReqData, State};
 		% Get specific stream
 		X -> 
 			Stream = db_api:get_stream_by_id(list_to_integer(X)),
-			
 			{ stream_to_json(Stream), ReqData, State}
 	end.
 
