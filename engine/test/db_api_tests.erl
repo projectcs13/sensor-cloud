@@ -13,7 +13,7 @@
 
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("stdlib/include/qlc.hrl").
--include("include/database.hrl").
+-include("include/user.hrl").
 
 %% ====================================================================
 %% API functions

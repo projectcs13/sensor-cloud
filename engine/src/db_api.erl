@@ -18,7 +18,8 @@
 -export([create_user/2, get_user_by_id/1, get_user_by_username/1, 
 		authenticate/2, change_password/3, exists_username/1]).
 -include_lib("stdlib/include/qlc.hrl").
--include("include/database.hrl").
+-include("include/user.hrl").
+-include("include/unique_ids.hrl").
 
 
 %% ====================================================================
