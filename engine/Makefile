@@ -1,8 +1,5 @@
 all: compile
 
-#install:
-#	@scripts/install.sh
-
 compile:
 	./rebar compile
 

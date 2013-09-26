@@ -1,33 +1,24 @@
 all: compile
-compile: compile_engine compile_website compile_deps
+compile: compile_engine compile_website
 clean: clean_engine clean_website clean_deps clean_emacs_vsn_files
-
-compile_deps:
-	cd deps/ ; tar xvfz nitrogen-yaws.tar.gz ; cd nitrogen/ ; make
 
 compile_engine:
 	cd engine; make
 
-compile_website: compile_deps
+compile_website:
 	cd website; make
 
 clean_emacs_vsn_files:
 	rm -rf *~
-	rm -rf doc/*~
-	rm -rf include/*~
-	rm -rf priv/*~
-	rm -rf scripts/*~
-	rm -rf src/*~
-	rm -rf test/*~		
 
 clean_engine:
-	cd engine; make clean
+	cd engine/ && make clean
 
 clean_website:
-	cd website; make clean
+	cd website/ && make clean
 
 clean_deps:
-	cd deps/nitrogen; make clean
+	-cd deps/nitrogen/ && make clean
 
 #run: compile
 #	erl

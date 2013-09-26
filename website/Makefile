@@ -1,10 +1,11 @@
 all: compile
 
-#install:
-#	@scripts/install.sh
-
-compile:
+compile: compile_libs
 	./rebar compile
+
+compile_libs:
+	-cd lib && tar xvfz nitrogen-yaws.tar.gz
+	cd lib/nitrogen && make
 
 clean: clean_emacs_vsn_files
 	./rebar clean
@@ -20,5 +21,5 @@ clean_emacs_vsn_files:
 	rm -rf test/*~
 
 run:
-	../deps/nitrogen/bin/nitrogen console
+	lib/nitrogen/bin/nitrogen console
 
