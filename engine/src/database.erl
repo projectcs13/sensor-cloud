@@ -11,7 +11,10 @@
 -module(database).
 -compile(export_all).
 -include_lib("stdlib/include/qlc.hrl").
--include("include/database.hrl").
+-include("include/user.hrl").
+-include("include/unique_ids.hrl").
+-include("include/resource.hrl").
+-include("include/stream.hrl").
 
 %% @doc
 %% Function: init/0 
@@ -35,7 +38,8 @@ init() ->
     mnesia:create_table(user,
                         [{attributes, record_info(fields, user)}]),
     mnesia:create_table(resource,
-                        [{attributes, record_info(fields, resource)}]).
-
+                        [{attributes, record_info(fields, resource)}]),
+	mnesia:create_table(unique_ids, 
+						[{attributes, record_info(fields, unique_ids)}]).
 
 
