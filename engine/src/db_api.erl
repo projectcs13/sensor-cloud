@@ -16,7 +16,7 @@
 %% ====================================================================
 -export([start/0, connect/2, traverse/1]).
 -export([create_user/2, get_user_by_id/1, get_user_by_username/1, 
-		authenticate/2]).
+		authenticate/2, change_password/3]).
 -include_lib("stdlib/include/qlc.hrl").
 -include("include/database.hrl").
 
@@ -147,6 +147,27 @@ authenticate(Username,Password) ->
 		[] -> {error, authentication_error};
 		_ -> ok
 	end.
+
+
+%% @doc
+%% Function: change_password/3
+%% Purpose: Changes the user's password
+%% Args: string(), string(), string()
+%% Returns: ok | {error, authentication_error}
+%%
+%% @end
+-spec change_password(string(), string(), string()) ->  ok | {error, term()}.
+change_password(Username,OldPassword,NewPassword) ->
+	Pattern = #user{_ = '_',
+					user_name = Username,
+					password = OldPassword},
+	F = fun() -> 
+		case mnesia:match_object(Pattern) of
+			[User] -> mnesia:write(User#user{password = NewPassword});
+			[] -> {error, username_password_wrong}
+		end
+	end,
+	mnesia:activity(transaction, F).
 
 
 
