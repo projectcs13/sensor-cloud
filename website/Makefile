@@ -1,13 +1,24 @@
 all: compile
 
-#install:
-#	@scripts/install.sh
+compile: compile_libs compile_src
 
-compile:
+compile_src:
 	./rebar compile
+
+compile_libs:
+	-cd lib && tar xvfz nitrogen-yaws.tar.gz
+	-cd lib/nitrogen && make
 
 clean: clean_emacs_vsn_files
 	./rebar clean
+	rm -f erl_crash.dump
+	rm -rf ebin/
+
+clean_docs:
+	rm -f doc/*.html
+	rm -f doc/edoc-info
+	rm -f doc/erlang.png
+	rm -f doc/stylesheet.css
 
 clean_emacs_vsn_files:
 	rm -rf *~
@@ -18,6 +29,8 @@ clean_emacs_vsn_files:
 	rm -rf src/*~
 	rm -rf test/*~
 
-run:
-	../deps/nitrogen/bin/nitrogen console
+run: compile
+	lib/nitrogen/bin/nitrogen console
 
+docs: compile_src
+	erl -pa ebin -s start doc
