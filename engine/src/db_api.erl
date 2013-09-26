@@ -53,17 +53,42 @@ connect(ConnectStr, Options) ->
 %% Function: createUser/2
 %% Purpose: Inserts a new User to the system
 %% Args:   string(), string()
-%% Returns: ok | or {error, term()}
+%% Returns: ok | or {error, username_exists} | or {error, term()}
+%%
+%% Side effects: Creates a new User in the database
+%% @end
+-spec create_user(string(), string()) -> ok | {error, term()}.
+create_user(Username, Password) ->	
+	case exists_username(Username) of
+		true -> {error, username_exists};
+		false ->
+			Id = mnesia:dirty_update_counter(unique_ids, user, 1),
+			F = fun() ->
+				mnesia:write(#user{id=Id, user_name=Username, password=Password})							
+			end,
+			mnesia:activity(transaction, F)
+	end.
+
+
+%% @doc
+%% Function: exists_username/1
+%% Purpose: Checks if username exists
+%% Args:   string()
+%% Returns: boolean()
 %%
 %% @end
--spec create_user(string(), string()) -> {ok, term()} | {error, term()}.
-create_user(Username, Password) ->
-	%mnesia:wait_for_tables({user}, 5000),
-	Id = mnesia:dirty_update_counter(unique_ids, user, 1),
-	F = fun() ->
-		mnesia:write(#user{id=Id, user_name=Username, password=Password})							
+-spec exists_username(string()) -> boolean().
+exists_username(Username) ->	
+	Pattern = #user{_ = '_',
+					user_name = Username},
+	F = fun() -> 
+		mnesia:match_object(Pattern)
 	end,
-	mnesia:activity(transaction, F).
+	case mnesia:activity(transaction, F) of
+		[] -> false;
+		_ -> true
+	end.
+
 
 
 %% @doc
@@ -110,7 +135,7 @@ get_user_by_username(Username) ->
 %% Returns: ok | {error, authentication_error}
 %%
 %% @end
--spec authenticate(string(), string()) ->  Record :: #user{}.
+-spec authenticate(string(), string()) ->  ok | {error, term()}.
 authenticate(Username,Password) ->
 	Pattern = #user{_ = '_',
 					user_name = Username,
@@ -118,7 +143,7 @@ authenticate(Username,Password) ->
 	F = fun() -> 
 		mnesia:match_object(Pattern)
 	end,
-	case User = mnesia:activity(transaction, F) of
+	case mnesia:activity(transaction, F) of
 		[] -> {error, authentication_error};
 		_ -> ok
 	end.
