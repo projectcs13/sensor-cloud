@@ -16,7 +16,7 @@
 %% ====================================================================
 -export([start/0, connect/2, traverse/1]).
 -export([create_user/2, get_user_by_id/1, get_user_by_username/1, 
-		authenticate/2, change_password/3]).
+		authenticate/2, change_password/3, exists_username/1]).
 -include_lib("stdlib/include/qlc.hrl").
 -include("include/database.hrl").
 
@@ -153,7 +153,7 @@ authenticate(Username,Password) ->
 %% Function: change_password/3
 %% Purpose: Changes the user's password
 %% Args: string(), string(), string()
-%% Returns: ok | {error, authentication_error}
+%% Returns: ok | {error, username_password_wrong}
 %%
 %% @end
 -spec change_password(string(), string(), string()) ->  ok | {error, term()}.
