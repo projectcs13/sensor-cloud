@@ -14,7 +14,7 @@
 	 json_get/2]).
 
 -include_lib("webmachine/include/webmachine.hrl").
--include("stream_resource.hrl").
+-include("database.hrl").
 
 init([]) -> 
 	{ok, undefined}.
