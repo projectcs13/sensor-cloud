@@ -27,8 +27,9 @@
 %% Returns: Success or error message(username exists or database error)
 %%
 %% @end
-add_user(username,password) ->
-    db_api:create_user(username,password).
+-spec add_user(string(), string()) -> ok | {error, term()}.
+add_user(Username,Password) ->
+    db_api:create_user(Username,Password).
 
 
 %% @doc
@@ -38,8 +39,10 @@ add_user(username,password) ->
 %% Returns: Success or database error message
 %%
 %% @end
-remove_user(username) ->
-	db_api:remove_user(username).
+%% not implemented in db_api yet, should not be used
+-spec remove_user(string()) -> ok | {error, term()}.
+remove_user(Username) ->
+	db_api:remove_user(Username).
 
 
 %% @doc
@@ -49,8 +52,9 @@ remove_user(username) ->
 %% Returns: Success or error message(database or authentication error)
 %%
 %% @end
-change_password(username,password,new_password) ->
-	db_api:change_password(username,old_password,new_password).
+-spec change_password(string(), string(), string()) ->  ok | {error, term()}.
+change_password(Username,Old_Password,New_password) ->
+	db_api:change_password(Username,Old_Password,New_password).
 
 
 %% @doc
@@ -60,5 +64,6 @@ change_password(username,password,new_password) ->
 %% Returns: Success or error message(database error or authentication error)
 %%
 %% @end
-authenticate(username,password) ->
-	db_api:authenticate(username,password).
+-spec authenticate(string(), string()) ->  ok | {error, term()}.
+authenticate(Username,Password) ->
+	db_api:authenticate(Username,Password).
