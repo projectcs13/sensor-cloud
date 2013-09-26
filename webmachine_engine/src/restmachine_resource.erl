@@ -22,7 +22,7 @@
 %% Purpose: init function used to fetch path information from webmachine dispatcher.
 %% Returns: {ok, undefined}
 %% @end
--spec init([options()]) -> {ok, undefined}.
+-spec init([]) -> {ok, undefined}.
 
 init([]) -> 
 	{ok, undefined}.
@@ -57,15 +57,21 @@ content_types_accepted(ReqData, State) ->
 process_post(ReqData, State) ->
 	erlang:display("Posting request"),
 	{Stream, _, _} = json_handler(ReqData, State),
-	db_api:add_stream(Stream),
-	{true, ReqData, State}.
+	case db_api:add_stream(Stream) of
+		{aborted, Reason} -> {{error, Reason}, ReqData, State};
+		{error, Reason} -> {{error, Reason}, ReqData, State};
+		ok -> {true, ReqData, State}
+	end.
 
 %% DELETE
 delete_resource(ReqData, State) ->
 	Id = proplists:get_value('?', wrq:path_info(ReqData)),
 	erlang:display("delete request"),
-	db_api:delete_stream_with_id(list_to_integer(Id)),
-	{true, ReqData, State}.
+	case db_api:delete_stream_with_id(list_to_integer(Id)) of
+		{aborted, Reason} -> {{error, Reason}, ReqData, State};
+		{error, Reason} -> {{error, Reason}, ReqData, State};
+		ok -> {true, ReqData, State}
+	end.
 
 %% PUT
 
@@ -76,7 +82,7 @@ put_resource(ReqData, State) ->
 	case db_api:update_stream(list_to_integer(Id), Stream) of
 		{aborted, Reason} -> {{error, Reason}, ReqData, State};
 		{error, Reason} -> {{error, Reason}, ReqData, State};
-		_ -> {true, ReqData, State}
+		ok -> {true, ReqData, State}
 	end.
 
 json_handler(ReqData, State) ->
@@ -130,13 +136,19 @@ json_get(ReqData, State) ->
 	case proplists:get_value('?', wrq:path_info(ReqData)) of
 		% Get all streams
 		undefined -> 
-			List_of_streams = db_api:get_all_streams(),
-			Streams = lists:map(fun(X) -> stream_to_json(X) end, List_of_streams),
-			{ Streams, ReqData, State};
+			case db_api:get_all_streams() of
+				{aborted, Reason} -> {{error, Reason}, ReqData, State};
+				{error, Reason} -> {{error, Reason}, ReqData, State};
+				List_of_streams -> Streams = lists:map(fun(X) -> stream_to_json(X) end, List_of_streams),
+					  {Streams, ReqData, State}
+			end;
 		% Get specific stream
 		X -> 
-			Stream = db_api:get_stream_by_id(list_to_integer(X)),
-			{ stream_to_json(Stream), ReqData, State}
+			case db_api:get_stream_by_id(list_to_integer(X)) of
+				{aborted, Reason} -> {{error, Reason}, ReqData, State};
+				{error, Reason} -> {{error, Reason}, ReqData, State};
+				Stream -> {stream_to_json(Stream), ReqData, State}
+			end
 	end.
 
 %%parse_path(List) -> [{Key::String(), Value::String()}] | [{Error, Err}]
