@@ -17,3 +17,6 @@ distclean: clean
 
 docs:
 	@erl -noshell -run edoc_run application '$(APP)' '"."' '[]'
+
+api-tests:
+    $(shell python -m unittest discover test '*_tests.py' -v)
