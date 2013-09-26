@@ -1,4 +1,5 @@
 engine/ebin/
 website/ebin/
+website/lib/nitrogen/
 *~
 .project
