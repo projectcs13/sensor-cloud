@@ -15,7 +15,8 @@
 %% API functions
 %% ====================================================================
 -export([start/0, connect/2, traverse/1]).
--export([create_user/2, get_user_by_id/1, get_user_by_username/1]).
+-export([create_user/2, get_user_by_id/1, get_user_by_username/1, 
+		authenticate/2]).
 -include_lib("stdlib/include/qlc.hrl").
 -include("include/database.hrl").
 
@@ -80,7 +81,7 @@ get_user_by_id(ID) ->
 	case User = mnesia:activity(transaction, F) of
 		[] -> {error, unknown_user};
 		_ -> User
-end.
+	end.
 
 %% @doc
 %% Function: getUserbyUsername/1
@@ -99,7 +100,30 @@ get_user_by_username(Username) ->
 	case User = mnesia:activity(transaction, F) of
 		[] -> {error, unknown_user};
 		_ -> User
-end.
+	end.
+
+
+%% @doc
+%% Function: authenticate/2
+%% Purpose: Authenticates a user
+%% Args: string(), string()
+%% Returns: ok | {error, authentication_error}
+%%
+%% @end
+-spec authenticate(string(), string()) ->  Record :: #user{}.
+authenticate(Username,Password) ->
+	Pattern = #user{_ = '_',
+					user_name = Username,
+					password = Password},
+	F = fun() -> 
+		mnesia:match_object(Pattern)
+	end,
+	case User = mnesia:activity(transaction, F) of
+		[] -> {error, authentication_error};
+		_ -> ok
+	end.
+
+
 
 %% @doc
 %% Function: traverse/2
