@@ -1,19 +1,18 @@
-%% @author Tholsg�rd Gabriel
+%% @author Tomas Sävström <tosa7943@student.uu.se>
 %%   [www.csproj13.student.it.uu.se]
 %% @version 1.0
 %% @copyright [Copyright information]
 %%
-%% @doc == db_api_tests ==
+%% @doc == resource_directory_api_tests ==
 %% This module contains several tests to test the functionallity
-%% in the module dp_api.
+%% in the module resource_directory_api.
 %%
 %% @end
 
--module(db_api_tests).
+-module(rd_api_tests).
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("stdlib/include/qlc.hrl").
 -include("include/database.hrl").
-
 %% ====================================================================
 %% API functions
 %% ====================================================================
@@ -24,29 +23,6 @@
 %% ====================================================================
 %% Internal functions
 %% ====================================================================
-
-
-%% @doc
-%% Function: start_test/0
-%% Purpose: Test to start a db_api process
-%% Returns: ok | {error, term()}
-%%
-%% Side effects: Starts a db_api process
-%% @end
--spec start_test() -> ok | {error, term()}.
-start_test() ->
-	?assertEqual(ok, db_api:start()).
-
-
-%% @doc
-%% Function: connect_test/0
-%% Purpose: Test to establish a database connection
-%% Returns: ok | {error, term()}
-%%
-%% Side effects: Establish a connection to a 
-%% @end
--spec connect_test() -> ok | {error, term()}.
-connect_test() -> ok.
 
 
 %% @doc
@@ -67,21 +43,21 @@ write_resource_test() ->
     Resource3 = #resource{id = 3,
 						  owner_id = 3,
 						  version = 1.0},
-	% Resource updated with new owner
+% Resource updated with new owner
 	Resource4 = #resource{id = 3,
 						  owner_id = 2},
-	db_api:write_resource(Resource1),
-	db_api:write_resource(Resource2),
-	db_api:write_resource(Resource3),
-	
+	rd_api:write_resource(Resource1),
+	rd_api:write_resource(Resource2),
+	rd_api:write_resource(Resource3),
+
 	{_,Result1} = find_owner(1),
     {_,Result2} = find_owner(2),
     {_,Result3} = find_owner(3),
 	{_,Version1} = find_version(3),
-	db_api:write_resource(Resource4),
-	{_,Version2} = find_version(3),
+	rd_api:write_resource(Resource4),	
+	{_,Version2} = find_version(3),	
     {_,Result4} = find_owner(3),
-	
+
 
     ?assert(Result1 == [1]),
     ?assert(Result2 == [2]),
@@ -95,14 +71,14 @@ write_resource_test() ->
 %% Purpose: Query the database for the owner of resource with given id
 %% Returns: {atomic,list()} | {aborted, Reason}
 %%
-%% Side effects: Query the mnesia database
+%% Side effects: Establish a connection to a
 %% @end
 -spec find_owner(ResourceID::integer()) -> {atomic,list()} | {aborted, atom()}.
 
 find_owner(ResourceID) ->
     F = fun() ->
-		Resource = #resource{id = ResourceID,owner_id = '$1', _ = '_'},
-		mnesia:select(resource, [{Resource, [], ['$1']}])
+			Resource = #resource{id = ResourceID,owner_id = '$1', _ = '_'},
+			mnesia:select(resource, [{Resource, [], ['$1']}])
         end,
     rpc:call(get_local_db_node(),mnesia,transaction,[F]).
 
@@ -132,6 +108,6 @@ find_version(ResourceID) ->
 
 get_local_db_node() ->
 	{ok,Host} = inet:gethostname(),
-    FullHost = string:concat("database@",Host), 
+    FullHost = string:concat("database@",Host),
     HostAtom = list_to_atom(FullHost),
 	HostAtom.
