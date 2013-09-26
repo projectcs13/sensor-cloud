@@ -1,0 +1,73 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html><head>
+  <title>Sign Up Page</title>
+
+  
+  
+  <meta http-equiv="content-type" content="text/html;charset=utf-8">
+
+  
+  <script>
+		//var URL = "http://localhost:8000/user";
+		var URL = "/user"
+
+		function register_user() {
+			if(document.getElementById('username').value == "") {
+				alert("Error: Username cannot be blank!");
+				document.username.focus();
+				return false;
+						}
+			var register_name = document.getElementById('name').value;
+			var register_email = document.getElementById('email').value;
+			var register_username = document.getElementById('username').value;
+			var register_password = document.getElementById('password').value;
+			if(register_name == "") {
+      				alert("Error: Username cannot be blank!");
+      					document.username.focus();
+					return false;
+						}
+			var conn = new XMLHttpRequest();
+			// Function for logging the response in the console of the browser
+			conn.onreadystatechange = function() {
+       				 	console.log(conn.responseText);
+			}
+			var data = JSON.stringify({"name": register_name, "email": register_email, "username": register_username, "password": register_password});
+			alert(data);
+			conn.open("POST", URL, true);
+			conn.setRequestHeader("Content-type","application/json");
+			conn.send(data);
+
+		}
+	</script>
+</head><body>
+&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp; Register a new User:<br>
+
+<form name="form" action="" id="register" onsubmit="register_user();">
+  <table style="width: 428px; height: 307px;" border="0">
+    <tbody>
+      <tr>
+        <td><label for="name">Full Name: </label> </td>
+        <td><input id="name" maxlength="45" name="name" type="text"> </td>
+      </tr>
+      <tr>
+        <td><label for="email">Email Address:</label> </td>
+        <td><input id="email" maxlength="45" name="email" type="email"></td>
+      </tr>
+      <tr>
+        <td><label for="username">User Name:</label> </td>
+        <td><input id="username" maxlength="45" name="username" type="text"> </td>
+      </tr>
+      <tr>
+        <td><label for="password">Password:</label></td>
+        <td><input id="password" maxlength="45" name="password" type="password"></td>
+      </tr>
+      <tr>
+        <td align="right"><input name="Submit" value="Submit" type="submit"></td>
+      </tr>
+    </tbody>
+  </table>
+</form>
+
+</body></html>
