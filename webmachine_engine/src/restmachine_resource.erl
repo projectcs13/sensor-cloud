@@ -58,16 +58,31 @@ delete_resource(ReqData, State) ->
 json_handler(ReqData, State) ->
 	[{Value,_ }] = mochiweb_util:parse_qs(wrq:req_body(ReqData)), 
 	{struct, JsonData} = mochijson2:decode(Value),
+	erlang:display("Proplist: ~p~n", [JsonData]),
 	Stream = json_to_stream(JsonData),
 	Json = stream_to_json(Stream),
+	erlang:display(Value),
 	erlang:display(Json),
-	{true, ReqData, State}.
+	{Json, ReqData, State}.
 
 stream_to_json(Record) ->
-  [RecordName | Values] = tuple_to_list(Record),
-  Keys = restmachine_resource:record_info({keys, RecordName}),
-  lists:zip(Keys, Values).
+  [_ | Values] = tuple_to_list(Record),
+  %Keys = restmachine_resource:record_info(fields, RecordName).
+  Keys = [<<"id">>, <<"type">>, <<"latitude">>, <<"longitude">>, 
+		  <<"description">>, <<"public_access">>, <<"public_search">>,
+		  <<"frozen">>, <<"history_size">>, <<"last_updated">>,
+		  <<"secret_key">>, <<"owner_id">>, <<"resource_id">>, <<"version">>],
+  P_list = merge_lists(Keys, Values),
+  erlang:display(P_list),
+  mochijson2:encode({struct, P_list}).
 
+%% PRE-COND: Assumes that both lists are of equal size.
+merge_lists([], []) -> [];
+merge_lists([H|T], [A|B]) ->
+	case A of
+		undefined -> merge_lists(T,B);
+		_ -> [{H,A}]++merge_lists(T,B)
+	end.
 
 json_to_stream(JsonData) ->
 	#streams{id = proplists:get_value(<<"id">>, JsonData),
@@ -116,3 +131,4 @@ pair([A,B|T]) ->
 
 %% To-do : HTTP Caching support w etags / header expiration.
 	
+
