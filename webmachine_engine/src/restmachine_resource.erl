@@ -11,10 +11,11 @@
 	 process_post/2,
 	 delete_resource/2,
 	 json_handler/2,
-	 json_get/2]).
+	 json_get/2,
+	 put_resource/2]).
 
 -include_lib("webmachine/include/webmachine.hrl").
--include("stream_resource.hrl").
+-include("include/database.hrl").
 
 init([]) -> 
 	{ok, undefined}.
@@ -37,40 +38,58 @@ content_types_provided(ReqData, State) ->
 
 %% Redirecting PUT requests to appropriate media type.
 content_types_accepted(ReqData, State) ->
-	{[{"application/json", json_handler}], ReqData, State}.
+	{[{"application/json", put_resource}], ReqData, State}.
 
 %% POST
 process_post(ReqData, State) ->
 	erlang:display("Posting request"),
-	json_handler(ReqData, State),
+	{Stream, _, _} = json_handler(ReqData, State),
+	db_api:add_stream(Stream),
 	{true, ReqData, State}.
 
 %% DELETE
 delete_resource(ReqData, State) ->
+	Id = proplists:get_value('?', wrq:path_info(ReqData)),
 	erlang:display("delete request"),
+	db_api:delete_stream_with_id(list_to_integer(Id)),
 	{true, ReqData, State}.
 
 %% PUT
-%% 1. Parse the json object
-%% 2. Try to add it to the database
-%% 3. ???
-%% 4. Profit
+
+put_resource(ReqData, State) ->
+	Id = proplists:get_value('?', wrq:path_info(ReqData)),
+	erlang:display("put request"),
+	{Stream, _,_} = json_handler(ReqData, State),
+	db_api:update_stream(list_to_integer(Id), Stream),
+	{true, ReqData, State}.
+
 json_handler(ReqData, State) ->
 	[{Value,_ }] = mochiweb_util:parse_qs(wrq:req_body(ReqData)), 
 	{struct, JsonData} = mochijson2:decode(Value),
 	Stream = json_to_stream(JsonData),
-	Json = stream_to_json(Stream),
-	erlang:display(Json),
-	{true, ReqData, State}.
+	{Stream, ReqData, State}.
 
 stream_to_json(Record) ->
-  [RecordName | Values] = tuple_to_list(Record),
-  Keys = restmachine_resource:record_info({keys, RecordName}),
-  lists:zip(Keys, Values).
+  [_ | Values] = tuple_to_list(Record),
+  %Keys = restmachine_resource:record_info(fields, RecordName).
+  Keys = [<<"id">>, <<"type">>, <<"latitude">>, <<"longitude">>, 
+		  <<"description">>, <<"public_access">>, <<"public_search">>,
+		  <<"frozen">>, <<"history_size">>, <<"last_updated">>,
+		  <<"secret_key">>, <<"owner_id">>, <<"resource_id">>, <<"version">>],
+  P_list = merge_lists(Keys, Values),
+  erlang:display(P_list),
+  mochijson2:encode({struct, P_list}).
 
+%% PRE-COND: Assumes that both lists are of equal size.
+merge_lists([], []) -> [];
+merge_lists([H|T], [A|B]) ->
+	case A of
+		undefined -> merge_lists(T,B);
+		_ -> [{H,A}]++merge_lists(T,B)
+	end.
 
 json_to_stream(JsonData) ->
-	#streams{id = proplists:get_value(<<"id">>, JsonData),
+	#stream{id = proplists:get_value(<<"id">>, JsonData),
 		type = proplists:get_value(<<"type">>, JsonData), 
 		latitude = proplists:get_value(<<"latitude">>, JsonData),
 		longitude = proplists:get_value(<<"longitude">>, JsonData), 
@@ -95,10 +114,13 @@ json_get(ReqData, State) ->
 	case proplists:get_value('?', wrq:path_info(ReqData)) of
 		% Get all streams
 		undefined -> 
-			{ "{'label':'Hello, World!'}", ReqData, State};
+			List_of_streams = db_api:get_all_streams(),
+			Streams = lists:map(fun(X) -> stream_to_json(X) end, List_of_streams),
+			{ Streams, ReqData, State};
 		% Get specific stream
 		X -> 
-			{ "{'id':"++X++" 'label':'Hello, World!'}", ReqData, State}
+			Stream = db_api:get_stream_by_id(list_to_integer(X)),
+			{ stream_to_json(Stream), ReqData, State}
 	end.
 
 %%parse_path(List) -> [{Key::String(), Value::String()}] | [{Error, Err}]
@@ -116,3 +138,4 @@ pair([A,B|T]) ->
 
 %% To-do : HTTP Caching support w etags / header expiration.
 	
+
