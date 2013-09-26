@@ -12,8 +12,8 @@
 -compile(export_all).
 -include_lib("stdlib/include/qlc.hrl").
 -include("include/user.hrl").
--include("include/unique_id.hrl").
--include("include/record.hrl").
+-include("include/unique_ids.hrl").
+-include("include/resource.hrl").
 -include("include/stream.hrl").
 
 %% @doc

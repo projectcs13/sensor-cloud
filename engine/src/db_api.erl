@@ -19,7 +19,7 @@
 		authenticate/2, change_password/3, exists_username/1]).
 -include_lib("stdlib/include/qlc.hrl").
 -include("include/user.hrl").
--include("include/unique_id.hrl").
+-include("include/unique_ids.hrl").
 
 
 %% ====================================================================
