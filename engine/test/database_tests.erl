@@ -11,7 +11,9 @@
 -module(database_tests).
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("stdlib/include/qlc.hrl").
--include("include/database.hrl").
+-include("include/user.hrl").
+-include("include/resource.hrl").
+-include("include/stream.hrl").
 
 %% @doc
 %% Function: db_test/0
