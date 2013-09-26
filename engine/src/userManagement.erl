@@ -35,7 +35,7 @@ add_user(username,password) ->
 %% Function: remove_user/1
 %% Purpose: Removes the current user from the database
 %% Args: username
-%% Returns: (???Success or error message)
+%% Returns: Success or database error message
 %%
 %% @end
 remove_user(username) ->
