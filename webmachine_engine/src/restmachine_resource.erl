@@ -11,7 +11,8 @@
 	 process_post/2,
 	 delete_resource/2,
 	 json_handler/2,
-	 json_get/2]).
+	 json_get/2,
+	 put_resource/2]).
 
 -include_lib("webmachine/include/webmachine.hrl").
 -include("include/database.hrl").
@@ -37,27 +38,36 @@ content_types_provided(ReqData, State) ->
 
 %% Redirecting PUT requests to appropriate media type.
 content_types_accepted(ReqData, State) ->
-	{[{"application/json", json_handler}], ReqData, State}.
+	{[{"application/json", put_resource}], ReqData, State}.
 
 %% POST
 process_post(ReqData, State) ->
 	erlang:display("Posting request"),
-	json_handler(ReqData, State),
+	{Stream, _, _} = json_handler(ReqData, State),
+	db_api:add_stream(Stream),
 	{true, ReqData, State}.
 
 %% DELETE
 delete_resource(ReqData, State) ->
+	Id = proplists:get_value('?', wrq:path_info(ReqData)),
 	erlang:display("delete request"),
-	
+	db_api:delete_stream_with_id(list_to_integer(Id)),
 	{true, ReqData, State}.
 
 %% PUT
+
+put_resource(ReqData, State) ->
+	Id = proplists:get_value('?', wrq:path_info(ReqData)),
+	erlang:display("put request"),
+	{Stream, _,_} = json_handler(ReqData, State),
+	db_api:update_stream(list_to_integer(Id), Stream),
+	{true, ReqData, State}.
+
 json_handler(ReqData, State) ->
 	[{Value,_ }] = mochiweb_util:parse_qs(wrq:req_body(ReqData)), 
 	{struct, JsonData} = mochijson2:decode(Value),
 	Stream = json_to_stream(JsonData),
-	db_api:add_stream(Stream),
-	{true, ReqData, State}.
+	{Stream, ReqData, State}.
 
 stream_to_json(Record) ->
   [_ | Values] = tuple_to_list(Record),

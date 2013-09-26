@@ -15,7 +15,7 @@
 %% API functions
 %% ====================================================================
 -export([start/0, stop/0, add_stream/1, get_stream_by_id/1, get_all_streams/0,
-		 update_stream/1, delete_stream_with_id/1, print_stream/1,
+		 update_stream/2, delete_stream_with_id/1, print_stream/1,
 		 clear_stream_table/0]).
 
 -include_lib("database.hrl").
@@ -157,9 +157,9 @@ get_stream_by_id(Id) when is_integer(Id) ->
 %%               as the id in the provided stream, in the database that
 %%               are not undefined in the provided stream.
 %% @end
--spec update_stream(record) -> {aborted, term()} | {error, term()} | ok.
-update_stream(Stream) when is_record(Stream, stream) ->
-	case get_stream_by_id(Stream#stream.id) of
+-spec update_stream(integer(), record()) -> {aborted, term()} | {error, term()} | ok.
+update_stream(Id, Stream) when is_record(Stream, stream) ->
+	case get_stream_by_id(Id) of
 		{aborted, Reason} -> {aborted, Reason};
 		{error, Reason} -> {error, Reason};
 		Record ->
