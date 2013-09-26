@@ -1,4 +1,4 @@
-% Record defineing the stream table in the database
+% Record defining the stream table in the database
 
 %% @type user() = #user{id   = integer(),
 %%						email = string(),
