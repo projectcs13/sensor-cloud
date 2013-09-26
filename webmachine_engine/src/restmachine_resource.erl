@@ -17,8 +17,21 @@
 -include_lib("webmachine/include/webmachine.hrl").
 -include("include/database.hrl").
 
+%% @doc
+%% Function: init/1
+%% Purpose: init function used to fetch path information from webmachine dispatcher.
+%% Returns: {ok, undefined}
+%% @end
+-spec init([options()]) -> {ok, undefined}.
+
 init([]) -> 
 	{ok, undefined}.
+
+%% @doc
+%% Function: allowed_methods/2
+%% Purpose: init function used to fetch path information from webmachine dispatcher.
+%% Returns: {ok, undefined}
+%% @end
 
 allowed_methods(ReqData, State) ->
 		case parse_path(wrq:path(ReqData)) of
@@ -60,8 +73,11 @@ put_resource(ReqData, State) ->
 	Id = proplists:get_value('?', wrq:path_info(ReqData)),
 	erlang:display("put request"),
 	{Stream, _,_} = json_handler(ReqData, State),
-	db_api:update_stream(list_to_integer(Id), Stream),
-	{true, ReqData, State}.
+	case db_api:update_stream(list_to_integer(Id), Stream) of
+		{aborted, Reason} -> {{error, Reason}, ReqData, State};
+		{error, Reason} -> {{error, Reason}, ReqData, State};
+		_ -> {true, ReqData, State}
+	end.
 
 json_handler(ReqData, State) ->
 	[{Value,_ }] = mochiweb_util:parse_qs(wrq:req_body(ReqData)), 
