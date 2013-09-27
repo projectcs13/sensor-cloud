@@ -1,25 +1,13 @@
-all: compile
-
-#install:
-#	@scripts/install.sh
-
 compile:
 	./rebar compile
-
-clean: clean_emacs_vsn_files
+clean:
 	./rebar clean
-
-clean_emacs_vsn_files:
-	rm -rf *~
-	rm -rf doc/*~
-	rm -rf include/*~
-	rm -rf priv/*~
-	rm -rf scripts/*~
-	rm -rf src/*~
-	rm -rf test/*~
-
 run:
 	erl -pa ebin
+deps:
+	@./rebar get-deps
+all: deps
+	@./rebar compile
 
-setup_database:
-	erl -pz 'ebin/' -sname database -mnesia dir '"/home/database/Mnesia.Database"' -s database init
+distclean: clean
+	@./rebar delete-deps
