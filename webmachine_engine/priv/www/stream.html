@@ -64,6 +64,7 @@
 			var data = JSON.stringify({"description": stream_name});
 			var conn = new XMLHttpRequest();
 			conn.open("PUT", URL + "/" + stream_id, false);
+			conn.setRequestHeader("Content-type","application/json");
 			conn.send(data)
 		}
 	</script>
