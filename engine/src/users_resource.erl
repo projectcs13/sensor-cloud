@@ -1,6 +1,9 @@
-%% @author author <author@example.com>
-%% @copyright YYYY author.
-%% @doc Example webmachine_resource.
+%% @author Georgios Koutsoumpakis
+%%   [www.csproj13.student.it.uu.se]
+%% @version 1.0
+%% @copyright [Copyright information]
+
+%% @doc Webmachine_resource for /users
 
 -module(users_resource).
 -export([init/1, 

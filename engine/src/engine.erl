@@ -1,5 +1,7 @@
-%% @author author <author@example.com>
-%% @copyright YYYY author.
+%% @author Georgios Koutsoumpakis
+%%   [www.csproj13.student.it.uu.se]
+%% @version 1.0
+%% @copyright [Copyright information]
 
 %% @doc engine startup code
 
