@@ -44,3 +44,5 @@ deps:
 distclean: clean
 	@./rebar delete-deps
 
+docs: compile_src
+	erl -pa ebin -s start doc
