@@ -1,4 +1,4 @@
-all: compile
+all: deps compile
 
 compile: compile_libs compile_src
 
@@ -31,6 +31,18 @@ clean_emacs_vsn_files:
 
 run: compile
 	erl -pa ebin -sname database -setcookie database -mnesia dir '"/home/database/Mnesia.Database"' -s database init
+
+run_restful:
+	./start.sh
+
+docs: compile_src
+	erl -pa ebin -s start doc
+
+deps:
+	@./rebar get-deps
+
+distclean: clean
+	@./rebar delete-deps
 
 docs: compile_src
 	erl -pa ebin -s start doc

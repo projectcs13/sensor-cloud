@@ -1,5 +1,12 @@
 engine/ebin/
 website/ebin/
 website/lib/nitrogen/
+engine/lib/ibrowse/
+engine/lib/meck/
+engine/lib/mochiweb/
+engine/lib/webmachine/
+erl_crash.dump
+engine/erl_crash.dump
+website/erl_crash.dump
 *~
 .project

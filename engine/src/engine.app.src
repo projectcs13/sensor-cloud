@@ -1,11 +1,16 @@
 {application, engine,
  [
-  {description, ""},
+  {description, "engine"},
   {vsn, "1"},
+  {modules, []},
   {registered, []},
   {applications, [
                   kernel,
-                  stdlib
+                  stdlib,
+                  inets,
+                  crypto,
+                  mochiweb,
+                  webmachine
                  ]},
   {mod, { engine_app, []}},
   {env, []}
