@@ -36,7 +36,7 @@
        				 if(conn.readyState == 4)
        				 	console.log(conn.responseText);
 			}
-			var data = JSON.stringify({"name": stream_name});
+			var data = JSON.stringify({"description": stream_name});
 			conn.open("POST", URL, false);
 			conn.setRequestHeader("Content-type","application/json");
 			conn.send(data);
@@ -52,18 +52,46 @@
 			conn.open("GET", URL, false);
 			conn.send(null);
 		}
+		function delete_stream() {
+			var stream_id = document.getElementById('stream_id').value;
+			var conn = new XMLHttpRequest();
+			conn.open("DELETE", URL + "/" + stream_id, false);
+			conn.send(null);
+		}
+		function update_stream() {
+			var stream_id = document.getElementById('update_stream_id').value;
+			var stream_name = document.getElementById('update_stream_name').value;
+			var data = JSON.stringify({"description": stream_name});
+			var conn = new XMLHttpRequest();
+			conn.open("PUT", URL + "/" + stream_id, false);
+			conn.setRequestHeader("Content-type","application/json");
+			conn.send(data)
+		}
 	</script>
 </head>
 <body>
 	Create a new stream:
-	<form action="" onsubmit="mypost();">
+	<form action="" onsubmit="post_stream();">
 		Stream name:<input type="text" id="name">
 		<input type=submit value=Try it...>
 	</form>
 	<hr>
 	Fetch streams:
-	<form action="" onsubmit="myget();">
+	<form action="" onsubmit="get_stream();">
 		<input type=submit value="Fetch all streams!">
+	</form>
+	<hr>
+	Delete stream:
+	<form action="" onsubmit="delete_stream();">
+		<input type=text id="stream_id">
+		<input type=submit value="delete stream">
+	</form>
+	<hr>
+	Update stream:
+	<form action="" onsubmit="update_stream()">
+		Stream id: <input type=text id="update_stream_id"> 
+		Stream description: <input type=text id="update_stream_name">
+		<input type=submit value="Update stream">
 	</form>
 </body>
 </html>
