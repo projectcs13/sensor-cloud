@@ -1,24 +1,28 @@
-all: deps compile
+ERL ?= erl
+APP := website
 
-compile: compile_libs compile_src
+all: compile
 
-compile_src:
+compile: get_libs compile_src
+
+compile_src: get_libs
 	./rebar compile
 
-compile_libs:
+get_libs:
+	@./rebar get-deps
 
 
-
-clean: clean_emacs_vsn_files
+clean: clean_libs clean_emacs_vsn_files
 	./rebar clean
 	rm -f erl_crash.dump
 	rm -rf ebin/
 
 clean_docs:
-	rm -f doc/*.html
-	rm -f doc/edoc-info
-	rm -f doc/erlang.png
-	rm -f doc/stylesheet.css
+	find doc/ -type f -not -name 'overview.edoc' | xargs rm
+
+clean_libs:
+	@./rebar delete-deps
+	rm -rf lib/
 
 clean_emacs_vsn_files:
 	rm -rf *~
@@ -30,19 +34,11 @@ clean_emacs_vsn_files:
 	rm -rf test/*~
 
 run: compile
-	erl -pa ebin -sname database -setcookie database -mnesia dir '"/home/database/Mnesia.Database"' -s database init
-
-run_restful:
 	./start.sh
 
 docs: compile_src
-	erl -pa ebin -s start doc
+	@$(ERL) -noshell -run edoc_run application '$(APP)' '"."' '[{packages, false},{private, true}]'
 
-deps:
-	@./rebar get-deps
 
-distclean: clean
-	@./rebar delete-deps
 
-docs: compile_src
-	erl -pa ebin -s start doc
+
