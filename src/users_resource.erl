@@ -10,13 +10,14 @@
 	 allowed_methods/2,
 	 content_types_accepted/2,
 	 content_types_provided/2,
-	 process_post/2,
+%	 process_post/2,
 	 delete_resource/2,
-	put_resource/2,
-	 json_handler/2,
+%	put_resource/2,
+	 from_json/2,
 	 get_resource/2,
 	 post_is_create/2,
- 	 allow_missing_post/2]).
+ 	 allow_missing_post/2,
+	 create_path/2]).
 
 -include_lib("webmachine/include/webmachine.hrl").
 -include("include/user.hrl").
@@ -30,7 +31,28 @@
 init([]) -> {ok, undefined}.
 
 
-post_is_create(ReqData, State) -> {false, ReqData, State}.
+%% @doc
+%% Function: post_is_create/2
+%% Purpose: Webmachine on a post request should run create_path first. This
+%% means that a POST is handled as a PUT. Ex: POST to /users is a
+%% PUT to /users/5
+%% Returns: {true, undefined}
+%% @end
+post_is_create(ReqData, State) -> {true, ReqData, State}.
+
+
+%% @doc
+%% Function: create_path/2
+%% Purpose: Creates an ID for the new user and then inserts an empty one
+%% in the database
+%% Returns: {Path, _, _ }
+%% @end
+create_path(RD, Ctx) ->
+	erlang:display("create path"),
+    Path = "/users/" ++ integer_to_list(Id=db_api:generate_id(user)),
+	erlang:display(Path),
+	db_api:create_user(#user{id= Id}),
+    {Path, RD, Ctx}.
 
 
 %% @doc
@@ -38,7 +60,6 @@ post_is_create(ReqData, State) -> {false, ReqData, State}.
 %% Purpose: If the resource accepts POST requests to nonexistent resources, then this should return true.
 %% Returns: {true, ReqData, State}
 %% @end
-
 allow_missing_post(ReqData, State) ->
 	{true, ReqData, State}.
 
@@ -78,41 +99,8 @@ content_types_provided(ReqData, State) ->
 %% Returns: {[{Mediatype, Handler}], ReqData, State}
 %% @end
 content_types_accepted(ReqData, State) ->
-	{[{"application/json", json_handler}], ReqData, State}.
+	{[{"application/json", from_json}], ReqData, State}.
 
-
-%% @doc
-%% Function: process_post/2
-%% Purpose: Adds a stream to the database on a 'POST' method.
-%% Returns: {true, ReqData, State} | {{error, Reason}, ReqData, State}
-%% @end
-process_post(ReqData, State) ->
-	erlang:display("Posting request"),
-	{User, _, _} = json_handler(ReqData, State),
-	erlang:display(User),
-	case db_api:create_user(User) of
-		{aborted, Reason} -> {{error, Reason}, ReqData, State};
-		{error, Reason} -> {{error, Reason}, ReqData, State};
-		ok -> {true, ReqData, State}
-	end.
-
-
-%% @doc
-%% Function: put_resource/2
-%% Purpose: Returns the JSON representation of a json-object or multiple json-objects. 
-%%  		Fault tolerance is handled by resources_exists/2.
-%% Returns: {true, ReqData, State} | {false, ReqData, State}
-%% @end
-put_resource(ReqData, State) ->
-	erlang:display("put request"),
-	Id = proplists:get_value('?', wrq:path_info(ReqData)),
-	{User, _,_} = json_handler(ReqData, State),
-	case db_api:get_user_by_id(list_to_integer(Id)) of
-		{aborted, Reason} -> {{error, Reason}, ReqData, State};
-		{error, Reason} -> {{error, Reason}, ReqData, State};
-		_ -> db_api:update_user(list_to_integer(Id), User),
-			 {true, ReqData, State}
-	end.
 
 
 %% DELETE
@@ -126,14 +114,28 @@ delete_resource(ReqData, State) ->
 %% Purpose: decodes a JSON object and returns a record representation of this.
 %% Returns: {Stream :: record, ReqData, State}
 %% @end
-json_handler(ReqData, State) ->
+from_json(ReqData, State) ->
+	Id = id_from_path(ReqData),
+	case get_user(ReqData) of
+		{error, Reason} -> {{error, Reason}, ReqData, State};
+		{ok, User} ->
+			erlang:display(User),
+			case db_api:get_user_by_id(list_to_integer(Id)) of
+				{aborted, Reason} -> {{error, Reason}, ReqData, State};
+				{error, Reason} -> {{error, Reason}, ReqData, State};
+				_ -> db_api:update_user(list_to_integer(Id), User),
+					{true, ReqData, State}
+			end
+	end.
+
+get_user(ReqData) ->
 	[{Value,_ }] = mochiweb_util:parse_qs(wrq:req_body(ReqData)), 
 	case Value of
-		[] -> {{error, "empty body"}, ReqData, State};
+		[] -> {error, "empty body"};
 		_ ->
 			{struct, JsonData} = mochijson2:decode(Value),
 			User = json_to_user(JsonData),
-			{User, ReqData, State}
+			{ok, User}
 	end.
 
 
@@ -145,7 +147,7 @@ json_handler(ReqData, State) ->
 %% @end
 
 get_resource(ReqData, State) ->
-	case proplists:get_value('?', wrq:path_info(ReqData)) of
+	case proplists:get_value('id', wrq:path_info(ReqData)) of
 		undefined -> 
 			% Get all users
 			Users = lists:map(fun(X) -> user_to_json(X) end, db_api:get_all_users()),
@@ -230,6 +232,20 @@ merge_lists([H|T], [A|B]) ->
 		undefined -> merge_lists(T,B);
 		_ -> [{H,A}]++merge_lists(T,B)
 	end.
+
+
+%% @doc
+%% Function: id_from_path/2
+%% Purpose: Retrieves the if from the path.
+%% Returns: Id
+%% @end
+id_from_path(RD) ->
+    case wrq:path_info(id, RD) of
+        undefined->
+            ["users", Id] = string:tokens(wrq:disp_path(RD), "/"),
+            Id;
+        Id -> Id
+    end.
 
 
 %% To-do : HTTP Caching support w etags / header expiration.

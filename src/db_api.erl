@@ -25,7 +25,7 @@
 		 update_stream/2, delete_stream_with_id/1, print_stream/1,
 		 clear_stream_table/0]).
 
--export([connect/2,write_resource/1, traverse/1]).
+-export([connect/2,write_resource/1, traverse/1, generate_id/1]).
 -export([create_user/2, create_user/1, get_user_by_id/1, get_user_by_username/1, 
 		authenticate/2, change_password/3, exists_username/1, get_all_users/0,
 		update_user/2]).
@@ -680,5 +680,12 @@ print_stream(#stream{id=Id, type=Type, latitude=Lat, longitude=Long,
 clear_stream_table() ->
 	mnesia:wait_for_tables([stream], 5000),
 	mnesia:clear_table(stream).
+
+
+-spec generate_id(atom)->integer().
+generate_id(Table) ->
+	Id = mnesia:dirty_update_counter(unique_ids, Table, 1).
+
+
 
 
