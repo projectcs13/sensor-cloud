@@ -12,8 +12,11 @@
 	 content_types_provided/2,
 	 process_post/2,
 	 delete_resource/2,
+	put_resource/2,
 	 json_handler/2,
-	 json_get/2]).
+	 get_resource/2,
+	 post_is_create/2,
+ 	 allow_missing_post/2]).
 
 -include_lib("webmachine/include/webmachine.hrl").
 -include("include/user.hrl").
@@ -25,6 +28,19 @@
 %% @end
 -spec init([]) -> {ok, undefined}.
 init([]) -> {ok, undefined}.
+
+
+post_is_create(ReqData, State) -> {false, ReqData, State}.
+
+
+%% @doc
+%% Function: allow_missing_post/2
+%% Purpose: If the resource accepts POST requests to nonexistent resources, then this should return true.
+%% Returns: {true, ReqData, State}
+%% @end
+
+allow_missing_post(ReqData, State) ->
+	{true, ReqData, State}.
 
 
 %% @doc
@@ -52,7 +68,7 @@ allowed_methods(ReqData, State) ->
 %% Returns: {[{Mediatype, Handler}], ReqData, State}
 %% @end
 content_types_provided(ReqData, State) ->
-	{[{"application/json", json_get}], ReqData, State}.
+	{[{"application/json", get_resource}], ReqData, State}.
 
 
 %% @doc
@@ -80,6 +96,25 @@ process_post(ReqData, State) ->
 		ok -> {true, ReqData, State}
 	end.
 
+
+%% @doc
+%% Function: put_resource/2
+%% Purpose: Returns the JSON representation of a json-object or multiple json-objects. 
+%%  		Fault tolerance is handled by resources_exists/2.
+%% Returns: {true, ReqData, State} | {false, ReqData, State}
+%% @end
+put_resource(ReqData, State) ->
+	erlang:display("put request"),
+	Id = proplists:get_value('?', wrq:path_info(ReqData)),
+	{User, _,_} = json_handler(ReqData, State),
+	case db_api:get_user_by_id(list_to_integer(Id)) of
+		{aborted, Reason} -> {{error, Reason}, ReqData, State};
+		{error, Reason} -> {{error, Reason}, ReqData, State};
+		_ -> db_api:update_user(list_to_integer(Id), User),
+			 {true, ReqData, State}
+	end.
+
+
 %% DELETE
 delete_resource(ReqData, State) ->
 	erlang:display("delete request"),
@@ -103,13 +138,13 @@ json_handler(ReqData, State) ->
 
 
 %% @doc
-%% Function: json_get/2
+%% Function: get_resource/2
 %% Purpose: Returns the JSON representation of a json-object or multiple json-objects. 
 %%  		Fault tolerance is handled by resources_exists/2.
 %% Returns: {true, ReqData, State} | {false, ReqData, State}
 %% @end
 
-json_get(ReqData, State) ->
+get_resource(ReqData, State) ->
 	case proplists:get_value('?', wrq:path_info(ReqData)) of
 		undefined -> 
 			% Get all users
