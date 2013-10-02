@@ -1,0 +1,17 @@
+{application, engine,
+ [
+  {description, "engine"},
+  {vsn, "1"},
+  {modules, []},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib,
+                  inets,
+                  crypto,
+                  mochiweb,
+                  webmachine
+                 ]},
+  {mod, { engine_app, []}},
+  {env, []}
+ ]}.

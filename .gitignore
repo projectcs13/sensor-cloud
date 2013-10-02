@@ -1,0 +1,5 @@
+ebin/
+lib/
+erl_crash.dump
+*~
+.project
