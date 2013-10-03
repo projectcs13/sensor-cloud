@@ -110,9 +110,10 @@ delete_resource(ReqData, State) ->
 
 
 %% @doc
-%% Function: json_handler/2
+%% Function: from_json/2
 %% Purpose: decodes a JSON object and returns a record representation of this.
-%% Returns: {Stream :: record, ReqData, State}
+%% It is run automatically for POST and PUT requests
+%% Returns: {true, ReqData, State} || {{error, Reason}, ReqData, State}
 %% @end
 from_json(ReqData, State) ->
 	Id = id_from_path(ReqData),
@@ -128,6 +129,12 @@ from_json(ReqData, State) ->
 			end
 	end.
 
+
+%% @doc
+%% Function: get_user/2
+%% Purpose: Creates a User record in the request
+%% Returns: {ok, User} || {error, "empty body"}
+%% @end
 get_user(ReqData) ->
 	[{Value,_ }] = mochiweb_util:parse_qs(wrq:req_body(ReqData)), 
 	case Value of
