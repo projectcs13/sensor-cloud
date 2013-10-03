@@ -28,7 +28,7 @@
 -export([connect/2,write_resource/1, traverse/1, generate_id/1]).
 -export([create_user/2, create_user/1, get_user_by_id/1, get_user_by_username/1, 
 		authenticate/2, change_password/3, exists_username/1, get_all_users/0,
-		update_user/2]).
+		update_user/2,delete_user_with_id/1]).
 
 -define(MNESIA_DIR, "/home/kristian/mnesia/").
 -define(NODES, [node()]).
@@ -641,8 +641,32 @@ delete_stream_with_id(Id) when is_integer(Id) ->
 			end,
 	mnesia:wait_for_tables([stream], 5000),
 	mnesia:activity(transaction, Trans).
-										 
+				
 
+%% @doc
+%% Function: delete_user_with_id/1
+%% Purpose: Delete a user from the database.
+%% Returns: ok | {error, Reason} | {abort, Reason}
+%%
+%% Side effect: Deletes a row from the database in the table 'user'
+%%              that have id equal to the provided id.
+%% @end
+-spec delete_user_with_id(integer()) -> 
+		  ok | {error, term()} | {aborted, term()}.
+delete_user_with_id(Id) when is_integer(Id) ->
+	Trans = fun() ->
+					case mnesia:match_object(#user{id=Id, _='_'}) of
+						{abort, Reason} -> {abort, Reason};
+						[] -> {error, "unknown_user"};
+						[S|_] -> 
+							case mnesia:delete({user, Id}) of
+								{abort, Reason} -> {abort, Reason};
+								ok -> ok
+							end
+					end
+			end,
+	mnesia:wait_for_tables([stream], 5000),
+	mnesia:activity(transaction, Trans).
 
 
 %% @doc

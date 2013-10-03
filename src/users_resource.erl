@@ -101,8 +101,13 @@ content_types_accepted(ReqData, State) ->
 
 %% DELETE
 delete_resource(ReqData, State) ->
-	erlang:display("delete request"),
-	{true, ReqData, State}.
+	Id = list_to_integer(id_from_path(ReqData)),
+	erlang:display(Id),
+	case db_api:delete_user_with_id(Id) of
+		ok -> {true, ReqData, State};
+		{error,_} -> {{halt, 404}, ReqData, State};
+		{abort,_} -> {{halt, 404}, ReqData, State}
+	end.
 
 
 %% @doc
@@ -114,13 +119,12 @@ delete_resource(ReqData, State) ->
 from_json(ReqData, State) ->
 	Id = id_from_path(ReqData),
 	case get_user_from_request(ReqData) of
-		{error, Reason} -> {{error, Reason}, ReqData, State};
+		{error, Reason} -> {{halt, 400}, ReqData, State};
 		{ok, User} ->
-			erlang:display(User),
 			case db_api:get_user_by_id(list_to_integer(Id)) of
 				{aborted, Reason} -> {{error, Reason}, ReqData, State};
 				{error, Reason} -> {{error, Reason}, ReqData, State};
-				_ -> db_api:update_user(list_to_integer(Id), User),
+				_ -> db_api:update_user(list_to_integer(Id), User),					 
 					{true, ReqData, State}
 			end
 	end.
@@ -134,7 +138,9 @@ from_json(ReqData, State) ->
 get_user_from_request(ReqData) ->
 	[{Value,_ }] = mochiweb_util:parse_qs(wrq:req_body(ReqData)), 
 	case Value of
-		[] -> {error, "empty body"};
+		[] -> 
+	erlang:display("empty"),
+			{error, "empty body"};
 		_ ->
 			{struct, JsonData} = mochijson2:decode(Value),
 			User = json_to_user(JsonData),
