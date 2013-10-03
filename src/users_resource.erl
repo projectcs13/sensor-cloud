@@ -7,17 +7,15 @@
 
 -module(users_resource).
 -export([init/1, 
-	 allowed_methods/2,
-	 content_types_accepted/2,
-	 content_types_provided/2,
-%	 process_post/2,
-	 delete_resource/2,
-%	put_resource/2,
-	 from_json/2,
-	 get_resource/2,
-	 post_is_create/2,
- 	 allow_missing_post/2,
-	 create_path/2]).
+		 allowed_methods/2,
+		 content_types_accepted/2,
+		 content_types_provided/2,
+		 delete_resource/2,
+		 from_json/2,
+		 get_resource/2,
+		 post_is_create/2,
+		 allow_missing_post/2,
+		 create_path/2]).
 
 -include_lib("webmachine/include/webmachine.hrl").
 -include("include/user.hrl").
@@ -48,9 +46,7 @@ post_is_create(ReqData, State) -> {true, ReqData, State}.
 %% Returns: {Path, _, _ }
 %% @end
 create_path(RD, Ctx) ->
-	erlang:display("create path"),
     Path = "/users/" ++ integer_to_list(Id=db_api:generate_id(user)),
-	erlang:display(Path),
 	db_api:create_user(#user{id= Id}),
     {Path, RD, Ctx}.
 
@@ -117,7 +113,7 @@ delete_resource(ReqData, State) ->
 %% @end
 from_json(ReqData, State) ->
 	Id = id_from_path(ReqData),
-	case get_user(ReqData) of
+	case get_user_from_request(ReqData) of
 		{error, Reason} -> {{error, Reason}, ReqData, State};
 		{ok, User} ->
 			erlang:display(User),
@@ -131,11 +127,11 @@ from_json(ReqData, State) ->
 
 
 %% @doc
-%% Function: get_user/2
+%% Function: get_user_from_request/2
 %% Purpose: Creates a User record in the request
 %% Returns: {ok, User} || {error, "empty body"}
 %% @end
-get_user(ReqData) ->
+get_user_from_request(ReqData) ->
 	[{Value,_ }] = mochiweb_util:parse_qs(wrq:req_body(ReqData)), 
 	case Value of
 		[] -> {error, "empty body"};
@@ -162,7 +158,7 @@ get_resource(ReqData, State) ->
 		X -> 
 			% Get specific user
 			case User = db_api:get_user_by_id(list_to_integer(X)) of
-				{error, "unknown_user"} -> {"unknown_user", ReqData, State};
+				{error, "unknown_user"} -> {{halt, 404}, ReqData, State};
 		 		_ -> {user_to_json(User), ReqData, State}
 			end
 	end.
