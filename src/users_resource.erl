@@ -102,7 +102,6 @@ content_types_accepted(ReqData, State) ->
 %% DELETE
 delete_resource(ReqData, State) ->
 	Id = list_to_integer(id_from_path(ReqData)),
-	erlang:display(Id),
 	case db_api:delete_user_with_id(Id) of
 		ok -> {true, ReqData, State};
 		{error,_} -> {{halt, 404}, ReqData, State};
@@ -119,7 +118,7 @@ delete_resource(ReqData, State) ->
 from_json(ReqData, State) ->
 	Id = id_from_path(ReqData),
 	case get_user_from_request(ReqData) of
-		{error, Reason} -> {{halt, 400}, ReqData, State};
+		{error, _} -> {{halt, 400}, ReqData, State};
 		{ok, User} ->
 			case db_api:get_user_by_id(list_to_integer(Id)) of
 				{aborted, Reason} -> {{error, Reason}, ReqData, State};
@@ -175,7 +174,7 @@ get_resource(ReqData, State) ->
 %% Purpose: Given a proplist, the return value will be a 'user' record with the values taken from the proplist.
 %% Returns: user::record()
 %% @end
-
+-spec json_to_user(string()) -> Record :: #user{}.
 json_to_user(JsonData) ->
 	#user{id = proplists:get_value(<<"id">>, JsonData),
 		email = proplists:get_value(<<"email">>, JsonData), 
@@ -198,6 +197,7 @@ json_to_user(JsonData) ->
 %% Returns: [{"directory_name", "id_value"}] | [{Error, Err}] | []
 %% @end
 
+-spec parse_path(string()) -> string().
 parse_path(Path) -> 
 	[_|T] = filename:split(Path),
 	pair(T).
@@ -217,6 +217,7 @@ pair([A,B|T]) ->
 %% Returns: obj :: JSON()
 %% @end
 
+-spec user_to_json( Record :: #user{}) -> string().
 user_to_json(Record) ->
   [_ | Values] = tuple_to_list(Record),
   Keys = [<<"id">>, <<"email">>, <<"user_name">>, <<"password">>, 
@@ -248,6 +249,7 @@ merge_lists([H|T], [A|B]) ->
 %% Purpose: Retrieves the if from the path.
 %% Returns: Id
 %% @end
+-spec id_from_path(string()) -> string().
 id_from_path(RD) ->
     case wrq:path_info(id, RD) of
         undefined->
