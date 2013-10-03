@@ -11,10 +11,10 @@
 -module(database).
 -compile(export_all).
 -include_lib("stdlib/include/qlc.hrl").
--include("include/user.hrl").
--include("include/unique_ids.hrl").
--include("include/resource.hrl").
--include("include/stream.hrl").
+-include("user.hrl").
+-include("unique_ids.hrl").
+-include("resource.hrl").
+-include("stream.hrl").
 
 %% @doc
 %% Function: init/0 

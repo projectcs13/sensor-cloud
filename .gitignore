@@ -5,6 +5,7 @@ lib/
 erl_crash.dump
 *~
 .project
+.settings
 
 # Do not Ignore these
 !doc/overview.edoc

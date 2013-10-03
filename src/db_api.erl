@@ -14,10 +14,10 @@
 
 -module(db_api).
 -include_lib("stdlib/include/qlc.hrl").
--include("include/user.hrl").
--include("include/resource.hrl").
--include("include/stream.hrl").
--include("include/unique_ids.hrl").
+-include("user.hrl").
+-include("resource.hrl").
+-include("stream.hrl").
+-include("unique_ids.hrl").
 %% ====================================================================
 %% API functions
 %% ====================================================================
