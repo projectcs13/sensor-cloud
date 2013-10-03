@@ -51,7 +51,7 @@ install: get_libs
 ### Command: make run
 ### Downloads all depenedencies, bulds entire project and runs the project.
 run: compile
-	erl -pa $(PWD)/ebin $(PWD)/lib/*/ebin -boot start_sasl -s reloader -s engine -sname database -setcookie database -mnesia dir '"/home/database/Mnesia.Database"' -s database init
+	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname database -setcookie database -mnesia dir '"/home/database/Mnesia.Database"' -s database init
 
 ### Command: make docs
 ### Genereats all of the documentation files

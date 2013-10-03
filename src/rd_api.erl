@@ -10,7 +10,7 @@
 %% @end
 -module(rd_api).
 -include_lib("stdlib/include/qlc.hrl").
--include("include/resource.hrl").
+-include("resource.hrl").
 
 %% ====================================================================
 %% API functions

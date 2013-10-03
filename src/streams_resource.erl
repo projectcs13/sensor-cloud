@@ -17,8 +17,8 @@
 	 put_resource/2,
 	 post_is_create/2]).
 
--include_lib("webmachine/include/webmachine.hrl").
--include("include/stream.hrl").
+-include("webmachine.hrl").
+-include("stream.hrl").
 
 %% @doc
 %% Function: init/1

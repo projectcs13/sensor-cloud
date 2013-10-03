@@ -15,7 +15,7 @@
 	 json_handler/2,
 	 json_get/2]).
 
--include_lib("webmachine/include/webmachine.hrl").
+-include("webmachine.hrl").
 
 init([]) -> {ok, undefined}.
 
