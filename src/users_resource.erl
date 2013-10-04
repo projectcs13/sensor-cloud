@@ -17,8 +17,8 @@
 		 allow_missing_post/2,
 		 create_path/2]).
 
--include_lib("webmachine/include/webmachine.hrl").
--include("include/user.hrl").
+-include("webmachine.hrl").
+-include("user.hrl").
 
 %% @doc
 %% Function: init/1
