@@ -11,7 +11,9 @@
 %% Returns: {ok, undefined}
 %% @end
 -spec init([]) -> {ok, undefined}.
-init([]) -> {ok, undefined}.
+init([]) -> 
+    erlastic_search_app:start(),
+    {ok, undefined}.
 
 %% @doc
 %% Function: allowed_methods/2
@@ -20,6 +22,7 @@ init([]) -> {ok, undefined}.
 %% @end
 
 allowed_methods(ReqData, State) ->
+        erlastic_search_app:start(),
 	case parse_path(wrq:path(ReqData)) of
 		[{"streams"}] ->
 			{['POST','GET'], ReqData, State};
@@ -68,6 +71,7 @@ content_types_accepted(ReqData, State) ->
 
 %% DELETE
 delete_resource(ReqData, State) ->
+        erlastic_search_app:start_deps(),
 	Id = proplists:get_value('stream', wrq:path_info(ReqData)),
 	erlang:display("delete request"),
 	erlastic_search:delete_doc("streams","stream", integer_to_list(Id)),
@@ -150,13 +154,13 @@ get_stream(ReqData, State) ->
 				undefined ->
 					UserQuery = [];
 				UserId ->
-					UserQuery = ["q=owner_id:" ++ lists:nth(1,UserId)]
+					UserQuery = ["q=owner_id:" ++ UserId]
 			end,
 			case proplists:get_value('res', wrq:path_info(ReqData)) of
 				undefined ->
 					ResQuery = [];
 				ResId ->
-					ResQuery = ["q=resource_id:" ++ lists:nth(1,ResId)]
+					ResQuery = ["q=resource_id:" ++ ResId]
 			end,
 			Query = lists:append(["q=*"],lists:append(UserQuery,ResQuery)),
 			case erlastic_search:search_limit("streams", "stream", Query, 100) of % Maybe wanna take more
@@ -165,8 +169,9 @@ get_stream(ReqData, State) ->
 			end;
 		StreamId ->
 		        erlang:display("Value defined"),
+		        erlang:display(StreamId),
 		% Get specific stream
-			case erlastic_search:search("streams", "stream", ["q=stream_id:" ++ StreamId])) of 
+			case erlastic_search:search("streams", "stream", "id:" ++ StreamId) of 
 				{error, Msg} -> erlang:display("got error"),
 						{Msg, ReqData, State};
 				{ok,List} -> erlang:display("got value"),
