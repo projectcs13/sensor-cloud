@@ -49,6 +49,12 @@ install: get_libs
 run: compile
 	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname database -setcookie database -mnesia dir '"/home/database/Mnesia.Database"' -s database init
 
+### Command: make test
+### Compile project resources (not libraries) and runs all eunit tests.
+test: compile
+	@./rebar eunit skip_deps=true
+
+
 ### Command: make docs
 ### Genereats all of the documentation files
 docs:
