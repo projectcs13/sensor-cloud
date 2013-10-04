@@ -21,10 +21,6 @@ get_libs:
 	@./rebar get-deps
 	@./rebar compile
 
-clean_libs:
-	@./rebar delete-deps
-	rm -rf lib/
-
 clean_emacs_vsn_files:
 	rm -rf *~
 	rm -rf doc/*~
@@ -60,13 +56,19 @@ docs:
 
 ### Command: make clean
 ### Cleans the directory of the following things:
-### * Libraries, including 'lib' folder.
 ### * Emacs versioning files.
 ### * All erlang .beam files, including 'ebin' folder
-clean: clean_libs clean_emacs_vsn_files
-	@./rebar clean
+clean: clean_emacs_vsn_files
+	@./rebar clean skip_deps=true
 	rm -f erl_crash.dump
 	rm -rf ebin/
+
+### Command: make clean_libs
+### Cleans the directory of the following things:
+### * All the downloaded libraries
+clean_libs:
+	@./rebar delete-deps
+	rm -rf lib/
 
 ### Command: make clean_docs
 ### Cleans the directory of the following things:
@@ -94,6 +96,9 @@ help:
 	@echo ""
 	@echo "'make clean'"
 	@echo "Cleans all the project, including dependencies"
+	@echo ""
+	@echo "'make clean_libs'"
+	@echo "Cleans all of the libraries"
 	@echo ""
 	@echo "'make clean_docs'"
 	@echo "Cleans all of the documentation files, except for 'overview.edoc'"
