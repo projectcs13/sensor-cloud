@@ -1,4 +1,5 @@
 language: erlang
+script: "make install && make"
 otp_release:
   - R16B02
   - R16B01
