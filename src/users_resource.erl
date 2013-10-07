@@ -44,18 +44,6 @@ post_is_create(ReqData, State) -> {true, ReqData, State}.
 
 
 %% @doc
-%% Function: create_path/2
-%% Purpose: Creates an ID for the new user and then inserts an empty one
-%% in the database
-%% Returns: {Path, _, _ }
-%% @end
-create_path(ReqData, State) ->
-    Path = "/users/" ++ integer_to_list(Id=db_api:generate_id(user)),
-	erlastic_search:index_doc_with_id(?INDEX, "user", Id, "{\"user_name\" : \"b\"}")
-    {Path, ReqData, State}.
-
-
-%% @doc
 %% Function: allow_missing_post/2
 %% Purpose: If the resource accepts POST requests to nonexistent resources, then this should return true.
 %% Returns: {true, ReqData, State}
@@ -72,7 +60,7 @@ allow_missing_post(ReqData, State) ->
 
 allowed_methods(ReqData, State) ->
 	case parse_path(wrq:path(ReqData)) of
-		[{"users",_}] ->
+		[{"users",_Id}] ->
 			{['GET', 'PUT', 'DELETE'], ReqData, State};
 		[{"users"}] ->
 			{['POST','GET'], ReqData, State};
@@ -107,9 +95,24 @@ content_types_accepted(ReqData, State) ->
 delete_resource(ReqData, State) ->
 	Id = list_to_integer(id_from_path(ReqData)),
 	case erlastic_search:delete_doc(?INDEX,"user", Id) of
-		{error, Reason} -> {{error,Reason}, ReqData, State};
+		{error, not_found} -> {{halt,404}, ReqData, State};
+		{error, _} -> {{halt,400}, ReqData, State};		
 		{ok, _} -> {true, ReqData, State}
 	end.
+
+
+
+%% @doc
+%% Function: create_path/2
+%% Purpose: Creates an ID for the new user and then inserts an empty one
+%% in the database. Run automatically on a POST
+%% Returns: {Path, _, _ }
+%% @end
+create_path(ReqData, State) ->
+    Path = "/users/" ++ integer_to_list(Id=db_api:generate_id(user)),
+	erlastic_search:index_doc_with_id(?INDEX, "user", Id, "{\"user_name\" : \"temp\"}"),
+    {Path, ReqData, State}.
+
 
 
 %% @doc
@@ -141,7 +144,6 @@ put_user(ReqData, State) ->
 %%  		Fault tolerance is handled by resources_exists/2.
 %% Returns: {true, ReqData, State} | {false, ReqData, State}
 %% @end
-
 get_user(ReqData, State) ->
 	case id_from_path(ReqData) of
 		undefined -> 
@@ -174,7 +176,6 @@ json_handler(ReqData, State) ->
 %%			and the return value is a list of tuples [{dir, id}].
 %% Returns: [{"directory_name", "id_value"}] | [{Error, Err}] | []
 %% @end
-
 -spec parse_path(string()) -> string().
 parse_path(Path) -> 
 	[_|T] = filename:split(Path),
@@ -208,8 +209,3 @@ id_from_path(RD) ->
 
 json_encode(Data) ->
     (mochijson2:encoder([{utf8, true}]))(Data).
-
-%% To-do : HTTP Caching support w etags / header expiration.
-
-
-	

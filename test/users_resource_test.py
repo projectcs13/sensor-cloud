@@ -58,7 +58,7 @@ class TestUser_Resource(unittest.TestCase):
 
 
 		resp3 = requests.get(url)
-		self.assertEqual(resp3.content, '{"id":3,"description":"Vilaine"}')
+		self.assertEqual(resp3.content, '{"description":"Vilaine"}')
 	 
 	# GET 
 
@@ -67,7 +67,7 @@ class TestUser_Resource(unittest.TestCase):
 		headers=self.json_headers)
 
 		resp = requests.get(self.user_url + '2')
-		self.assertEqual(resp.content, '{"id":2,"description":"Seine"}')
+		self.assertEqual(resp.content, '{"description":"Seine"}')
 		self.assertEqual(resp.status_code, 200)
 
 	def test_get_on_nonexisting_user_returns_404(self):
