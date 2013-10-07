@@ -4,6 +4,7 @@ doc/*
 lib/
 erl_crash.dump
 *~
+TEST*.xml
 .project
 .settings
 

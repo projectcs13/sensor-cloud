@@ -12,8 +12,8 @@
 -module(db_api_tests).
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("stdlib/include/qlc.hrl").
--include("include/user.hrl").
--include("include/resource.hrl").
+-include("user.hrl").
+-include("resource.hrl").
 
 
 %% ====================================================================
@@ -35,7 +35,7 @@
 %% @end
 -spec start_test() -> ok | {error, term()}.
 start_test() ->
-	?assertEqual(ok, db_api:start()).
+	?assertEqual({atomic, ok}, db_api:start()).
 
 
 %% @doc
@@ -161,9 +161,9 @@ create_user_test() ->
 get_user_by_id_test() -> 
 	db_api:create_user("user3", "pass3"),
 	db_api:create_user("user4", "pass4"),	
-	?assertEqual(db_api:get_user_by_id(3), db_api:get_user_by_username("user3")),
-	?assertEqual(db_api:get_user_by_id(4), db_api:get_user_by_username("user4")),
-	?assertEqual(db_api:get_user_by_id(5), {error, unknown_user}).
+	?assertEqual([db_api:get_user_by_id(3)], db_api:get_user_by_username("user3")),
+	?assertEqual([db_api:get_user_by_id(4)], db_api:get_user_by_username("user4")),
+	?assertEqual(db_api:get_user_by_id(5), {error, "unknown_user"}).
 
 %% @doc
 %% Function: get_user_by_username_test/0
@@ -176,9 +176,9 @@ get_user_by_id_test() ->
 get_user_by_username_test() -> 
 	db_api:create_user("user5", "pass5"),
 	db_api:create_user("user6", "pass6"),	
-	?assertEqual(db_api:get_user_by_id(5), db_api:get_user_by_username("user5")),
-	?assertEqual(db_api:get_user_by_id(6), db_api:get_user_by_username("user6")),
-	?assertEqual(db_api:get_user_by_id(7), {error, unknown_user}).
+	?assertEqual([db_api:get_user_by_id(5)], db_api:get_user_by_username("user5")),
+	?assertEqual([db_api:get_user_by_id(6)], db_api:get_user_by_username("user6")),
+	?assertEqual(db_api:get_user_by_id(7), {error, "unknown_user"}).
 
 
 %% @doc
