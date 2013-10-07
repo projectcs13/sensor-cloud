@@ -21,10 +21,6 @@ get_libs:
 	@./rebar get-deps
 	@./rebar compile
 
-clean_libs:
-	@./rebar delete-deps
-	rm -rf lib/
-
 clean_emacs_vsn_files:
 	rm -rf *~
 	rm -rf doc/*~
@@ -53,6 +49,13 @@ install: get_libs
 run: compile
 	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname database -setcookie database -mnesia dir '"/home/database/Mnesia.Database"' -s database init
 
+### Command: make test
+### Compile project resources (not libraries) and runs all eunit tests.
+test: compile
+	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname database -setcookie database -mnesia dir '"/home/database/Mnesia.Database"' -s database init -eval 'eunit:test("ebin", [verbose, {cover_enabled, true}, {report, {eunit_surefire, [{dir, "."}]}}])' -s init stop
+#	@./rebar eunit skip_deps=true
+
+
 ### Command: make docs
 ### Genereats all of the documentation files
 docs:
@@ -60,13 +63,19 @@ docs:
 
 ### Command: make clean
 ### Cleans the directory of the following things:
-### * Libraries, including 'lib' folder.
 ### * Emacs versioning files.
 ### * All erlang .beam files, including 'ebin' folder
-clean: clean_libs clean_emacs_vsn_files
-	@./rebar clean
+clean: clean_emacs_vsn_files
+	@./rebar clean skip_deps=true
 	rm -f erl_crash.dump
 	rm -rf ebin/
+
+### Command: make clean_libs
+### Cleans the directory of the following things:
+### * All the downloaded libraries
+clean_libs:
+	@./rebar delete-deps
+	rm -rf lib/
 
 ### Command: make clean_docs
 ### Cleans the directory of the following things:
@@ -94,6 +103,9 @@ help:
 	@echo ""
 	@echo "'make clean'"
 	@echo "Cleans all the project, including dependencies"
+	@echo ""
+	@echo "'make clean_libs'"
+	@echo "Cleans all of the libraries"
 	@echo ""
 	@echo "'make clean_docs'"
 	@echo "Cleans all of the documentation files, except for 'overview.edoc'"
