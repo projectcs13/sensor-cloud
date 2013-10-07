@@ -11,8 +11,8 @@
 		 content_types_accepted/2,
 		 content_types_provided/2,
 		 delete_resource/2,
-		 from_json/2,
-		 get_resource/2,
+		 put_user/2,
+		 get_user/2,
 		 post_is_create/2,
 		 allow_missing_post/2,
 		 create_path/2]).
@@ -20,13 +20,17 @@
 -include("webmachine.hrl").
 -include("user.hrl").
 
+-define(INDEX, "sensorcloud").
+
+
 %% @doc
 %% Function: init/1
 %% Purpose: init function used to fetch path information from webmachine dispatcher.
 %% Returns: {ok, undefined}
 %% @end
 -spec init([]) -> {ok, undefined}.
-init([]) -> {ok, undefined}.
+init([]) -> 
+	{ok, undefined}.
 
 
 %% @doc
@@ -45,10 +49,10 @@ post_is_create(ReqData, State) -> {true, ReqData, State}.
 %% in the database
 %% Returns: {Path, _, _ }
 %% @end
-create_path(RD, Ctx) ->
+create_path(ReqData, State) ->
     Path = "/users/" ++ integer_to_list(Id=db_api:generate_id(user)),
-	db_api:create_user(#user{id= Id}),
-    {Path, RD, Ctx}.
+	erlastic_search:index_doc_with_id(?INDEX, "user", Id, "{\"user_name\" : \"b\"}")
+    {Path, ReqData, State}.
 
 
 %% @doc
@@ -85,7 +89,7 @@ allowed_methods(ReqData, State) ->
 %% Returns: {[{Mediatype, Handler}], ReqData, State}
 %% @end
 content_types_provided(ReqData, State) ->
-	{[{"application/json", get_resource}], ReqData, State}.
+	{[{"application/json", get_user}], ReqData, State}.
 
 
 %% @doc
@@ -95,99 +99,73 @@ content_types_provided(ReqData, State) ->
 %% Returns: {[{Mediatype, Handler}], ReqData, State}
 %% @end
 content_types_accepted(ReqData, State) ->
-	{[{"application/json", from_json}], ReqData, State}.
+	{[{"application/json", put_user}], ReqData, State}.
 
 
 
 %% DELETE
 delete_resource(ReqData, State) ->
 	Id = list_to_integer(id_from_path(ReqData)),
-	case db_api:delete_user_with_id(Id) of
-		ok -> {true, ReqData, State};
-		{error,_} -> {{halt, 404}, ReqData, State};
-		{abort,_} -> {{halt, 404}, ReqData, State}
+	case erlastic_search:delete_doc(?INDEX,"user", Id) of
+		{error, Reason} -> {{error,Reason}, ReqData, State};
+		{ok, _} -> {true, ReqData, State}
 	end.
 
 
 %% @doc
-%% Function: from_json/2
+%% Function: put_user/2
 %% Purpose: decodes a JSON object and returns a record representation of this.
 %% It is run automatically for POST and PUT requests
 %% Returns: {true, ReqData, State} || {{error, Reason}, ReqData, State}
 %% @end
-from_json(ReqData, State) ->
-	Id = id_from_path(ReqData),
-	case get_user_from_request(ReqData) of
-		{error, _} -> {{halt, 400}, ReqData, State};
-		{ok, User} ->
-			case db_api:get_user_by_id(list_to_integer(Id)) of
-				{aborted, Reason} -> {{error, Reason}, ReqData, State};
-				{error, Reason} -> {{error, Reason}, ReqData, State};
-				_ -> db_api:update_user(list_to_integer(Id), User),					 
+put_user(ReqData, State) ->
+	case id_from_path(ReqData) of
+		undefined -> {{halt, 400}, ReqData, State};
+		Id ->	
+			%check if doc already exists
+			case erlastic_search:get_doc(?INDEX, "user", Id) of 
+				{error, _} -> 
+					{{halt, 404}, ReqData, State};
+				{ok, _} -> 
+					{UserJson,_,_} = json_handler(ReqData, State),
+					erlastic_search:index_doc_with_id(?INDEX, "user", Id, UserJson),
 					{true, ReqData, State}
 			end
 	end.
 
 
-%% @doc
-%% Function: get_user_from_request/2
-%% Purpose: Creates a User record in the request
-%% Returns: {ok, User} || {error, "empty body"}
-%% @end
-get_user_from_request(ReqData) ->
-	[{Value,_ }] = mochiweb_util:parse_qs(wrq:req_body(ReqData)), 
-	case Value of
-		[] -> 
-	erlang:display("empty"),
-			{error, "empty body"};
-		_ ->
-			{struct, JsonData} = mochijson2:decode(Value),
-			User = json_to_user(JsonData),
-			{ok, User}
-	end.
-
 
 %% @doc
-%% Function: get_resource/2
+%% Function: get_user/2
 %% Purpose: Returns the JSON representation of a json-object or multiple json-objects. 
 %%  		Fault tolerance is handled by resources_exists/2.
 %% Returns: {true, ReqData, State} | {false, ReqData, State}
 %% @end
 
-get_resource(ReqData, State) ->
-	case proplists:get_value('id', wrq:path_info(ReqData)) of
+get_user(ReqData, State) ->
+	case id_from_path(ReqData) of
 		undefined -> 
 			% Get all users
-			Users = lists:map(fun(X) -> user_to_json(X) end, db_api:get_all_users()),
-			{Users, ReqData, State};
-		X -> 
+			case erlastic_search:search(?INDEX,"user","*:*") of
+				{ok, Result} -> 
+					{json_encode(Result), ReqData, State};
+				_ -> {{halt, 404}, ReqData, State}
+			end;
+		Id -> 
 			% Get specific user
-			case User = db_api:get_user_by_id(list_to_integer(X)) of
-				{error, "unknown_user"} -> {{halt, 404}, ReqData, State};
-		 		_ -> {user_to_json(User), ReqData, State}
+			case erlastic_search:get_doc(?INDEX, "user", Id) of 
+				{error, _} -> 
+					{{halt, 404}, ReqData, State};
+				{ok,{struct, JsonData}} -> 
+					User = proplists:get_value(<<"_source">>, JsonData),
+					{json_encode(User), ReqData, State}
 			end
 	end.
 
+json_handler(ReqData, State) ->
+	[{Value,_ }] = mochiweb_util:parse_qs(wrq:req_body(ReqData)), 
+	{Value, ReqData, State}.
 
-%% @doc
-%% Function: json_to_user/1
-%% Purpose: Given a proplist, the return value will be a 'user' record with the values taken from the proplist.
-%% Returns: user::record()
-%% @end
--spec json_to_user(string()) -> Record :: #user{}.
-json_to_user(JsonData) ->
-	#user{id = proplists:get_value(<<"id">>, JsonData),
-		email = proplists:get_value(<<"email">>, JsonData), 
-		user_name = proplists:get_value(<<"user_name">>, JsonData),
-		password = proplists:get_value(<<"password">>, JsonData), 
-		first_name = proplists:get_value(<<"first_name">>, JsonData), 
-		last_name = proplists:get_value(<<"last_name">>, JsonData), 
-		description = proplists:get_value(<<"description">>, JsonData),
-		latitude = proplists:get_value(<<"latitude">>, JsonData), 
-		longitude = proplists:get_value(<<"longitude">>, JsonData), 
-		creation_date = proplists:get_value(<<"creation_date">>, JsonData),
-		last_login = proplists:get_value(<<"last_login">>, JsonData)
-	}.
 
 
 %% @doc
@@ -212,39 +190,6 @@ pair([A,B|T]) ->
 
 
 %% @doc
-%% Function: user_to_json/1
-%% Purpose: decodes a record 'user' to a JSON object and returns it.
-%% Returns: obj :: JSON()
-%% @end
-
--spec user_to_json( Record :: #user{}) -> string().
-user_to_json(Record) ->
-  [_ | Values] = tuple_to_list(Record),
-  Keys = [<<"id">>, <<"email">>, <<"user_name">>, <<"password">>, 
-		  <<"first_name">>, <<"last_name">>, <<"description">>,
-		  <<"latitude">>, <<"longitude">>, <<"creation_date">>,
-		  <<"last_login">>],
-  P_list = merge_lists(Keys, Values),
-  mochijson2:encode({struct, P_list}).
-
-%% @doc
-%% Function: merge_lists/2
-%% Purpose: helper function to user_to_json/1, given a list of keys and a list of values, this function
-%%			will create a list [{Key, Value}], if a value is undefined, it will remove the value and the key 
-%% 			that it corresponds, both lists are assumed to be of equal length.
-%% Returns: [{Key, Value}] | []
-%% @end
-
-%% PRE-COND: Assumes that both lists are of equal size.
-merge_lists([], []) -> [];
-merge_lists([H|T], [A|B]) ->
-	case A of
-		undefined -> merge_lists(T,B);
-		_ -> [{H,A}]++merge_lists(T,B)
-	end.
-
-
-%% @doc
 %% Function: id_from_path/2
 %% Purpose: Retrieves the if from the path.
 %% Returns: Id
@@ -252,12 +197,17 @@ merge_lists([H|T], [A|B]) ->
 -spec id_from_path(string()) -> string().
 id_from_path(RD) ->
     case wrq:path_info(id, RD) of
-        undefined->
-            ["users", Id] = string:tokens(wrq:disp_path(RD), "/"),
-            Id;
+        undefined ->
+            case string:tokens(wrq:disp_path(RD), "/") of
+				["users", Id] -> Id;
+				_ -> undefined
+			end;
         Id -> Id
     end.
 
+
+json_encode(Data) ->
+    (mochijson2:encoder([{utf8, true}]))(Data).
 
 %% To-do : HTTP Caching support w etags / header expiration.
 
