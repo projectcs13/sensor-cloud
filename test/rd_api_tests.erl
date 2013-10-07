@@ -12,7 +12,7 @@
 -module(rd_api_tests).
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("stdlib/include/qlc.hrl").
--include("include/database.hrl").
+-include("resource.hrl").
 %% ====================================================================
 %% API functions
 %% ====================================================================
