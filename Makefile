@@ -52,8 +52,8 @@ run: compile
 ### Command: make test
 ### Compile project resources (not libraries) and runs all eunit tests.
 test: compile
-	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname database -setcookie database -mnesia dir '"/home/database/Mnesia.Database"' -s database init -eval 'eunit:test("ebin", [verbose, {cover_enabled, true}, {report, {eunit_surefire, [{dir, "."}]}}])' -s init stop
-#	@./rebar eunit skip_deps=true
+#	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname database -setcookie database -mnesia dir '"/home/database/Mnesia.Database"' -s database init -eval 'eunit:test("ebin", [verbose, {cover_enabled, true}, {report, {eunit_surefire, [{dir, "."}]}}])' -s init stop
+	@./rebar eunit skip_deps=true
 
 
 ### Command: make docs
