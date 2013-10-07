@@ -162,7 +162,7 @@ get_user_by_id_test() ->
 	db_api:create_user("user3", "pass3"),
 	db_api:create_user("user4", "pass4"),	
 	?assertEqual([db_api:get_user_by_id(3)], db_api:get_user_by_username("user3")),
-	?assertEqual(db_api:get_user_by_id(4), db_api:get_user_by_username("user4")),
+	?assertEqual([db_api:get_user_by_id(4)], db_api:get_user_by_username("user4")),
 	?assertEqual(db_api:get_user_by_id(5), {error, "unknown_user"}).
 
 %% @doc
