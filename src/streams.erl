@@ -5,6 +5,8 @@
 -include_lib("webmachine/include/webmachine.hrl").
 -include("include/user.hrl").
 
+-define(INDEX, "sensorcloud").
+
 %% @doc
 %% Function: init/1
 %% Purpose: init function used to fetch path information from webmachine dispatcher.
@@ -12,7 +14,7 @@
 %% @end
 -spec init([]) -> {ok, undefined}.
 init([]) -> 
-    erlastic_search_app:start(),
+	erlastic_search_app:start(), %% start this in the make file somehow
     {ok, undefined}.
 
 %% @doc
@@ -22,28 +24,27 @@ init([]) ->
 %% @end
 
 allowed_methods(ReqData, State) ->
-        erlastic_search_app:start(),
 	case parse_path(wrq:path(ReqData)) of
 		[{"streams"}] ->
-			{['POST','GET'], ReqData, State};
+			{['PUT','GET'], ReqData, State}; 
 		[{"streams", _StreamID}] ->
-			{['GET', 'PUT', 'DELETE'], ReqData, State};
-		[{"users", _UserID, "resources", _ResourceID, "streams", "_search"}] ->
+			{['GET', 'PUT', 'POST', 'DELETE'], ReqData, State};
+		[{"users", _UserID}, {"resources", _ResourceID}, {"streams", "_search" ++ _Query}] ->
 		  	{['POST'], ReqData, State};
-		[{"users", _UserID, "resources", _ResourceID, "streams", _StreamID}] ->
-			{['GET', 'PUT', 'DELETE'], ReqData, State};
-		[{"users", _UserID, "resources", _ResourceID, "streams"}] ->
-			{['GET','POST'], ReqData, State};
-		[{"users", _UserID, "streams", "_search"}] ->
+		[{"users", _UserID}, {"resources", _ResourceID}, {"streams", _StreamID}] ->
+			{['GET', 'PUT', 'POST','DELETE'], ReqData, State};
+		[{"users", _UserID}, {"resources", _ResourceID}, {"streams"}] ->
+			{['GET','PUT'], ReqData, State};
+		[{"users", _UserID}, {"streams","_search" ++ _Query}] ->
 			{['POST'], ReqData, State};
-		[{"users", _UserID, "streams", _StreamID}] ->
-			{['GET', 'PUT', 'DELETE'], ReqData, State};
-		[{"users", _UserID, "streams"}] ->
-			{['GET','POST'], ReqData, State};
-		[{"streams", "_search"}] ->
+		[{"users", _UserID}, {"streams", _StreamID}] ->
+			{['GET', 'PUT', 'DELETE', 'POST'], ReqData, State};
+		[{"users", _UserID}, {"streams"}] ->
+			{['GET','PUT'], ReqData, State};
+		[{"streams"}, {"_search" ++ _Query}] ->
 			{['POST'], ReqData, State};
 		[error] ->
-		        {['POST','GET'], ReqData, State}
+		    {['POST','GET'], ReqData, State}
 end.
 
 
@@ -70,12 +71,16 @@ content_types_accepted(ReqData, State) ->
 
 
 %% DELETE
+%% Works but need to fix transformation of the return value
 delete_resource(ReqData, State) ->
-        erlastic_search_app:start_deps(),
 	Id = proplists:get_value('stream', wrq:path_info(ReqData)),
 	erlang:display("delete request"),
-	erlastic_search:delete_doc("streams","stream", integer_to_list(Id)),
-	{true, ReqData, State}.
+	erlang:display(Id),
+	case erlastic_search:delete_doc(?INDEX,"stream", Id) of
+			{error,Reason} -> {{error,Reason}, ReqData, State};
+			{ok,List} -> {json_encode(List),ReqData,State}
+	end.
+
 
 
 %% POST
@@ -86,27 +91,39 @@ process_post(ReqData, State) ->
 		false ->
 			erlang:display("update request"),
 			{Stream,_,_} = json_handler(ReqData,State),
-			case erlastic_search:index_doc("streams","stream",Stream) of
+			case erlastic_search:index_doc(?INDEX,"stream",Stream) of %should update instead
 				{error,Reason} -> {{error,Reason}, ReqData, State};
-				{ok,_List} -> {true,ReqData,State}
+				{ok,List} -> {json_encode(List),ReqData,State}
 			end;
 		true ->
 			erlang:display("search request"),
 			URIQuery = wrq:req_qs(ReqData),
 			case proplists:get_value('user', wrq:path_info(ReqData)) of
 				undefined ->
-					UserQuery = [];
+					UserQuery = [],
+					UserDef = false;
 				UserId ->
-					UserQuery = ["q=owner_id:" ++ lists:nth(1,UserId)]
+					UserQuery = "owner_id:" ++ UserId,
+					UserDef = true
 			end,
 			case proplists:get_value('res', wrq:path_info(ReqData)) of
 				undefined ->
-					ResQuery = [];
+					ResQuery = [],
+					ResDef = false;
 				ResId ->
-					ResQuery = ["q=resource_id:" ++ lists:nth(1,ResId)]
+					ResQuery = "resource_id:" ++ ResId,
+					ResDef = true
 			end,
-			SearchQuery = lists:append(URIQuery,lists:append(UserQuery,ResQuery)),
-			case erlastic_search:search_limit("streams", "stream", SearchQuery,100) of % Maybe wanna take more
+			case ResDef and UserDef of
+				true -> Query = ResQuery;
+				false -> case ResDef or UserDef of
+							 true -> Query = UserQuery ++ ResQuery;
+							 false -> Query = ""
+						 end
+			end,
+			FullQuery = lists:append(transform(URIQuery,ResDef or UserDef),Query),
+			erlang:display(FullQuery),
+			case erlastic_search:search_limit(?INDEX, "stream", FullQuery,10) of % Maybe wanna take more
 				{error,Reason} -> {{error,Reason}, ReqData, State};
 				{ok,List} -> {List,ReqData,State} % May need to convert
 			end
@@ -121,18 +138,21 @@ put_stream(ReqData, State) ->
 	case proplists:get_value('stream', wrq:path_info(ReqData)) of 
 		undefined ->
 			{Stream,_,_} = json_handler(ReqData, State),
-			case erlastic_search:index_doc("streams", "stream", Stream) of	
+			case erlastic_search:index_doc(?INDEX, "stream", Stream) of	
 				{error, Reason} -> {{error, Reason}, ReqData, State};
-				{ok,_List} -> {true, ReqData, State}
+				{ok,List} -> {json_encode(List), ReqData, State}
 			end;
 		Id ->
-			case erlastic_search:search("streams", "stream", ["q=stream_id:" ++ lists:nth(1,Id)]) of
+			Result = erlastic_search:search(?INDEX, "stream", ["id:" ++ Id]),
+			{Msg,Data} = Result,
+			erlang:display(json_encode(Data)),
+			case Result of
 				{error, Reason} -> {{error, Reason}, ReqData, State};
 				{ok, []} ->
 					{Stream,_,_} = json_handler(ReqData, State),
-					case erlastic_search:index_doc_with_id("streams", "stream", lists:nth(1,Id), Stream) of	
+					case erlastic_search:index_doc_with_id(?INDEX, "stream", Id, Stream) of	
 						{error, Reason} -> {{error, Reason}, ReqData, State};
-						{ok,_List} -> {true, ReqData, State}
+						{ok,List} -> {json_encode(List), ReqData, State}
 					end;
 				_ -> {"id already exist",ReqData,State}
 			end
@@ -149,33 +169,44 @@ get_stream(ReqData, State) ->
 	case proplists:get_value('stream', wrq:path_info(ReqData)) of
 		undefined ->
 		% List streams based on URI
-		        erlang:display("Value undefined"),
+		    erlang:display("Value undefined"),
 			case proplists:get_value('user', wrq:path_info(ReqData)) of
 				undefined ->
-					UserQuery = [];
+					UserQuery = [],
+					UserDef = false;
 				UserId ->
-					UserQuery = ["q=owner_id:" ++ UserId]
+					UserQuery = "owner_id:" ++ UserId,
+					UserDef = true
 			end,
 			case proplists:get_value('res', wrq:path_info(ReqData)) of
 				undefined ->
-					ResQuery = [];
+					ResQuery = [],
+					ResDef = false;
 				ResId ->
-					ResQuery = ["q=resource_id:" ++ ResId]
+					ResQuery = "resource_id:" ++ ResId,
+					ResDef = true
 			end,
-			Query = lists:append(["q=*"],lists:append(UserQuery,ResQuery)),
-			case erlastic_search:search_limit("streams", "stream", Query, 100) of % Maybe wanna take more
+			case ResDef and UserDef of
+				true -> Query = ResQuery;
+				false -> case ResDef or UserDef of
+							 true -> Query = UserQuery ++ ResQuery;
+							 false -> Query = "*"
+						 end
+			end,
+			case erlastic_search:search_limit(?INDEX, "stream", Query, 10) of % Maybe wanna take more
 				{error,Reason} -> {{error, Reason}, ReqData, State};
-				{ok,List} -> {List, ReqData, State} % Maybe need to convert
+				{ok,List} -> {json_encode(List), ReqData, State} % Maybe need to convert
 			end;
 		StreamId ->
 		        erlang:display("Value defined"),
-		        erlang:display(StreamId),
 		% Get specific stream
-			case erlastic_search:search("streams", "stream", "id:" ++ StreamId) of 
-				{error, Msg} -> erlang:display("got error"),
+			case erlastic_search:get_doc(?INDEX, "stream", StreamId) of 
+				{error, Msg} -> 
+						erlang:display("got error"),
 						{Msg, ReqData, State};
-				{ok,List} -> erlang:display("got value"),
-					     {List, ReqData, State}
+				{ok,List} -> 
+						 erlang:display("got value"),
+					     {json_encode(List), ReqData, State}
 			end
 	end.
 
@@ -185,8 +216,9 @@ get_stream(ReqData, State) ->
 
 json_handler(ReqData, State) ->
 	[{Value,_ }] = mochiweb_util:parse_qs(wrq:req_body(ReqData)), 
-	{struct, JsonData} = mochijson2:decode(Value),
-	{JsonData, ReqData, State}.
+	erlang:display(Value),
+	%%{struct, JsonData} = mochijson2:decode(Value),
+	{Value, ReqData, State}.
 
 
 %% @doc
@@ -227,11 +259,19 @@ parse_path(Path) ->
 pair([]) -> [];
 pair([A]) -> [{A}];
 pair([A,B|T]) ->
-	case string:to_integer(B) of
-		{V, []} -> [{A,V}|pair(T)];
-		{error, no_integer} -> [error]
+	[{A,B}|pair(T)].
+
+transform([],true) -> "&";
+transform([],false) -> "";
+transform([{Field,Value}|Rest],AddAnd) ->
+	case Rest of 
+		[] -> Field ++ ":" ++ Value ++ transform(Rest,AddAnd);
+		_ -> Field ++ ":" ++ Value ++ "&" ++ transform(Rest,AddAnd)
 	end.
 
+% Taken from erlasticsearch
+json_encode(Data) ->
+    (mochijson2:encoder([{utf8, true}]))(Data).
 
 %% To-do : HTTP Caching support w etags / header expiration.
 
