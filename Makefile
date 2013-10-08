@@ -21,10 +21,6 @@ get_libs:
 	@./rebar get-deps
 	@./rebar compile
 
-clean_libs:
-	@./rebar delete-deps
-	rm -rf lib/
-
 clean_emacs_vsn_files:
 	rm -rf *~
 	rm -rf doc/*~
@@ -43,9 +39,11 @@ clean_emacs_vsn_files:
 ################################################################################
 
 ### Command: make
-### Downloads all dependencies and builds the entire project
+### Builds the entire project, excluding the dependencies.
 all: compile
 
+### Command: make install
+### Downloads all dependencies and builds the entire project
 install: get_libs
 
 ### Command: make run
@@ -53,20 +51,35 @@ install: get_libs
 run: compile
 	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname database -setcookie database -mnesia dir '"/home/database/Mnesia.Database"' -s database init
 
+### Command: make test
+### Compile project resources (not libraries) and runs all eunit tests.
+test: compile
+	-@mkdir test-results
+	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname database -setcookie database -mnesia dir '"/home/database/Mnesia.Database"' -s database init -s test run
+#	@./rebar eunit skip_deps=true
+
+
 ### Command: make docs
 ### Genereats all of the documentation files
 docs:
-	@$(ERL) -noshell -run edoc_run application '$(APP)' '"."' '[{packages, false},{private, true}]'
+	./rebar skip_deps=true doc
 
 ### Command: make clean
 ### Cleans the directory of the following things:
-### * Libraries, including 'lib' folder.
 ### * Emacs versioning files.
 ### * All erlang .beam files, including 'ebin' folder
-clean: clean_libs clean_emacs_vsn_files
-	@./rebar clean
+clean: clean_emacs_vsn_files
+	@./rebar clean skip_deps=true
 	rm -f erl_crash.dump
 	rm -rf ebin/
+	rm -rf test-results/
+
+### Command: make clean_libs
+### Cleans the directory of the following things:
+### * All the downloaded libraries
+clean_libs:
+	@./rebar delete-deps
+	rm -rf lib/
 
 ### Command: make clean_docs
 ### Cleans the directory of the following things:
@@ -94,6 +107,9 @@ help:
 	@echo ""
 	@echo "'make clean'"
 	@echo "Cleans all the project, including dependencies"
+	@echo ""
+	@echo "'make clean_libs'"
+	@echo "Cleans all of the libraries"
 	@echo ""
 	@echo "'make clean_docs'"
 	@echo "Cleans all of the documentation files, except for 'overview.edoc'"
