@@ -1,7 +1,7 @@
 -module(resource).
 -compile(export_all).
 
--include_lib("webmachine.hrl").
+-include_lib("webmachine/include/webmachine.hrl").
 -include("user.hrl").
 
 -define(INDEX, "sensorcloud").
@@ -119,37 +119,28 @@ process_post(ReqData, State) ->
 	end.
 
 
-
-%% @doc
 %% Function: put_resource/2
-%% Purpose: Handle PUT request
-%% Returns:  {JSON-object(string), ReqData, State}
+%% Purpose: Updates the resource in the database
+%% It is run automatically for POST and PUT requests
+%% Returns: {true, ReqData, State} || {{error, Reason}, ReqData, State}
 %% @end
--spec put_resource(ReqData::tuple(), State::string()) -> {list(), tuple(), string()}.
 put_resource(ReqData, State) ->
-	case proplists:get_value('resourceid', wrq:path_info(ReqData)) of 
-		undefined ->
-			{"id does not exist",ReqData,State};
-		Id ->
-			Result = erlastic_search:search(?INDEX, "resource", ["id:" ++ Id]),
-			{_Msg,Data} = Result,
-			erlang:display(json_encode(Data)),
-			case Result of
-				{error, Reason} -> {{error, Reason}, ReqData, State};
-				{ok, []} ->
-					{"id does not exist",ReqData,State};
-				_ -> 
-					{Resource,_,_} = json_handler(ReqData,State),
-					case erlastic_search:update_doc(?INDEX,"resource",Id,Resource) of %should update instead
-						{error,Reason} -> {{error,Reason}, ReqData, State};
-						{ok,List} -> {json_encode(List),ReqData,State}
-					end
+	erlang:display("Got here1~n"),
+	case id_from_path(ReqData) of
+		undefined -> {{halt, 400}, ReqData, State};
+		
+		Id ->	
+			%check if doc already exists
+			case erlastic_search:get_doc(?INDEX, "resource", Id) of
+				{error, _} ->
+					{{halt, 404}, ReqData, State};
+				{ok, _} ->
+					{UserJson,_,_} = json_handler(ReqData, State),
+erlang:display("Got here2~n"),
+					erlastic_search:index_doc_with_id(?INDEX, "resource", Id, UserJson),
+					{true, ReqData, State}
 			end
 	end.
-
-
-
-
 
 
 %% @doc
@@ -228,9 +219,9 @@ merge_lists([H|T], [A|B]) ->
 %% @end
 -spec id_from_path(tuple()) -> string().
 id_from_path(RD) ->
-    case wrq:path_info(id, RD) of
+    case wrq:path_info(resourceid, RD) of
         undefined->
-            ["users", Id] = string:tokens(wrq:disp_path(RD), "/"),
+            ["resource", Id] = string:tokens(wrq:disp_path(RD), "/"),
             Id;
         Id -> Id
     end.
