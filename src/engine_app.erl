@@ -15,7 +15,6 @@
 %% @spec start(_Type, _StartArgs) -> ServerRet
 %% @doc application start callback for engine.
 start(_Type, _StartArgs) ->
-	erlang:display("aTerm"),
 	erlastic_search_app:start(),
     engine_sup:start_link().
 
