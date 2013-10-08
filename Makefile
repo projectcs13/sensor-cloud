@@ -54,7 +54,7 @@ run: compile
 ### Command: make test
 ### Compile project resources (not libraries) and runs all eunit tests.
 test: compile
-	@mkdir test-results
+	-@mkdir test-results
 	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname database -setcookie database -mnesia dir '"/home/database/Mnesia.Database"' -s database init -s test run
 #	@./rebar eunit skip_deps=true
 
