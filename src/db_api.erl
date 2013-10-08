@@ -14,10 +14,10 @@
 
 -module(db_api).
 -include_lib("stdlib/include/qlc.hrl").
--include("include/user.hrl").
--include("include/resource.hrl").
--include("include/stream.hrl").
--include("include/unique_ids.hrl").
+-include("user.hrl").
+-include("resource.hrl").
+-include("stream.hrl").
+-include("unique_ids.hrl").
 %% ====================================================================
 %% API functions
 %% ====================================================================
@@ -25,9 +25,10 @@
 		 update_stream/2, delete_stream_with_id/1, print_stream/1,
 		 clear_stream_table/0]).
 
--export([connect/2,write_resource/1, traverse/1]).
--export([create_user/2, get_user_by_id/1, get_user_by_username/1, 
-		authenticate/2, change_password/3, exists_username/1]).
+-export([connect/2,write_resource/1, traverse/1, generate_id/1]).
+-export([create_user/2, create_user/1, get_user_by_id/1, get_user_by_username/1, 
+		authenticate/2, change_password/3, exists_username/1, get_all_users/0,
+		update_user/2,delete_user_with_id/1]).
 
 -define(MNESIA_DIR, "/home/kristian/mnesia/").
 -define(NODES, [node()]).
@@ -206,6 +207,12 @@ create_user(Username, Password) ->
 			mnesia:activity(transaction, F)
 	end.
 
+create_user(User) ->
+	F = fun() ->
+		mnesia:write(User)							
+	end,
+	mnesia:activity(transaction, F).
+
 
 %% @doc
 %% Function: exists_username/1
@@ -237,13 +244,15 @@ exists_username(Username) ->
 %% @end
 -spec get_user_by_id(integer()) -> Record :: #user{}.
 get_user_by_id(ID) ->
-	F = fun() -> 
-		mnesia:read({user, ID}) 
-	end,
-	case User = mnesia:activity(transaction, F) of
-		[] -> {error, unknown_user};
-		_ -> User
-	end.
+	Trans = fun() ->
+					case mnesia:match_object(#user{id=ID, _='_'}) of
+						{aborted, Reason} -> {aborted, Reason};
+						[] -> {error, "unknown_user"};
+						[S|_] -> S
+					end
+			end,
+	mnesia:wait_for_tables([user], 5000),
+	mnesia:activity(transaction, Trans).
 
 %% @doc
 %% Function: getUserbyUsername/1
@@ -395,7 +404,17 @@ get_all_streams() ->
 	mnesia:wait_for_tables([stream], 5000),
 	mnesia:activity(transaction, Trans).
 
-
+-spec get_all_users() -> {aborted, term()} | {error, term()} | [record].
+get_all_users() ->
+	Trans = fun() ->
+					case mnesia:match_object(#user{_='_'}) of
+						{aborted, Reason} -> {aborted, Reason};
+						[] -> {error, "No Such ID"};
+						S -> S
+					end
+			end,
+	mnesia:wait_for_tables([user], 5000),
+	mnesia:activity(transaction, Trans).
 
 
 %% @doc
@@ -519,6 +538,89 @@ update_stream(Id, Stream) when is_record(Stream, stream) ->
 	end.
 
 
+%% @doc
+%% Function: update_user/1
+%% Purpose: Update a user in the database.
+%% Returns: {aborted, Reason} | {error, Reason} | ok
+%%
+%% Side effects: Updates values of an existing user, with the same id
+%%               as the id in the provided stream, in the database that
+%%               are not undefined in the provided user.
+%% @end
+-spec update_user(integer(), record()) -> {aborted, term()} | {error, term()} | ok.
+update_user(Id, User) when is_record(User, user) ->
+	case get_user_by_id(Id) of
+		{aborted, Reason} -> {aborted, Reason};
+		{error, Reason} -> {error, Reason};
+		Record ->
+			Updated_record =
+				Record#user{
+				   email =
+					   case User#user.email of
+						   undefined -> Record#user.email;
+						   Type -> Type
+					   end,
+				   user_name =
+					   case User#user.user_name of
+						   undefined ->
+							   Record#user.user_name;
+						   Lat -> Lat
+					   end,
+				   password =
+					   case User#user.password of
+						   undefined ->
+							   Record#user.password;
+						   Long -> Long
+					   end,
+				   first_name =
+					   case User#user.first_name of
+						   undefined ->
+							   Record#user.first_name;
+						   Desc -> Desc
+					   end,
+				   last_name =
+					   case User#user.last_name of
+						   undefined ->
+							   Record#user.last_name;
+						   P_A -> P_A
+					   end,
+				   description =
+					   case User#user.description of
+						   undefined ->
+							   Record#user.description;
+						   P_S -> P_S
+					   end,
+				   latitude =
+					   case User#user.latitude of
+						   undefined -> Record#user.latitude;
+						   Frozen -> Frozen
+					   end,
+				   longitude =
+					   case User#user.longitude of
+						   undefined ->
+							   Record#user.longitude;
+						   H_S -> H_S
+					   end,
+				   creation_date =
+					   case User#user.creation_date of
+						   undefined ->
+							   Record#user.creation_date;
+						   L_U -> L_U
+					   end,
+				   last_login =
+					   case User#user.last_login of
+						   undefined -> Record#user.last_login;
+						   S_K -> S_K
+					   end							 
+					},
+			Trans = fun() ->
+				mnesia:write(Updated_record)
+			end,
+			mnesia:wait_for_tables([user], 5000),
+			mnesia:activity(transaction, Trans)
+	end.
+
+
 
 %% @doc
 %% Function: delete_stream_with_id/1
@@ -539,8 +641,32 @@ delete_stream_with_id(Id) when is_integer(Id) ->
 			end,
 	mnesia:wait_for_tables([stream], 5000),
 	mnesia:activity(transaction, Trans).
-										 
+				
 
+%% @doc
+%% Function: delete_user_with_id/1
+%% Purpose: Delete a user from the database.
+%% Returns: ok | {error, Reason} | {abort, Reason}
+%%
+%% Side effect: Deletes a row from the database in the table 'user'
+%%              that have id equal to the provided id.
+%% @end
+-spec delete_user_with_id(integer()) -> 
+		  ok | {error, term()} | {aborted, term()}.
+delete_user_with_id(Id) when is_integer(Id) ->
+	Trans = fun() ->
+					case mnesia:match_object(#user{id=Id, _='_'}) of
+						{abort, Reason} -> {abort, Reason};
+						[] -> {error, "unknown_user"};
+						[S|_] -> 
+							case mnesia:delete({user, Id}) of
+								{abort, Reason} -> {abort, Reason};
+								ok -> ok
+							end
+					end
+			end,
+	mnesia:wait_for_tables([stream], 5000),
+	mnesia:activity(transaction, Trans).
 
 
 %% @doc
@@ -578,5 +704,12 @@ print_stream(#stream{id=Id, type=Type, latitude=Lat, longitude=Long,
 clear_stream_table() ->
 	mnesia:wait_for_tables([stream], 5000),
 	mnesia:clear_table(stream).
+
+
+-spec generate_id(atom)->integer().
+generate_id(Table) ->
+	Id = mnesia:dirty_update_counter(unique_ids, Table, 1).
+
+
 
 
