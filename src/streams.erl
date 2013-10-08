@@ -14,7 +14,7 @@
 %% @end
 -spec init([]) -> {ok, undefined}.
 init([]) -> 
-	erlastic_search_app:start(), %% start this in the make file somehow
+	 %% start this in the make file somehow
     {ok, undefined}.
 
 %% @doc
@@ -24,19 +24,20 @@ init([]) ->
 %% @end
 
 allowed_methods(ReqData, State) ->
+	erlang:display(parse_path(wrq:path(ReqData))),
 	case parse_path(wrq:path(ReqData)) of
-		[{"streams"}] ->
-			{['POST','GET'], ReqData, State}; 
-		[{"users", _UserID}, {"streams"}] ->
-			{['GET','POST'], ReqData, State};
-		[{"users", _UserID}, {"resources", _ResourceID}, {"streams"}] ->
-			{['GET','POST'], ReqData, State};
 		[{"streams", "_search"}] ->
 			{['POST', 'GET'], ReqData, State};
 		[{"users", _UserID}, {"streams","_search"}] ->
 			{['POST', 'GET'], ReqData, State};
 		[{"users", _UserID}, {"resources", _ResourceID}, {"streams", "_search" ++ _Query}] ->
 		  	{['POST', 'GET'], ReqData, State};
+		[{"streams"}] ->
+			{['POST','GET'], ReqData, State}; 
+		[{"users", _UserID}, {"streams"}] ->
+			{['GET','POST'], ReqData, State};
+		[{"users", _UserID}, {"resources", _ResourceID}, {"streams"}] ->
+			{['GET','POST'], ReqData, State};
 		[{"streams", _StreamID}] ->
 			{['GET', 'PUT', 'DELETE'], ReqData, State};
 		[{"users", _UserID}, {"streams", _StreamID}] ->
@@ -89,9 +90,23 @@ process_post(ReqData, State) ->
 		false ->
 			erlang:display("Create request"),
 			{Stream,_,_} = json_handler(ReqData, State),
-			case erlastic_search:index_doc(?INDEX, "stream", Stream) of	
+			case proplists:get_value('user', wrq:path_info(ReqData)) of
+				undefined ->
+					UserAdded = Stream;
+				UserId ->
+					UserAdded = add_field(Stream,"owner_id",UserId)
+			end,
+			case proplists:get_value('res', wrq:path_info(ReqData)) of
+				undefined ->
+					ResAdded = UserAdded;
+				ResId ->
+					ResAdded = add_field(UserAdded,"resource_id",ResId)
+			end,
+			%display:erlang(ResAdded),
+			case erlastic_search:index_doc(?INDEX, "stream", ResAdded) of	
 				{error, Reason} -> {{error, Reason}, ReqData, State};
-				{ok,List} -> {json_encode(List), ReqData, State}
+				{ok,List} -> erlang:display(convert_binary_to_string(json_encode(List))), 
+							 {convert_binary_to_string(json_encode(List)), ReqData, State}
 			end;
 		true ->
 			process_search(ReqData,State)	
@@ -182,6 +197,7 @@ get_stream(ReqData, State) ->
 							 		false -> Query = "*"
 								 end
 					end,
+					erlang:display(Query),
 					case erlastic_search:search_limit(?INDEX, "stream", Query, 10) of % Maybe wanna take more
 						{error,Reason} -> {{error, Reason}, ReqData, State};
 						{ok,List} -> {json_encode(List), ReqData, State} % Maybe need to convert
@@ -219,6 +235,26 @@ is_query_empty(_) ->
 create_update(Stream) ->
 	"{\n\"doc\" : " ++ Stream ++ "\n}".
 
+convert_binary_to_string([]) ->
+	[];
+convert_binary_to_string([First|Rest]) ->
+	case is_binary(First) of
+		true -> binary_to_list(First) ++ convert_binary_to_string(Rest);
+		false -> case is_list(First) of
+					 true -> convert_binary_to_string(First) ++ convert_binary_to_string(Rest);
+					 false -> [First] ++ convert_binary_to_string(Rest)
+				 end
+	end.
+
+add_field(Stream,FieldName,FieldValue) ->
+	string:substr(Stream,1,length(Stream)-2) ++ ",\n" ++ FieldName ++ " : " ++ FieldValue ++ "\n}".
+	
+clear_qoutes([]) ->
+	[];
+clear_qoutes(["\""|Rest]) ->
+	clear_qoutes(Rest);
+clear_qoutes([First|Rest]) ->
+	[First] ++ clear_qoutes(Rest).
 
 %% @doc
 %% Function: merge_lists/2
