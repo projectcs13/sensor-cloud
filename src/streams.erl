@@ -33,6 +33,7 @@ init([]) ->
 -spec allowed_methods(ReqData::term(),State::term()) -> {list(), term(), term()}.
 
 allowed_methods(ReqData, State) ->
+	erlang:display(ReqData),
 	erlang:display(parse_path(wrq:path(ReqData))),
 	case parse_path(wrq:path(ReqData)) of
 		[{"streams", "_search"}] ->
