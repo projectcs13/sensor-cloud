@@ -240,7 +240,7 @@ get_stream(ReqData, State) ->
 							ResDef = true
 					end,
 					case ResDef and UserDef of
-						true -> Query = UserQuery ++ "&" ++ ResQuery;
+						true -> Query = ResQuery;
 						false -> case ResDef or UserDef of
 							 		true -> Query = UserQuery ++ ResQuery;
 							 		false -> Query = "*"
@@ -257,7 +257,7 @@ get_stream(ReqData, State) ->
 					case erlastic_search:get_doc(?INDEX, "stream", StreamId) of 
 						{error, Msg} -> 
 							erlang:display("got error"),
-							{Msg, ReqData, State};
+							{json_encode(Msg), ReqData, State};
 						{ok,List} -> 
 							erlang:display("got value"),
 					     	{json_encode(List), ReqData, State}
@@ -288,68 +288,59 @@ json_handler(ReqData, State) ->
 	{Value, ReqData, State}.
 
 %% @doc
-%% Function: is_query_empty/1
-%% Purpose: Used to decied if the respond from erlastic search found no value
-%% Returns: True if URI specifys a search, false otherwise
+%% Function: create_update/1
+%% Purpose: Used to create the update document sent to erlastic search
+%% Returns: The update document to send to erlasticsearch
 %% @end
--spec is_query_empty(Respons::term()) -> boolean().
-
-is_query_empty({struct,[{_,_},{_,_},{_,{struct,[{_,_},{_,_},{_,0}]}},_]}) ->
-	true;
-is_query_empty(_) ->
-	false.
-
-
+-spec create_update(Stream::string()) -> string().
 
 create_update(Stream) ->
 	"{\n\"doc\" : " ++ Stream ++ "\n}".
 
-
+%% @doc
+%% Function: add_field/3
+%% Purpose: Used to add a new field to the given string representation of
+%%          of a JSON object, the field will be FieldName : FieldValue
+%% Returns: The string representation of the JSON object with the new field
+%% @end
+-spec add_field(Stream::string(),FieldName::string(),FieldValue::string()) -> string().
 
 add_field(Stream,FieldName,FieldValue) ->
 	string:substr(Stream,1,length(Stream)-2) ++ ",\n" ++ FieldName ++ " : " ++ FieldValue ++ "\n}".
 	
 
-
 %% @doc
-%% Function: merge_lists/2
-%% Purpose: helper function to user_to_json/1, given a list of keys and a list of values, this function
-%% will create a list [{Key, Value}], if a value is undefined, it will remove the value and the key
-%% that it corresponds, both lists are assumed to be of equal length.
-%% Returns: [{Key, Value}] | []
+%% Function: parse_path/1
+%% Purpose: Used to parse the URI path
+%% Returns: The parsed URI path as a list
 %% @end
-
-%% PRE-COND: Assumes that both lists are of equal size.
-merge_lists([], []) -> [];
-merge_lists([H|T], [A|B]) ->
-	case A of
-		undefined -> merge_lists(T,B);
-		_ -> [{H,A}]++merge_lists(T,B)
-	end.
-
-
-%% @doc
-%% Function: id_from_path/2
-%% Purpose: Retrieves the if from the path.
-%% Returns: Id
-%% @end
-id_from_path(RD) ->
-    case wrq:path_info(id, RD) of
-        undefined->
-            ["users", Id] = string:tokens(wrq:disp_path(RD), "/"),
-            Id;
-        Id -> Id
-    end.
-
+-spec parse_path(Path::file:name_all()) -> list().
 
 parse_path(Path) -> 
 	[_|T] = filename:split(Path),
 	pair(T).
 
+%% @doc
+%% Function: pair/1
+%% Purpose: Used to create a new list of tuples where each 
+%%          2 elements are paired
+%% Returns: The paired list
+%% @end
+-spec pair(PathList::list()) -> list().
+
 pair([]) -> [];
 pair([A]) -> [{A}];
 pair([A,B|T]) ->
 	[{A,B}|pair(T)].
+
+%% @doc
+%% Function: transform/2
+%% Purpose: Used to create the query for search, expects more fields
+%%          if AddAnd euqal to true
+%% Returns: The query string from given from the list
+%%          were the list will be {Field,Value} tuples
+%% @end
+-spec transform(QueryList::list(),AddAnd::boolean()) -> list().
 
 transform([],true) -> "&";
 transform([],false) -> "";
@@ -363,5 +354,5 @@ transform([{Field,Value}|Rest],AddAnd) ->
 json_encode(Data) ->
     (mochijson2:encoder([{utf8, true}]))(Data).
 
-%% To-do : HTTP Caching support w etags / header expiration.
+
 
