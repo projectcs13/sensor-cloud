@@ -30,10 +30,10 @@ allowed_methods(ReqData, State) ->
 			{['GET', 'PUT', 'DELETE'], ReqData, State};
 		[{"user", _UserID}, {"resource"}] ->
 			{['GET','POST'], ReqData, State};
+		[{"user", _UserID}, {"resource", "_search" ++ _Query}] ->
+		  	{['GET', 'POST'], ReqData, State};
 		[{"user", _UserID}, {"resource", _ResourceID}] ->
 			{['GET', 'PUT', 'DELETE'], ReqData, State};
-		[{"user", _UserID}, {"resource", "_search" ++ _Query}] ->
-		  	{['POST', 'GET'], ReqData, State};
 		[error] ->
 		    {['POST','GET'], ReqData, State}
 end.
@@ -73,8 +73,8 @@ delete_resource(ReqData, State) ->
 	erlang:display("delete request - check permission here"),
 	erlang:display(Id),
 	case erlastic_search:delete_doc(?INDEX,"resource", Id) of
-			{error,Reason} -> {{error,Reason}, ReqData, State};
-			{ok,List} -> {json_encode(List),ReqData,State}
+			{error,Reason} -> {{halt,Reason}, ReqData, State};
+			{ok,List} -> {true,wrq:set_resp_body(json_encode(List),ReqData),State}
 	end.
 
 
@@ -83,7 +83,7 @@ delete_resource(ReqData, State) ->
 %% Purpose: Handle POST request
 %% Returns:  {JSON-object(string), ReqData, State}
 %% @end
--spec process_post(ReqData::tuple(), State::string()) -> {list(), tuple(), string()}.
+-spec process_post(ReqData::tuple(), State::string()) -> {atom(), tuple(), string()}.
 process_post(ReqData, State) ->
 	erlang:display("POST"),
 	URIList = string:tokens(wrq:path(ReqData), "/"),
@@ -93,11 +93,15 @@ process_post(ReqData, State) ->
 			erlang:display("create request"),
 			{Resource,_,_} = json_handler(ReqData,State),
 			case erlastic_search:index_doc(?INDEX,"resource",Resource) of %should update instead
-				{error,Reason} -> {{error,Reason}, ReqData, State};
-				{ok,List} -> {json_encode(List),ReqData,State}
+				{error, Reason} -> 
+					{{halt,Reason}, ReqData, State};
+				{ok,List} ->
+					erlang:display("NO ERROR"),
+					{ok,wrq:set_resp_body(json_encode(List),ReqData),State}
 			end;
 		true ->
 			erlang:display("search request"),
+			erlang:display("~s", wrq:req_body(ReqData)),
 			URIQuery = wrq:req_qs(ReqData),
 			case proplists:get_value('userid', wrq:path_info(ReqData)) of
 				undefined ->
@@ -108,8 +112,8 @@ process_post(ReqData, State) ->
 			FullQuery = lists:append(transform(URIQuery,true),Query),
 			erlang:display(FullQuery),
 			case erlastic_search:search_limit(?INDEX, "resource", FullQuery,10) of % Maybe wanna take more
-				{error,Reason} -> {{error,Reason}, ReqData, State};
-				{ok,List} -> {List,ReqData,State} % May need to convert
+				{error,Reason} -> {{halt,Reason}, ReqData, State};
+				{ok,List} -> {true,wrq:set_resp_body(json_encode(List),ReqData),State} % May need to convert
 			end
 
 	end.
@@ -135,7 +139,6 @@ put_resource(ReqData, State) ->
 				{ok, []} ->
 					{"id does not exist",ReqData,State};
 				_ -> 
-					{"id already exist",ReqData,State},
 					{Resource,_,_} = json_handler(ReqData,State),
 					case erlastic_search:update_doc(?INDEX,"resource",Id,Resource) of %should update instead
 						{error,Reason} -> {{error,Reason}, ReqData, State};
@@ -168,16 +171,17 @@ get_resource(ReqData, State) ->
 					Query = "owner:" ++ UserId
 			end,
 			case erlastic_search:search_limit(?INDEX, "resource", Query, 10) of % Maybe wanna take more
-				{error,Reason} -> {{error, Reason}, ReqData, State};
-				{ok,List} -> {json_encode(List), ReqData, State} % Maybe need to convert
+				{error,Reason} -> {{halt, Reason}, ReqData, State};
+				{ok,List} -> 
+					{json_encode(List), ReqData, State} % Maybe need to convert
 			end;
 		ResourceId ->
 		        erlang:display("Value defined"),
 		% Get specific resource
 			case erlastic_search:get_doc(?INDEX, "resource", ResourceId) of 
-				{error, Msg} -> 
+				{error,_Msg} -> 
 						erlang:display("got error"),
-						{{error, Msg}, ReqData, State};
+						{{halt, 404}, ReqData, State};
 				{ok,List} -> 
 						 erlang:display("got value"),
 					     {json_encode(List), ReqData, State}
