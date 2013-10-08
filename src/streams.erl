@@ -1,4 +1,13 @@
-
+%% @author Tomas Sävström <tosa7943@student.uu.se>
+%%   [www.csproj13.student.it.uu.se]
+%% @version 1.0
+%% @copyright [Copyright information]
+%%
+%% @doc == streams ==
+%% This module will contain all functions needed to handle 
+%% http requests done to the webmachine regarding streams 
+%%
+%% @end
 -module(streams).
 -compile(export_all).
 
@@ -14,14 +23,14 @@
 %% @end
 -spec init([]) -> {ok, undefined}.
 init([]) -> 
-	 %% start this in the make file somehow
     {ok, undefined}.
 
 %% @doc
 %% Function: allowed_methods/2
-%% Purpose: init function used to fetch path information from webmachine dispatcher.
-%% Returns: {ok, undefined}
+%% Purpose: Used to define what methods are allowed one the given URI's.
+%% Returns: {List, ReqData, State}, where list is the allowed methods for the given URI. 
 %% @end
+-spec allowed_methods(ReqData::term(),State::term()) -> {list(), term(), term()}.
 
 allowed_methods(ReqData, State) ->
 	erlang:display(parse_path(wrq:path(ReqData))),
@@ -45,7 +54,7 @@ allowed_methods(ReqData, State) ->
 		[{"users", _UserID}, {"resources", _ResourceID}, {"streams", _StreamID}] ->
 			{['GET', 'PUT', 'DELETE'], ReqData, State};
 		[error] ->
-		    {['POST', 'GET'], ReqData, State} % Probably should give som error message
+		    {[], ReqData, State} 
 end.
 
 
@@ -56,6 +65,8 @@ end.
 %% A code 406 is returned to the client if we cannot return the media-type that the user has requested.
 %% Returns: {[{Mediatype, Handler}], ReqData, State}
 %% @end
+-spec content_types_provided(ReqData::term(),State::term()) -> {list(), term(), term()}.
+
 content_types_provided(ReqData, State) ->
 	{[{"application/json", get_stream}], ReqData, State}.
 
@@ -66,25 +77,41 @@ content_types_provided(ReqData, State) ->
 %% A code 406 is returned to the client if we don't accept a media type that the client has sent.
 %% Returns: {[{Mediatype, Handler}], ReqData, State}
 %% @end
+-spec content_types_accepted(ReqData::term(),State::term()) -> {list(), term(), term()}.
+
 content_types_accepted(ReqData, State) ->
 	{[{"application/json", put_stream}], ReqData, State}.
 
 
 
-%% DELETE
-%% Works but need to fix transformation of the return value
+
+
+%% @doc
+%% Function: delete_resource/2
+%% Purpose: Used to handle DELETE requests by deleteing the stream in elastic search
+%% Returns: {Sucess, ReqData, State}, where Sucess is true if delete is sucessful
+%%			and false otherwise.
+%% @end
+-spec delete_resource(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
+
 delete_resource(ReqData, State) ->
 	Id = proplists:get_value('stream', wrq:path_info(ReqData)),
 	erlang:display("delete request"),
 	erlang:display(Id),
 	case erlastic_search:delete_doc(?INDEX,"stream", Id) of
-			{error,Reason} -> {{error,Reason}, ReqData, State};
-			{ok,List} -> {json_encode(List),ReqData,State}
+			{error,Reason} -> {false, wrq:set_resp_body(json_encode(Reason),ReqData), State};
+			{ok,List} -> {true,wrq:set_resp_body(json_encode(List),ReqData),State}
 	end.
 
 
+%% @doc
+%% Function: process_post/2
+%% Purpose: Used to handle POST requests by creating streams, or search for streams in elastic search
+%% Returns: {Sucess, ReqData, State}, where Sucess is true if the post request is 
+%%          sucessful and false otherwise.
+%% @end
+-spec process_post(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 
-%% POST
 process_post(ReqData, State) ->
 	case is_search(ReqData) of 
 		false ->
@@ -102,15 +129,22 @@ process_post(ReqData, State) ->
 				ResId ->
 					ResAdded = add_field(UserAdded,"resource_id",ResId)
 			end,
-			%display:erlang(ResAdded),
 			case erlastic_search:index_doc(?INDEX, "stream", ResAdded) of	
-				{error, Reason} -> {{error, Reason}, ReqData, State};
-				{ok,List} -> erlang:display(convert_binary_to_string(json_encode(List))), 
-							 {convert_binary_to_string(json_encode(List)), ReqData, State}
+				{error, Reason} -> {false, wrq:set_resp_body(json_encode(Reason),ReqData), State};
+				{ok,List} -> erlang:display("Sucess"), 
+							 {true, wrq:set_resp_body(json_encode(List),ReqData), State}
 			end;
 		true ->
 			process_search(ReqData,State)	
 	end.
+
+%% @doc
+%% Function: process_search/2
+%% Purpose: Used to handle search requests that come from POST or GET requests
+%% Returns: {Sucess, ReqData, State}, where Sucess is true if the search request is 
+%%          sucessful and false otherwise.
+%% @end
+-spec process_search(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 
 process_search(ReqData, State) ->
 	erlang:display("search request"),
@@ -141,12 +175,19 @@ process_search(ReqData, State) ->
 	FullQuery = lists:append(transform(URIQuery,ResDef or UserDef),Query),
 	erlang:display(FullQuery),
 	case erlastic_search:search_limit(?INDEX, "stream", FullQuery,10) of % Maybe wanna take more
-		{error,Reason} -> {{error,Reason}, ReqData, State};
-		{ok,List} -> {List,ReqData,State} % May need to convert
+		{error,Reason} -> {false, wrq:set_resp_body(json_encode(Reason),ReqData), State};
+		{ok,List} -> erlang:display(json_encode(List)),
+					 {true,wrq:set_resp_body(json_encode(List),ReqData),State} % May need to convert
 	end.
 
 
-
+%% @doc
+%% Function: put_stream/2
+%% Purpose: Used to handle PUT requests by updateing the given documents in elastic search
+%% Returns: {Sucess, ReqData, State}, where Sucess is true if the PUT request is 
+%%          sucessful and false otherwise.
+%% @end
+-spec put_stream(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 
 put_stream(ReqData, State) ->
 	erlang:display("update request"),
@@ -155,15 +196,23 @@ put_stream(ReqData, State) ->
 	Update = create_update(Stream),
 	erlang:display(Update),
 	case erlastic_search:update_doc(?INDEX, "stream", StreamId, Update) of 
-		{error,Reason} -> {{error,Reason}, ReqData, State};
-		{ok,List} -> {List,ReqData,State}
+		{error,Reason} -> {false, wrq:set_resp_body(json_encode(Reason),ReqData), State};
+		{ok,List} -> {true,wrq:set_resp_body(json_encode(List),ReqData),State}
 	end.
 
 
 
 
 
-
+%% @doc
+%% Function: get_stream/2
+%% Purpose: Used to handle GET requests by giveing the document with the given
+%%          Id or listing the documents that can be found from the restrictions
+%%          given by the URI.
+%% Returns: {Sucess, ReqData, State}, where Sucess is true if the PUT request is 
+%%          sucessful and false otherwise.
+%% @end
+-spec get_stream(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 
 get_stream(ReqData, State) ->
 	case is_search(ReqData) of
@@ -216,45 +265,51 @@ get_stream(ReqData, State) ->
 				end
 	end.
 
-
+%% @doc
+%% Function: is_search/1
+%% Purpose: Used to decied if the URI specifys a search
+%% Returns: True if URI specifys a search, false otherwise
+%% @end
+-spec is_search(ReqData::term()) -> boolean().
 
 is_search(ReqData) ->
 	URIList = string:tokens(wrq:path(ReqData), "/"),
 	IsSearch = (string:sub_string(lists:nth(length(URIList),URIList),1,7) == "_search").
 
+%% @doc
+%% Function: json_handler/2
+%% Purpose: Used to get the json object from the request
+%% Returns: {Json,ReqData,State}
+%% @end
+-spec json_handler(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
+
 json_handler(ReqData, State) ->
 	[{Value,_ }] = mochiweb_util:parse_qs(wrq:req_body(ReqData)), 
-	%%{struct, JsonData} = mochijson2:decode(Value),
 	{Value, ReqData, State}.
+
+%% @doc
+%% Function: is_query_empty/1
+%% Purpose: Used to decied if the respond from erlastic search found no value
+%% Returns: True if URI specifys a search, false otherwise
+%% @end
+-spec is_query_empty(Respons::term()) -> boolean().
 
 is_query_empty({struct,[{_,_},{_,_},{_,{struct,[{_,_},{_,_},{_,0}]}},_]}) ->
 	true;
 is_query_empty(_) ->
 	false.
 
+
+
 create_update(Stream) ->
 	"{\n\"doc\" : " ++ Stream ++ "\n}".
 
-convert_binary_to_string([]) ->
-	[];
-convert_binary_to_string([First|Rest]) ->
-	case is_binary(First) of
-		true -> binary_to_list(First) ++ convert_binary_to_string(Rest);
-		false -> case is_list(First) of
-					 true -> convert_binary_to_string(First) ++ convert_binary_to_string(Rest);
-					 false -> [First] ++ convert_binary_to_string(Rest)
-				 end
-	end.
+
 
 add_field(Stream,FieldName,FieldValue) ->
 	string:substr(Stream,1,length(Stream)-2) ++ ",\n" ++ FieldName ++ " : " ++ FieldValue ++ "\n}".
 	
-clear_qoutes([]) ->
-	[];
-clear_qoutes(["\""|Rest]) ->
-	clear_qoutes(Rest);
-clear_qoutes([First|Rest]) ->
-	[First] ++ clear_qoutes(Rest).
+
 
 %% @doc
 %% Function: merge_lists/2
