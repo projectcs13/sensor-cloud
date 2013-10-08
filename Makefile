@@ -39,9 +39,11 @@ clean_emacs_vsn_files:
 ################################################################################
 
 ### Command: make
-### Downloads all dependencies and builds the entire project
+### Builds the entire project, excluding the dependencies.
 all: compile
 
+### Command: make install
+### Downloads all dependencies and builds the entire project
 install: get_libs
 
 ### Command: make run
@@ -52,14 +54,15 @@ run: compile
 ### Command: make test
 ### Compile project resources (not libraries) and runs all eunit tests.
 test: compile
-#	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname database -setcookie database -mnesia dir '"/home/database/Mnesia.Database"' -s database init -eval 'eunit:test("ebin", [verbose, {cover_enabled, true}, {report, {eunit_surefire, [{dir, "."}]}}])' -s init stop
-	@./rebar eunit skip_deps=true
+	@mkdir test-results
+	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname database -setcookie database -mnesia dir '"/home/database/Mnesia.Database"' -s database init -s test run
+#	@./rebar eunit skip_deps=true
 
 
 ### Command: make docs
 ### Genereats all of the documentation files
 docs:
-	@$(ERL) -noshell -run edoc_run application '$(APP)' '"."' '[{packages, false},{private, true}]'
+	./rebar skip_deps=true doc
 
 ### Command: make clean
 ### Cleans the directory of the following things:
@@ -69,6 +72,7 @@ clean: clean_emacs_vsn_files
 	@./rebar clean skip_deps=true
 	rm -f erl_crash.dump
 	rm -rf ebin/
+	rm -rf test-results/
 
 ### Command: make clean_libs
 ### Cleans the directory of the following things:
