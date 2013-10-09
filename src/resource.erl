@@ -1,8 +1,7 @@
 -module(resource).
 -compile(export_all).
 
--include_lib("webmachine/include/webmachine.hrl").
--include("user.hrl").
+-include_lib("webmachine.hrl").
 
 -define(INDEX, "sensorcloud").
 
@@ -125,7 +124,6 @@ process_post(ReqData, State) ->
 %% Returns: {true, ReqData, State} || {{error, Reason}, ReqData, State}
 %% @end
 put_resource(ReqData, State) ->
-	erlang:display("Got here1~n"),
 	case id_from_path(ReqData) of
 		undefined -> {{halt, 400}, ReqData, State};
 		
@@ -136,7 +134,6 @@ put_resource(ReqData, State) ->
 					{{halt, 404}, ReqData, State};
 				{ok, _} ->
 					{UserJson,_,_} = json_handler(ReqData, State),
-erlang:display("Got here2~n"),
 					erlastic_search:index_doc_with_id(?INDEX, "resource", Id, UserJson),
 					{true, ReqData, State}
 			end
@@ -182,7 +179,7 @@ get_resource(ReqData, State) ->
 					end
 		end;
 		true ->
-			erlang:display("Processing search"),
+			erlang:display("Processing _search"),
 				process_search(ReqData,State, get)
 	end.
 
