@@ -11,6 +11,7 @@
 -module(streams).
 -compile(export_all).
 
+-include_lib("erlastic_search/include/erlastic_search.hrl").
 -include_lib("webmachine/include/webmachine.hrl").
 -include("include/user.hrl").
 
@@ -33,21 +34,21 @@ init([]) ->
 -spec allowed_methods(ReqData::term(),State::term()) -> {list(), term(), term()}.
 
 allowed_methods(ReqData, State) ->
-	erlang:display(ReqData),
-	erlang:display(parse_path(wrq:path(ReqData))),
+	%erlang:display(ReqData),
+	%erlang:display(parse_path(wrq:path(ReqData))),
 	case parse_path(wrq:path(ReqData)) of
 		[{"streams", "_search"}] ->
 			{['POST', 'GET'], ReqData, State};
 		[{"users", _UserID}, {"streams","_search"}] ->
 			{['POST', 'GET'], ReqData, State};
-		[{"users", _UserID}, {"resources", _ResourceID}, {"streams", "_search" ++ _Query}] ->
+		[{"users", _UserID}, {"resources", _ResourceID}, {"streams", "_search"}] ->
 		  	{['POST', 'GET'], ReqData, State};
 		[{"streams"}] ->
-			{['POST','GET'], ReqData, State}; 
+			{['POST', 'GET'], ReqData, State}; 
 		[{"users", _UserID}, {"streams"}] ->
-			{['GET','POST'], ReqData, State};
+			{['POST', 'GET'], ReqData, State};
 		[{"users", _UserID}, {"resources", _ResourceID}, {"streams"}] ->
-			{['GET','POST'], ReqData, State};
+			{['POST', 'GET'], ReqData, State};
 		[{"streams", _StreamID}] ->
 			{['GET', 'PUT', 'DELETE'], ReqData, State};
 		[{"users", _UserID}, {"streams", _StreamID}] ->
@@ -98,7 +99,6 @@ content_types_accepted(ReqData, State) ->
 delete_resource(ReqData, State) ->
 	Id = proplists:get_value('stream', wrq:path_info(ReqData)),
 	erlang:display("delete request"),
-	erlang:display(Id),
 	case erlastic_search:delete_doc(?INDEX,"stream", Id) of
 			{error,Reason} -> {false, wrq:set_resp_body(json_encode(Reason),ReqData), State};
 			{ok,List} -> {true,wrq:set_resp_body(json_encode(List),ReqData),State}
@@ -132,22 +132,21 @@ process_post(ReqData, State) ->
 			end,
 			case erlastic_search:index_doc(?INDEX, "stream", ResAdded) of	
 				{error, Reason} -> {false, wrq:set_resp_body(json_encode(Reason),ReqData), State};
-				{ok,List} -> erlang:display("Sucess"), 
-							 {true, wrq:set_resp_body(json_encode(List),ReqData), State}
+				{ok,List} -> {true, wrq:set_resp_body(json_encode(List),ReqData), State}
 			end;
 		true ->
-			process_search(ReqData,State)	
+			process_search_post(ReqData,State)	
 	end.
 
 %% @doc
-%% Function: process_search/2
-%% Purpose: Used to handle search requests that come from POST or GET requests
+%% Function: process_search_post/2
+%% Purpose: Used to handle search requests that come from POST requests
 %% Returns: {Sucess, ReqData, State}, where Sucess is true if the search request is 
 %%          sucessful and false otherwise.
 %% @end
--spec process_search(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
+-spec process_search_post(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 
-process_search(ReqData, State) ->
+process_search_post(ReqData, State) ->
 	erlang:display("search request"),
 	URIQuery = wrq:req_qs(ReqData),
 	case proplists:get_value('user', wrq:path_info(ReqData)) of
@@ -174,11 +173,49 @@ process_search(ReqData, State) ->
 				 end
 	end,
 	FullQuery = lists:append(transform(URIQuery,ResDef or UserDef),Query),
-	erlang:display(FullQuery),
 	case erlastic_search:search_limit(?INDEX, "stream", FullQuery,10) of % Maybe wanna take more
 		{error,Reason} -> {false, wrq:set_resp_body(json_encode(Reason),ReqData), State};
-		{ok,List} -> erlang:display(json_encode(List)),
-					 {true,wrq:set_resp_body(json_encode(List),ReqData),State} % May need to convert
+		{ok,List} -> {true,wrq:set_resp_body(json_encode(List),ReqData),State} 
+	end.
+
+%% @doc
+%% Function: process_search_get/2
+%% Purpose: Used to handle search requests that come from GET requests
+%% Returns: {Sucess, ReqData, State}, where Sucess is true if the search request is 
+%%          sucessful and false otherwise.
+%% @end
+-spec process_search_get(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
+
+process_search_get(ReqData, State) ->
+	erlang:display("search request"),
+	URIQuery = wrq:req_qs(ReqData),
+	case proplists:get_value('user', wrq:path_info(ReqData)) of
+		undefined ->
+			UserQuery = [],
+			UserDef = false;
+		UserId ->
+			UserQuery = "owner_id:" ++ UserId,
+			UserDef = true
+		end,
+	case proplists:get_value('res', wrq:path_info(ReqData)) of
+		undefined ->
+			ResQuery = [],
+			ResDef = false;
+		ResId ->
+			ResQuery = "resource_id:" ++ ResId,
+			ResDef = true
+	end,
+	case ResDef and UserDef of
+		true -> Query = UserQuery ++ "&" ++ ResQuery; 
+		false -> case ResDef or UserDef of
+					 true -> Query = UserQuery ++ ResQuery;
+					 false -> Query = ""
+				 end
+	end,
+	FullQuery = lists:append(transform(URIQuery,ResDef or UserDef),Query),
+	case erlastic_search:search_limit(?INDEX, "stream", FullQuery,10) of % Maybe wanna take more
+		{error,Reason} -> {Reason, ReqData, State};
+		{ok,List} -> {json_encode(List),ReqData,State} 
 	end.
 
 
@@ -195,8 +232,7 @@ put_stream(ReqData, State) ->
 	StreamId = proplists:get_value('stream', wrq:path_info(ReqData)),
 	{Stream,_,_} = json_handler(ReqData,State),
 	Update = create_update(Stream),
-	erlang:display(Update),
-	case erlastic_search:update_doc(?INDEX, "stream", StreamId, Update) of 
+	case update_doc(?INDEX, "stream", StreamId, Update) of 
 		{error,Reason} -> {false, wrq:set_resp_body(json_encode(Reason),ReqData), State};
 		{ok,List} -> {true,wrq:set_resp_body(json_encode(List),ReqData),State}
 	end.
@@ -217,13 +253,12 @@ put_stream(ReqData, State) ->
 
 get_stream(ReqData, State) ->
 	case is_search(ReqData) of
-		true -> process_search(ReqData,State);
+		true -> process_search_get(ReqData,State);
 		false ->
 			erlang:display("fetch request"),
 			case proplists:get_value('stream', wrq:path_info(ReqData)) of
 				undefined ->
 				% List streams based on URI
-		    		erlang:display("Value undefined"),
 					case proplists:get_value('user', wrq:path_info(ReqData)) of
 						undefined ->
 							UserQuery = [],
@@ -247,20 +282,16 @@ get_stream(ReqData, State) ->
 							 		false -> Query = "*"
 								 end
 					end,
-					erlang:display(Query),
 					case erlastic_search:search_limit(?INDEX, "stream", Query, 10) of % Maybe wanna take more
 						{error,Reason} -> {{error, Reason}, ReqData, State};
 						{ok,List} -> {json_encode(List), ReqData, State} % Maybe need to convert
 					end;
 				StreamId ->
-		        	erlang:display("Value defined"),
 				% Get specific stream
 					case erlastic_search:get_doc(?INDEX, "stream", StreamId) of 
 						{error, Msg} -> 
-							erlang:display("got error"),
 							{json_encode(Msg), ReqData, State};
 						{ok,List} -> 
-							erlang:display("got value"),
 					     	{json_encode(List), ReqData, State}
 					end
 				end
@@ -354,6 +385,14 @@ transform([{Field,Value}|Rest],AddAnd) ->
 % Taken from erlasticsearch
 json_encode(Data) ->
     (mochijson2:encoder([{utf8, true}]))(Data).
+
+% Taken from erlasticsearch and modified to not encode
+update_doc(Index, Type, Id, Mochijson) ->
+    update_doc(Index, Type, Id, Mochijson, []).
+update_doc(Index, Type, Id, Json, Qs) ->
+    Id1 = mochiweb_util:quote_plus(Id),
+    ReqPath = Index ++ [$/ | Type] ++ [$/ | Id1] ++ "/_update",
+    erls_resource:post(#erls_params{}, ReqPath, [], Qs, Json, []).
 
 
 
