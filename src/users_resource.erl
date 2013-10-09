@@ -189,7 +189,6 @@ process_search(ReqData, State, post) ->
 process_search(ReqData, State, get) ->
 	TempQuery =  wrq:req_qs(ReqData),
 	TransformedQuery =transform(TempQuery),
-	erlang:display("Query "++TransformedQuery),
 	case erlastic_search:search_limit(?INDEX, "user", TransformedQuery, 10) of 
 		{error,Reason} -> {{error,Reason}, ReqData, State};
 		{ok,List} -> {json_encode(List),ReqData,State} % May need to convert
@@ -230,10 +229,7 @@ parse_path(Path) ->
 pair([]) -> [];
 pair([A]) -> [{A}];
 pair([A,B|T]) ->
-	case string:to_integer(B) of
-		{V, []} -> [{A,V}|pair(T)];
-		{error, no_integer} -> [error]
-	end.
+	[{A,B}|pair(T)].
 
 
 %% @doc
