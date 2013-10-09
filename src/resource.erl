@@ -151,34 +151,97 @@ erlang:display("Got here2~n"),
 -spec get_resource(ReqData::tuple(), State::string()) -> {list(), tuple(), string()}.
 get_resource(ReqData, State) ->
 	erlang:display("fetch request"),
-	case proplists:get_value('resourceid', wrq:path_info(ReqData)) of
-		undefined ->
-		% List resources based on URI
-		    erlang:display("Value undefined"),
-			case proplists:get_value('userid', wrq:path_info(ReqData)) of
+	case is_search(ReqData) of
+		false ->
+			erlang:display("should get in here"),
+			case proplists:get_value('resourceid', wrq:path_info(ReqData)) of
 				undefined ->
-					Query = [];
-				UserId ->
-					Query = "owner:" ++ UserId
-			end,
-			case erlastic_search:search_limit(?INDEX, "resource", Query, 10) of % Maybe wanna take more
-				{error,Reason} -> {{halt, Reason}, ReqData, State};
-				{ok,List} -> 
-					{json_encode(List), ReqData, State} % Maybe need to convert
-			end;
-		ResourceId ->
-		        erlang:display("Value defined"),
-		% Get specific resource
-			case erlastic_search:get_doc(?INDEX, "resource", ResourceId) of 
-				{error,_Msg} -> 
-						erlang:display("got error"),
-						{{halt, 404}, ReqData, State};
-				{ok,List} -> 
-						 erlang:display("got value"),
-					     {json_encode(List), ReqData, State}
-			end
+				% List resources based on URI
+				    erlang:display("Value undefined"),
+					case proplists:get_value('userid', wrq:path_info(ReqData)) of
+						undefined ->
+							Query = [];
+						UserId ->
+							Query = "owner:" ++ UserId
+					end,
+					case erlastic_search:search_limit(?INDEX, "resource", Query, 10) of % Maybe wanna take more
+						{error,Reason} -> {{halt, Reason}, ReqData, State};
+						{ok,List} -> 
+							{json_encode(List), ReqData, State} % Maybe need to convert
+					end;
+				ResourceId ->
+				        erlang:display("Value defined"),
+				% Get specific resource
+					case erlastic_search:get_doc(?INDEX, "resource", ResourceId) of 
+						{error,_Msg} -> 
+								erlang:display("got error"),
+								{{halt, 404}, ReqData, State};
+						{ok,List} -> 
+								 erlang:display("got value"),
+							     {json_encode(List), ReqData, State}
+					end
+		end;
+		true ->
+			erlang:display("Processing search"),
+				process_search(ReqData,State, get)
 	end.
 
+
+%% @doc
+%% Function: is_search/2
+%% Purpose: Returns true if it is a search POST/GET request.
+%% Returns: {true | false}
+%% @end
+-spec is_search(string()) -> boolean().
+is_search(ReqData) ->
+	URIList = string:tokens(wrq:path(ReqData), "/"),
+	IsSearch = (string:sub_string(lists:nth(length(URIList),URIList),1,7) == "_search").
+
+
+%% @doc
+%% Function: transform/1
+%% Purpose: Transforms the query into the proper query language
+%% Returns: string()
+%% @end
+-spec transform(tuple()) -> {string()}.
+transform([]) -> "";
+transform([{Field,Value}|Rest]) when is_binary(Field) andalso is_binary(Value)->
+case Rest of
+[] -> binary_to_list(Field) ++ ":" ++ binary_to_list(Value) ++
+transform(Rest);
+_ -> binary_to_list(Field) ++ ":" ++ binary_to_list(Value) ++ "&" ++
+transform(Rest)
+end;
+transform([{Field,Value}|Rest]) ->
+case Rest of
+[] -> Field ++ ":" ++ Value ++ transform(Rest);
+_ -> Field ++ ":" ++ Value ++ "&" ++ transform(Rest)
+end.
+
+
+%% @doc
+%% Function: process_search/3
+%% Purpose: Does search for Users for either search done with POST or GET
+%% Returns: {true, ReqData, State} || {{error, Reason}, ReqData, State}
+%% @end
+-spec process_search(ReqData::tuple(), State::string(), term()) ->
+		{list(), tuple(), string()}.
+process_search(ReqData, State, post) ->
+		{Json,_,_} = json_handler(ReqData,State),
+		{struct, JsonData} = mochijson2:decode(Json),
+		Query = transform(JsonData),
+		case erlastic_search:search_limit(?INDEX, "resource", Query, 10) of
+			{error,Reason} -> {{error,Reason}, ReqData, State};
+			{ok,List} -> {true, wrq:set_resp_body(json_encode(List),ReqData),State}
+		end;
+process_search(ReqData, State, get) ->
+		TempQuery = wrq:req_qs(ReqData),
+		TransformedQuery =transform(TempQuery),
+		erlang:display("Query "++TransformedQuery),
+		case erlastic_search:search_limit(?INDEX, "resource", TransformedQuery, 10) of
+			{error,Reason} -> {{error,Reason}, ReqData, State};
+			{ok,List} -> {json_encode(List),ReqData,State} % May need to convert
+		end.
 
 
 
