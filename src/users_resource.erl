@@ -39,12 +39,12 @@ init([]) ->
 %% @end
 -spec allowed_methods(ReqData::tuple(), State::string()) -> {list(), tuple(), string()}.
 allowed_methods(ReqData, State) ->
-	case parse_path(wrq:path(ReqData)) of
+	case parse_path(wrq:path(ReqData)) of		
+		[{"users","_search"}] ->
+			{['POST','GET'], ReqData, State};
 		[{"users",_Id}] ->
 			{['GET', 'PUT', 'DELETE'], ReqData, State};
 		[{"users"}] ->
-			{['POST','GET'], ReqData, State};		
-		[{"users"},{"_search"}] ->
 			{['POST','GET'], ReqData, State};
 		[error] ->
 			{['POST','GET'], ReqData, State}
