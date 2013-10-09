@@ -256,7 +256,7 @@ id_from_path(RD) ->
 -spec is_search(string()) -> boolean().
 is_search(ReqData) ->
 	URIList = string:tokens(wrq:path(ReqData), "/"),
-	IsSearch = (string:sub_string(lists:nth(length(URIList),URIList),1,7) == "_search").
+	string:sub_string(lists:nth(length(URIList),URIList),1,7) == "_search".
 
 
 
