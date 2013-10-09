@@ -1,7 +1,7 @@
 # Ignore these
 ebin/
 doc/*
-lib/
+
 erl_crash.dump
 *~
 .project
