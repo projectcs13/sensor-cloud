@@ -54,7 +54,7 @@ run: compile
 ### Command: make run_db
 ### Runs elastic search
 run_es:
-	lib/elastic_search/bin/elasticsearch
+	lib/elastic_search/bin/elasticsearch -f
 
 ### Command: make test
 ### Compile project resources (not libraries) and runs all eunit tests.
@@ -64,7 +64,7 @@ test: compile
 
 test_travis: 
 	-@mkdir test-results
-	lib/elastic_search/bin/elasticsearch&
+	lib/elastic_search/bin/elasticsearch
 	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname database -setcookie database -mnesia dir '"/home/database/Mnesia.Database"' -s database init -s test run
 
 ### Command: make docs
