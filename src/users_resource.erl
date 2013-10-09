@@ -83,7 +83,7 @@ content_types_accepted(ReqData, State) ->
 %% @end
 -spec delete_resource(ReqData::tuple(), State::string()) -> {string(), tuple(), string()}.
 delete_resource(ReqData, State) ->
-	Id = list_to_integer(id_from_path(ReqData)),
+	Id = id_from_path(ReqData),
 	case erlastic_search:delete_doc(?INDEX,"user", Id) of
 		{error, not_found} -> {{halt,404}, ReqData, State};
 		{error, _} -> {{halt,400}, ReqData, State};		
