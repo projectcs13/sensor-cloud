@@ -382,13 +382,33 @@ transform([{Field,Value}|Rest],AddAnd) ->
 		_ -> Field ++ ":" ++ Value ++ "&" ++ transform(Rest,AddAnd)
 	end.
 
+%% @doc
+%% Function: json_encode/1
+%% Purpose: Used to transform the given data to json
+%% Returns: JSON that is created
+%% @end
+
 % Taken from erlasticsearch
 json_encode(Data) ->
     (mochijson2:encoder([{utf8, true}]))(Data).
 
+%% @doc
+%% Function: update_doc/4
+%% Purpose: Used to update document in elastic search
+%% Returns: JSON repons from elastic search server
+%% @end
+
 % Taken from erlasticsearch and modified to not encode
 update_doc(Index, Type, Id, Mochijson) ->
     update_doc(Index, Type, Id, Mochijson, []).
+
+%% @doc
+%% Function: update_doc/5
+%% Purpose: Used to update document in elastic search
+%% Returns: JSON repons from elastic search server
+%% @end
+
+% Taken from erlasticsearch and modified to not encode
 update_doc(Index, Type, Id, Json, Qs) ->
     Id1 = mochiweb_util:quote_plus(Id),
     ReqPath = Index ++ [$/ | Type] ++ [$/ | Id1] ++ "/_update",
