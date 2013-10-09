@@ -51,10 +51,16 @@ install: get_libs
 run: compile
 	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname database -setcookie database -mnesia dir '"/home/database/Mnesia.Database"' -s database init
 
+### Command: make run_db
+### Runs elastic search
+run_es:
+	lib/elastic_search/bin/elasticsearch
+
 ### Command: make test
 ### Compile project resources (not libraries) and runs all eunit tests.
 test: compile
 	-@mkdir test-results
+	lib/elastic_search/bin/elasticsearch&
 	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname database -setcookie database -mnesia dir '"/home/database/Mnesia.Database"' -s database init -s test run
 #	@./rebar eunit skip_deps=true
 
@@ -101,6 +107,9 @@ help:
 	@echo ""
 	@echo "'make run'"
 	@echo "Compiles and runs the project. Does NOT compile libraries"
+	@echo ""
+	@echo "'make run_es'"
+	@echo "Runs the elastic search server"
 	@echo ""
 	@echo "'make docs'"
 	@echo "Generates documentation for the project"
