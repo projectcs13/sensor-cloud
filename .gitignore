@@ -1,11 +1,7 @@
 # Ignore these
 ebin/
 doc/*
-lib/ibrowse
-lib/lhttpc
-lib/meck
-lib/mochiweb
-lib/webmachine
+lib/
 erl_crash.dump
 *~
 .project
