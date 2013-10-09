@@ -11,9 +11,8 @@
 -module(streams).
 -compile(export_all).
 
--include_lib("erlastic_search/include/erlastic_search.hrl").
--include_lib("webmachine/include/webmachine.hrl").
--include("include/user.hrl").
+-include_lib("erlastic_search.hrl").
+-include_lib("webmachine.hrl").
 
 -define(INDEX, "sensorcloud").
 
