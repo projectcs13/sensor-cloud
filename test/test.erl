@@ -37,7 +37,7 @@ run() ->
 %% Returns: ok | no_return()
 %% @end
 run_travis() ->
-	timer:sleep(60000),
+	timer:sleep(10000),
     Result = eunit:test("ebin",
 			[verbose, 
 			 {cover_enabled, true},
