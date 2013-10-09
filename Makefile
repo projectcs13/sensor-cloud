@@ -23,7 +23,7 @@ get_libs:
 
 test_travis: 
 	-@mkdir test-results
-	lib/elastic_search/bin/elasticsearch
+	lib/elastic_search/bin/elasticsearch -Des.network.host=localhost -Des.discovery.zen.ping.multicast.enabled=false -Des.discovery.zen.ping_timeout=1
 	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname database -setcookie database -mnesia dir '"/home/database/Mnesia.Database"' -s database init -s test run_travis
 
 clean_emacs_vsn_files:
