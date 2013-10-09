@@ -1,5 +1,5 @@
 language: erlang
-script: "make install && make test"
+script: "make install && make test_travis"
 otp_release:
 #  - R16B02
 #  - R16B01
