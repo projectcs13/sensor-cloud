@@ -16,7 +16,7 @@
 %% Returns: ok | no_return()
 %% @end
 run() ->
-	timer:sleep(1000),
+	timer:sleep(10000),
     Result = eunit:test("ebin",
 			[verbose, 
 			 {cover_enabled, true},

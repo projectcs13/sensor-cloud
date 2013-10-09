@@ -21,6 +21,11 @@ get_libs:
 	@./rebar get-deps
 	@./rebar compile
 
+test_travis: 
+	-@mkdir test-results
+	lib/elastic_search/bin/elasticsearch&
+	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname database -setcookie database -mnesia dir '"/home/database/Mnesia.Database"' -s database init -s test run
+
 clean_emacs_vsn_files:
 	rm -rf *~
 	rm -rf doc/*~
@@ -60,11 +65,6 @@ run_es:
 ### Compile project resources (not libraries) and runs all eunit tests.
 test: compile
 	-@mkdir test-results
-	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname database -setcookie database -mnesia dir '"/home/database/Mnesia.Database"' -s database init -s test run
-
-test_travis: 
-	-@mkdir test-results
-	lib/elastic_search/bin/elasticsearch&
 	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname database -setcookie database -mnesia dir '"/home/database/Mnesia.Database"' -s database init -s test run
 
 ### Command: make docs
