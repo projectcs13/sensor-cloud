@@ -51,7 +51,7 @@ install: get_libs
 run: compile
 	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname database -setcookie database -mnesia dir '"/home/database/Mnesia.Database"' -s database init
 
-### Command: make run_db
+### Command: make run_es
 ### Runs elastic search
 run_es:
 	lib/elastic_search/bin/elasticsearch -f
