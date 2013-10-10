@@ -17,20 +17,8 @@ APP := website
 compile:
 	@./rebar compile skip_deps=true
 
-### get_libs will download and install all project Install Erlang if it is not already installed. D
+### get_libs will download and install all project libraries
 get_libs:
-#       Add Erlang solutions Erlang package
-	wget https://packages.erlang-solutions.com/erlang-solutions_1.0_all.deb
-	sudo dpkg -i erlang-solutions_1.0_all.deb
-	rm -f erlang-solutions_1.0_all.deb
-#	Add Erlang solutions key
-	wget http://packages.erlang-solutions.com/debian/erlang_solutions.asc
-	sudo apt-key add erlang_solutions.asc
-	rm -f erlang_solutions.asc
-#	Install Erlang
-	sudo apt-get update
-	sudo apt-get install erlang
-#	Download and insall project dependencies
 	@./rebar get-deps
 	@./rebar compile
 
