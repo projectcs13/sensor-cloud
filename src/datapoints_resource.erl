@@ -101,8 +101,8 @@ json_handler(ReqData, State) ->
 %% @end
 -spec get_datapoint(ReqData::tuple(), State::string()) -> {list(), tuple(), string()}.
 get_datapoint(ReqData, State) ->
-		%case is_search(ReqData) of
-		%	false ->
+		case is_search(ReqData) of
+			false ->
 				case id_from_path(ReqData) of
 					undefined ->
 						% Get all datapoints
@@ -120,11 +120,68 @@ get_datapoint(ReqData, State) ->
 								Datapoint = proplists:get_value(<<"_source">>, JsonData),
 								{json_encode(Datapoint), ReqData, State}
 						end
-				%case for ranged of datapoints?
-				end.
-		%	true ->	
-		%		process_search(ReqData,State, get)	
-		%end.
+				end;
+			true ->	
+				process_search(ReqData,State, get)	
+		end.
+
+
+%% @doc
+%% Function: is_search/2
+%% Purpose: Returns true if it is a search POST/GET request.
+%% Returns: {true | false}
+%% @end
+-spec is_search(string()) -> boolean().
+is_search(ReqData) ->
+		URIList = string:tokens(wrq:path(ReqData), "/"),
+		string:sub_string(lists:nth(length(URIList),URIList),1,7) == "_search".
+
+
+%% @doc
+%% Function: process_search/3
+%% Purpose: Does search for Datapoints for either search done with POST or GET
+%% Returns: {true, ReqData, State} || {{error, Reason}, ReqData, State}
+%% @end
+-spec process_search(ReqData::tuple(), State::string(), term()) ->
+		{list(), tuple(), string()}.
+process_search(ReqData, State, post) ->
+		{Json,_,_} = json_handler(ReqData,State),
+		{struct, JsonData} = mochijson2:decode(Json),
+		Query = transform(JsonData),
+		case erlastic_search:search_limit(?INDEX, "datapoint", Query, 10) of
+			{error,Reason} -> {{error,Reason}, ReqData, State};
+			{ok,List} -> {true, wrq:set_resp_body(json_encode(List),ReqData),State}
+		end;
+process_search(ReqData, State, get) ->
+		TempQuery = wrq:req_qs(ReqData),
+		TransformedQuery = transform(TempQuery),
+		case erlastic_search:search_limit(?INDEX, "datapoint", TransformedQuery, 10) of
+			{error,Reason} -> {{error,Reason}, ReqData, State};
+			{ok,List} -> {json_encode(List),ReqData,State} % May need to convert
+		end.
+
+
+%% @doc
+%% Function: transform/1
+%% Purpose: Transforms the query into the proper query language
+%% Returns: string()
+%% @end
+-spec transform(tuple()) -> {string()}.
+transform([]) -> "";
+transform([{Field,Value}|Rest]) when is_binary(Field) andalso is_binary(Value)->
+		case Rest of
+			[] -> binary_to_list(Field) ++ ":" ++ binary_to_list(Value) ++
+					transform(Rest);
+			_ -> binary_to_list(Field) ++ ":" ++ binary_to_list(Value) ++ "&" ++
+					transform(Rest)
+		end;
+transform([{Field,Value}|Rest]) ->
+		case Rest of
+			[] -> Field ++ ":" ++ Value ++ transform(Rest);
+			_ -> A= Field ++ ":" ++ Value ++ "&" ++ transform(Rest),
+				 erlang:display(A),
+				 A
+		end.
 
 
 %% @doc
