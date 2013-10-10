@@ -145,9 +145,6 @@ process_search(ReqData, State) ->
 		{ok,List} -> {List,ReqData,State} % May need to convert
 	end.
 
-
-
-
 put_stream(ReqData, State) ->
 	erlang:display("update request"),
 	StreamId = proplists:get_value('stream', wrq:path_info(ReqData)),
@@ -158,12 +155,6 @@ put_stream(ReqData, State) ->
 		{error,Reason} -> {{error,Reason}, ReqData, State};
 		{ok,List} -> {List,ReqData,State}
 	end.
-
-
-
-
-
-
 
 get_stream(ReqData, State) ->
 	case is_search(ReqData) of
