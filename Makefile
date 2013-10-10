@@ -17,6 +17,7 @@ APP := website
 compile:
 	@./rebar compile skip_deps=true
 
+### get_libs will download and install all project libraries
 get_libs:
 	@./rebar get-deps
 	@./rebar compile
@@ -51,13 +52,16 @@ install: get_libs
 run: compile
 	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname database -setcookie database -mnesia dir '"/home/database/Mnesia.Database"' -s database init
 
+### Command: make run_es
+### Runs elastic search
+run_es:
+	lib/elastic_search/bin/elasticsearch -f
+
 ### Command: make test
 ### Compile project resources (not libraries) and runs all eunit tests.
 test: compile
 	-@mkdir test-results
 	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname database -setcookie database -mnesia dir '"/home/database/Mnesia.Database"' -s database init -s test run
-#	@./rebar eunit skip_deps=true
-
 
 ### Command: make docs
 ### Genereats all of the documentation files
@@ -101,6 +105,9 @@ help:
 	@echo ""
 	@echo "'make run'"
 	@echo "Compiles and runs the project. Does NOT compile libraries"
+	@echo ""
+	@echo "'make run_es'"
+	@echo "Runs the elastic search server"
 	@echo ""
 	@echo "'make docs'"
 	@echo "Generates documentation for the project"
