@@ -2,8 +2,8 @@
 -module(streams).
 -compile(export_all).
 
--include_lib("webmachine/include/webmachine.hrl").
--include("include/user.hrl").
+-include_lib("webmachine.hrl").
+-include("user.hrl").
 
 -define(INDEX, "sensorcloud").
 

@@ -7,8 +7,9 @@
 		 put_handler/2,
 		 put_group/2]).
 
--include_lib("webmachine/include/webmachine.hrl").
--include("include/user.hrl").
+-include_lib("webmachine.hrl").
+-include_lib("erlastic_search.hrl").
+
 
 %% Index and Type definitions
 
@@ -122,7 +123,7 @@ put_group(ReqData, State) ->
 	GroupId = proplists:get_value(group, wrq:path_info(ReqData)),
 	{ReqBody,_,_} = json_handler(ReqData,State),
 	Update = create_update(ReqBody),
-	case erlastic_search:update_doc(?INDEX, ?GROUP, GroupId, Update) of 
+	case update_doc(?INDEX, ?GROUP, GroupId, Update) of 
 		{error,Reason} -> {{error,Reason}, ReqData, State};
 		{ok,List} -> {List,ReqData,State}
 	end.
@@ -161,4 +162,11 @@ pair([]) -> [];
 pair([A]) -> [{A}];
 pair([A,B|T]) ->
 	[{A,B}|pair(T)].
+
+update_doc(Index, Type, Id, Mochijson) ->
+    update_doc(Index, Type, Id, Mochijson, []).
+update_doc(Index, Type, Id, Mochijson, Qs) ->
+    Id1 = mochiweb_util:quote_plus(Id),
+    ReqPath = Index ++ [$/ | Type] ++ [$/ | Id1] ++ "/_update",
+    erls_resource:post(#erls_params{}, ReqPath, [], Qs, Mochijson, []).
 
