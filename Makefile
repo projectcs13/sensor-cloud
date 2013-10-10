@@ -23,7 +23,7 @@ get_libs:
 
 test_travis: 
 	-@mkdir test-results
-	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname database -setcookie database -mnesia dir '"/home/database/Mnesia.Database"' -s database init -s test run_travis
+	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname database -setcookie database -mnesia dir '"/home/database/Mnesia.Database"' -s database init -s test run
 
 clean_emacs_vsn_files:
 	rm -rf *~
