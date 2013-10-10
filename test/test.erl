@@ -28,24 +28,3 @@ run() ->
 	    halt(1)
     end.
 
-
-%% @doc
-%% Function: run_travis/0
-%% Purpose: Wrapper function for testing in order to be able to return a 
-%%          non-zero exit code on failure of one or more test cases fails.
-%%          This is for getting tests to work with Travis CI.
-%% Returns: ok | no_return()
-%% @end
-run_travis() ->
-	timer:sleep(10000),
-    Result = eunit:test("ebin",
-			[verbose, 
-			 {cover_enabled, true},
-			 {report, {eunit_surefire, [{dir, "test-results"}]}}
-			]),
-    case Result of
-	ok ->
-	    init:stop();
-	error ->
-	    halt(1)
-    end.

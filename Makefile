@@ -21,10 +21,6 @@ get_libs:
 	@./rebar get-deps
 	@./rebar compile
 
-test_travis: 
-	-@mkdir test-results
-	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname database -setcookie database -mnesia dir '"/home/database/Mnesia.Database"' -s database init -s test run
-
 clean_emacs_vsn_files:
 	rm -rf *~
 	rm -rf doc/*~
