@@ -6,7 +6,7 @@
 %% @doc Test wrapper module
 -module(test).
 -author('Tommy Mattsson').
--export([run/0,run_travis/0]).
+-export([run/0]).
 
 %% @doc
 %% Function: run/0
