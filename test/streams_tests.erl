@@ -100,19 +100,19 @@ delete_stream_test() ->
 %% @end
 -spec delete_stream_and_datapoints_test() -> ok | {error, term()}.
 delete_stream_and_datapoints_test() ->
-	?assertMatch({ok, {{Version1, 200, ReasonPhrase1}, Headers1, Body1}}, 
+	{ok, {{_, 200, ReasonPhrase1}, _, Body1}}=
 		httpc:request(post, {"http://localhost:8000/streams", 
 							 [], 
 							 "application/json", 
-							 "{\n\"test\" : \"get\"\n}"}, [], [])),
+							 "{\n\"test\" : \"get\"\n}"}, [], []),
 	DocId1 = get_field_value(Body1,"_id"),
-	?assertMatch({ok, {{Version2, 200, ReasonPhrase12, Headers2, Body2}} ,
+	{ok, {{_, 200, ReasonPhrase2}, _, _}} =
 		 httpc:request(post, {"http://localhost:8000/streams/"++DocId1++"/data", 
 							  [], 
 							  "application/json", 
-							  "{\n\"streamid\" : "++ DocId1 ++"\n}"}, [], [])),
-	?assertMatch({ok, {{Version3, 200, ReasonPhrase3}, Headers3, Body3}} , 
-		 httpc:request(delete, {"http://localhost:8000/streams/" ++ DocId1, []}, [], [])),
+							  "{\n\"streamid\" : "++ DocId1 ++"\n}"}, [], []),
+	{ok, {{_, 200, ReasonPhrase3}, _, _}} =
+		 httpc:request(delete, {"http://localhost:8000/streams/" ++ DocId1, []}, [], []),
 	?assertMatch({ok, {{_, 400, _}, _, _}} , 
 		 httpc:request(get, {"http://localhost:8000/streams/" ++ DocId1++"/data", []}, [], [])).
 
