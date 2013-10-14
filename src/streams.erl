@@ -12,8 +12,10 @@
 -export([init/1, allowed_methods/2, content_types_provided/2, content_types_accepted/2,
 		 delete_resource/2, process_post/2, put_stream/2, get_stream/2]).
 
+
 -include_lib("erlastic_search.hrl").
--include_lib("webmachine.hrl").
+-include("webmachine.hrl").
+
 
 -define(INDEX, "sensorcloud").
 
@@ -179,6 +181,7 @@ process_search_post(ReqData, State) ->
 		{ok,List} -> {true,wrq:set_resp_body(json_encode(List),ReqData),State} 
 	end.
 
+
 %% @doc
 %% Function: process_search_get/2
 %% Purpose: Used to handle search requests that come from GET requests
@@ -242,6 +245,7 @@ put_stream(ReqData, State) ->
 
 
 
+
 %% @doc
 %% Function: get_stream/2
 %% Purpose: Used to handle GET requests by giving the document with the given
@@ -251,6 +255,7 @@ put_stream(ReqData, State) ->
 %% successful and false otherwise.
 %% @end
 -spec get_stream(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
+
 
 get_stream(ReqData, State) ->
 	case is_search(ReqData) of
