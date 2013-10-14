@@ -31,12 +31,10 @@ init([]) ->
 -spec allowed_methods(ReqData::tuple(), State::string()) -> {list(), tuple(), string()}.
 allowed_methods(ReqData, State) ->
 	case parse_path(wrq:path(ReqData)) of	
-		[{"datapoints","_search"}] ->
+		[{"streams", _Id}, {"data", "_search"}] ->
 			{['POST','GET'], ReqData, State};
-		[{"datapoints",_Id}] ->
-			{['GET', 'PUT', 'DELETE'], ReqData, State};
-		[{"datapoints"}] ->
-			{['POST','GET'], ReqData, State};
+		[{"streams", _Id}, {"data"}] ->
+			{['GET', 'PUT', 'POST', 'DELETE'], ReqData, State};
 		[error] ->
 			{['POST','GET'], ReqData, State}
 	end.
@@ -101,10 +99,13 @@ json_handler(ReqData, State) ->
 %% @end
 -spec get_datapoint(ReqData::tuple(), State::string()) -> {list(), tuple(), string()}.
 get_datapoint(ReqData, State) ->
+						erlang:display("get"),
 		case is_search(ReqData) of
 			false ->
-				case id_from_path(ReqData) of
+				case id_from_path(ReqData) of %streams/5/data
+%und_ can be removed?
 					undefined ->
+						erlang:display("bbb"),
 						% Get all datapoints
 						case erlastic_search:search(?INDEX,"datapoint","*:*") of
 							{ok, Result} ->
@@ -113,12 +114,11 @@ get_datapoint(ReqData, State) ->
 						end;
 					Id ->
 						% Get specific datapoint
-						case erlastic_search:get_doc(?INDEX, "datapoint", Id) of
-							{error, _} ->
-								{{halt, 404}, ReqData, State};
-							{ok,{struct, JsonData}} ->
-								Datapoint = proplists:get_value(<<"_source">>, JsonData),
-								{json_encode(Datapoint), ReqData, State}
+						erlang:display("aaaa"),
+						case A=erlastic_search:search(?INDEX, "datapoint", "streamid:"++Id) of
+							{ok, Result} ->
+								{json_encode(Result), ReqData, State};
+							_ -> erlang:display(A),{{halt, 404}, ReqData, State}
 						end
 				end;
 			true ->	
@@ -194,7 +194,7 @@ id_from_path(RD) ->
     case wrq:path_info(id, RD) of
         undefined ->
             case string:tokens(wrq:disp_path(RD), "/") of
-					["datapoints", Id] -> Id;
+					["streams", Id, "data"] -> Id;
 					_ -> undefined
 			end;
         Id -> Id
