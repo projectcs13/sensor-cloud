@@ -89,9 +89,9 @@ content_types_accepted(ReqData, State) ->
 
 %% @doc
 %% Function: delete_resource/2
-%% Purpose: Used to handle DELETE requests by deleteing the stream in elastic search
-%% Returns: {Sucess, ReqData, State}, where Sucess is true if delete is sucessful
-%%			and false otherwise.
+%% Purpose: Used to handle DELETE requests by deleting the stream in elastic search
+%% Returns: {Success, ReqData, State}, where Success is true if delete is successful
+%% and false otherwise.
 %% @end
 -spec delete_resource(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 
@@ -107,8 +107,8 @@ delete_resource(ReqData, State) ->
 %% @doc
 %% Function: process_post/2
 %% Purpose: Used to handle POST requests by creating streams, or search for streams in elastic search
-%% Returns: {Sucess, ReqData, State}, where Sucess is true if the post request is 
-%%          sucessful and false otherwise.
+%% Returns: {Success, ReqData, State}, where Success is true if the post request is
+%% successful and false otherwise.
 %% @end
 -spec process_post(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 
@@ -137,11 +137,12 @@ process_post(ReqData, State) ->
 			process_search_post(ReqData,State)	
 	end.
 
+
 %% @doc
 %% Function: process_search_post/2
 %% Purpose: Used to handle search requests that come from POST requests
-%% Returns: {Sucess, ReqData, State}, where Sucess is true if the search request is 
-%%          sucessful and false otherwise.
+%% Returns: {Success, ReqData, State}, where Success is true if the search request is
+%% successful and false otherwise.
 %% @end
 -spec process_search_post(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 
@@ -172,7 +173,7 @@ process_search_post(ReqData, State) ->
 				 end
 	end,
 	FullQuery = lists:append(transform(URIQuery,ResDef or UserDef),Query),
-	case erlastic_search:search_limit(?INDEX, "stream", FullQuery,10) of % Maybe wanna take more
+	case erlastic_search:search_limit(?INDEX, "stream", FullQuery,200) of % Maybe wanna take more
 		{error,Reason} -> {false, wrq:set_resp_body(json_encode(Reason),ReqData), State};
 		{ok,List} -> {true,wrq:set_resp_body(json_encode(List),ReqData),State} 
 	end.
@@ -180,8 +181,8 @@ process_search_post(ReqData, State) ->
 %% @doc
 %% Function: process_search_get/2
 %% Purpose: Used to handle search requests that come from GET requests
-%% Returns: {Sucess, ReqData, State}, where Sucess is true if the search request is 
-%%          sucessful and false otherwise.
+%% Returns: {Success, ReqData, State}, where Success is true if the search request is
+%% successful and false otherwise.
 %% @end
 -spec process_search_get(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 
@@ -212,7 +213,7 @@ process_search_get(ReqData, State) ->
 				 end
 	end,
 	FullQuery = lists:append(transform(URIQuery,ResDef or UserDef),Query),
-	case erlastic_search:search_limit(?INDEX, "stream", FullQuery,10) of % Maybe wanna take more
+	case erlastic_search:search_limit(?INDEX, "stream", FullQuery,200) of % Maybe wanna take more
 		{error,Reason} -> {Reason, ReqData, State};
 		{ok,List} -> {json_encode(List),ReqData,State} 
 	end.
@@ -220,9 +221,9 @@ process_search_get(ReqData, State) ->
 
 %% @doc
 %% Function: put_stream/2
-%% Purpose: Used to handle PUT requests by updateing the given documents in elastic search
-%% Returns: {Sucess, ReqData, State}, where Sucess is true if the PUT request is 
-%%          sucessful and false otherwise.
+%% Purpose: Used to handle PUT requests by updating the given documents in elastic search
+%% Returns: {Success, ReqData, State}, where Success is true if the PUT request is
+%% successful and false otherwise.
 %% @end
 -spec put_stream(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 
@@ -242,11 +243,11 @@ put_stream(ReqData, State) ->
 
 %% @doc
 %% Function: get_stream/2
-%% Purpose: Used to handle GET requests by giveing the document with the given
-%%          Id or listing the documents that can be found from the restrictions
-%%          given by the URI.
-%% Returns: {Sucess, ReqData, State}, where Sucess is true if the PUT request is 
-%%          sucessful and false otherwise.
+%% Purpose: Used to handle GET requests by giving the document with the given
+%% Id or listing the documents that can be found from the restrictions
+%% given by the URI.
+%% Returns: {Success, ReqData, State}, where Success is true if the PUT request is
+%% successful and false otherwise.
 %% @end
 -spec get_stream(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 
@@ -281,7 +282,7 @@ get_stream(ReqData, State) ->
 							 		false -> Query = "*"
 								 end
 					end,
-					case erlastic_search:search_limit(?INDEX, "stream", Query, 10) of % Maybe wanna take more
+					case erlastic_search:search_limit(?INDEX, "stream", Query,200) of % Maybe wanna take more
 						{error,Reason} -> {{error, Reason}, ReqData, State};
 						{ok,List} -> {json_encode(List), ReqData, State} % Maybe need to convert
 					end;
@@ -298,8 +299,8 @@ get_stream(ReqData, State) ->
 
 %% @doc
 %% Function: is_search/1
-%% Purpose: Used to decied if the URI specifys a search
-%% Returns: True if URI specifys a search, false otherwise
+%% Purpose: Used to deiced if the URI specify a search
+%% Returns: True if URI specify a search, false otherwise
 %% @end
 -spec is_search(ReqData::term()) -> boolean().
 
@@ -367,9 +368,9 @@ pair([A,B|T]) ->
 %% @doc
 %% Function: transform/2
 %% Purpose: Used to create the query for search, expects more fields
-%%          if AddAnd euqal to true
+%% if AddAnd euqal to true
 %% Returns: The query string from given from the list
-%%          were the list will be {Field,Value} tuples
+%% were the list will be {Field,Value} tuples
 %% @end
 -spec transform(QueryList::list(),AddAnd::boolean()) -> list().
 
@@ -394,7 +395,7 @@ json_encode(Data) ->
 %% @doc
 %% Function: update_doc/4
 %% Purpose: Used to update document in elastic search
-%% Returns: JSON repons from elastic search server
+%% Returns: JSON response from elastic search server
 %% @end
 
 % Taken from erlasticsearch and modified to not encode
@@ -404,7 +405,7 @@ update_doc(Index, Type, Id, Mochijson) ->
 %% @doc
 %% Function: update_doc/5
 %% Purpose: Used to update document in elastic search
-%% Returns: JSON repons from elastic search server
+%% Returns: JSON response from elastic search server
 %% @end
 
 % Taken from erlasticsearch and modified to not encode
