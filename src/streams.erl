@@ -9,7 +9,8 @@
 %%
 %% @end
 -module(streams).
--compile(export_all).
+-export([init/1, allowed_methods/2, content_types_provided/2, content_types_accepted/2,
+		 delete_resource/2, process_post/2, put_stream/2, get_stream/2]).
 
 -include_lib("erlastic_search.hrl").
 -include_lib("webmachine.hrl").
@@ -284,7 +285,7 @@ get_stream(ReqData, State) ->
 					end,
 					case erlastic_search:search_limit(?INDEX, "stream", Query,200) of % Maybe wanna take more
 						{error,Reason} -> {{error, Reason}, ReqData, State};
-						{ok,List} -> {json_encode(List), ReqData, State} % Maybe need to convert
+						{ok,List} -> {remove_search_part(json_encode(List),false,0), ReqData, State} 
 					end;
 				StreamId ->
 				% Get specific stream
@@ -295,6 +296,41 @@ get_stream(ReqData, State) ->
 					     	{json_encode(List), ReqData, State}
 					end
 				end
+	end.
+
+%% @doc
+%% Function: remove_search_part/3
+%% Purpose: Used to remove the search header of a search JSON 
+%% Returns: Returns the list of JSON objects return from the search
+%% @end
+-spec remove_search_part(JSONString::string(),FoundLeft::boolean(),OpenBrackets::integer()) -> string().
+
+remove_search_part([],_,_) ->
+	[];
+remove_search_part([First|Rest],true,1) ->
+	case First of
+		93 ->
+			[First];
+		91 ->
+			[First|remove_search_part(Rest,true,2)];
+		_ ->
+			[First|remove_search_part(Rest,true,1)]
+	end;
+remove_search_part([First|Rest],true,Val) ->
+  	case First of
+		93 ->
+			[First|remove_search_part(Rest,true,Val-1)];
+		91 ->
+			[First|remove_search_part(Rest,true,Val+1)];
+		_ ->
+			[First|remove_search_part(Rest,true,Val)]
+	end;
+remove_search_part([First|Rest],false,Val) ->
+	case First of
+		91 ->
+			[First|remove_search_part(Rest,true,1)];
+		_ ->
+			remove_search_part(Rest,false,Val)
 	end.
 
 %% @doc
