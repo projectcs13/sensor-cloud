@@ -83,7 +83,7 @@ process_post(ReqData, State) ->
 
 %% @doc
 %% Function: json_handler/2
-%% Purpose: Handles JSON (?)
+%% Purpose: Handles JSON 
 %% Returns: A string with fields and values formatted in a correct way
 %% @end
 -spec json_handler(tuple(), string()) -> {string(), tuple(), string()}.
@@ -122,6 +122,7 @@ get_datapoint(ReqData, State) ->
 						end
 				end;
 			true ->	
+				erlang:display("process search"),
 				process_search(ReqData,State, get)	
 		end.
 
