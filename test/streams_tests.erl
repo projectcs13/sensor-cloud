@@ -91,6 +91,32 @@ delete_stream_test() ->
 	?assertEqual(true,string:str(Body4,DocId2) =/= 0),
 	?assertEqual(true,string:str(Body5,"not_found") =/= 0),
 	?assertEqual(true,string:str(Body5,"not_found") =/= 0).
+
+
+%% @doc
+%% Function: delete_stream_and_datapoints_test/0
+%% Purpose: Test if delete_stream function correctly deletes the streams datapoints
+%% Returns: ok | {error, term()}
+%% @end
+-spec delete_stream_and_datapoints_test() -> ok | {error, term()}.
+delete_stream_and_datapoints_test() ->
+	?assertMatch({ok, {{Version1, 200, ReasonPhrase1}, Headers1, Body1}}, 
+		httpc:request(post, {"http://localhost:8000/streams", 
+							 [], 
+							 "application/json", 
+							 "{\n\"test\" : \"get\"\n}"}, [], [])),
+	DocId1 = get_field_value(Body1,"_id"),
+	?assertMatch({ok, {{Version2, 200, ReasonPhrase12, Headers2, Body2}} ,
+		 httpc:request(post, {"http://localhost:8000/streams/"++DocId1++"/data", 
+							  [], 
+							  "application/json", 
+							  "{\n\"streamid\" : "++ DocId1 ++"\n}"}, [], [])),
+	?assertMatch({ok, {{Version3, 200, ReasonPhrase3}, Headers3, Body3}} , 
+		 httpc:request(delete, {"http://localhost:8000/streams/" ++ DocId1, []}, [], [])),
+	?assertMatch({ok, {{_, 400, _}, _, _}} , 
+		 httpc:request(get, {"http://localhost:8000/streams/" ++ DocId1++"/data", []}, [], [])).
+
+
 	
 %% @doc
 %% Function: get_field_value/2

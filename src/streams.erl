@@ -100,7 +100,9 @@ delete_resource(ReqData, State) ->
 	erlang:display("delete request"),
 	case erlastic_search:delete_doc(?INDEX,"stream", Id) of
 			{error,Reason} -> {false, wrq:set_resp_body(json_encode(Reason),ReqData), State};
-			{ok,List} -> {true,wrq:set_resp_body(json_encode(List),ReqData),State}
+			{ok,List} -> 
+				erlastic_search:delete_doc_by_query(?INDEX, "datapoint", "streamid:"++Id),
+				{true,wrq:set_resp_body(json_encode(List),ReqData),State}
 	end.
 
 
