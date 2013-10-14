@@ -106,6 +106,7 @@ delete_stream_and_datapoints_test() ->
 							 "application/json", 
 							 "{\n\"test\" : \"get\"\n}"}, [], []),
 	DocId1 = get_field_value(Body1,"_id"),
+	erlang:display(DocId1),
 	{ok, {{_, 200, ReasonPhrase2}, _, _}} =
 		 httpc:request(post, {"http://localhost:8000/streams/"++DocId1++"/data", 
 							  [], 
