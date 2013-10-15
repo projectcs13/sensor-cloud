@@ -180,7 +180,6 @@ put_resource(ReqData, State) ->
 			end
 	end.
 
-
 %% @doc
 %% Function: get_resource/2
 %% Purpose: Handle GET request
@@ -202,11 +201,12 @@ get_resource(ReqData, State) ->
 						UserId ->
 							Query = "owner:" ++ UserId
 					end,
-					case erlastic_search:search_limit(?INDEX, "resource", Query, 10) of % Maybe wanna take more
+					case erlastic_search:search_limit(?INDEX, "resource", Query, 100) of % Maybe wanna take more
 						{error,Reason} -> {{halt, Reason}, ReqData, State};
 						{ok,List} -> 
-				    erlang:display(Query),
-							{json_encode(List), ReqData, State} % Maybe need to convert
+				    		erlang:display(Query),
+
+							{remove_search_part(make_to_string(json_encode(List)),false,0), ReqData, State} % Maybe need to convert
 					end;
 				ResourceId ->
 				        erlang:display("Value defined"),
@@ -273,6 +273,61 @@ json_handler(ReqData, State) ->
 	erlang:display(Value),
 	%%{struct, JsonData} = mochijson2:decode(Value),
 	{Value, ReqData, State}.
+
+%% @doc
+%% Function: make_to_string/1
+%% Purpose: Used to convert JSON with binary data left to string
+%% Returns: Returns the string represented by the given list
+%% @end
+
+make_to_string([]) ->
+	[];
+make_to_string([First|Rest]) ->
+	case is_list(First) of
+		true -> make_to_string(First) ++ make_to_string(Rest);
+		false ->
+			case is_binary(First) of
+				true -> binary:bin_to_list(First) ++ make_to_string(Rest);
+				false -> [First] ++ make_to_string(Rest)
+			end
+	end.
+
+%% @doc
+%% Function: remove_search_part/3
+%% Purpose: Used to remove the search header of a search JSON 
+%% Returns: Returns the list of JSON objects return from the search
+%% @end
+-spec remove_search_part(JSONString::string(),FoundLeft::boolean(),OpenBrackets::integer()) -> string().
+
+remove_search_part([],_,_) ->
+	[];
+remove_search_part([First|Rest],true,1) ->
+	case First of
+		93 ->
+			[First];
+		91 ->
+			[First|remove_search_part(Rest,true,2)];
+		_ ->
+			[First|remove_search_part(Rest,true,1)]
+	end;
+remove_search_part([First|Rest],true,Val) ->
+  	case First of
+		93 ->
+			[First|remove_search_part(Rest,true,Val-1)];
+		91 ->
+			[First|remove_search_part(Rest,true,Val+1)];
+		_ ->
+			[First|remove_search_part(Rest,true,Val)]
+	end;
+remove_search_part([First|Rest],false,Val) ->
+	case First of
+		91 ->
+			[First|remove_search_part(Rest,true,1)];
+		_ ->
+			remove_search_part(Rest,false,Val)
+	end.
+
+
 
 
 %% @doc
