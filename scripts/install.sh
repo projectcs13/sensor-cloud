@@ -7,16 +7,13 @@
 echo "#################################################################"
 echo "Installing Erlang"
 echo "#################################################################"
-wget https://packages.erlang-solutions.com/erlang-solutions_1.0_all.deb
-sudo dpkg -i erlang-solutions_1.0_all.deb
-rm -f erlang-solutions_1.0_all.deb
-
-wget http://packages.erlang-solutions.com/debian/erlang_solutions.asc
+grep -q -e 'deb http://packages.erlang-solutions.com/debian '$(lsb_release -sc)' contrib' /etc/apt/sources.list || echo 'deb http://packages.erlang-solutions.com/debian '$(lsb_release -sc)' contrib' >> /etc/apt/sources.list
+sudo wget http://packages.erlang-solutions.com/debian/erlang_solutions.asc
 sudo apt-key add erlang_solutions.asc
 rm -f erlang_solutions.asc
 
 sudo apt-get update
-sudo apt-get install erlang
+sudo apt-get install -y erlang
 
 ### Install Emacs erlang-mode
 sudo apt-get install erlang-mode

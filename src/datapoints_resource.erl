@@ -63,30 +63,28 @@ content_types_provided(ReqData, State) ->
 %% @end
 -spec process_post(ReqData::tuple(), State::string()) -> {true, tuple(), string()}.
 process_post(ReqData, State) ->
-	erlang:display("posted"),
-			{DatapointJson,_,_} = json_handler(ReqData, State),
-			case id_from_path(ReqData) of
-				undefined ->
-					StreamAdded = DatapointJson;
-				StreamId ->
-					StreamAdded = add_field(DatapointJson,"streamid",StreamId),
-					case erlastic_search:index_doc(?INDEX, "datapoint", StreamAdded) of
-						{error, Reason} -> {{error, Reason}, ReqData, State};
-						{ok,_} -> {true, ReqData, State}
-					end
-			end.
+	{DatapointJson,_,_} = json_handler(ReqData, State),
+	Id = id_from_path(ReqData),
+	case Id of
+		undefined -> {{halt, 404}, ReqData, State};
+		_ ->
+			FinalJson = add_field(DatapointJson, "streamid", Id),
+			case erlastic_search:index_doc(?INDEX, "datapoint", FinalJson) of
+				{error, Reason} -> {{error, Reason}, ReqData, State};
+				{ok,_} -> {true, ReqData, State}
+			end
+	end.
 
 
 %% @doc
 %% Function: add_field/3
 %% Purpose: Used to add a new field to the given string representation of
-%% of a JSON object, the field will be FieldName : FieldValue
+%%          of a JSON object, the field will be FieldName : FieldValue
 %% Returns: The string representation of the JSON object with the new field
 %% @end
 -spec add_field(Stream::string(),FieldName::string(),FieldValue::string()) -> string().
-
-add_field(DatapointJson,FieldName,FieldValue) ->
-		string:substr(DatapointJson,1,length(DatapointJson)-1) ++ ",\n\"" ++ FieldName ++ "\" : \"" ++ FieldValue ++ "\"\n}". %%-1 value could not the same for all JSON objects?
+add_field(Stream,FieldName,FieldValue) ->
+	string:substr(Stream,1,length(Stream)-1) ++ ",\n\"" ++ FieldName ++ "\" : \"" ++ FieldValue ++ "\"\n}".
 
 
 %% @doc
@@ -107,30 +105,21 @@ json_handler(ReqData, State) ->
 %% @end
 -spec get_datapoint(ReqData::tuple(), State::string()) -> {list(), tuple(), string()}.
 get_datapoint(ReqData, State) ->
-						erlang:display("get"),
 		case is_search(ReqData) of
 			false ->
-				case id_from_path(ReqData) of %streams/5/data
-%und_ can be removed?
-					undefined ->
-						erlang:display("bbb"),
-						% Get all datapoints of the stream
-						case erlastic_search:search(?INDEX,"datapoint","*:*") of
-							{ok, Result} ->
-								{json_encode(Result), ReqData, State};
-							_ -> {{halt, 404}, ReqData, State}
+				Id = id_from_path(ReqData),
+				% Get specific datapoint				
+				case A=erlastic_search:search(?INDEX, "datapoint", "streamid:"++Id) of
+					{ok, Result} ->
+						EncodedResult = json_encode(Result),
+						case re:run(EncodedResult, "\"max_score\":null", [{capture, first, list}]) of
+							{match, _} -> {{halt, 404}, ReqData, State};
+							nomatch -> {json_encode(Result), ReqData, State}
 						end;
-					Id ->
-						% Get specific datapoints, only these between two given timestamps
-						erlang:display("aaaa"),
-						case A=erlastic_search:search(?INDEX, "datapoint", "streamid:"++Id) of
-							{ok, Result} ->
-								{json_encode(Result), ReqData, State};
-							_ -> erlang:display(A),{{halt, 404}, ReqData, State}
-						end
+					_ -> {{halt, 404}, ReqData, State}
+
 				end;
 			true ->	
-				erlang:display("process search"),
 				process_search(ReqData,State, get)	
 		end.
 
@@ -187,9 +176,7 @@ transform([{Field,Value}|Rest]) when is_binary(Field) andalso is_binary(Value)->
 transform([{Field,Value}|Rest]) ->
 		case Rest of
 			[] -> Field ++ ":" ++ Value ++ transform(Rest);
-			_ -> A= Field ++ ":" ++ Value ++ "&" ++ transform(Rest),
-				 erlang:display(A),
-				 A
+			_ -> Field ++ ":" ++ Value ++ "&" ++ transform(Rest)
 		end.
 
 
