@@ -396,7 +396,7 @@ create_update(Stream) ->
 -spec add_field(Stream::string(),FieldName::string(),FieldValue::string()) -> string().
 
 add_field(Stream,FieldName,FieldValue) ->
-	string:substr(Stream,1,length(Stream)-2) ++ ",\n" ++ FieldName ++ " : " ++ FieldValue ++ "\n}".
+	string:substr(Stream,1,length(Stream)-1) ++ ",\n\"" ++ FieldName ++ "\" : " ++ FieldValue ++ "\n}".
 	
 
 %% @doc
