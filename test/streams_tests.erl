@@ -1,5 +1,5 @@
 %% @author Tomas Sävström <tosa7943@student.uu.se>
-%%   [www.csproj13.student.it.uu.se]
+%% [www.csproj13.student.it.uu.se]
 %% @version 1.0
 %% @copyright [Copyright information]
 %%
@@ -23,7 +23,7 @@
 -spec init_test() -> ok | {error, term()}.
 
 init_test() ->
-	inets:start().
+inets:start().
 
 %% @doc
 %% Function: get_stream_test/0
@@ -35,17 +35,35 @@ init_test() ->
 -spec get_stream_test() -> ok | {error, term()}.
 
 get_stream_test() ->
-	{ok, {{Version1, 200, ReasonPhrase1}, Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"get\",\"owner_id\" : 0, \"resource_id\" : 0}"}, [], []),
-	DocId = get_field_value(Body1,"_id"),
-	{ok, {{Version2, 200, ReasonPhrase1}, Headers2, Body2}} = httpc:request(get, {"http://localhost:8000/streams/" ++ DocId, []}, [], []),
-	{ok, {{Version3, 200, ReasonPhrase2}, Headers3, Body3}} = httpc:request(get, {"http://localhost:8000/users/0/resources/0/streams", []}, [], []),
-	{ok, {{Version4, 200, ReasonPhrase3}, Headers4, Body4}} = httpc:request(get, {"http://localhost:8000/streams/_search?owner_id=0", []}, [], []),
-	{ok, {{Version5, 200, ReasonPhrase5}, Headers5, Body5}} = httpc:request(post, {"http://localhost:8000/streams/_search?test=get",[],"",""}, [], []),
-	?assertEqual(true,string:str(Body2,"get") - string:str(Body2,"test") == 7),
-	?assertEqual(true,string:str(Body3,"get") - string:str(Body3,"test") == 11),
-	?assertEqual(true,string:str(Body4,"get") - string:str(Body4,"test") == 11),
-	?assertEqual(true,string:str(Body5,"get") - string:str(Body5,"test") == 11).
-	
+	% Test create
+	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"get\",\"owner_id\" : 0, \"resource_id\" : 0, \"private\" : \"true\"}"}, [], []),
+	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"get\",\"owner_id\" : 0, \"resource_id\" : 0, \"private\" : \"true\"}"}, [], []),
+	DocId1 = get_id_value(Body1,"_id"),
+	DocId2 = get_id_value(Body2,"_id"),
+	timer:sleep(1000),
+	% Test get and search
+	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(get, {"http://localhost:8000/streams/" ++ DocId1, []}, [], []),
+	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(get, {"http://localhost:8000/users/0/resources/0/streams", []}, [], []),
+	{ok, {{_Version5, 200, _ReasonPhrase5}, _Headers5, Body5}} = httpc:request(get, {"http://localhost:8000/streams/_search?owner_id=0", []}, [], []),
+	{ok, {{_Version6, 200, _ReasonPhrase6}, _Headers6, Body6}} = httpc:request(post, {"http://localhost:8000/streams/_search?test=get",[],"",""}, [], []),
+	% Test get for missing index
+	{ok, {{_Version7, 200, _ReasonPhrase7}, _Headers7, Body7}} = httpc:request(get, {"http://localhost:8000/streams/1", []}, [], []),
+	% Test delete
+	timer:sleep(1000),
+	{ok, {{_Version8, 200, _ReasonPhrase8}, _Headers8, Body8}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ DocId1, []}, [], []),
+	{ok, {{_Version9, 200, _ReasonPhrase9}, _Headers9, Body9}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ DocId2, []}, [], []),
+
+	?assertEqual(true,get_value_field(Body3,"test") == "get"),
+	?assertEqual(true,get_value_field(Body3,"private") == "true"),
+	?assertEqual(true,get_value_field(Body4,"test") == "get"),
+	?assertEqual(true,get_value_field(Body5,"test") == "get"),
+	?assertEqual(true,list_to_integer(get_value_field(Body5,"total")) >= 2), % Needed in case unempty elasticsearch
+	?assertEqual(true,get_value_field(Body6,"test") == "get"),
+	?assertEqual(true,list_to_integer(get_value_field(Body6,"total")) >= 2), % Needed in case unempty elasticsearch
+	?assertEqual(true,string:str(Body7,"not_found") =/= 0),
+	?assertEqual(true,get_id_value(Body8,"_id") == DocId1),
+	?assertEqual(true,get_id_value(Body9,"_id") == DocId2).
+
 %% @doc
 %% Function: get_stream_test/0
 %% Purpose: Test the put_stream function by doing some HTTP requests
@@ -56,18 +74,35 @@ get_stream_test() ->
 -spec put_stream_test() -> ok | {error, term()}.
 
 put_stream_test() ->
-	{ok, {{Version1, 200, ReasonPhrase1}, Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [], "application/json", "{\n\"test\" : \"get\"\n}"}, [], []),
-	{ok, {{Version2, 200, ReasonPhrase2}, Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/users/0/resources/0/streams", [], "application/json", "{\n\"test\" : \"get\"\n}"}, [], []),
-	DocId1 = get_field_value(Body1,"_id"),
-	DocId2 = get_field_value(Body2,"_id"),
-	{ok, {{Version3, 200, ReasonPhrase3}, Headers3, Body3}} = httpc:request(put, {"http://localhost:8000/streams/" ++ DocId1, [], "application/json", "{\n\"test\" : \"put\"\n}"}, [], []),
-	{ok, {{Version4, 200, ReasonPhrase4}, Headers4, Body4}} = httpc:request(put, {"http://localhost:8000/streams/" ++ DocId2, [], "application/json", "{\n\"test\" : \"put\"\n}"}, [], []),
-	{ok, {{Version5, 200, ReasonPhrase5}, Headers5, Body5}} = httpc:request(get, {"http://localhost:8000/streams/" ++ DocId1, []}, [], []),
-	{ok, {{Version6, 200, ReasonPhrase6}, Headers6, Body6}} = httpc:request(get, {"http://localhost:8000/streams/" ++ DocId2, []}, [], []),
-	?assertEqual(true,string:str(Body5,"put") - string:str(Body5,"test") == 7),
-	?assertEqual(true,string:str(Body6,"put") - string:str(Body6,"test") == 7),
-	?assertEqual(true,string:str(Body5,"get") == 0),
-	?assertEqual(true,string:str(Body6,"get") == 0).
+	% Test create
+	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [], "application/json", "{\n\"test\" : \"get\",\n\"private\" : \"true\"\n}"}, [], []),
+	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/users/0/resources/0/streams", [], "application/json", "{\n\"test\" : \"get\",\n\"private\" : \"true\"\n}}"}, [], []),
+	DocId1 = get_id_value(Body1,"_id"),
+	DocId2 = get_id_value(Body2,"_id"),
+	timer:sleep(1000),
+	% Test update
+	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, _Body3}} = httpc:request(put, {"http://localhost:8000/streams/" ++ DocId1, [], "application/json", "{\n\"test\" : \"put\",\n\"private\" : \"false\"\n}"}, [], []),
+	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, _Body4}} = httpc:request(put, {"http://localhost:8000/streams/" ++ DocId2, [], "application/json", "{\n\"test\" : \"put\"\n}"}, [], []),
+	% Test get
+	{ok, {{_Version5, 200, _ReasonPhrase5}, _Headers5, Body5}} = httpc:request(get, {"http://localhost:8000/streams/" ++ DocId1, []}, [], []),
+	{ok, {{_Version6, 200, _ReasonPhrase6}, _Headers6, Body6}} = httpc:request(get, {"http://localhost:8000/streams/" ++ DocId2, []}, [], []),
+	% Test delete
+	timer:sleep(1000),
+	{ok, {{_Version7, 200, _ReasonPhrase7}, _Headers7, Body7}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ DocId1, []}, [], []),
+	{ok, {{_Version8, 200, _ReasonPhrase8}, _Headers8, Body8}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ DocId2, []}, [], []),
+	% Test update on missing doc
+	{ok, {{_Version9, 200, _ReasonPhrase9}, _Headers9, Body9}} = httpc:request(put, {"http://localhost:8000/streams/1", [], "application/json", "{\n\"test\" : \"put\"\n}"}, [], []),
+	?assertEqual(true,get_value_field(Body5,"private") == "false"),
+	?assertEqual(true,get_value_field(Body5,"private") =/= "true"),
+	?assertEqual(true,get_value_field(Body6,"private") =/= "false"),
+	?assertEqual(true,get_value_field(Body6,"private") == "true"),
+	?assertEqual(true,get_value_field(Body5,"test") == "put"),
+	?assertEqual(true,get_value_field(Body5,"test") =/= "get"),
+	?assertEqual(true,get_value_field(Body6,"test") == "put"),
+	?assertEqual(true,get_value_field(Body6,"test") =/= "get"),
+	?assertEqual(true,get_id_value(Body7,"_id") == DocId1),
+	?assertEqual(true,get_id_value(Body8,"_id") == DocId2),
+	?assertEqual(true,string:str(Body9,"not_found") =/= 0).
 
 %% @doc
 %% Function: delete_stream_test/0
@@ -79,18 +114,22 @@ put_stream_test() ->
 -spec delete_stream_test() -> ok | {error, term()}.
 
 delete_stream_test() ->
-	{ok, {{Version1, 200, ReasonPhrase1}, Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [], "application/json", "{\n\"test\" : \"get\"\n}"}, [], []),
-	{ok, {{Version2, 200, ReasonPhrase2}, Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/users/0/resources/0/streams", [], "application/json", "{\n\"test\" : \"get\"\n}"}, [], []),
-	DocId1 = get_field_value(Body1,"_id"),
-	DocId2 = get_field_value(Body2,"_id"),
-	{ok, {{Version3, 200, ReasonPhrase3}, Headers3, Body3}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ DocId1, []}, [], []),
-	{ok, {{Version4, 200, ReasonPhrase4}, Headers4, Body4}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ DocId2, []}, [], []),
-	{ok, {{Version5, 500, ReasonPhrase5}, Headers5, Body5}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ DocId1, []}, [], []),
-	{ok, {{Version6, 500, ReasonPhrase6}, Headers6, Body6}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ DocId2, []}, [], []),
-	?assertEqual(true,string:str(Body3,DocId1) =/= 0),
-	?assertEqual(true,string:str(Body4,DocId2) =/= 0),
+	% Test create
+	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [], "application/json", "{\n\"test\" : \"get\"\n}"}, [], []),
+	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/users/0/resources/0/streams", [], "application/json", "{\n\"test\" : \"get\"\n}"}, [], []),
+	DocId1 = get_id_value(Body1,"_id"),
+	DocId2 = get_id_value(Body2,"_id"),
+	timer:sleep(1000),
+	% Test delete
+	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ DocId1, []}, [], []),
+	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ DocId2, []}, [], []),
+	% Test delete on missing index
+	{ok, {{_Version5, 500, _ReasonPhrase5}, _Headers5, Body5}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ DocId1, []}, [], []),
+	{ok, {{_Version6, 500, _ReasonPhrase6}, _Headers6, Body6}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ DocId2, []}, [], []),
+	?assertEqual(true,get_id_value(Body3,"_id") == DocId1),
+	?assertEqual(true,get_id_value(Body4,"_id") == DocId2),
 	?assertEqual(true,string:str(Body5,"not_found") =/= 0),
-	?assertEqual(true,string:str(Body5,"not_found") =/= 0).
+	?assertEqual(true,string:str(Body6,"not_found") =/= 0).
 
 
 %% @doc
@@ -100,35 +139,98 @@ delete_stream_test() ->
 %% @end
 -spec delete_stream_and_datapoints_test() -> ok | {error, term()}.
 delete_stream_and_datapoints_test() ->
-	{ok, {{_, 200, ReasonPhrase1}, _, Body1}}=
+	Response1 = {ok, {{_, 200, ReasonPhrase1}, _, Body1}} =
 		httpc:request(post, {"http://localhost:8000/streams", 
 							 [], 
 							 "application/json", 
 							 "{\n\"test\" : \"get\"\n}"}, [], []),
-	DocId1 = get_field_value(Body1,"_id"),
-	erlang:display(DocId1),
-	{ok, {{_, 200, ReasonPhrase2}, _, _}} =
+	{match, ["id\":\"" ++ DocId1]} = re:run(Body1, "id\":\"[^\"]*", [{capture, first, list}]),
+	{ok, {{_, 204, ReasonPhrase2}, _, _}} =
 		 httpc:request(post, {"http://localhost:8000/streams/"++DocId1++"/data", 
 							  [], 
 							  "application/json", 
-							  "{\n\"streamid\" : "++ DocId1 ++"\n}"}, [], []),
+							  "{\"label\" : \"TestLabel\"}"}, [], []),
 	{ok, {{_, 200, ReasonPhrase3}, _, _}} =
 		 httpc:request(delete, {"http://localhost:8000/streams/" ++ DocId1, []}, [], []),
-	?assertMatch({ok, {{_, 400, _}, _, _}} , 
+	?assertMatch({ok, {{_, 404, _}, _, _}} , 
 		 httpc:request(get, {"http://localhost:8000/streams/" ++ DocId1++"/data", []}, [], [])).
 
 
-	
+
 %% @doc
-%% Function: get_field_value/2
+%% Function: get_value_field/2
+%% Purpose: Return the value of a certain field in the given JSON string.
+%% Returns: Return the value of the specified field, if it exists, 
+%%          otherwise returns the empty string.
+%% @end
+-spec get_value_field(String::string(),Field::string()) -> string().
+
+get_value_field(JSONString,Field) ->
+	Tokens = string:tokens(JSONString, ","),
+	ResourceField = find_field(Tokens,Field),
+	case ResourceField of 
+		[] -> "";
+		_ -> FieldValue = string:tokens(ResourceField,":"),
+			 remove_special_characters(lists:nth(length(FieldValue),FieldValue),false)
+	end.
+
+%% @doc
+%% Function: find_field/2
+%% Purpose: Help function to find the first string containing the given string
+%%          in the list.
+%% Returns: The first string containing the given string
+%%          in the list, the empty string if non exists.
+%% @end
+-spec find_field(List::list(),Field::string()) -> string().
+
+find_field([],_) ->
+	[];
+
+find_field([First|Rest],Field) ->
+	case string:str(First,Field) of
+		0 -> find_field(Rest,Field);
+		_ -> First
+	end.
+
+
+%% @doc
+%% Function: remove_special_characters/2
+%% Purpose: Help function to remove non alphanumerical characters
+%% Returns: First string of alphanumerical characters that can be found,
+%%          empty string if non exists
+%% @end
+-spec remove_special_characters(String::string(),CharactersFound::boolean()) -> string().
+
+remove_special_characters([],_) ->
+	[];
+
+remove_special_characters([First|Rest],false) ->
+	Character = (First < 91) and (First > 64) or (First < 123) and (First > 96) or (First > 47) and (First < 58),
+	case Character of
+		true ->
+			[First|remove_special_characters(Rest,true)];
+		false ->
+			remove_special_characters(Rest,false)
+	end;
+remove_special_characters([First|Rest],true) ->
+	Character = (First < 91) and (First > 64) or (First < 123) and (First > 96),
+	case Character of
+		true ->
+			[First|remove_special_characters(Rest,true)];
+		false ->
+			[]
+	end.
+
+
+		
+%% @doc
+%% Function: get_id_value/2
 %% Purpose: Help function to find value of a field in the string
 %% Returns: String with value of the field
-%%
-%% Side effects: creates 2 document in elasticsearch and deletes them
 %% @end
--spec get_field_value(String::string(),Field::string()) -> string().
-	
-get_field_value(String,Field) ->
+-spec get_id_value(String::string(),Field::string()) -> string().
+
+get_id_value(String,Field) ->
 	Location = string:str(String,Field),
 	Start = Location + 3 + length(Field),
 	RestOfString = string:substr(String, Start),

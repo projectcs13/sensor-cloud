@@ -9,10 +9,13 @@
 %%
 %% @end
 -module(streams).
--compile(export_all).
+-export([init/1, allowed_methods/2, content_types_provided/2, content_types_accepted/2,
+		 delete_resource/2, process_post/2, put_stream/2, get_stream/2]).
+
 
 -include_lib("erlastic_search.hrl").
--include_lib("webmachine.hrl").
+-include("webmachine.hrl").
+
 
 -define(INDEX, "sensorcloud").
 
@@ -97,11 +100,14 @@ content_types_accepted(ReqData, State) ->
 
 delete_resource(ReqData, State) ->
 	Id = proplists:get_value('stream', wrq:path_info(ReqData)),
-	erlang:display("delete request"),
 	case erlastic_search:delete_doc(?INDEX,"stream", Id) of
 			{error,Reason} -> {false, wrq:set_resp_body(json_encode(Reason),ReqData), State};
 			{ok,List} -> 
-				erlastic_search:delete_doc_by_query(?INDEX, "datapoint", "streamid:"++Id),
+				%this del doc by query doesn't work properly, is there a
+				%problem with delete_doc_by_query?
+				%erlastic_search:delete_doc_by_query(?INDEX, "datapoint", "streamid:"++Id),
+				httpc:request(delete, {"http://localhost:9200/sensorcloud/datapoint/_query?q=streamid:" 
+									  ++ Id , []}, [], []),
 				{true,wrq:set_resp_body(json_encode(List),ReqData),State}
 	end.
 
@@ -117,7 +123,6 @@ delete_resource(ReqData, State) ->
 process_post(ReqData, State) ->
 	case is_search(ReqData) of 
 		false ->
-			erlang:display("Create request"),
 			{Stream,_,_} = json_handler(ReqData, State),
 			case proplists:get_value('user', wrq:path_info(ReqData)) of
 				undefined ->
@@ -149,7 +154,6 @@ process_post(ReqData, State) ->
 -spec process_search_post(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 
 process_search_post(ReqData, State) ->
-	erlang:display("search request"),
 	URIQuery = wrq:req_qs(ReqData),
 	case proplists:get_value('user', wrq:path_info(ReqData)) of
 		undefined ->
@@ -180,6 +184,7 @@ process_search_post(ReqData, State) ->
 		{ok,List} -> {true,wrq:set_resp_body(json_encode(List),ReqData),State} 
 	end.
 
+
 %% @doc
 %% Function: process_search_get/2
 %% Purpose: Used to handle search requests that come from GET requests
@@ -189,7 +194,6 @@ process_search_post(ReqData, State) ->
 -spec process_search_get(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 
 process_search_get(ReqData, State) ->
-	erlang:display("search request"),
 	URIQuery = wrq:req_qs(ReqData),
 	case proplists:get_value('user', wrq:path_info(ReqData)) of
 		undefined ->
@@ -230,7 +234,6 @@ process_search_get(ReqData, State) ->
 -spec put_stream(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 
 put_stream(ReqData, State) ->
-	erlang:display("update request"),
 	StreamId = proplists:get_value('stream', wrq:path_info(ReqData)),
 	{Stream,_,_} = json_handler(ReqData,State),
 	Update = create_update(Stream),
@@ -238,6 +241,7 @@ put_stream(ReqData, State) ->
 		{error,Reason} -> {false, wrq:set_resp_body(json_encode(Reason),ReqData), State};
 		{ok,List} -> {true,wrq:set_resp_body(json_encode(List),ReqData),State}
 	end.
+
 
 
 
@@ -253,11 +257,11 @@ put_stream(ReqData, State) ->
 %% @end
 -spec get_stream(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 
+
 get_stream(ReqData, State) ->
 	case is_search(ReqData) of
 		true -> process_search_get(ReqData,State);
 		false ->
-			erlang:display("fetch request"),
 			case proplists:get_value('stream', wrq:path_info(ReqData)) of
 				undefined ->
 				% List streams based on URI
@@ -286,7 +290,7 @@ get_stream(ReqData, State) ->
 					end,
 					case erlastic_search:search_limit(?INDEX, "stream", Query,200) of % Maybe wanna take more
 						{error,Reason} -> {{error, Reason}, ReqData, State};
-						{ok,List} -> {json_encode(List), ReqData, State} % Maybe need to convert
+						{ok,List} -> {remove_search_part(make_to_string(json_encode(List)),false,0), ReqData, State} 
 					end;
 				StreamId ->
 				% Get specific stream
@@ -297,6 +301,58 @@ get_stream(ReqData, State) ->
 					     	{json_encode(List), ReqData, State}
 					end
 				end
+	end.
+
+%% @doc
+%% Function: make_to_string/1
+%% Purpose: Used to convert JSON with binary data left to string
+%% Returns: Returns the string represented by the given list
+%% @end
+
+make_to_string([]) ->
+	[];
+make_to_string([First|Rest]) ->
+	case is_list(First) of
+		true -> make_to_string(First) ++ make_to_string(Rest);
+		false ->
+			case is_binary(First) of
+				true -> binary:bin_to_list(First) ++ make_to_string(Rest);
+				false -> [First] ++ make_to_string(Rest)
+			end
+	end.
+%% @doc
+%% Function: remove_search_part/3
+%% Purpose: Used to remove the search header of a search JSON 
+%% Returns: Returns the list of JSON objects return from the search
+%% @end
+-spec remove_search_part(JSONString::string(),FoundLeft::boolean(),OpenBrackets::integer()) -> string().
+
+remove_search_part([],_,_) ->
+	[];
+remove_search_part([First|Rest],true,1) ->
+	case First of
+		93 ->
+			[First];
+		91 ->
+			[First|remove_search_part(Rest,true,2)];
+		_ ->
+			[First|remove_search_part(Rest,true,1)]
+	end;
+remove_search_part([First|Rest],true,Val) ->
+  	case First of
+		93 ->
+			[First|remove_search_part(Rest,true,Val-1)];
+		91 ->
+			[First|remove_search_part(Rest,true,Val+1)];
+		_ ->
+			[First|remove_search_part(Rest,true,Val)]
+	end;
+remove_search_part([First|Rest],false,Val) ->
+	case First of
+		91 ->
+			[First|remove_search_part(Rest,true,1)];
+		_ ->
+			remove_search_part(Rest,false,Val)
 	end.
 
 %% @doc
