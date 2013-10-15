@@ -21,8 +21,6 @@ compile:
 
 ### get_libs will download and install all project libraries
 get_libs:
-	wget -q -O $(REBAR) $(REBAR_URL)
-	chmod u+x $(REBAR)
 	@./rebar get-deps
 	@./rebar compile
 
