@@ -32,7 +32,7 @@ init([]) ->
 allowed_methods(ReqData, State) ->
 	case parse_path(wrq:path(ReqData)) of
 		[ {"resources"}] ->
-			{['GET','POST'], ReqData, State};
+			{['POST'], ReqData, State};
 		[ {"resources", _ResourceID}] ->
 			{['GET', 'PUT', 'DELETE'], ReqData, State};
 		[{"users", _UserID}, {"resources"}] ->
