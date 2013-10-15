@@ -16,7 +16,7 @@
 		process_post/2]).
 
 -include("webmachine.hrl").
-%-include("user.hrl").
+
 
 -define(INDEX, "sensorcloud").
 
