@@ -8,8 +8,8 @@
 -module(resource).
 -compile(export_all).
 
--include_lib("lib/webmachine/include/webmachine.hrl").
--include_lib("lib/erlastic_search/include/erlastic_search.hrl").
+-include_lib("webmachine.hrl").
+-include_lib("erlastic_search.hrl").
 
 -define(INDEX, "sensorcloud").
 
@@ -203,7 +203,6 @@ get_resource(ReqData, State) ->
 						{error,Reason} -> {{halt, Reason}, ReqData, State};
 						{ok,List} -> 
 				    		erlang:display(Query),
-
 							{remove_search_part(make_to_string(json_encode(List)),false,0), ReqData, State} % Maybe need to convert
 					end;
 				ResourceId ->
