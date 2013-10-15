@@ -132,9 +132,13 @@ process_post(ReqData, State) ->
 				ResId ->
 					ResAdded = add_field(UserAdded,"resource_id",ResId)
 			end,
-			case erlastic_search:index_doc(?INDEX, "stream", ResAdded) of	
-				{error, Reason} -> {false, wrq:set_resp_body(json_encode(Reason),ReqData), State};
-				{ok,List} -> {true, wrq:set_resp_body(json_encode(List),ReqData), State}
+			case get_value_field(ResAdded,"resource_id") == [] of
+				true -> {false, wrq:set_resp_body("\"resource_id_missing\"",ReqData), State};
+				false ->
+					case erlastic_search:index_doc(?INDEX, "stream", ResAdded) of	
+						{error, Reason} -> {false, wrq:set_resp_body(json_encode(Reason),ReqData), State};
+						{ok,List} -> {true, wrq:set_resp_body(json_encode(List),ReqData), State}
+					end
 			end;
 		true ->
 			process_search_post(ReqData,State)	
@@ -478,5 +482,75 @@ filter_json(Json,ResourceQuery) ->
 	
 	
 	
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Should be moved to own module later
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% @doc
+%% Function: get_value_field/2
+%% Purpose: Return the value of a certain field in the given JSON string.
+%% Returns: Return the value of the specified field, if it exists, 
+%%          otherwise returns the empty string.
+%% @end
+-spec get_value_field(String::string(),Field::string()) -> string().
+
+get_value_field(JSONString,Field) ->
+	Tokens = string:tokens(JSONString, ","),
+	ResourceField = find_field(Tokens,Field),
+	case ResourceField of 
+		[] -> "";
+		_ -> FieldValue = string:tokens(ResourceField,":"),
+			 remove_special_characters(lists:nth(length(FieldValue),FieldValue),false)
+	end.
+
+%% @doc
+%% Function: find_field/2
+%% Purpose: Help function to find the first string containing the given string
+%%          in the list.
+%% Returns: The first string containing the given string
+%%          in the list, the empty string if non exists.
+%% @end
+-spec find_field(List::list(),Field::string()) -> string().
+
+find_field([],_) ->
+	[];
+
+find_field([First|Rest],Field) ->
+	case string:str(First,Field) of
+		0 -> find_field(Rest,Field);
+		_ -> First
+	end.
+
+
+%% @doc
+%% Function: remove_special_characters/2
+%% Purpose: Help function to remove non alphanumerical characters
+%% Returns: First string of alphanumerical characters that can be found,
+%%          empty string if non exists
+%% @end
+-spec remove_special_characters(String::string(),CharactersFound::boolean()) -> string().
+
+remove_special_characters([],_) ->
+	[];
+
+remove_special_characters([First|Rest],false) ->
+	Character = (First < 91) and (First > 64) or (First < 123) and (First > 96) or (First > 47) and (First < 58),
+	case Character of
+		true ->
+			[First|remove_special_characters(Rest,true)];
+		false ->
+			remove_special_characters(Rest,false)
+	end;
+remove_special_characters([First|Rest],true) ->
+	Character = (First < 91) and (First > 64) or (First < 123) and (First > 96),
+	case Character of
+		true ->
+			[First|remove_special_characters(Rest,true)];
+		false ->
+			[]
+	end.
+
 
 
