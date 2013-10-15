@@ -79,7 +79,7 @@ put_resource_test() ->
 %% @end
 get_resource_test() ->
 	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/resources/", [],"application/json", "{\"test\" : \"get\",\"owner\" : 0}"}, [], []),
-	timer:sleep(100),
+	timer:sleep(800),
 	DocId = get_id_value(Body1,"_id"),
 	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(get, {"http://localhost:8000/resources/" ++ DocId, []}, [], []),
 	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(get, {"http://localhost:8000/users/0/resources/" ++ DocId, []}, [], []),
