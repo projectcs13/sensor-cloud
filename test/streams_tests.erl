@@ -127,6 +127,14 @@ delete_stream_test() ->
 	?assertEqual(true,string:str(Body5,"not_found") =/= 0),
 	?assertEqual(true,string:str(Body6,"not_found") =/= 0).
 
+%% @doc
+%% Function: create_doc_without_resource_test/0
+%% Purpose: Test that error is given when creating stream without resource
+%% Returns: ok | {error, term()}
+%%
+%% @end
+-spec create_doc_without_resource_test() -> ok | {error, term()}.
+
 create_doc_without_resource_test() ->
 	{ok, {{_Version1, 500, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [], "application/json", "{\n\"test\" : \"get\"\n}"}, [], []),
  	{ok, {{_Version2, 500, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/users/0/streams", [], "application/json", "{\n\"test\" : \"get\"\n}"}, [], []),
