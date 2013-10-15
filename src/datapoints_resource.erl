@@ -67,11 +67,9 @@ process_post(ReqData, State) ->
 			{DatapointJson,_,_} = json_handler(ReqData, State),
 			case id_from_path(ReqData) of
 				undefined ->
-					StreamAdded = DatapointJson,
-					erlang:display("Not defined");
+					StreamAdded = DatapointJson;
 				StreamId ->
 					StreamAdded = add_field(DatapointJson,"streamid",StreamId),
-					erlang:display("Got in here1"),
 					case erlastic_search:index_doc(?INDEX, "datapoint", StreamAdded) of
 						{error, Reason} -> {{error, Reason}, ReqData, State};
 						{ok,_} -> {true, ReqData, State}
@@ -88,8 +86,7 @@ process_post(ReqData, State) ->
 -spec add_field(Stream::string(),FieldName::string(),FieldValue::string()) -> string().
 
 add_field(DatapointJson,FieldName,FieldValue) ->
-		erlang:display("Got in here2"),
-		A = string:substr(DatapointJson,1,length(DatapointJson)-1) ++ ",\n\"" ++ FieldName ++ "\" : \"" ++ FieldValue ++ "\"\n}". %%-1 value could not the same for all JSON objects?
+		string:substr(DatapointJson,1,length(DatapointJson)-1) ++ ",\n\"" ++ FieldName ++ "\" : \"" ++ FieldValue ++ "\"\n}". %%-1 value could not the same for all JSON objects?
 
 
 %% @doc
@@ -117,14 +114,14 @@ get_datapoint(ReqData, State) ->
 %und_ can be removed?
 					undefined ->
 						erlang:display("bbb"),
-						% Get all datapoints
+						% Get all datapoints of the stream
 						case erlastic_search:search(?INDEX,"datapoint","*:*") of
 							{ok, Result} ->
 								{json_encode(Result), ReqData, State};
 							_ -> {{halt, 404}, ReqData, State}
 						end;
 					Id ->
-						% Get specific datapoint
+						% Get specific datapoints, only these between two given timestamps
 						erlang:display("aaaa"),
 						case A=erlastic_search:search(?INDEX, "datapoint", "streamid:"++Id) of
 							{ok, Result} ->
