@@ -3,13 +3,13 @@
 %% @version 1.0
 %% @copyright [Copyright information]
 %%
-%% @doc == users_resource_tests ==
+%% @doc == users_tests ==
 %% This module contains several tests to test the functionallity
-%% in the restful API in users_resource.
+%% in the restful API in users.
 %%
 %% @end
 
--module(users_resource_tests).
+-module(users_tests).
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("stdlib/include/qlc.hrl").
 

@@ -5,7 +5,7 @@
 
 %% @doc Webmachine_resource for /users
 
--module(users_resource).
+-module(users).
 -export([init/1, 
 		allowed_methods/2,
 		content_types_accepted/2,
