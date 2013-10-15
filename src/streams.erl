@@ -384,8 +384,13 @@ create_update(Stream) ->
 -spec add_field(Stream::string(),FieldName::string(),FieldValue::string()) -> string().
 
 add_field(Stream,FieldName,FieldValue) ->
-	string:substr(Stream,1,length(Stream)-1) ++ ",\n\"" ++ FieldName ++ "\" : " ++ FieldValue ++ "\n}".
-	
+	case is_integer(FieldValue) of
+		true ->
+			string:substr(Stream,1,length(Stream)-1) ++ ",\n\"" ++ FieldName ++ "\" : " ++ FieldValue ++ "\n}";
+		false ->
+			string:substr(Stream,1,length(Stream)-1) ++ ",\n\"" ++ FieldName ++ "\" : \"" ++ FieldValue ++ "\"\n}"
+	end.
+			
 
 %% @doc
 %% Function: parse_path/1
