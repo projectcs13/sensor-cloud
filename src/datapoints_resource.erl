@@ -7,7 +7,7 @@
 
 -module(datapoints_resource).
 -export([init/1, allowed_methods/2, content_types_provided/2,
-		 		content_types_accepted/2, process_post/2, get_datapoint/2]).
+		 		process_post/2, get_datapoint/2]).
 
 -include("webmachine.hrl").
 
@@ -34,7 +34,7 @@ allowed_methods(ReqData, State) ->
 		[{"streams", _Id}, {"data", "_search"}] ->
 			{['POST','GET'], ReqData, State};
 		[{"streams", _Id}, {"data"}] ->
-			{['GET', 'PUT', 'POST', 'DELETE'], ReqData, State};
+			{['GET', 'POST', 'DELETE'], ReqData, State};
 		[error] ->
 			{['POST','GET'], ReqData, State}
 	end.
@@ -50,16 +50,6 @@ allowed_methods(ReqData, State) ->
 content_types_provided(ReqData, State) ->
 		{[{"application/json", get_datapoint}], ReqData, State}.
 
-
-%% @doc
-%% Function: content_types_accepted/2
-%% Purpose: based on the content-type on a 'POST' or 'PUT', we know which kind of data that is allowed to be sent to the server.
-%% A code 406 is returned to the client if we don't accept a media type that the client has sent.
-%% Returns: {[{Mediatype, Handler}], ReqData, State}
-%% @end
--spec content_types_accepted(ReqData::tuple(), State::string()) -> {list(), tuple(), string()}.
-content_types_accepted(ReqData, State) ->
-		{[{"application/json", put_datapoint}], ReqData, State}.
 
 
 %% @doc
@@ -93,9 +83,9 @@ process_post(ReqData, State) ->
 %% Returns: The string representation of the JSON object with the new field
 %% @end
 -spec add_field(Stream::string(),FieldName::string(),FieldValue::string()) -> string().
-
 add_field(Stream,FieldName,FieldValue) ->
 	string:substr(Stream,1,length(Stream)-1) ++ ",\n\"" ++ FieldName ++ "\" : \"" ++ FieldValue ++ "\"\n}".
+
 
 %% @doc
 %% Function: json_handler/2
@@ -127,6 +117,7 @@ get_datapoint(ReqData, State) ->
 							nomatch -> {json_encode(Result), ReqData, State}
 						end;
 					_ -> {{halt, 404}, ReqData, State}
+
 				end;
 			true ->	
 				process_search(ReqData,State, get)	
