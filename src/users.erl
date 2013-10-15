@@ -239,14 +239,14 @@ pair([A,B|T]) ->
 %% @end
 -spec id_from_path(string()) -> string().
 id_from_path(RD) ->
-    case wrq:path_info(id, RD) of
-        undefined ->
-            case string:tokens(wrq:disp_path(RD), "/") of
+	case wrq:path_info(id, RD) of
+		undefined ->
+			case string:tokens(wrq:disp_path(RD), "/") of
 				["users", Id] -> Id;
 				_ -> undefined
 			end;
-        Id -> Id
-    end.
+		Id -> Id
+	end.
 
 %% @doc
 %% Function: is_search/2
@@ -289,4 +289,4 @@ transform([{Field,Value}|Rest]) ->
 %% @end
 -spec json_encode(string()) -> string().
 json_encode(Data) ->
-    (mochijson2:encoder([{utf8, true}]))(Data).
+	(mochijson2:encoder([{utf8, true}]))(Data).
