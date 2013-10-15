@@ -397,7 +397,7 @@ create_update(Stream) ->
 %%          of a JSON object, the field will be FieldName : FieldValue
 %% Returns: The string representation of the JSON object with the new field
 %% @end
--spec add_field(Stream::string(),FieldName::string(),FieldValue::string()) -> string().
+-spec add_field(Stream::string(),FieldName::string(),FieldValue::term()) -> string().
 
 add_field(Stream,FieldName,FieldValue) ->
 	case is_integer(FieldValue) of
