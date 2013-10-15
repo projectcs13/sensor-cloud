@@ -7,7 +7,7 @@
 
 -module(datapoints_resource).
 -export([init/1, allowed_methods/2, content_types_provided/2,
-		 		content_types_accepted/2, process_post/2, get_datapoint/2]).
+		 		process_post/2, get_datapoint/2]).
 
 -include("webmachine.hrl").
 
@@ -34,7 +34,7 @@ allowed_methods(ReqData, State) ->
 		[{"streams", _Id}, {"data", "_search"}] ->
 			{['POST','GET'], ReqData, State};
 		[{"streams", _Id}, {"data"}] ->
-			{['GET', 'PUT', 'POST', 'DELETE'], ReqData, State};
+			{['GET', 'POST', 'DELETE'], ReqData, State};
 		[error] ->
 			{['POST','GET'], ReqData, State}
 	end.
@@ -51,16 +51,6 @@ content_types_provided(ReqData, State) ->
 		{[{"application/json", get_datapoint}], ReqData, State}.
 
 
-%% @doc
-%% Function: content_types_accepted/2
-%% Purpose: based on the content-type on a 'POST' or 'PUT', we know which kind of data that is allowed to be sent to the server.
-%% A code 406 is returned to the client if we don't accept a media type that the client has sent.
-%% Returns: {[{Mediatype, Handler}], ReqData, State}
-%% @end
--spec content_types_accepted(ReqData::tuple(), State::string()) -> {list(), tuple(), string()}.
-content_types_accepted(ReqData, State) ->
-		{[{"application/json", put_datapoint}], ReqData, State}.
-
 
 %% @doc
 %% Function: process_post/2
@@ -75,10 +65,31 @@ content_types_accepted(ReqData, State) ->
 process_post(ReqData, State) ->
 	erlang:display("posted"),
 			{DatapointJson,_,_} = json_handler(ReqData, State),
-			case erlastic_search:index_doc(?INDEX, "datapoint", DatapointJson) of
-				{error, Reason} -> {{error, Reason}, ReqData, State};
-				{ok,_} -> {true, ReqData, State}
+			case id_from_path(ReqData) of
+				undefined ->
+					StreamAdded = DatapointJson,
+					erlang:display("Not defined");
+				StreamId ->
+					StreamAdded = add_field(DatapointJson,"streamid",StreamId),
+					erlang:display("Got in here1"),
+					case erlastic_search:index_doc(?INDEX, "datapoint", StreamAdded) of
+						{error, Reason} -> {{error, Reason}, ReqData, State};
+						{ok,_} -> {true, ReqData, State}
+					end
 			end.
+
+
+%% @doc
+%% Function: add_field/3
+%% Purpose: Used to add a new field to the given string representation of
+%% of a JSON object, the field will be FieldName : FieldValue
+%% Returns: The string representation of the JSON object with the new field
+%% @end
+-spec add_field(Stream::string(),FieldName::string(),FieldValue::string()) -> string().
+
+add_field(DatapointJson,FieldName,FieldValue) ->
+		erlang:display("Got in here2"),
+		A = string:substr(DatapointJson,1,length(DatapointJson)-1) ++ ",\n\"" ++ FieldName ++ "\" : \"" ++ FieldValue ++ "\"\n}". %%-1 value could not the same for all JSON objects?
 
 
 %% @doc
