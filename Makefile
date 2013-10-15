@@ -4,7 +4,9 @@
 ### Variable assignment
 ################################################################################
 ERL ?= erl
-APP := website
+APP := engine
+REBAR=./rebar
+REBAR_URL=http://cloud.github.com/downloads/basho/rebar/rebar
 ################################################################################
 
 
