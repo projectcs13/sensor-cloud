@@ -78,7 +78,7 @@ content_types_accepted(ReqData, State) ->
 -spec delete_resource(ReqData::tuple(), State::string()) -> {string(), tuple(), string()}.
 delete_resource(ReqData, State) ->
 	Id = proplists:get_value('resourceid', wrq:path_info(ReqData)),
-	erlang:display("delete request - check permission here"),
+	erlang:display("DELETE request - check permission here"),
 	%% TODO Authentication
 	case erlastic_search:get_doc(?INDEX, "resource", Id,  [{"fields", "_source.streams"}]) of
 			{ok,{struct,Json}} ->
@@ -187,14 +187,12 @@ put_resource(ReqData, State) ->
 %% @end
 -spec get_resource(ReqData::tuple(), State::string()) -> {list(), tuple(), string()}.
 get_resource(ReqData, State) ->
-	erlang:display("fetch request"),
+	erlang:display("GET request"),
 	case is_search(ReqData) of
 		false ->
-			erlang:display("should get in here"),
 			case proplists:get_value('resourceid', wrq:path_info(ReqData)) of
 				undefined ->
 				% List resources based on URI
-				    erlang:display("Value undefined"),
 					case proplists:get_value('userid', wrq:path_info(ReqData)) of
 						undefined ->
 							Query = [];
@@ -209,7 +207,6 @@ get_resource(ReqData, State) ->
 							{remove_search_part(make_to_string(json_encode(List)),false,0), ReqData, State} % Maybe need to convert
 					end;
 				ResourceId ->
-				        erlang:display("Value defined"),
 				% Get specific resource
 					case erlastic_search:get_doc(?INDEX, "resource", ResourceId) of 
 						{error,_Msg} -> 
