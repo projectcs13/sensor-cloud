@@ -325,24 +325,6 @@ remove_search_part([First|Rest],false,Val) ->
 
 
 
-
-%% @doc
-%% Function: merge_lists/2
-%% Purpose: helper function to user_to_json/1, given a list of keys and a list of values, this function
-%% will create a list [{Key, Value}], if a value is undefined, it will remove the value and the key
-%% that it corresponds, both lists are assumed to be of equal length.
-%% PRE-COND: Assumes that both lists are of equal size.
-%% Returns: [{Key, Value}] | []
-%% @end
--spec merge_lists(list(), list()) -> list().
-merge_lists([], []) -> [];
-merge_lists([H|T], [A|B]) ->
-	case A of
-		undefined -> merge_lists(T,B);
-		_ -> [{H,A}]++merge_lists(T,B)
-	end.
-
-
 %% @doc
 %% Function: id_from_path/1
 %% Purpose: Retrieves the id from the path.
