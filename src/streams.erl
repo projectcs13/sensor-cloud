@@ -549,7 +549,7 @@ remove_special_characters([First|Rest],false) ->
 			remove_special_characters(Rest,false)
 	end;
 remove_special_characters([First|Rest],true) ->
-	Character = (First < 91) and (First > 64) or (First < 123) and (First > 96),
+	Character = (First < 91) and (First > 64) or (First < 123) and (First > 96) or (First > 47) and (First < 58),
 	case Character of
 		true ->
 			[First|remove_special_characters(Rest,true)];
