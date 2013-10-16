@@ -74,8 +74,8 @@ get_stream_test() ->
 
 put_stream_test() ->
 	% Test create
-	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [], "application/json", "{\n\"test\" : \"get\",\n\"private\" : \"true\"\n}"}, [], []),
-	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/users/0/resources/0/streams", [], "application/json", "{\n\"test\" : \"get\",\n\"private\" : \"true\"\n}}"}, [], []),
+	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [], "application/json", "{\n\"test\" : \"get\",\n\"private\" : \"true\"\n, \"resource_id\" : 0}"}, [], []),
+	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/users/0/resources/asdascvsr213sda/streams", [], "application/json", "{\n\"test\" : \"get\",\n\"private\" : \"true\"\n}}"}, [], []),
 	DocId1 = get_id_value(Body1,"_id"),
 	DocId2 = get_id_value(Body2,"_id"),
 	% Test update
@@ -112,7 +112,7 @@ put_stream_test() ->
 
 delete_stream_test() ->
 	% Test create
-	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [], "application/json", "{\n\"test\" : \"get\"\n}"}, [], []),
+	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [], "application/json", "{\n\"test\" : \"get\"\n, \"resource_id\" : 0}"}, [], []),
 	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/users/0/resources/0/streams", [], "application/json", "{\n\"test\" : \"get\"\n}"}, [], []),
 	DocId1 = get_id_value(Body1,"_id"),
 	DocId2 = get_id_value(Body2,"_id"),
@@ -127,6 +127,19 @@ delete_stream_test() ->
 	?assertEqual(true,string:str(Body5,"not_found") =/= 0),
 	?assertEqual(true,string:str(Body6,"not_found") =/= 0).
 
+%% @doc
+%% Function: create_doc_without_resource_test/0
+%% Purpose: Test that error is given when creating stream without resource
+%% Returns: ok | {error, term()}
+%%
+%% @end
+-spec create_doc_without_resource_test() -> ok | {error, term()}.
+
+create_doc_without_resource_test() ->
+	{ok, {{_Version1, 500, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [], "application/json", "{\n\"test\" : \"get\"\n}"}, [], []),
+ 	{ok, {{_Version2, 500, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/users/0/streams", [], "application/json", "{\n\"test\" : \"get\"\n}"}, [], []),
+	?assertEqual(true,string:str(Body1,"resource_id_missing") =/= 0),
+	?assertEqual(true,string:str(Body2,"resource_id_missing") =/= 0).
 
 %% @doc
 %% Function: get_value_field/2
@@ -184,7 +197,7 @@ remove_special_characters([First|Rest],false) ->
 			remove_special_characters(Rest,false)
 	end;
 remove_special_characters([First|Rest],true) ->
-	Character = (First < 91) and (First > 64) or (First < 123) and (First > 96),
+	Character = (First < 91) and (First > 64) or (First < 123) and (First > 96) or (First > 47) and (First < 58),
 	case Character of
 		true ->
 			[First|remove_special_characters(Rest,true)];
