@@ -57,7 +57,7 @@ run: compile
 ### Command: make run_es
 ### Runs elastic search
 run_es:
-	lib/elastic_search/bin/elasticsearch -f
+	lib/elasticsearch/bin/elasticsearch -f
 
 ### Command: make test
 ### Compile project resources (not libraries) and runs all eunit tests.
