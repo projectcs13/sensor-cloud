@@ -335,25 +335,25 @@ remove_search_part([],_,_) ->
 	[];
 remove_search_part([First|Rest],true,1) ->
 	case First of
-		93 ->
+		$] ->
 			[First];
-		91 ->
+		$[ ->
 			[First|remove_search_part(Rest,true,2)];
 		_ ->
 			[First|remove_search_part(Rest,true,1)]
 	end;
 remove_search_part([First|Rest],true,Val) ->
   	case First of
-		93 ->
+		$] ->
 			[First|remove_search_part(Rest,true,Val-1)];
-		91 ->
+		$[ ->
 			[First|remove_search_part(Rest,true,Val+1)];
 		_ ->
 			[First|remove_search_part(Rest,true,Val)]
 	end;
 remove_search_part([First|Rest],false,Val) ->
 	case First of
-		91 ->
+		$[ ->
 			[First|remove_search_part(Rest,true,1)];
 		_ ->
 			remove_search_part(Rest,false,Val)
