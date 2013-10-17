@@ -64,7 +64,7 @@ put_resource_test() ->
 	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/resources/", [],"application/json", "{\"test\" : \"put1\",\"owner\" : 0,\"streams\" : 1}"}, [], []),
 	timer:sleep(100),
 	DocId = get_id_value(Body1,"_id"),
-	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(put, {"http://localhost:8000/resources/" ++ DocId , [],"application/json", "{\"doc\" :{\"test\" : \"put2\",\"owner\" : 0,\"streams\" : 1}}"}, [], []),
+	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(put, {"http://localhost:8000/resources/" ++ DocId , [],"application/json", "{\"test\" : \"put2\",\"owner\" : 0,\"streams\" : 1}"}, [], []),
 	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(get, {"http://localhost:8000/resources/" ++ DocId, []}, [], []),
 	?assertEqual("true",get_field_value(Body1,"ok")),
 	?assertEqual("true",get_field_value(Body2,"ok")),
