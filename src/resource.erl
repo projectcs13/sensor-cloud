@@ -8,8 +8,8 @@
 -module(resource).
 -compile(export_all).
 
--include_lib("lib/webmachine/include/webmachine.hrl").
--include_lib("lib/erlastic_search/include/erlastic_search.hrl").
+-include_lib("webmachine.hrl").
+-include_lib("erlastic_search.hrl").
 
 -define(INDEX, "sensorcloud").
 
@@ -203,7 +203,6 @@ get_resource(ReqData, State) ->
 						{error,Reason} -> {{halt, Reason}, ReqData, State};
 						{ok,List} -> 
 				    		erlang:display(Query),
-
 							{remove_search_part(make_to_string(json_encode(List)),false,0), ReqData, State} % Maybe need to convert
 					end;
 				ResourceId ->
@@ -300,47 +299,28 @@ remove_search_part([],_,_) ->
 	[];
 remove_search_part([First|Rest],true,1) ->
 	case First of
-		93 ->
+		$] ->
 			[First];
-		91 ->
+		$[ ->
 			[First|remove_search_part(Rest,true,2)];
 		_ ->
 			[First|remove_search_part(Rest,true,1)]
 	end;
 remove_search_part([First|Rest],true,Val) ->
   	case First of
-		93 ->
+		$] ->
 			[First|remove_search_part(Rest,true,Val-1)];
-		91 ->
+		$[ ->
 			[First|remove_search_part(Rest,true,Val+1)];
 		_ ->
 			[First|remove_search_part(Rest,true,Val)]
 	end;
 remove_search_part([First|Rest],false,Val) ->
 	case First of
-		91 ->
+		$[ ->
 			[First|remove_search_part(Rest,true,1)];
 		_ ->
 			remove_search_part(Rest,false,Val)
-	end.
-
-
-
-
-%% @doc
-%% Function: merge_lists/2
-%% Purpose: helper function to user_to_json/1, given a list of keys and a list of values, this function
-%% will create a list [{Key, Value}], if a value is undefined, it will remove the value and the key
-%% that it corresponds, both lists are assumed to be of equal length.
-%% PRE-COND: Assumes that both lists are of equal size.
-%% Returns: [{Key, Value}] | []
-%% @end
--spec merge_lists(list(), list()) -> list().
-merge_lists([], []) -> [];
-merge_lists([H|T], [A|B]) ->
-	case A of
-		undefined -> merge_lists(T,B);
-		_ -> [{H,A}]++merge_lists(T,B)
 	end.
 
 
