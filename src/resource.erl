@@ -171,7 +171,7 @@ put_resource(ReqData, State) ->
 					{{halt, 404}, ReqData, State};
 				{ok, _} ->
 					{UserJson,_,_} = json_handler(ReqData, State),
-					case update_doc(?INDEX,"resource", Id, UserJson, []) of 
+					case update_doc(?INDEX,"resource", Id, "{doc:" ++ UserJson ++ "}", []) of 
 						{error, Reason} -> 
 							{{halt,Reason}, ReqData, State};
 						{ok,List} ->
@@ -322,7 +322,6 @@ remove_search_part([First|Rest],false,Val) ->
 		_ ->
 			remove_search_part(Rest,false,Val)
 	end.
-
 
 
 %% @doc
