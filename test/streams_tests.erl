@@ -25,6 +25,26 @@
 init_test() ->
 inets:start().
 
+
+%% @doc
+%% Function: process_post_test/0
+%% Purpose: Test the process_post_test function by doing some HTTP requests
+%% Returns: ok | {error, term()}
+%% @end
+process_post_test() ->
+	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"search\",\"resource_id\" : 0, \"private\" : 0}"}, [], []),
+	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"search\",\"resource_id\" : 0, \"private\" : 1}"}, [], []),
+	DocId1 = get_id_value(Body1,"_id"),
+	DocId2 = get_id_value(Body2,"_id"),
+	timer:sleep(1000),
+	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(post, {"http://localhost:8000/streams/_search", [],"application/json", "{\"query\":{\"match_all\":{}}}"}, [], []),
+	?assertEqual("1",get_value_field(Body3,"hits")),
+	{ok, {{_Version8, 200, _ReasonPhrase8}, _Headers8, Body8}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ DocId1, []}, [], []),
+	{ok, {{_Version9, 200, _ReasonPhrase9}, _Headers9, Body9}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ DocId2, []}, [], []).
+	
+	
+	
+
 %% @doc
 %% Function: get_stream_test/0
 %% Purpose: Test the get_stream function by doing some HTTP requests
@@ -36,8 +56,8 @@ inets:start().
 
 get_stream_test() ->
 	% Test create
-	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"get\",\"owner_id\" : 0, \"resource_id\" : 0, \"private\" : \"true\"}"}, [], []),
-	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"get\",\"owner_id\" : 0, \"resource_id\" : 0, \"private\" : \"true\"}"}, [], []),
+	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"get\",\"owner_id\" : 0, \"resource_id\" : 0, \"private\" : 1}"}, [], []),
+	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"get\",\"owner_id\" : 0, \"resource_id\" : 0, \"private\" : 1}"}, [], []),
 	DocId1 = get_id_value(Body1,"_id"),
 	DocId2 = get_id_value(Body2,"_id"),
 	timer:sleep(800),
@@ -45,7 +65,7 @@ get_stream_test() ->
 	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(get, {"http://localhost:8000/streams/" ++ DocId1, []}, [], []),
 	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(get, {"http://localhost:8000/users/0/resources/0/streams", []}, [], []),
 	{ok, {{_Version5, 200, _ReasonPhrase5}, _Headers5, Body5}} = httpc:request(get, {"http://localhost:8000/streams/_search?owner_id=0", []}, [], []),
-	{ok, {{_Version6, 200, _ReasonPhrase6}, _Headers6, Body6}} = httpc:request(post, {"http://localhost:8000/streams/_search?test=get",[],"",""}, [], []),
+	{ok, {{_Version6, 200, _ReasonPhrase6}, _Headers6, Body6}} = httpc:request(get, {"http://localhost:8000/streams/_search?test=get",[]}, [], []),
 	% Test get for missing index
 	{ok, {{_Version7, 200, _ReasonPhrase7}, _Headers7, Body7}} = httpc:request(get, {"http://localhost:8000/streams/1", []}, [], []),
 	% Test delete
@@ -53,7 +73,7 @@ get_stream_test() ->
 	{ok, {{_Version9, 200, _ReasonPhrase9}, _Headers9, Body9}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ DocId2, []}, [], []),
 
 	?assertEqual(true,get_value_field(Body3,"test") == "get"),
-	?assertEqual(true,get_value_field(Body3,"private") == "true"),
+	?assertEqual(true,get_value_field(Body3,"private") == "1"),
 	?assertEqual(true,get_value_field(Body4,"test") == "get"),
 	?assertEqual(true,get_value_field(Body5,"test") == "get"),
 	?assertEqual(true,list_to_integer(get_value_field(Body5,"total")) >= 2), % Needed in case unempty elasticsearch
@@ -74,12 +94,12 @@ get_stream_test() ->
 
 put_stream_test() ->
 	% Test create
-	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [], "application/json", "{\n\"test\" : \"get\",\n\"private\" : \"true\"\n, \"resource_id\" : 0}"}, [], []),
-	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/users/0/resources/asdascvsr213sda/streams", [], "application/json", "{\n\"test\" : \"get\",\n\"private\" : \"true\"\n}}"}, [], []),
+	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [], "application/json", "{\n\"test\" : \"get\",\n\"private\" : 1\n, \"resource_id\" : 0}"}, [], []),
+	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/users/0/resources/asdascvsr213sda/streams", [], "application/json", "{\n\"test\" : \"get\",\n\"private\" : 1\n}}"}, [], []),
 	DocId1 = get_id_value(Body1,"_id"),
 	DocId2 = get_id_value(Body2,"_id"),
 	% Test update
-	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, _Body3}} = httpc:request(put, {"http://localhost:8000/streams/" ++ DocId1, [], "application/json", "{\n\"test\" : \"put\",\n\"private\" : \"false\"\n}"}, [], []),
+	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, _Body3}} = httpc:request(put, {"http://localhost:8000/streams/" ++ DocId1, [], "application/json", "{\n\"test\" : \"put\",\n\"private\" : 0\n}"}, [], []),
 	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, _Body4}} = httpc:request(put, {"http://localhost:8000/streams/" ++ DocId2, [], "application/json", "{\n\"test\" : \"put\"\n}"}, [], []),
 	% Test get
 	{ok, {{_Version5, 200, _ReasonPhrase5}, _Headers5, Body5}} = httpc:request(get, {"http://localhost:8000/streams/" ++ DocId1, []}, [], []),
@@ -89,10 +109,10 @@ put_stream_test() ->
 	{ok, {{_Version8, 200, _ReasonPhrase8}, _Headers8, Body8}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ DocId2, []}, [], []),
 	% Test update on missing doc
 	{ok, {{_Version9, 200, _ReasonPhrase9}, _Headers9, Body9}} = httpc:request(put, {"http://localhost:8000/streams/1", [], "application/json", "{\n\"test\" : \"put\"\n}"}, [], []),
-	?assertEqual(true,get_value_field(Body5,"private") == "false"),
-	?assertEqual(true,get_value_field(Body5,"private") =/= "true"),
-	?assertEqual(true,get_value_field(Body6,"private") =/= "false"),
-	?assertEqual(true,get_value_field(Body6,"private") == "true"),
+	?assertEqual(true,get_value_field(Body5,"private") == "0"),
+	?assertEqual(true,get_value_field(Body5,"private") =/= "1"),
+	?assertEqual(true,get_value_field(Body6,"private") =/= "0"),
+	?assertEqual(true,get_value_field(Body6,"private") == "1"),
 	?assertEqual(true,get_value_field(Body5,"test") == "put"),
 	?assertEqual(true,get_value_field(Body5,"test") =/= "get"),
 	?assertEqual(true,get_value_field(Body6,"test") == "put"),

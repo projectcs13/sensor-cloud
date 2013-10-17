@@ -153,7 +153,7 @@ process_post(ReqData, State) ->
 %% @end
 -spec process_search_post(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 
-process_search_post(ReqData, State) ->0
+process_search_post(ReqData, State) ->
 	erlang:display("search with json request"),
 	{Json,_,_} = json_handler(ReqData,State),
 	case proplists:get_value('res', wrq:path_info(ReqData)) of
