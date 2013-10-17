@@ -149,36 +149,20 @@ process_post(ReqData, State) ->
 %% @end
 -spec process_search_post(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 
-process_search_post(ReqData, State) ->
-	erlang:display("search request"),
-	URIQuery = wrq:req_qs(ReqData),
-	case proplists:get_value('user', wrq:path_info(ReqData)) of
-		undefined ->
-			UserQuery = [],
-			UserDef = false;
-		UserId ->
-			UserQuery = "owner_id:" ++ UserId,
-			UserDef = true
-		end,
+process_search_post(ReqData, State) ->0
+	erlang:display("search with json request"),
+	{Json,_,_} = json_handler(ReqData,State),
 	case proplists:get_value('res', wrq:path_info(ReqData)) of
 		undefined ->
-			ResQuery = [],
-			ResDef = false;
+			FilteredJson = filter_json(Json);
 		ResId ->
-			ResQuery = "resource_id:" ++ ResId,
-			ResDef = true
+			ResQuery = "\"resource\":" ++ ResId,
+			FilteredJson = filter_json(Json, ResQuery)
 	end,
-	case ResDef and UserDef of
-		true -> Query = UserQuery ++ "&" ++ ResQuery; 
-		false -> case ResDef or UserDef of
-					 true -> Query = UserQuery ++ ResQuery;
-					 false -> Query = ""
-				 end
-	end,
-	FullQuery = lists:append(transform(URIQuery,ResDef or UserDef),Query),
-	case erlastic_search:search_limit(?INDEX, "stream", FullQuery,200) of % Maybe wanna take more
-		{error,Reason} -> {false, wrq:set_resp_body(json_encode(Reason),ReqData), State};
-		{ok,List} -> {true,wrq:set_resp_body(json_encode(List),ReqData),State} 
+	erlang:display(FilteredJson),
+	case erlastic_search:search_json(#erls_params{},?INDEX, "stream", FilteredJson) of % Maybe wanna take more
+		{error,Reason} -> {{halt,Reason}, ReqData, State};
+		{ok,List} -> {true,wrq:set_resp_body(json_encode(List),ReqData),State} % May need to convert
 	end.
 
 
@@ -472,5 +456,27 @@ update_doc(Index, Type, Id, Json, Qs) ->
     ReqPath = Index ++ [$/ | Type] ++ [$/ | Id1] ++ "/_update",
     erls_resource:post(#erls_params{}, ReqPath, [], Qs, Json, []).
 
+
+%% @doc
+%% Function: filter_json/1
+%% Purpose: Used to add private filters to the json query
+%% Returns: JSON string that is updated with filter
+%% @end
+filter_json(Json) ->
+	NewJson = string:sub_string(Json,1,string:len(Json)-1),
+	"{\"query\":{\"filtered\":"++NewJson++",\"filter\":{\"bool\":{\"must\":{\"term\":{\"private\":0}}}}}}}".
+
+%% @doc
+%% Function: filter_json/2
+%% Purpose: Used to add private and resource filters to the json query
+%% Returns: JSON string that is updated with filter
+%% @end
+filter_json(Json,ResourceQuery) ->
+	NewJson = string:sub_string(Json,1,string:len(Json)-1),
+	"{\"query\":{\"filtered\":"++NewJson++",\"filter\":{\"bool\":{\"must\":[{\"term\":{\"private\":0}},{\"term\":{"++ResourceQuery++"}}]}}}}}".
+
+	
+	
+	
 
 
