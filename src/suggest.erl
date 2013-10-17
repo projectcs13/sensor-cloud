@@ -9,7 +9,8 @@
 %%
 %% @end
 -module(suggest).
--export([init/1, allowed_methods/2, process_post/2]).
+-export([init/1, allowed_methods/2, process_post/2, content_types_provided/2, 
+		 get_suggestion/2]).
 
 
 -include_lib("erlastic_search.hrl").
@@ -38,6 +39,8 @@ allowed_methods(ReqData, State) ->
 	%erlang:display(ReqData),
 	%erlang:display(parse_path(wrq:path(ReqData))),
 	case parse_path(wrq:path(ReqData)) of
+		[{"suggest", _Term}] ->
+			{['GET'], ReqData, State}; 
 		[{"suggest"}] ->
 			{['POST'], ReqData, State}; 
 		[error] ->
@@ -52,42 +55,10 @@ end.
 %% A code 406 is returned to the client if we cannot return the media-type that the user has requested.
 %% Returns: {[{Mediatype, Handler}], ReqData, State}
 %% @end
-%-spec content_types_provided(ReqData::term(),State::term()) -> {list(), term(), term()}.
+-spec content_types_provided(ReqData::term(),State::term()) -> {list(), term(), term()}.
 
-%content_types_provided(ReqData, State) ->
-%	{[{"application/json", get_suggestion}], ReqData, State}.
-
-
-%% @doc
-%% Function: content_types_accepted/2
-%% Purpose: based on the content-type on a 'POST' or 'PUT', we know which kind of data that is allowed to be sent to the server.
-%% A code 406 is returned to the client if we don't accept a media type that the client has sent.
-%% Returns: {[{Mediatype, Handler}], ReqData, State}
-%% @end
-%-spec content_types_accepted(ReqData::term(),State::term()) -> {list(), term(), term()}.
-
-%content_types_accepted(ReqData, State) ->
-%	{[{"application/json", put_stream}], ReqData, State}.
-
-
-
-
-
-%% %% @doc
-%% %% Function: delete_resource/2
-%% %% Purpose: Used to handle DELETE requests by deleting the stream in elastic search
-%% %% Returns: {Success, ReqData, State}, where Success is true if delete is successful
-%% %% and false otherwise.
-%% %% @end
-%% -spec delete_resource(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
-%% 
-%% delete_resource(ReqData, State) ->
-%% 	Id = proplists:get_value('stream', wrq:path_info(ReqData)),
-%% 	erlang:display("delete request"),
-%% 	case erlastic_search:delete_doc(?INDEX,"stream", Id) of
-%% 			{error,Reason} -> {false, wrq:set_resp_body(json_encode(Reason),ReqData), State};
-%% 			{ok,List} -> {true,wrq:set_resp_body(json_encode(List),ReqData),State}
-%% 	end.
+content_types_provided(ReqData, State) ->
+	{[{"application/json", get_suggestion}], ReqData, State}.
 
 
 %% @doc
@@ -101,12 +72,50 @@ end.
 process_post(ReqData, State) ->
 	erlang:display("suggestion works?"),
 	{Query,_,_} = json_handler(ReqData, State),	
-	erlang:display(Query),
 	case erlastic_search:suggest(?INDEX, Query) of	
 		{error, Reason} -> {false, wrq:set_resp_body(json_encode(Reason),ReqData), State};
 		{ok,List} -> {true, wrq:set_resp_body(json_encode(List),ReqData), State}
 	end.
 
+
+
+%% @doc
+%% Function: get_suggestion/2
+%% Purpose: Used to handle GET requests for suggestions by giving the term 
+%% (model)
+%% Returns: {String, ReqData, State}
+%% @end
+-spec get_suggestion(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
+
+get_suggestion(ReqData, State) ->
+	erlang:display("get suggestion"),
+	case proplists:get_value('term', wrq:path_info(ReqData)) of
+		undefined ->
+			{{halt, 400}, ReqData, State};
+		Term ->
+			%forms the query
+			Query = "{                   
+    					\"test-suggest\" : {     
+        					\"text\" : \""++Term++"\",
+        					\"completion\" : {                    
+            					\"field\" : \"suggest\",
+								\"size\" : 1            
+        					}                                                   
+    					}                                      
+					}",
+			case erlastic_search:suggest(?INDEX, Query) of	
+				{error, Reason} -> {json_encode(Reason),ReqData, State};
+				{ok,List} -> 
+					erlang:display("---->"),
+					EncodedList = json_encode(List),
+					case re:run(EncodedList, "\"options\":\\[\\]", [{capture, first, list}]) of
+						{match, _} -> 
+							{{halt,404},ReqData, State};
+						_->
+							{json_encode(List),ReqData, State}
+					end
+			end
+	end.
 
 
 %% @doc
