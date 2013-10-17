@@ -45,7 +45,6 @@ post_test() ->
 								}
 							}"),
 	check_returned_code(Response1, 200),
-	timer:sleep(2000),
 	Response2 = post_request(?SUGGEST_URL, "application/json", 
 							"{                   
 								\"test-suggest\" : {     
@@ -56,8 +55,9 @@ post_test() ->
 									}                                                   
 								}                                      
 							}"),     
-	check_returned_code(Response2, 200).
-%check if exists in responce
+	check_returned_code(Response2, 200),
+	{ok, {_, _ ,Body}} = Response2,
+	?assertMatch({match, _}, re:run(Body, "\"payload\":{\"brand\":\"ericsson\"}", [{capture, first, list}])).
 
 
 %% @doc
@@ -83,7 +83,6 @@ get_suggestion_test() ->
 	check_returned_code(Response2, 200),
 	{ok, {_, _ ,Body}} = Response2,
 	?assertMatch({match, _}, re:run(Body, "\"payload\":{\"brand\":\"ericsson\"}", [{capture, first, list}])).
-%check if exists in responce
 
 
 %% @doc
