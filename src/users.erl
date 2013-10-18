@@ -188,7 +188,7 @@ process_search(ReqData, State, post) ->
 	end;
 process_search(ReqData, State, get) ->
 	TempQuery =  wrq:req_qs(ReqData),
-	TransformedQuery =transform(TempQuery),
+	TransformedQuery = transform(TempQuery),
 	case erlastic_search:search_limit(?INDEX, "user", TransformedQuery, 10) of 
 		{error,Reason} -> {{error,Reason}, ReqData, State};
 		{ok,List} -> {json_encode(List),ReqData,State} % May need to convert
