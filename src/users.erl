@@ -132,7 +132,14 @@ process_post(ReqData, State) ->
                         {UserJson,_,_} = api_help:json_handler(ReqData, State),
                         case erlastic_search:index_doc(?INDEX, "user", UserJson) of
                                 {error, Reason} -> {{error, Reason}, ReqData, State};
-                                {ok,_} -> {true, ReqData, State}
+                                {ok,List} -> Json = api_help:make_to_string(api_help:json_encode(List)),
+                   							 Id = api_help:get_id_value(Json,"_id"),
+                                    		 NewJson = "{\"id\" : \"" ++ Id ++ "\"}",
+                                     		 Update = api_help:create_update(NewJson),
+                                     		 case api_help:update_doc(?INDEX,"user", Id, Update, []) of
+												 {error, Reason} -> {false, wrq:set_resp_body(api_help:json_encode(Reason), ReqData), State};
+                                        		 {ok,_} ->{true, wrq:set_resp_body(api_help:json_encode(List), ReqData), State}
+                                     		 end
                         end;
                 true ->
                         process_search(ReqData,State, post)                        
@@ -153,7 +160,9 @@ get_user(ReqData, State) ->
                                         % Get all users
                                         case erlastic_search:search(?INDEX,"user","*:*") of
                                                 {ok, Result} ->
-                                                        {api_help:json_encode(Result), ReqData, State};
+                                                        SearchRemoved = api_help:remove_search_part(api_help:make_to_string(api_help:json_encode(Result)),false,0),
+														ExtraRemoved = api_help:remove_extra_info(SearchRemoved,0),
+                                     					{ExtraRemoved, ReqData, State}; 
                                                 _ -> {{halt, 404}, ReqData, State}
                                         end;
                                 Id ->
@@ -161,9 +170,9 @@ get_user(ReqData, State) ->
                                         case erlastic_search:get_doc(?INDEX, "user", Id) of
                                                 {error, _} ->
                                                         {{halt, 404}, ReqData, State};
-                                                {ok,{struct, JsonData}} ->
-                                                        User = proplists:get_value(<<"_source">>, JsonData),
-                                                        {api_help:json_encode(User), ReqData, State}
+                                                {ok,List} ->
+                                                        ExtraRemoved = api_help:remove_extra_info(api_help:make_to_string(api_help:json_encode(List)),0),
+														{ExtraRemoved, ReqData, State}
                                         end
                         end;
                 true ->                        
