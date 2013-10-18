@@ -10,7 +10,7 @@
 %% @end
 -module(suggest).
 -export([init/1, allowed_methods/2, process_post/2, content_types_provided/2, 
-		 get_suggestion/2]).
+		 get_suggestion/2, add_suggestion/2]).
 
 
 -include_lib("erlastic_search.hrl").
@@ -36,8 +36,6 @@ init([]) ->
 -spec allowed_methods(ReqData::term(),State::term()) -> {list(), term(), term()}.
 
 allowed_methods(ReqData, State) ->
-	%erlang:display(ReqData),
-	%erlang:display(parse_path(wrq:path(ReqData))),
 	case parse_path(wrq:path(ReqData)) of
 		[{"suggest", _Term}] ->
 			{['GET'], ReqData, State}; 
@@ -70,7 +68,6 @@ content_types_provided(ReqData, State) ->
 -spec process_post(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 
 process_post(ReqData, State) ->
-	erlang:display("suggestion works?"),
 	{Query,_,_} = json_handler(ReqData, State),	
 	case erlastic_search:suggest(?INDEX, Query) of	
 		{error, Reason} -> {false, wrq:set_resp_body(json_encode(Reason),ReqData), State};
@@ -88,7 +85,6 @@ process_post(ReqData, State) ->
 -spec get_suggestion(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 
 get_suggestion(ReqData, State) ->
-	erlang:display("get suggestion"),
 	case proplists:get_value('term', wrq:path_info(ReqData)) of
 		undefined ->
 			{{halt, 400}, ReqData, State};
@@ -106,7 +102,6 @@ get_suggestion(ReqData, State) ->
 			case erlastic_search:suggest(?INDEX, Query) of	
 				{error, Reason} -> {json_encode(Reason),ReqData, State};
 				{ok,List} -> 
-					erlang:display("---->"),
 					EncodedList = json_encode(List),
 					case re:run(EncodedList, "\"options\":\\[\\]", [{capture, first, list}]) of
 						{match, _} -> 
@@ -118,68 +113,45 @@ get_suggestion(ReqData, State) ->
 	end.
 
 
-%% @doc
-%% Function: make_to_string/1
-%% Purpose: Used to convert JSON with binary data left to string
-%% Returns: Returns the string represented by the given list
-%% @end
 
-make_to_string([]) ->
-	[];
-make_to_string([First|Rest]) ->
-	case is_list(First) of
-		true -> make_to_string(First) ++ make_to_string(Rest);
-		false ->
-			case is_binary(First) of
-				true -> binary:bin_to_list(First) ++ make_to_string(Rest);
-				false -> [First] ++ make_to_string(Rest)
-			end
-	end.
-%% @doc
-%% Function: remove_search_part/3
-%% Purpose: Used to remove the search header of a search JSON 
-%% Returns: Returns the list of JSON objects return from the search
-%% @end
--spec remove_search_part(JSONString::string(),FoundLeft::boolean(),OpenBrackets::integer()) -> string().
 
-remove_search_part([],_,_) ->
-	[];
-remove_search_part([First|Rest],true,1) ->
-	case First of
-		$] ->
-			[First];
-		$[ ->
-			[First|remove_search_part(Rest,true,2)];
-		_ ->
-			[First|remove_search_part(Rest,true,1)]
-	end;
-remove_search_part([First|Rest],true,Val) ->
-  	case First of
-		$] ->
-			[First|remove_search_part(Rest,true,Val-1)];
-		$[ ->
-			[First|remove_search_part(Rest,true,Val+1)];
-		_ ->
-			[First|remove_search_part(Rest,true,Val)]
-	end;
-remove_search_part([First|Rest],false,Val) ->
-	case First of
-		$[ ->
-			[First|remove_search_part(Rest,true,1)];
-		_ ->
-			remove_search_part(Rest,false,Val)
+%% @doc
+%% Function: add_suggestion/2aaaaaaaaa
+%% Purpose: Used to get the json object from the request
+%% Returns: {Json,ReqData,State}
+%% @end
+add_suggestion(Resource, Json) ->
+	ResourceId = binary_to_list(proplists:get_value(<<"_id">>, Json)),
+	Manufacturer = lib_json:get_value_field(Resource, "manufacturer"),
+	Model = lib_json:get_value_field(Resource, "model"),
+	Tags = lib_json:get_value_field(Resource, "tags"),
+	Polling_freq = lib_json:get_value_field(Resource, "polling_freq"),
+	Weight = scoring:calc(Resource, resource),
+	erlang:display(ResourceId),
+	erlang:display(Manufacturer),
+	erlang:display(Model),
+	erlang:display(Tags),
+	erlang:display(Polling_freq),
+	erlang:display(Weight),
+	Suggestion = "{
+		\"resource_id\" : \"" ++ ResourceId++ "\",
+		\"suggest\" : {
+			\"input\" : [ \"" ++ Model ++ "\" ], 
+			\"output\" : \"" ++ get_timestamp() ++ "\",
+			\"payload\" : { 
+				\"manufacturer\" : \"" ++ Manufacturer ++ "\",
+				\"tags\" : \"" ++ Tags ++ "\",
+				\"polling_freq\" : \"" ++ Polling_freq ++ "\"
+			},
+			\"weight\" : " ++ integer_to_list(Weight) ++ "
+		}				
+	}",
+	case erlastic_search:index_doc(?INDEX, "suggestion", Suggestion) of 
+		{error, S} -> erlang:display("Suggestion not saved ");
+		{ok, _} -> 	ok
 	end.
 
-%% @doc
-%% Function: is_search/1
-%% Purpose: Used to deiced if the URI specify a search
-%% Returns: True if URI specify a search, false otherwise
-%% @end
--spec is_search(ReqData::term()) -> boolean().
 
-is_search(ReqData) ->
-	URIList = string:tokens(wrq:path(ReqData), "/"),
-	IsSearch = (string:sub_string(lists:nth(length(URIList),URIList),1,7) == "_search").
 
 %% @doc
 %% Function: json_handler/2
@@ -243,22 +215,7 @@ pair([A]) -> [{A}];
 pair([A,B|T]) ->
 	[{A,B}|pair(T)].
 
-%% @doc
-%% Function: transform/2
-%% Purpose: Used to create the query for search, expects more fields
-%% if AddAnd euqal to true
-%% Returns: The query string from given from the list
-%% were the list will be {Field,Value} tuples
-%% @end
--spec transform(QueryList::list(),AddAnd::boolean()) -> list().
 
-transform([],true) -> "&";
-transform([],false) -> "";
-transform([{Field,Value}|Rest],AddAnd) ->
-	case Rest of 
-		[] -> Field ++ ":" ++ Value ++ transform(Rest,AddAnd);
-		_ -> Field ++ ":" ++ Value ++ "&" ++ transform(Rest,AddAnd)
-	end.
 
 %% @doc
 %% Function: json_encode/1
@@ -291,32 +248,6 @@ update_doc(Index, Type, Id, Json, Qs) ->
     Id1 = mochiweb_util:quote_plus(Id),
     ReqPath = Index ++ [$/ | Type] ++ [$/ | Id1] ++ "/_update",
     erls_resource:post(#erls_params{}, ReqPath, [], Qs, Json, []).
-
-
-add_suggestion(Resource, Json) ->
-	ResourceId = binary_to_list(proplists:get_value(<<"_id">>, Json)),
-	erlang:display(ResourceId),
-	Manufacturer = lib_json:get_value_field(Resource, "manufacturer"),
-	Tags = lib_json:get_value_field(Resource, "tags"),
-	Polling_freq = lib_json:get_value_field(Resource, "polling_freq"),
-	Weight = scoring:calc(Resource, resource),
-	Suggestion = "{
-		\"resource_id\" : \"" ++ ResourceId++ "\",
-		\"suggest\" : {
-			\"input\" : [ \"smartphone\" ], 
-			\"output\" : \"" ++ get_timestamp() ++ "\",
-			\"payload\" : { 
-				\"manufacturer\" : \"" ++ Manufacturer ++ "\",
-				\"tags\" : \"" ++ Tags ++ "\",
-				\"polling_freq\" : \"" ++ Polling_freq ++ "\"
-			},
-			\"weight\" : " ++ integer_to_list(Weight) ++ "
-		}				
-	}",
-	case erlastic_search:index_doc(?INDEX, "suggestion", Suggestion) of 
-		{error, S} -> erlang:display("Suggestion not saved ");
-		{ok, _} -> 	erlang:display("Suggestion added :D")
-	end.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

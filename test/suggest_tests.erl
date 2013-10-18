@@ -37,27 +37,14 @@ post_test() ->
 	Response1 = post_request(?RESOURCE_URL, "application/json", 
 							"{
 								\"model\" : \"test-smartphone1\",
-								\"suggest\" : {
-									\"input\": [ \"test-smartphone1\" ],
-									\"output\": \"ericsson\",
-									\"payload\" : { \"brand\" : \"ericsson\" },
-									\"weight\" : 2
-								}
+								\"tags\" : \"test-tag\"
 							}"),
 	check_returned_code(Response1, 200),
-	Response2 = post_request(?SUGGEST_URL, "application/json", 
-							"{                   
-								\"test-suggest\" : {     
-									\"text\" : \"test-smartphone1\",
-									\"completion\" : {                    
-										\"field\" : \"suggest\",
-									\"size\" : 1                
-									}                                                   
-								}                                      
-							}"),     
-	check_returned_code(Response2, 200),
-	{ok, {_, _ ,Body}} = Response2,
-	?assertMatch({match, _}, re:run(Body, "\"payload\":{\"brand\":\"ericsson\"}", [{capture, first, list}])).
+ 	Response2 = get_request(?SUGGEST_URL++"test-smartphone1"),     
+ 	check_returned_code(Response2, 200),
+ 	{ok, {_, _ ,Body}} = Response2,
+	erlang:display(Body),
+	?assertMatch({match, _}, re:run(Body, "\"payload\":{\"tag\":\"test-tag\"}", [{capture, first, list}])).
 
 
 %% @doc
@@ -82,6 +69,7 @@ get_suggestion_test() ->
 	Response2 = get_request(?SUGGEST_URL ++ "/test-smartphone2"),
 	check_returned_code(Response2, 200),
 	{ok, {_, _ ,Body}} = Response2,
+	erlang:display(Body),
 	?assertMatch({match, _}, re:run(Body, "\"payload\":{\"brand\":\"ericsson\"}", [{capture, first, list}])).
 
 
