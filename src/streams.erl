@@ -442,11 +442,13 @@ transform([{Field,Value}|Rest],AddAnd) ->
 
 %% @doc
 %% Function: json_encode/1
+%%
+%% Taken from erlasticsearch
+%%
 %% Purpose: Used to transform the given data to json
 %% Returns: JSON that is created
 %% @end
 
-% Taken from erlasticsearch
 json_encode(Data) ->
     (mochijson2:encoder([{utf8, true}]))(Data).
 
