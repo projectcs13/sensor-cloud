@@ -132,7 +132,7 @@ process_post(ReqData, State) ->
 			{UserJson,_,_} = json_handler(ReqData, State),
 			case erlastic_search:index_doc(?INDEX, "user", UserJson) of
 				{error, Reason} -> {{error, Reason}, ReqData, State};
-				{ok,_} -> {true, ReqData, State}
+				{ok,List} -> {true,  wrq:set_resp_body(json_encode(List),ReqData), State}
 			end;
 		true ->
 			process_search(ReqData,State, post)			
