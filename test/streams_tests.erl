@@ -52,17 +52,28 @@ get_stream_test() ->
 	{ok, {{_Version8, 200, _ReasonPhrase8}, _Headers8, Body8}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ DocId1, []}, [], []),
 	{ok, {{_Version9, 200, _ReasonPhrase9}, _Headers9, Body9}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ DocId2, []}, [], []),
 	
-			erlang:display("**************************************"),
-	erlang:display(Body3),
+			erlang:display("******************1********************"),
 	?assertEqual(true,lib_json:get_value_field(Body3,"_source.test") == "get"),
+			erlang:display("******************2********************"),
 	?assertEqual(true,lib_json:get_value_field(Body3,"_source.private") == "true"),
+			erlang:display("******************3********************"),
+	erlang:display(Body4),
 	?assertEqual(true,lib_json:get_value_field(Body4,"_source.test") == "get"),
+			erlang:display("*****************4*********************"),
 	?assertEqual(true,lib_json:get_value_field(Body5,"_source.test") == "get"),
+			erlang:display("*****************5*********************"),
 	?assertEqual(true,list_to_integer(lib_json:get_value_field(Body5,"total")) >= 2), % Needed in case unempty elasticsearch
+	
+			erlang:display("*****************6*********************"),
 	?assertEqual(true,lib_json:get_value_field(Body6,"_source.test") == "get"),
+			erlang:display("*****************7*********************"),
 	?assertEqual(true,list_to_integer(lib_json:get_value_field(Body6,"total")) >= 2), % Needed in case unempty elasticsearch
+	
+			erlang:display("*****************8*********************"),
 	?assertEqual(true,string:str(Body7,"not_found") =/= 0),
+			erlang:display("*****************9*********************"),
 	?assertEqual(true,get_id_value(Body8,"_id") == DocId1),
+			erlang:display("*****************10********************"),
 	?assertEqual(true,get_id_value(Body9,"_id") == DocId2).
 
 %% @doc
