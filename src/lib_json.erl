@@ -25,17 +25,21 @@
 %% @end
 -spec get_value_field(String::string(),Field::string()) -> string().
 
-get_value_field(JSONString, Field) ->
-    Obj = mochijson2:decode(JSONString),
+get_value_field(JsonString, Field) when is_list(JsonString) ->
+    JsonObj = mochijson2:decode(JsonString),
     JsonParser = destructure_json:parse("Obj."++Field),
-    case JsonParser(Obj) of
+    case JsonParser(JsonObj) of
 		R when is_binary(R) ->
 			binary_to_list(R);
 		R when is_integer(R) ->
 			integer_to_list(R);
 		R ->
 			R	
-  	end.
+  	end;
+get_value_field(JsonObj, Field) when is_tuple(JsonObj) ->    
+	erlang:display("Shouldn't be here: LIB_JSON"),
+    JsonParser = destructure_json:parse("Obj."++Field),
+    JsonParser(JsonObj).
 
 
 
