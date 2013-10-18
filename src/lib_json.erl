@@ -28,7 +28,14 @@
 get_value_field(JSONString, Field) ->
     Obj = mochijson2:decode(JSONString),
     JsonParser = destructure_json:parse("Obj."++Field),
-    JsonParser(Obj).
+    case JsonParser(Obj) of
+		R when is_binary(R) ->
+			binary_to_list(R);
+		R when is_integer(R) ->
+			integer_to_list(R);
+		R ->
+			R	
+  	end.
 
 
 
