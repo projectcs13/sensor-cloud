@@ -293,74 +293,42 @@ update_doc(Index, Type, Id, Json, Qs) ->
     erls_resource:post(#erls_params{}, ReqPath, [], Qs, Json, []).
 
 
+add_suggestion(Resource, Json) ->
+	ResourceId = binary_to_list(proplists:get_value(<<"_id">>, Json)),
+	erlang:display(ResourceId),
+	Manufacturer = lib_json:get_value_field(Resource, "manufacturer"),
+	Tags = lib_json:get_value_field(Resource, "tags"),
+	Polling_freq = lib_json:get_value_field(Resource, "polling_freq"),
+	Weight = scoring:calc(Resource, resource),
+	Suggestion = "{
+		\"resource_id\" : \"" ++ ResourceId++ "\",
+		\"suggest\" : {
+			\"input\" : [ \"smartphone\" ], 
+			\"output\" : \"" ++ get_timestamp() ++ "\",
+			\"payload\" : { 
+				\"manufacturer\" : \"" ++ Manufacturer ++ "\",
+				\"tags\" : \"" ++ Tags ++ "\",
+				\"polling_freq\" : \"" ++ Polling_freq ++ "\"
+			},
+			\"weight\" : " ++ integer_to_list(Weight) ++ "
+		}				
+	}",
+	case erlastic_search:index_doc(?INDEX, "suggestion", Suggestion) of 
+		{error, S} -> erlang:display("Suggestion not saved ");
+		{ok, _} -> 	erlang:display("Suggestion added :D")
+	end.
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Should be moved to own module later
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc
-%% Function: get_value_field/2
-%% Purpose: Return the value of a certain field in the given JSON string.
-%% Returns: Return the value of the specified field, if it exists, 
-%%          otherwise returns the empty string.
-%% @end
--spec get_value_field(String::string(),Field::string()) -> string().
+get_timestamp() ->
+    TS = {MSec,Sec,Micro} = os:timestamp(),
+	{{Year,Month,Day},{Hour,Minute,Second}} = calendar:now_to_universal_time(TS),
+    Mstr = element(Month,{"Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"}),
+    io_lib:format("~2w ~s ~4w ~2w:~2..0w:~2..0w.~6..0w", [Day,Mstr,Year,Hour,Minute,Second,Micro]).
 
-get_value_field(JSONString,Field) ->
-	Tokens = string:tokens(JSONString, ","),
-	ResourceField = find_field(Tokens,Field),
-	case ResourceField of 
-		[] -> "";
-		_ -> FieldValue = string:tokens(ResourceField,":"),
-			 remove_special_characters(lists:nth(length(FieldValue),FieldValue),false)
-	end.
-
-%% @doc
-%% Function: find_field/2
-%% Purpose: Help function to find the first string containing the given string
-%%          in the list.
-%% Returns: The first string containing the given string
-%%          in the list, the empty string if non exists.
-%% @end
--spec find_field(List::list(),Field::string()) -> string().
-
-find_field([],_) ->
-	[];
-
-find_field([First|Rest],Field) ->
-	case string:str(First,Field) of
-		0 -> find_field(Rest,Field);
-		_ -> First
-	end.
-
-
-%% @doc
-%% Function: remove_special_characters/2
-%% Purpose: Help function to remove non alphanumerical characters
-%% Returns: First string of alphanumerical characters that can be found,
-%%          empty string if non exists
-%% @end
--spec remove_special_characters(String::string(),CharactersFound::boolean()) -> string().
-
-remove_special_characters([],_) ->
-	[];
-
-remove_special_characters([First|Rest],false) ->
-	Character = (First < 91) and (First > 64) or (First < 123) and (First > 96) or (First > 47) and (First < 58),
-	case Character of
-		true ->
-			[First|remove_special_characters(Rest,true)];
-		false ->
-			remove_special_characters(Rest,false)
-	end;
-remove_special_characters([First|Rest],true) ->
-	Character = (First < 91) and (First > 64) or (First < 123) and (First > 96) or (First > 47) and (First < 58),
-	case Character of
-		true ->
-			[First|remove_special_characters(Rest,true)];
-		false ->
-			[]
-	end.
 
 
 

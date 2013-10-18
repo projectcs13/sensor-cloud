@@ -129,9 +129,11 @@ process_post(ReqData, State) ->
 		false ->
 			% Create
 			{Resource,_,_} = json_handler(ReqData,State),
-			case erlastic_search:index_doc(?INDEX,"resource",Resource) of 
+			case erlastic_search:index_doc(?INDEX, "resource", Resource) of 
 				{error, Reason} -> {false, wrq:set_resp_body(json_encode(Reason), ReqData), State};
-				{ok,List} -> 	{true, wrq:set_resp_body(json_encode(List), ReqData), State}
+				{ok, List = {struct, Json}} -> 	
+					suggest:add_suggestion(Resource, Json),				
+					{true, wrq:set_resp_body(json_encode(List), ReqData), State}
 			end;
 		true ->
 			% Search
@@ -143,12 +145,10 @@ process_post(ReqData, State) ->
 					Query = "owner:" ++ UserId
 			end,
 			FullQuery = lists:append(transform(URIQuery,true),Query),
-			erlang:display(FullQuery),
 			case erlastic_search:search_limit(?INDEX, "resource", FullQuery,10) of % Maybe wanna take more
 				{error,Reason} -> {{halt,Reason}, ReqData, State};
 				{ok,List} -> {true,wrq:set_resp_body(json_encode(List),ReqData),State} % May need to convert
 			end
-
 	end.
 
 
@@ -187,7 +187,6 @@ put_resource(ReqData, State) ->
 %% @end
 -spec get_resource(ReqData::tuple(), State::string()) -> {list(), tuple(), string()}.
 get_resource(ReqData, State) ->
-	erlang:display("GET request"),
 	case is_search(ReqData) of
 		false ->
 			case proplists:get_value('resourceid', wrq:path_info(ReqData)) of
@@ -202,7 +201,6 @@ get_resource(ReqData, State) ->
 					case erlastic_search:search_limit(?INDEX, "resource", Query, 100) of % Maybe wanna take more
 						{error,Reason} -> {{halt, Reason}, ReqData, State};
 						{ok,List} -> 
-				    		erlang:display(Query),
 							{remove_search_part(make_to_string(json_encode(List)),false,0), ReqData, State} % Maybe need to convert
 					end;
 				ResourceId ->
@@ -215,8 +213,7 @@ get_resource(ReqData, State) ->
 					end
 		end;
 		true ->
-			erlang:display("Processing _search"),
-				process_search(ReqData,State, get)
+			process_search(ReqData,State, get)
 	end.
 
 
@@ -250,7 +247,6 @@ process_search(ReqData, State, post) ->
 process_search(ReqData, State, get) ->
 		TempQuery = wrq:req_qs(ReqData),
 		TransformedQuery =transform(TempQuery),
-		erlang:display("Query "++TransformedQuery),
 		case erlastic_search:search_limit(?INDEX, "resource", TransformedQuery, 10) of
 			{error,Reason} -> {{error,Reason}, ReqData, State};
 			{ok,List} -> {json_encode(List),ReqData,State} % May need to convert
@@ -266,7 +262,6 @@ process_search(ReqData, State, get) ->
 -spec json_handler(tuple(), string()) -> {string(), tuple(), string()}.
 json_handler(ReqData, State) ->
 	[{Value,_ }] = mochiweb_util:parse_qs(wrq:req_body(ReqData)), 
-	erlang:display(Value),
 	%%{struct, JsonData} = mochijson2:decode(Value),
 	{Value, ReqData, State}.
 
@@ -431,4 +426,5 @@ convert_binary_to_string([First|Rest]) ->
 					 false -> [First] ++ convert_binary_to_string(Rest)
 				 end
 	end.
+
 
