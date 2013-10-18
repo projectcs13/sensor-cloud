@@ -21,8 +21,6 @@ compile:
 
 ### get_libs will download and install all project libraries
 get_libs:
-	wget -q -O $(REBAR) $(REBAR_URL)
-	chmod u+x $(REBAR)
 	@./rebar get-deps
 	@./rebar compile
 
@@ -54,18 +52,18 @@ install: get_libs
 ### Command: make run
 ### Downloads all depenedencies, bulds entire project and runs the project.
 run: compile
-	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname database -setcookie database -mnesia dir '"/home/database/Mnesia.Database"' -s database init
+	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname engine 
 
 ### Command: make run_es
 ### Runs elastic search
 run_es:
-	lib/elastic_search/bin/elasticsearch -f
+	lib/elasticsearch/bin/elasticsearch -f
 
 ### Command: make test
 ### Compile project resources (not libraries) and runs all eunit tests.
 test: compile
 	-@mkdir test-results
-	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname database -setcookie database -mnesia dir '"/home/database/Mnesia.Database"' -s database init -s test run
+	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname test -s test run
 
 ### Command: make docs
 ### Genereats all of the documentation files

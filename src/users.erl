@@ -5,7 +5,7 @@
 
 %% @doc Webmachine_resource for /users
 
--module(users_resource).
+-module(users).
 -export([init/1, 
 		allowed_methods/2,
 		content_types_accepted/2,
@@ -16,7 +16,7 @@
 		process_post/2]).
 
 -include("webmachine.hrl").
--include("user.hrl").
+
 
 -define(INDEX, "sensorcloud").
 
@@ -239,14 +239,14 @@ pair([A,B|T]) ->
 %% @end
 -spec id_from_path(string()) -> string().
 id_from_path(RD) ->
-    case wrq:path_info(id, RD) of
-        undefined ->
-            case string:tokens(wrq:disp_path(RD), "/") of
+	case wrq:path_info(id, RD) of
+		undefined ->
+			case string:tokens(wrq:disp_path(RD), "/") of
 				["users", Id] -> Id;
 				_ -> undefined
 			end;
-        Id -> Id
-    end.
+		Id -> Id
+	end.
 
 %% @doc
 %% Function: is_search/2
@@ -289,4 +289,4 @@ transform([{Field,Value}|Rest]) ->
 %% @end
 -spec json_encode(string()) -> string().
 json_encode(Data) ->
-    (mochijson2:encoder([{utf8, true}]))(Data).
+	(mochijson2:encoder([{utf8, true}]))(Data).
