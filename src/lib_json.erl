@@ -25,10 +25,14 @@
 %% @end
 -spec get_value_field(String::string(),Field::string()) -> string().
 
-get_value_field(JSONString, Field) ->
-    Obj = mochijson2:decode(JSONString),
+get_value_field(JsonString, Field) when is_list(JsonString) ->
+    JsonObj = mochijson2:decode(JsonString),
     JsonParser = destructure_json:parse("Obj."++Field),
-    JsonParser(Obj).
+    JsonParser(JsonObj);
+
+get_value_field(JsonObj, Field) when is_tuple(JsonObj) ->    
+    JsonParser = destructure_json:parse("Obj."++Field),
+    JsonParser(JsonObj).
 
 
 
