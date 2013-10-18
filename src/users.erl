@@ -151,7 +151,7 @@ get_user(ReqData, State) ->
 			case id_from_path(ReqData) of
 				undefined -> 
 					% Get all users
-					case erlastic_search:search(?INDEX,"user","*:*") of
+					case erlastic_search:search_limit(?INDEX,"user","*:*",200) of %%this limits it to 200 users need to fix it
 						{ok, Result} -> 
 							{json_encode(Result), ReqData, State};
 						_ -> {{halt, 404}, ReqData, State}
