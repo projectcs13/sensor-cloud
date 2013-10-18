@@ -30,11 +30,18 @@ init_test() ->
 %% Side effects: creates documents in elasticsearch
 %% @end
 process_post_test() ->
-	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/resources", [],"application/json", "{\"test\" : \"post\",\"owner\" : 0,\"streams\" : 1}"}, [], []),
-	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/users/0/resources/", [],"application/json", "{\"test\" : \"post\",\"owner\" : 0,\"streams\" : 1}"}, [], []),
+	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/resources", [],"application/json", "{\"test\" : \"post\",\"owner\" : 7,\"streams\" : 1}"}, [], []),
 	timer:sleep(100),
+	DocId1 = get_id_value(Body1,"_id"),
 	?assertEqual("true",get_field_value(Body1,"ok")),	
-	?assertEqual("true",get_field_value(Body2,"ok")).
+	timer:sleep(1000),
+	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(post, {"http://localhost:8000/users/7/resources/_search", [],"application/json", "{\"query\":{\"match_all\":{}}}"}, [], []),
+	{ok, {{_Version3, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(post, {"http://localhost:8000/users/5/resources/_search", [],"application/json", "{\"query\":{\"match_all\":{}}}"}, [], []),
+	?assertEqual("1",get_field_value(Body3,"hits")),
+	?assertEqual("0",get_field_value(Body4,"hits")),
+	{ok, {{_Version8, 200, _ReasonPhrase5}, _Headers5, Body5}} = httpc:request(delete, {"http://localhost:8000/resources/" ++ DocId1, []}, [], []).
+
+	
 
 %% @doc
 %% Function: delete_resource_test/0
@@ -66,9 +73,12 @@ put_resource_test() ->
 	DocId = get_id_value(Body1,"_id"),
 	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(put, {"http://localhost:8000/resources/" ++ DocId , [],"application/json", "{\"doc\" :{\"test\" : \"put2\",\"owner\" : 0,\"streams\" : 1}}"}, [], []),
 	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(get, {"http://localhost:8000/resources/" ++ DocId, []}, [], []),
+	{ok, {{_Version8, 200, _ReasonPhrase5}, _Headers5, Body5}} = httpc:request(delete, {"http://localhost:8000/resources/" ++ DocId, []}, [], []),
+
 	?assertEqual("true",get_field_value(Body1,"ok")),
 	?assertEqual("true",get_field_value(Body2,"ok")),
 	?assertEqual("put2",get_field_value(Body3,"test")).
+
 	
 %% @doc
 %% Function: get_resource_test/0

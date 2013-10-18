@@ -30,7 +30,7 @@ init([]) ->
 %% @end
 -spec allowed_methods(ReqData::tuple(), State::string()) -> {list(), tuple(), string()}.
 allowed_methods(ReqData, State) ->
-	case parse_path(wrq:path(ReqData)) of
+	case parse_path(wrq:path(ReqData)) of	
 		[ {"resources"}] ->
 			{['POST'], ReqData, State};
 		[ {"resources", _ResourceID}] ->
@@ -135,20 +135,32 @@ process_post(ReqData, State) ->
 			end;
 		true ->
 			% Search
-			URIQuery = wrq:req_qs(ReqData),
-			case proplists:get_value('userid', wrq:path_info(ReqData)) of
-				undefined ->
-					Query = [];
-				UserId ->
-					Query = "owner:" ++ UserId
-			end,
-			FullQuery = lists:append(transform(URIQuery,true),Query),
-			erlang:display(FullQuery),
-			case erlastic_search:search_limit(?INDEX, "resource", FullQuery,10) of % Maybe wanna take more
+			process_search_post(ReqData,State)
+	end.
+
+
+%% @doc
+%% Function: process_search_post/2
+%% Purpose: Used to handle search requests that come from POST requests
+%% Returns: {Success, ReqData, State}, where Success is true if the search request is
+%% successful and false otherwise.
+%% @end
+-spec process_search_post(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
+
+process_search_post(ReqData, State) ->
+	erlang:display("search with json request"),
+	{Json,_,_} = json_handler(ReqData,State),
+	case proplists:get_value('userid', wrq:path_info(ReqData)) of
+		undefined ->
+			{{halt,405}, ReqData, State};
+		UserId ->
+			UserQuery = "\"owner\":" ++ UserId,
+			FilteredJson = filter_json(Json, UserQuery),
+			erlang:display(FilteredJson),
+			case erlastic_search:search_json(#erls_params{},?INDEX, "resource", FilteredJson) of % Maybe wanna take more
 				{error,Reason} -> {{halt,Reason}, ReqData, State};
 				{ok,List} -> {true,wrq:set_resp_body(json_encode(List),ReqData),State} % May need to convert
 			end
-
 	end.
 
 
@@ -378,7 +390,6 @@ transform([{Field,Value}|Rest]) ->
 		_ -> Field ++ ":" ++ Value ++ "&" ++ transform(Rest)
 	end.
 
-
 %% @doc
 %% Function: transform/2
 %% Purpose: Takes the fields and values from the input list and parses them to a string
@@ -392,6 +403,15 @@ transform([{Field,Value}|Rest],AddAnd) ->
 		[] -> Field ++ ":" ++ Value ++ transform(Rest,AddAnd);
 		_ -> Field ++ ":" ++ Value ++ "&" ++ transform(Rest,AddAnd)
 	end.
+
+%% @doc
+%% Function: filter_json/2
+%% Purpose: Used to add private and resource filters to the json query
+%% Returns: JSON string that is updated with filter
+%% @end
+filter_json(Json,UserQuery) ->
+	NewJson = string:sub_string(Json,1,string:len(Json)-1),
+	"{\"query\":{\"filtered\":"++NewJson++",\"filter\":{\"bool\":{\"must\":[{\"term\":{"++UserQuery++"}}]}}}}}".
 
 % Taken from erlasticsearch
 
