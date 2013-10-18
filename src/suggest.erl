@@ -45,7 +45,7 @@ allowed_methods(ReqData, State) ->
 			{['POST'], ReqData, State}; 
 		[error] ->
 		    {[], ReqData, State} 
-end.
+	end.
 
 
 
