@@ -146,7 +146,14 @@ process_post(ReqData, State) ->
 			erlang:display(FullQuery),
 			case erlastic_search:search_limit(?INDEX, "resource", FullQuery,10) of % Maybe wanna take more
 				{error,Reason} -> {{halt,Reason}, ReqData, State};
-				{ok,List} -> {true,wrq:set_resp_body(api_help:json_encode(List),ReqData),State} % May need to convert
+				{ok,List} -> Json = api_help:make_to_string(api_help:json_encode(List)),
+                             Id = api_help:get_id_value(Json,"_id"),
+                             NewJson = "{\"id\" : \"" ++ Id ++ "\"}",
+                             Update = api_help:create_update(NewJson),
+                             case api_help:update_doc(?INDEX,"resource", Id, Update, []) of
+								 {error, Reason} -> {false, wrq:set_resp_body(api_help:json_encode(Reason), ReqData), State};
+                                 {ok,_} ->{true, wrq:set_resp_body(api_help:json_encode(List), ReqData), State}
+                             end
 			end
 
 	end.
@@ -161,7 +168,7 @@ process_post(ReqData, State) ->
 %% @end
 -spec put_resource(ReqData::tuple(), State::string()) -> {list(), tuple(), string()}.
 put_resource(ReqData, State) ->
-	case api_help:id_from_path(ReqData) of
+	case id_from_path(ReqData) of
 		undefined -> {{halt, 400}, ReqData, State};
 		
 		Id ->	
@@ -201,8 +208,9 @@ get_resource(ReqData, State) ->
 					end,
 					case erlastic_search:search_limit(?INDEX, "resource", Query, 100) of % Maybe wanna take more
 						{error,Reason} -> {{halt, Reason}, ReqData, State};
-						{ok,List} -> 
-							{api_help:remove_search_part(api_help:make_to_string(api_help:json_encode(List)),false,0), ReqData, State} % Maybe need to convert
+						{ok,List} -> SearchRemoved = api_help:remove_search_part(api_help:make_to_string(api_help:json_encode(List)),false,0),
+                                     ExtraRemoved = api_help:remove_extra_info(SearchRemoved,0),
+                                     {ExtraRemoved, ReqData, State}
 					end;
 				ResourceId ->
 				% Get specific resource
@@ -248,5 +256,17 @@ process_search(ReqData, State, get) ->
 		end.
 
 
-
+%% @doc
+%% Function: id_from_path/1
+%% Purpose: Retrieves the id from the path.
+%% Returns: Id
+%% @end
+-spec id_from_path(tuple()) -> string().
+id_from_path(RD) ->
+    case wrq:path_info(resourceid, RD) of
+        undefined->
+            ["resource", Id] = string:tokens(wrq:disp_path(RD), "/"),
+            Id;
+        Id -> Id
+    end.
 

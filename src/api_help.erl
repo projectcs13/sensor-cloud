@@ -181,19 +181,7 @@ transform([{Field,Value}|Rest],AddAnd) ->
 		_ -> Field ++ ":" ++ Value ++ "&" ++ transform(Rest,AddAnd)
 	end.
 
-%% @doc
-%% Function: id_from_path/1
-%% Purpose: Retrieves the id from the path.
-%% Returns: Id
-%% @end
--spec id_from_path(tuple()) -> string().
-id_from_path(RD) ->
-    case wrq:path_info(resourceid, RD) of
-        undefined->
-            ["resource", Id] = string:tokens(wrq:disp_path(RD), "/"),
-            Id;
-        Id -> Id
-    end.
+
 
 %% @doc
 %% Function: json_encode/1
@@ -292,6 +280,44 @@ remove_special_characters([First|Rest],true) ->
 			[]
 	end.
 
+
+%% @doc
+%% Function: remove_extra_info/3
+%% Purpose: Used to remove the extra info for documents
+%% Returns: Returns the list of JSON objects return from the search
+%% @end
+-spec remove_extra_info(JSONString::string(),OpenBrackets::integer()) -> string().
+
+remove_extra_info([],_) ->
+        [];
+remove_extra_info([First|Rest],0) ->
+        case First of
+                ${ ->
+                        remove_extra_info(Rest,1);
+                _ ->
+                        [First|remove_extra_info(Rest,0)]
+        end;
+remove_extra_info([First|Rest],1) ->
+        case First of
+                $} ->
+                        remove_extra_info(Rest,0);
+                ${ ->
+                        [First|remove_extra_info(Rest,2)];
+                _ ->
+                        remove_extra_info(Rest,1)
+        end;
+remove_extra_info([First|Rest],Val) ->
+          case First of
+                $} ->
+                        [First|remove_extra_info(Rest,Val-1)];
+                ${ ->
+                        [First|remove_extra_info(Rest,Val+1)];
+                _ ->
+                        [First|remove_extra_info(Rest,Val)]
+        end.
+
+
+
 convert_binary_to_string([]) ->
 	[];
 convert_binary_to_string([First|Rest]) ->
@@ -303,3 +329,22 @@ convert_binary_to_string([First|Rest]) ->
 				 end
 	end.
 
+%% @doc
+%% Function: get_id_value/2
+%% Purpose: Help function to find value of a field in the string
+%% Returns: String with value of the field
+%% @end
+-spec get_id_value(String::string(),Field::string()) -> string().
+
+get_id_value(String,Field) ->
+	Location = string:str(String,Field),
+	Start = Location + 3 + length(Field),
+	RestOfString = string:substr(String, Start),
+	NextComma = string:str(RestOfString,","),
+	NextBracket = string:str(RestOfString,"}"),
+	case (NextComma < NextBracket) and (NextComma =/= 0) of
+		true ->
+			string:substr(RestOfString, 1,NextComma-2);
+		false ->
+			string:substr(RestOfString, 1,NextBracket-2)
+	end.
