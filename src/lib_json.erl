@@ -49,41 +49,57 @@ wildcard_recursion(Json, QueryParts, Value) ->
     wildcard_recursion(Json, QueryParts, Value, "").
 
 
-wildcard_recursion(Json, [], _Value, Query) ->
-    erlang:display("1"++Query),
-    make_json_pretty(get_field_help(Json, Query));
 wildcard_recursion(Json, [{wildcard, Field} | Rest], Value, Query) ->
-    erlang:display("2"++Query),
+    %% erlang:display("2"++Query),
     case get_field_max_index(Json, Field) of
 	N when is_integer(N) ->
-	    case make_json_pretty(field_recursion(Json, [{wildcard, Field, N}| Rest], Value, Query)) of
+	    case field_recursion(Json, [{wildcard, Field, N}| Rest], Value, Query) of
 		Value ->
+		    %% erlang:display("3"),
 		    Value;
-		_ ->
-		    wildcard_recursion(Json, Rest, Value, Query)
+		R ->
+		    %% erlang:display("4a"),
+		    %% erlang:display(R),
+		    %% erlang:display("4b"),
+		    R
+		    %wildcard_recursion(Json, Rest, Value, Query)
 	    end;
 	R ->
 	    R
     end;
-wildcard_recursion(Json, [{no_wildcard, Field}], _Value, Query) ->
+wildcard_recursion(Json, [{no_wildcard, Field}], Value, Query) ->
     NewQuery = lists:concat([Query, Field]),
-    erlang:display("3"++NewQuery),
-    make_json_pretty(get_field_help(Json, NewQuery)).
-
+    %% erlang:display("5"++NewQuery),
+    case make_json_pretty(get_field_help(Json, NewQuery)) of
+	R when is_list(R) ->
+	    case lists:member(Value, R) of
+		true ->
+		    %% erlang:display("6a"),
+		    Value;
+		false ->
+		    %% erlang:display("6b"),
+		    R
+	    end;
+	R ->
+	    %% erlang:display("6c"++R),
+	    R
+    end.
 
 field_recursion(Json, [{wildcard, Field, 0 = N} | Rest], Value, Query) ->
     NewQuery = lists:concat([Query, Field]),
     NewIndexQuery = query_index_prep(NewQuery, N),
-    erlang:display("4"++NewIndexQuery),
+    %% erlang:display("7a"++NewIndexQuery),
     wildcard_recursion(Json, Rest, Value, NewIndexQuery);
 field_recursion(Json, [{wildcard, Field, N} | Rest], Value, Query) ->
     NewQuery = lists:concat([Query, Field]),
     NewIndexQuery = query_index_prep(NewQuery, N),
-    erlang:display("5"++NewIndexQuery),
+    %% erlang:display("8"++NewIndexQuery),
     case wildcard_recursion(Json, Rest, Value, NewIndexQuery) of
 	Value ->
+	    %% erlang:display("9"),
 	    Value;
 	_ ->
+	    %% erlang:display("10"),
 	    field_recursion(Json, [{wildcard, Field, N-1} | Rest], Value, Query)
     end.
     
