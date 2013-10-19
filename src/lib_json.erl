@@ -29,7 +29,6 @@ get_field(Json, Query) ->
     make_json_pretty(Result).
 
 get_field_help(Json, Query) ->
-    erlang:display(Query),
     JsonObj = mochijson2:decode(Json),
     JsonParser = destructure_json:parse("Obj."++Query),
     JsonParser(JsonObj).
@@ -51,8 +50,10 @@ wildcard_recursion(Json, QueryParts, Value) ->
 
 
 wildcard_recursion(Json, [], _Value, Query) ->
+    erlang:display("1"++Query),
     make_json_pretty(get_field_help(Json, Query));
 wildcard_recursion(Json, [{wildcard, Field} | Rest], Value, Query) ->
+    erlang:display("2"++Query),
     case get_field_max_index(Json, Field) of
 	N when is_integer(N) ->
 	    case make_json_pretty(field_recursion(Json, [{wildcard, Field, N}| Rest], Value, Query)) of
@@ -65,24 +66,20 @@ wildcard_recursion(Json, [{wildcard, Field} | Rest], Value, Query) ->
 	    R
     end;
 wildcard_recursion(Json, [{no_wildcard, Field}], _Value, Query) ->
-    erlang:display("1"++Query),
     NewQuery = lists:concat([Query, Field]),
-    erlang:display("2"++NewQuery),
-    make_json_pretty(get_field_help(Json, Query)).
+    erlang:display("3"++NewQuery),
+    make_json_pretty(get_field_help(Json, NewQuery)).
 
 
 field_recursion(Json, [{wildcard, Field, 0 = N} | Rest], Value, Query) ->
-    NewQuery = string:join([Query, Field], ?IF(Query == "", "", ".")),
+    NewQuery = lists:concat([Query, Field]),
     NewIndexQuery = query_index_prep(NewQuery, N),
-    case wildcard_recursion(Json, Rest, Value, NewIndexQuery) of
-	Value ->
-	    Value;
-	R ->
-	    R
-    end;
+    erlang:display("4"++NewIndexQuery),
+    wildcard_recursion(Json, Rest, Value, NewIndexQuery);
 field_recursion(Json, [{wildcard, Field, N} | Rest], Value, Query) ->
-    NewQuery = string:join([Query, Field], ?IF(Query == "", "", ".")),
+    NewQuery = lists:concat([Query, Field]),
     NewIndexQuery = query_index_prep(NewQuery, N),
+    erlang:display("5"++NewIndexQuery),
     case wildcard_recursion(Json, Rest, Value, NewIndexQuery) of
 	Value ->
 	    Value;
