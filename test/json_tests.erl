@@ -24,9 +24,6 @@
 init_test() ->
     inets:start().
 
-%% field_value_exists_test() ->
-%%     .
-
 get_field_test() ->
     Json1 = 
 	"{"
@@ -84,7 +81,6 @@ get_field_value_test() ->
 	    "{\"name\":\"FriendName2\", \"nickname\":[\"NickName2\", \"NickName3\"]}"
 	             "]"
 	"}",
-
     Json2 = 
 	"{"
 	"\"name\":\"Name1\","
@@ -97,18 +93,17 @@ get_field_value_test() ->
     ?assertEqual(Result1, lib_json:get_field_value(Json1, "friends[1].name", "FriendName2")),
 
     Result2 = not_found,
-    ?assertEqual(Result2, lib_json:get_field_value(Json1, "friends[0].name", "FriendName2")),
+     ?assertEqual(Result2, lib_json:get_field_value(Json1, "friends[0].name", "FriendName2")),
 
     Result3 = "NickName1",
     ?assertEqual(Result3, lib_json:get_field_value(Json1, "friends[*].nickname", "NickName1"))
 
-%    Result4 = "NickName3",
-%    ?assertEqual(Result4, lib_json:get_field_value(Json1, "friends[*].nickname", "NickName3"))
-
+    %% Result4 = "NickName3",
+    %% ?assertEqual(Result4, lib_json:get_field_value(Json1, "friends[*].nickname", "NickName3")),
     
-%    Result5 = not_found,
-%    ?assertEqual(Result5, lib_json:get_field_value(Json1, "friends[*].name", "NickName3")).
+    %% Result5 = not_found,
+    %% ?assertEqual(Result5, lib_json:get_field_value(Json1, "friends[*].name", "NickName3")),
 
-%    Result6
-%    ?assertEqual(Result6, lib_json:get_field_value(Json2, "friends[*].name", "Nickname3"))
+    %% Result6 = "NickName3",
+    %% ?assertEqual(Result6, lib_json:get_field_value(Json2, "friends[*].name", "NickName3"))
 	.

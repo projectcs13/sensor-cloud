@@ -3,18 +3,18 @@
 %% @version 1.0
 %% @copyright [Copyright information]
 %%
-%% @doc == scoring ==
+%% @doc == Library for accessing fields in JSON objects ==
 %% 
 %%  
 %%
 %% @end
-
 -module(lib_json).
 
 %% ====================================================================
 %% API functions
 %% ====================================================================
 -export([get_field/2, get_field_value/3]).
+-include("misc.hrl").
 
 %% @doc
 %% Function: get_field/2
@@ -24,158 +24,127 @@
 %% To-Check:  what if there is a ',' inside a Value??? It will fail?
 %% @end
 -spec get_field(String::string(),Field::string()) -> string().
-get_field(JsonString, Field) ->
-    JsonObj = mochijson2:decode(JsonString),
-    JsonParser = destructure_json:parse("Obj."++Field),
-    case JsonParser(JsonObj) of
-	R when is_binary(R) ->
-	    binary_to_list(R);
-	R when is_integer(R) ->
-	    integer_to_list(R);
-	R when is_list(R) ->
-	    %%      Fix so that this function does not trim away stuff, add another get_field_help
-	    %%      function that takes care of the actual search and get_field actually makes the
-	    %%      the result pretty
-	    %%	    lists:map(fun recursive_binary_to_list/1, R);
-	R when is_tuple(R)->
-	    recursive_binary_to_list(R);
-	R when is_atom(R)->
-	    R
-    end.
+get_field(Json, Query) ->
+    Result = get_field_help(Json, Query),
+    make_json_pretty(Result).
 
-get_field_value(JsonString, Field, Value) ->
-    case re:run(Field, ".*\\[\\*\\]", [{capture, first, list}]) of
-	{match, [WildcardField]} ->
-	    FieldPart1 = WildcardField -- "[*]",
-	    FieldPart2 = Field -- WildcardField,
-	    Length = length(get_field(JsonString, FieldPart1)),
-	    poff(JsonString, {FieldPart1, FieldPart2}, Length-1, Value);
-	nomatch ->
-	    case get_field(JsonString, Field) of
-		Value ->
-		    Value;
-		_ ->
-		    not_found
-	    end
-    end.
-    
-poff(JsonString, {FieldPart1, FieldPart2}, 0, _Value) ->
-    get_field(JsonString, FieldPart1 ++ "[0]" ++ FieldPart2);
-poff(JsonString, {FieldPart1, FieldPart2}, N, Value) ->
-    Query = FieldPart1 ++ "[" ++ integer_to_list(N) ++ "]" ++ FieldPart2,
-    case get_field(JsonString, Query) of
+get_field_help(Json, Query) ->
+    erlang:display(Query),
+    JsonObj = mochijson2:decode(Json),
+    JsonParser = destructure_json:parse("Obj."++Query),
+    JsonParser(JsonObj).
+
+
+
+get_field_value(Json, Query, Value) ->
+    QueryParts = find_wildcard_fields(Query),
+    case wildcard_recursion(Json, QueryParts, Value) of
 	Value ->
 	    Value;
+	_ ->
+	    not_found
+    end.
+	
 
-	R when is_list(R) ->
-	    Length = length(R),
-	    case poff(JsonString, {Query, ""}, Length, Value) of
+wildcard_recursion(Json, QueryParts, Value) ->
+    wildcard_recursion(Json, QueryParts, Value, "").
+
+
+wildcard_recursion(Json, [], _Value, Query) ->
+    make_json_pretty(get_field_help(Json, Query));
+wildcard_recursion(Json, [{wildcard, Field} | Rest], Value, Query) ->
+    case get_field_max_index(Json, Field) of
+	N when is_integer(N) ->
+	    case make_json_pretty(field_recursion(Json, [{wildcard, Field, N}| Rest], Value, Query)) of
 		Value ->
 		    Value;
 		_ ->
-		    poff(JsonString, {FieldPart1, FieldPart2}, N-1, Value)
+		    wildcard_recursion(Json, Rest, Value, Query)
 	    end;
+	R ->
+	    R
+    end;
+wildcard_recursion(Json, [{no_wildcard, Field}], _Value, Query) ->
+    erlang:display("1"++Query),
+    NewQuery = lists:concat([Query, Field]),
+    erlang:display("2"++NewQuery),
+    make_json_pretty(get_field_help(Json, Query)).
 
 
+field_recursion(Json, [{wildcard, Field, 0 = N} | Rest], Value, Query) ->
+    NewQuery = string:join([Query, Field], ?IF(Query == "", "", ".")),
+    NewIndexQuery = query_index_prep(NewQuery, N),
+    case wildcard_recursion(Json, Rest, Value, NewIndexQuery) of
+	Value ->
+	    Value;
+	R ->
+	    R
+    end;
+field_recursion(Json, [{wildcard, Field, N} | Rest], Value, Query) ->
+    NewQuery = string:join([Query, Field], ?IF(Query == "", "", ".")),
+    NewIndexQuery = query_index_prep(NewQuery, N),
+    case wildcard_recursion(Json, Rest, Value, NewIndexQuery) of
+	Value ->
+	    Value;
 	_ ->
-	    poff(JsonString, {FieldPart1, FieldPart2}, N-1, Value)
+	    field_recursion(Json, [{wildcard, Field, N-1} | Rest], Value, Query)
+    end.
+    
+
+    
+
+    
+get_field_max_index(Json, Query) ->
+    case get_field_help(Json, Query) of
+	R when is_list(R) ->
+	    length(R) - 1;
+	R ->
+	    R
+    end.
+    
+query_index_prep(Query, N) ->
+    lists:concat([Query, "[", integer_to_list(N), "]"]).
+    
+
+
+
+find_wildcard_fields(Query) ->
+    WildCards = re:split(Query, "\\[\\*\\]", [{return, list}]),
+    case lists:last(WildCards) of
+	[] ->
+	    NewWildCards = lists:filter(fun(X) -> X =/= [] end, WildCards),
+	    lists:map(fun(X) -> {wildcard, X} end, NewWildCards);
+	R ->
+	    NewWildCards = lists:sublist(WildCards, length(WildCards)-1),
+	    NewWildCards2 = lists:map(fun(X) -> {wildcard, X} end, NewWildCards),
+	    NewWildCards2 ++ [{no_wildcard, R}]
+
     end.
 
-    
-    
-    
-
-
-%% exist_value_field(JsonString, Field, Value) ->
-%%     JsonString.
 
 
 
-recursive_binary_to_list(X) when is_binary(X) ->
-    binary_to_list(X);
-recursive_binary_to_list({struct, Values}) ->
+
+
+
+
+make_json_pretty(R) when is_binary(R) ->
+    binary_to_list(R);
+
+make_json_pretty(R) when is_integer(R) ->
+    integer_to_list(R);
+
+make_json_pretty(R) when is_list(R) ->
+    lists:map(fun make_json_pretty/1, R);
+
+make_json_pretty({struct, Values})  ->
     ValuesList = lists:map(fun tuple_to_list/1, Values),
-    StringValues = lists:map(fun recursive_binary_to_list/1, ValuesList),
+    StringValues = lists:map(fun make_json_pretty/1, ValuesList),
     lists:map(fun list_to_tuple/1, StringValues);
-recursive_binary_to_list(X) when is_list(X)->
-    lists:map(fun recursive_binary_to_list/1, X).
+
+make_json_pretty(R) ->
+    R.
     
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-test(JsonObj, Fields) ->
-	Tokens = string:tokens(Fields, "."),
-	case Tokens of
-		[ Field, Rest ] -> 
-			NewObj = proplists:get_value(<<Field>>, JsonObj),
-			test(NewObj, Rest);
-		[Field] -> 
-			erlang:display(Field),
-			{struct, A} = proplists:get_value(<<Field>>, JsonObj),
-			A
-	end.
-	
-
-
-%% 	Tokens = string:tokens(JSONString, ","),
-%% 	ResourceField = find_field(Tokens,Field),
-%% 	case ResourceField of 
-%% 		[] -> "";
-%% 		_ -> FieldValue = string:tokens(ResourceField,":"),
-%% 			 trim(lists:nth(length(FieldValue),FieldValue))
-%% 			 %remove_special_characters(lists:nth(length(FieldValue),FieldValue),false)
-%% 	end.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -183,46 +152,22 @@ test(JsonObj, Fields) ->
 %% Internal functions
 %% ====================================================================
 
-destructure(JS, JSON) ->
-    F = json:parse(JS),
-    F(JSON).
-
-
-%% @doc
-%% Function: find_field/2
-%% Purpose: Help function to find the first string containing the given string
-%%          in the list.
-%% Returns: The first string containing the given string
-%%          in the list, the empty string if non exists.
-%% @end
--spec find_field(List::list(),Field::string()) -> string().
-
-find_field([],_) ->
-	[];
-
-find_field([First|Rest],Field) ->
-	case string:str(First,Field) of
-		0 -> find_field(Rest,Field);
-		_ -> First
-	end.
-
-
 %trims white spaces and quote from beggining and ending of the string
-trim(String)->
-	Temp = re:replace(re:replace(String, "\\s+$", "", [global,{return,list}]), "^\\s+", "", [global,{return,list}]),
-	case re:run(Temp, "^{.*$}", [{capture, first, list}]) of
-		{match, _} -> 
-			A = Temp;
-		_->
-			case re:run(Temp, "$}", [{capture, first, list}]) of
-				{match, _} -> 
-					A = string:substr(Temp, 1, length(Temp)-1);
-				_->
-					A = Temp
-			end
-	end,
-	Temp = re:replace(re:replace(String, "\\s+$", "", [global,{return,list}]), "^\\s+", "", [global,{return,list}]),
-	string:strip(Temp, both, $").
+%% trim(String)->
+%% 	Temp = re:replace(re:replace(String, "\\s+$", "", [global,{return,list}]), "^\\s+", "", [global,{return,list}]),
+%% 	case re:run(Temp, "^{.*$}", [{capture, first, list}]) of
+%% 		{match, _} -> 
+%% 			A = Temp;
+%% 		_->
+%% 			case re:run(Temp, "$}", [{capture, first, list}]) of
+%% 				{match, _} -> 
+%% 					A = string:substr(Temp, 1, length(Temp)-1);
+%% 				_->
+%% 					A = Temp
+%% 			end
+%% 	end,
+%% 	Temp = re:replace(re:replace(String, "\\s+$", "", [global,{return,list}]), "^\\s+", "", [global,{return,list}]),
+%% 	string:strip(Temp, both, $").
 
 
 
@@ -232,26 +177,26 @@ trim(String)->
 %% Returns: First string of alphanumerical characters that can be found,
 %%          empty string if non exists
 %% @end
--spec remove_special_characters(String::string(),CharactersFound::boolean()) -> string().
+%% -spec remove_special_characters(String::string(),CharactersFound::boolean()) -> string().
 
-remove_special_characters([],_) ->
-	[];
+%% remove_special_characters([],_) ->
+%% 	[];
 
-remove_special_characters([First|Rest],false) ->
-	Character = (First < $[) and (First > $@) or (First < ${) and (First > $`) or (First > $/) and (First < $:),
-	case Character of
-		true ->
-			[First|remove_special_characters(Rest,true)];
-		false ->
-			remove_special_characters(Rest,false)
-	end;
-remove_special_characters([First|Rest],true) ->
-	Character = (First < $[) and (First > $@) or (First < ${) and (First > $`) or (First > $/) and (First < $:),
-	case Character of
-		true ->
-			[First|remove_special_characters(Rest,true)];
-		false ->
-			[]
-	end.
+%% remove_special_characters([First|Rest],false) ->
+%% 	Character = (First < $[) and (First > $@) or (First < ${) and (First > $`) or (First > $/) and (First < $:),
+%% 	case Character of
+%% 		true ->
+%% 			[First|remove_special_characters(Rest,true)];
+%% 		false ->
+%% 			remove_special_characters(Rest,false)
+%% 	end;
+%% remove_special_characters([First|Rest],true) ->
+%% 	Character = (First < $[) and (First > $@) or (First < ${) and (First > $`) or (First > $/) and (First < $:),
+%% 	case Character of
+%% 		true ->
+%% 			[First|remove_special_characters(Rest,true)];
+%% 		false ->
+%% 			[]
+%% 	end.
 
 
