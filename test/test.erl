@@ -16,7 +16,7 @@
 %% Returns: ok | no_return()
 %% @end
 run() ->
-    Result = eunit:test("ebin",
+    Result = eunit:test(json,
 			[verbose, 
 			 {cover_enabled, true},
 			 {report, {eunit_surefire, [{dir, "test-results"}]}}
