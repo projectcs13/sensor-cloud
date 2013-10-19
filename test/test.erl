@@ -6,7 +6,7 @@
 %% @doc Test wrapper module
 -module(test).
 -author('Tommy Mattsson').
--export([run/0]).
+-export([run/0, run/1]).
 
 %% @doc
 %% Function: run/0
@@ -16,7 +16,10 @@
 %% Returns: ok | no_return()
 %% @end
 run() ->
-    Result = eunit:test(json,
+    run("ebin").
+
+run(Suite) ->    
+    Result = eunit:test(Suite,
 			[verbose, 
 			 {cover_enabled, true},
 			 {report, {eunit_surefire, [{dir, "test-results"}]}}
@@ -27,4 +30,3 @@ run() ->
 	error ->
 	    halt(1)
     end.
-
