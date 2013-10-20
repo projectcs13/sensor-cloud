@@ -10,6 +10,7 @@
 %% @end
 -module(json_tests).
 -include_lib("eunit/include/eunit.hrl").
+-include("json.hrl").
 -export([]).
 
 %% @doc
@@ -36,9 +37,7 @@ get_field_test() ->
     Json2 = 
 	"{"
 	"\"name\":\"Name1\","
-	"\"friend\": {"
-	"\"name\":\"FriendName2\", "
-	"\"nickname\":[\"NickName2\", \"NickName3\"]}"
+	"\"friend\": {\"name\":\"FriendName2\", \"nickname\":[\"NickName2\", \"NickName3\"]}"
 	"}",
 
     Result1 = "Name1",
@@ -61,7 +60,7 @@ get_field_test() ->
 
     Result6 = ["NickName2", "NickName3"],
     ?assertEqual(Result6, lib_json:get_field(Json1, "friends[1].nickname")),
-    
+
     Result7 = "NickName2",
     ?assertEqual(Result7, lib_json:get_field(Json1, "friends[1].nickname[0]")),
 
@@ -78,17 +77,17 @@ get_field_value_test() ->
 	"\"name\":\"Name1\","
 	"\"friends\": ["
 	"{\"name\":\"FriendName1\", \"nickname\":\"NickName1\"},"
-	"{\"name\":\"FriendName2\", \"nickname\":[\"NickName2\", \"NickName3\"]}"
+	"{\"name\":\"FriendName2\", \"nickname\":[\"NickName2\", \"NickName3\"]},"
+	"{\"name\":\"FriendName3\", \"nickname\":[\"NickName4\", \"NickName5\"]}"
 	"]"
 	"}",
     Json2 = 
 	"{"
 	"\"name\":\"Name1\","
 	"\"friends\": ["
-	    "{\"name\":\"FriendName2\", \"nickname\":[\"NickName2\", \"NickName3\"]}"
-	             "]"
+	"{\"name\":\"FriendName2\", \"nickname\":[\"NickName2\", \"NickName3\"]}"
+	"]"
 	"}",
-    
     Result1 = "FriendName2",
     ?assertEqual(Result1, lib_json:get_field_value(Json1, "friends[1].name", "FriendName2")),
 
@@ -100,7 +99,7 @@ get_field_value_test() ->
 
     Result4 = "NickName3",
     ?assertEqual(Result4, lib_json:get_field_value(Json1, "friends[*].nickname", "NickName3")),
-    
+
     Result5 = not_found,
     ?assertEqual(Result5, lib_json:get_field_value(Json1, "friends[*].name", "NickName3")),
 
@@ -115,7 +114,8 @@ get_field_value_test() ->
 
     Result9 = [
 	       [{"name","FriendName1"},{"nickname","NickName1"}],
-	       [{"name","FriendName2"},{"nickname",["NickName2","NickName3"]}]
+	       [{"name","FriendName2"},{"nickname",["NickName2","NickName3"]}],
+	       [{"name","FriendName3"},{"nickname",["NickName4","NickName5"]}]	       
 	      ],
     ?assertEqual(Result9, lib_json:get_field_value(Json1, "friends", Result9)),
 
@@ -127,6 +127,172 @@ get_field_value_test() ->
     Try = try lib_json:get_field_value(Json1, "friends[*]", "") of
 	      _ -> will_not_happen
 	  catch
-	      error:Error -> error
+	      error:_Error -> error
 	  end,    
     ?assertEqual(error, Try).
+
+field_value_exists_test() ->
+    Json1 = 
+	"{"
+	"\"name\":\"Name1\","
+	"\"friends\": ["
+	"{\"name\":\"FriendName1\", \"nickname\":\"NickName1\"},"
+	"{\"name\":\"FriendName2\", \"nickname\":[\"NickName2\", \"NickName3\"]},"
+	"{\"name\":\"FriendName3\", \"nickname\":[\"NickName4\", \"NickName5\"]}"
+	"]"
+	"}",
+
+    Json2 = 
+	"{"
+	"\"name\":\"Name1\","
+	"\"friends\": ["
+	"{\"name\":\"FriendName2\", \"nickname\":[\"NickName2\", \"NickName3\"]}"
+	"]"
+	"}",
+    ?assertEqual(true, lib_json:field_value_exist(Json1, "friends[1].name", "FriendName2")),
+
+    ?assertEqual(false, lib_json:field_value_exist(Json1, "friends[0].name", "FriendName2")),
+
+    ?assertEqual(true, lib_json:field_value_exist(Json1, "friends[*].nickname", "NickName1")),
+
+    ?assertEqual(true, lib_json:field_value_exist(Json1, "friends[*].nickname", "NickName3")),
+
+    ?assertEqual(false, lib_json:field_value_exist(Json1, "friends[*].name", "NickName3")),
+
+    ?assertEqual(false, lib_json:field_value_exist(Json2, "friends[*].name", "NickName3")),
+
+    ?assertEqual(true, lib_json:field_value_exist(Json2, "friends[*].nickname", "NickName3")),
+
+    ?assertEqual(true, lib_json:field_value_exist(Json1, "friends[0]", [{"name", "FriendName1"}, {"nickname", "NickName1"}])),
+
+    Result9 = [
+	       [{"name","FriendName1"},{"nickname","NickName1"}],
+	       [{"name","FriendName2"},{"nickname",["NickName2","NickName3"]}],
+	       [{"name","FriendName3"},{"nickname",["NickName4","NickName5"]}]	       
+	      ],
+    ?assertEqual(true, lib_json:field_value_exist(Json1, "friends", Result9)).
+
+encode_test() ->
+    Json1 = 
+	"{"
+	"\"name\":\"Name1\","
+	"\"friends\": ["
+	"{\"name\":\"FriendName1\", \"nickname\":\"NickName1\"},"
+	"{\"name\":\"FriendName2\", \"nickname\":[\"NickName2\", \"NickName3\"]}"
+	"]"
+	"}",
+
+    Json2 = 
+	{{name, "Name1"},
+	 {friend, [{{name, "FriendName1"}, {nickname, "NickName1"}},
+		   {{name, "FriendName2"}, {nickname, ["NickName2", "NickName3"]}}
+		  ]
+	 }
+	},
+    
+    Json3 = {{name, "Name1"},
+	     {friend, {{name, "FriendName2"}, {nickname, ["NickName2", "NickName3"]}}}
+	    },
+
+    Result1 = 
+	[$\{,[$\", <<"name">>,$\"],$:,[$\",<<"Name1">>,$\"],$,,[$\",<<"friends">>,$\"],$:,[$[,[${,[$\",<<"name">>,$\"],$:,[$\",<<"FriendName1">>,$\"],$,,[$\",<<"nickname">>,$\"],$:,[$\",<<"NickName1">>,$\"],$}],$,,[${,[$\",<<"name">>,$\"],$:,[$\",<<"FriendName2">>,$\"],$,,[$\",<<"nickname">>,$\"],$:,[$[,[$\",<<"NickName2">>,$\"],$,,[$\",<<"NickName3">>,$\"],$]],$}],$]],$}],
+
+    ?assertEqual(Result1, lib_json:encode(Json1)),
+
+
+    Result2 = 
+	"{"
+	"\"name\":\"Name1\","
+	  "\"friend\": ["
+	  "{\"name\":\"FriendName1\", \"nickname\":\"NickName1\"},"
+	  "{\"name\":\"FriendName2\", \"nickname\":[\"NickName2\", \"NickName3\"]}"
+	  "]"
+	  "}",
+	  ?assertEqual(Result2, lib_json:encode({non_mochi, Json2})),
+	  
+    Result3 = 
+	"{"
+	  "\"name\":\"Name1\","
+	  "\"friends\": ["
+	  "{\"name\":\"FriendName1\", \"nickname\":\"NickName1\"},"
+	  "{\"name\":\"FriendName2\", \"nickname\":[\"NickName2\", \"NickName3\"]}"
+	  "]"
+	  "}",
+	  ?assertEqual(Result3, lib_json:encode({non_mochi, Json3})).
+
+
+
+decode_test() ->
+    Json1 = 
+	"{"
+	"\"name\":\"Name1\","
+	"\"friends\": ["
+	"{\"name\":\"FriendName1\", \"nickname\":\"NickName1\"},"
+	"{\"name\":\"FriendName2\", \"nickname\":[\"NickName2\", \"NickName3\"]}"
+	"]"
+	"}",
+    Result1 = [{"name","Name1"},
+	       {"friends",[
+			   [{"name","FriendName1"},{"nickname","NickName1"}],
+			   [{"name","FriendName2"},{"nickname",["NickName2","NickName3"]}]
+			  ]
+	       }
+	      ],
+
+    ?assertEqual(Result1, lib_json:decode({pretty, Json1})).
+
+encode_decode_test() ->
+    Json1 = 
+	"{"
+	"\"name\":\"Name1\","
+	"\"friends\": ["
+	"{\"name\":\"FriendName1\", \"nickname\":\"NickName1\"},"
+	"{\"name\":\"FriendName2\", \"nickname\":[\"NickName2\", \"NickName3\"]}"
+	"]"
+	"}",
+
+    Result1 = [${,[$\", <<"name">>,$\"],$:,[$\",<<"Name1">>,$\"],$,,[$\",<<"friends">>,$\"],$:,[$[,[${,[$\",<<"name">>,$\"],$:,[$\",<<"FriendName1">>,$\"],$,,[$\",<<"nickname">>,$\"],$:,[$\",<<"NickName1">>,$\"],$}],$,,[${,[$\",<<"name">>,$\"],$:,[$\",<<"FriendName2">>,$\"],$,,[$\",<<"nickname">>,$\"],$:,[$[,[$\",<<"NickName2">>,$\"],$,,[$\",<<"NickName3">>,$\"],$]],$}],$]],$}],
+
+    Result2 = [{"name","Name1"},
+	       {"friends",[
+			   [{"name","FriendName1"},{"nickname","NickName1"}],
+			   [{"name","FriendName2"},{"nickname",["NickName2","NickName3"]}]
+			  ]
+	       }
+	      ],
+		   ?assertEqual(Result1, lib_json:encode(lib_json:decode(lib_json:encode(Json1)))),
+		   ?assertEqual(Result2, lib_json:decode({pretty, lib_json:encode(Json1)})).
+
+json_macro_test() ->
+    Json1 = 
+	"{"
+	"\"name\":\"Name1\","
+	"\"friend\": ["
+	"{\"name\":\"FriendName1\", \"nickname\":\"NickName1\"},"
+	"{\"name\":\"FriendName2\", \"nickname\":[\"NickName2\", \"NickName3\"]}"
+	"]"
+	"}",
+
+    Json1b = 
+	"{"
+	"\"name\":\"Name1\","
+	"\"friend\": ["
+	++ ?JSON_STRUCT([{name, {s, "FriendName1"}}, {nickname, {s, "NickName1"}}]) ++ ","	
+	++ ?JSON_STRUCT([{name, {s, "FriendName2"}}, {nickname, {l, ["NickName2", "NickName3"]}}]) ++	
+	"]"
+	"}",
+
+    Json2 = 
+	"{"
+	"\"name\":\"Name1\","
+	"\"friend\": {\"name\":\"FriendName2\", \"nickname\":[\"NickName2\", \"NickName3\"]}"
+	"}",
+
+    Json2b = 
+	"{"
+	"\"name\":\"Name1\","
+	"\"friend\": " ++ ?JSON_STRUCT([{name, {s, "FriendName2"}}, {nickname, {l, ["NickName2", "NickName3"]}}]) ++	
+	"}",
+
+    ?assertEqual(Json1, Json1b),
+    ?assertEqual(Json2, Json2b).

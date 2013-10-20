@@ -13,20 +13,39 @@
 %% ====================================================================
 %% API functions
 %% ====================================================================
--export([get_field/2, get_field_value/3]).
+-export([encode/1, decode/1, get_field/2, get_field_value/3, field_value_exist/3, mk_pretty/1]).
 -include("misc.hrl").
 
+encode(Json) when is_list(Json) ->
+    JsonObj = mochijson2:decode(Json),
+    mochijson2:encode(JsonObj);
+encode({non_mochi, Json}) when is_tuple(Json) ->
+    encode(encode_help(Json));
+encode(Json) when is_tuple(Json)->
+    mochijson2:encode(Json).
+
+    
+decode(Json) when is_list(Json) ->
+     mochijson2:decode(Json);
+decode({pretty, Json}) when is_list(Json)->
+     JsonObj = decode(Json),
+     mk_pretty(JsonObj)%% ;
+%% decode({pretty, Json}) when is_tuple(Json) ->
+%%     mk_pretty(Json)
+	.
+    
+    
 %% @doc
 %% Function: get_field/2
 %% Purpose: Return the value of a certain field in the given JSON string.
-%% Returns: Return the value of the specified field, if it exists, 
+%% Returns: Return the value of the specified field, if it exists,                                  
 %%          otherwise returns the empty string.
 %% To-Check:  what if there is a ',' inside a Value??? It will fail?
 %% @end
 -spec get_field(String::string(),Field::string()) -> string().
 get_field(Json, Query) ->
     Result = get_field_help(Json, Query),
-    make_json_pretty(Result).
+    mk_pretty(Result).
 
 get_field_help(Json, Query) ->
     JsonObj = mochijson2:decode(Json),
@@ -37,23 +56,65 @@ get_field_help(Json, Query) ->
 
 get_field_value(Json, Query, Value) ->
     QueryParts = find_wildcard_fields(Query),
-    case wildcard_recursion(Json, QueryParts, Value) of
+    case field_recursion(Json, QueryParts, Value) of
 	Value ->
 	    Value;
 	_ ->
 	    not_found
     end.
-	
 
-wildcard_recursion(Json, QueryParts, Value) ->
-    wildcard_recursion(Json, QueryParts, Value, "").
+field_value_exist(Json, Query, Value) ->
+    case get_field_value(Json, Query, Value) of
+	Value ->
+	    true;
+	not_found ->
+	    false
+    end.
 
 
-wildcard_recursion(Json, [{wildcard, Field} | Rest], Value, Query) ->
+mk_pretty(R) when is_binary(R) ->
+    binary_to_list(R);
+
+mk_pretty(R) when is_integer(R) ->
+    integer_to_list(R);
+
+mk_pretty(R) when is_list(R) ->
+    lists:map(fun mk_pretty/1, R);
+
+mk_pretty({struct, Values})  ->
+    ValuesList = lists:map(fun tuple_to_list/1, Values),
+    StringValues = lists:map(fun mk_pretty/1, ValuesList),
+    lists:map(fun list_to_tuple/1, StringValues);
+
+mk_pretty(R) ->
+    R.
+
+%% ====================================================================
+%% Internal functions
+%% ====================================================================
+encode_help(Json) when is_tuple(Json)->
+    JsonList = tuple_to_list(Json),
+    encode_help(JsonList, "").
+
+encode_help([], Acc) ->
+    Acc;
+encode_help([{Attr, Value} | Tl], Acc) when is_tuple(Value) ->
+    Acc;
+encode_help([{Attr, Value} | Tl], Acc) when is_list(Value) ->
+    Acc.
+
+    
+    
+
+
+field_recursion(Json, QueryParts, Value) ->
+    field_recursion(Json, QueryParts, Value, "").
+
+field_recursion(Json, [{wildcard, Field} | Rest], Value, Query) ->
     %% erlang:display("2"++Query),
     case get_field_max_index(Json, Field) of
 	N when is_integer(N) ->
-	    case field_recursion(Json, [{wildcard, Field, N}| Rest], Value, Query) of
+	    case index_recursion(Json, [{wildcard, Field, N}| Rest], Value, Query) of
 		Value ->
 		    %% erlang:display("3"),
 		    Value;
@@ -62,15 +123,15 @@ wildcard_recursion(Json, [{wildcard, Field} | Rest], Value, Query) ->
 		    %% erlang:display(R),
 		    %% erlang:display("4b"),
 		    R
-		    %wildcard_recursion(Json, Rest, Value, Query)
+		    %field_recursion(Json, Rest, Value, Query)
 	    end;
 	R ->
 	    R
     end;
-wildcard_recursion(Json, [{no_wildcard, Field}], Value, Query) ->
+field_recursion(Json, [{no_wildcard, Field}], Value, Query) ->
     NewQuery = lists:concat([Query, Field]),
     %% erlang:display("5"++NewQuery),
-    case make_json_pretty(get_field_help(Json, NewQuery)) of
+    case mk_pretty(get_field_help(Json, NewQuery)) of
 	R when is_list(R) ->
 	    case lists:member(Value, R) of
 		true ->
@@ -85,27 +146,24 @@ wildcard_recursion(Json, [{no_wildcard, Field}], Value, Query) ->
 	    R
     end.
 
-field_recursion(Json, [{wildcard, Field, 0 = N} | Rest], Value, Query) ->
+index_recursion(Json, [{wildcard, Field, 0 = N} | Rest], Value, Query) ->
     NewQuery = lists:concat([Query, Field]),
     NewIndexQuery = query_index_prep(NewQuery, N),
     %% erlang:display("7a"++NewIndexQuery),
-    wildcard_recursion(Json, Rest, Value, NewIndexQuery);
-field_recursion(Json, [{wildcard, Field, N} | Rest], Value, Query) ->
+    field_recursion(Json, Rest, Value, NewIndexQuery);
+index_recursion(Json, [{wildcard, Field, N} | Rest], Value, Query) ->
     NewQuery = lists:concat([Query, Field]),
     NewIndexQuery = query_index_prep(NewQuery, N),
     %% erlang:display("8"++NewIndexQuery),
-    case wildcard_recursion(Json, Rest, Value, NewIndexQuery) of
+    case field_recursion(Json, Rest, Value, NewIndexQuery) of
 	Value ->
 	    %% erlang:display("9"),
 	    Value;
 	_ ->
 	    %% erlang:display("10"),
-	    field_recursion(Json, [{wildcard, Field, N-1} | Rest], Value, Query)
+	    index_recursion(Json, [{wildcard, Field, N-1} | Rest], Value, Query)
     end.
     
-
-    
-
     
 get_field_max_index(Json, Query) ->
     case get_field_help(Json, Query) of
@@ -114,11 +172,11 @@ get_field_max_index(Json, Query) ->
 	R ->
 	    R
     end.
+
     
 query_index_prep(Query, N) ->
     lists:concat([Query, "[", integer_to_list(N), "]"]).
     
-
 
 
 find_wildcard_fields(Query) ->
@@ -131,39 +189,11 @@ find_wildcard_fields(Query) ->
 	    NewWildCards = lists:sublist(WildCards, length(WildCards)-1),
 	    NewWildCards2 = lists:map(fun(X) -> {wildcard, X} end, NewWildCards),
 	    NewWildCards2 ++ [{no_wildcard, R}]
-
     end.
 
 
 
 
-
-
-
-
-make_json_pretty(R) when is_binary(R) ->
-    binary_to_list(R);
-
-make_json_pretty(R) when is_integer(R) ->
-    integer_to_list(R);
-
-make_json_pretty(R) when is_list(R) ->
-    lists:map(fun make_json_pretty/1, R);
-
-make_json_pretty({struct, Values})  ->
-    ValuesList = lists:map(fun tuple_to_list/1, Values),
-    StringValues = lists:map(fun make_json_pretty/1, ValuesList),
-    lists:map(fun list_to_tuple/1, StringValues);
-
-make_json_pretty(R) ->
-    R.
-    
-
-
-
-%% ====================================================================
-%% Internal functions
-%% ====================================================================
 
 %trims white spaces and quote from beggining and ending of the string
 %% trim(String)->
