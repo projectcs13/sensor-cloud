@@ -13,26 +13,38 @@
 %% ====================================================================
 %% API functions
 %% ====================================================================
--export([encode/1, decode/1, get_field/2, get_field_value/3, field_value_exist/3, mk_pretty/1]).
+-export([encode/1, decode/1, get_field/2, get_field_value/3, field_value_exist/3]).
 -include("misc.hrl").
 
+
+%% @doc
+%% Function: encode/1
+%% Purpose : Encodes an json object/
+%% Returns : Either a string() representation of the json object or a mochiweb
+%%           representation of a json object: json_term()
+%% @end
 encode(Json) when is_list(Json) ->
     JsonObj = mochijson2:decode(Json),
     mochijson2:encode(JsonObj);
 encode({non_mochi, Json}) when is_tuple(Json) ->
-    encode(encode_help(Json));
+    encode_help(Json);
 encode(Json) when is_tuple(Json)->
     mochijson2:encode(Json).
 
-    
+%% @doc
+%% Function: decode/1
+%% Purpose : decodes a json object. 
+%% Returns : Either a mochiweb, json_term(), representation of the json object
+%%           or a more readable version which only contains lists, tuples and string
+%% @end
 decode(Json) when is_list(Json) ->
      mochijson2:decode(Json);
 decode({pretty, Json}) when is_list(Json)->
      JsonObj = decode(Json),
-     mk_pretty(JsonObj)%% ;
+     mk_pretty(JsonObj).
 %% decode({pretty, Json}) when is_tuple(Json) ->
-%%     mk_pretty(Json)
-	.
+%%     mk_pretty(Json).
+
     
     
 %% @doc
@@ -42,11 +54,18 @@ decode({pretty, Json}) when is_list(Json)->
 %%          otherwise returns the empty string.
 %% To-Check:  what if there is a ',' inside a Value??? It will fail?
 %% @end
--spec get_field(String::string(),Field::string()) -> string().
+-spec get_field(String::string(), Field::string()) -> string() | atom().
 get_field(Json, Query) ->
     Result = get_field_help(Json, Query),
     mk_pretty(Result).
 
+%% @doc
+%% Function: get_field_/2
+%% Purpose: Return the value of a certain field in the given JSON string.
+%% Returns: Return the value of the specified field, if it exists,                                  
+%%          otherwise returns the empty string.
+%% To-Check:  what if there is a ',' inside a Value??? It will fail?
+%% @end
 get_field_help(Json, Query) ->
     JsonObj = mochijson2:decode(Json),
     JsonParser = destructure_json:parse("Obj."++Query),
@@ -60,14 +79,14 @@ get_field_value(Json, Query, Value) ->
 	Value ->
 	    Value;
 	_ ->
-	    not_found
+	    false
     end.
 
 field_value_exist(Json, Query, Value) ->
     case get_field_value(Json, Query, Value) of
 	Value ->
 	    true;
-	not_found ->
+	false ->
 	    false
     end.
 
@@ -176,8 +195,6 @@ get_field_max_index(Json, Query) ->
     
 query_index_prep(Query, N) ->
     lists:concat([Query, "[", integer_to_list(N), "]"]).
-    
-
 
 find_wildcard_fields(Query) ->
     WildCards = re:split(Query, "\\[\\*\\]", [{return, list}]),

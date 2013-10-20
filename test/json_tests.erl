@@ -92,7 +92,7 @@ get_field_value_test() ->
     Result1 = "FriendName2",
     ?assertEqual(Result1, lib_json:get_field_value(Json1, "friends[1].name", "FriendName2")),
 
-    Result2 = not_found,
+    Result2 = false,
     ?assertEqual(Result2, lib_json:get_field_value(Json1, "friends[0].name", "FriendName2")),
 
     Result3 = "NickName1",
@@ -101,10 +101,10 @@ get_field_value_test() ->
     Result4 = "NickName3",
     ?assertEqual(Result4, lib_json:get_field_value(Json1, "friends[*].nickname", "NickName3")),
 
-    Result5 = not_found,
+    Result5 = false,
     ?assertEqual(Result5, lib_json:get_field_value(Json1, "friends[*].name", "NickName3")),
 
-    Result6 = not_found,
+    Result6 = false,
     ?assertEqual(Result6, lib_json:get_field_value(Json2, "friends[*].name", "NickName3")),
 
     Result7 = "NickName3",
