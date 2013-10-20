@@ -14,17 +14,12 @@
 -export([]).
 
 %% @doc
-%% Function: inti_test/0
-%% Purpose: Used to start the inets to be able to do HTTP requests
+%% Function: get_field_test/0
+%% Purpose: Test the json_lib:get_field/2 by attempting to get various fields 
+%%          from string json objects
 %% Returns: ok | {error, term()}
 %%
-%% Side effects: Start inets
 %% @end
--spec init_test() -> ok | {error, term()}.
-
-init_test() ->
-    inets:start().
-
 get_field_test() ->
     Json1 = 
 	"{"
@@ -70,7 +65,13 @@ get_field_test() ->
     Result9 = [{"name","FriendName2"}, {"nickname",["NickName2","NickName3"]}],
     ?assertEqual(Result9, lib_json:get_field(Json2, "friend")).
 
-
+%% @doc
+%% Function: get_field_value_test/0
+%% Purpose: Test the json_lib:get_field_value/2 by attempting to get various fields 
+%%          from string json objects
+%% Returns: ok | {error, term()}
+%%
+%% @end
 get_field_value_test() ->
     Json1 = 
 	"{"
@@ -131,6 +132,13 @@ get_field_value_test() ->
 	  end,    
     ?assertEqual(error, Try).
 
+%% @doc
+%% Function: field_value_exists_test/0
+%% Purpose: Test the json_lib:field_value_exists/3 by attempting to get various fields 
+%%          from string json objects
+%% Returns: ok | {error, term()}
+%%
+%% @end
 field_value_exists_test() ->
     Json1 = 
 	"{"
@@ -172,6 +180,12 @@ field_value_exists_test() ->
 	      ],
     ?assertEqual(true, lib_json:field_value_exist(Json1, "friends", Result9)).
 
+%% @doc
+%% Function: encode_test/0
+%% Purpose: Test the json_lib:encode/1 by attempting to encode various json objects
+%% Returns: ok | {error, term()}
+%%
+%% @end
 encode_test() ->
     Json1 = 
 	"{"
@@ -221,7 +235,12 @@ encode_test() ->
 	  ?assertEqual(Result3, lib_json:encode({non_mochi, Json3})).
 
 
-
+%% @doc
+%% Function: decode_test/0
+%% Purpose: Test the json_lib:decode/1 by attempting to decode various json objects
+%% Returns: ok | {error, term()}
+%%
+%% @end
 decode_test() ->
     Json1 = 
 	"{"
@@ -241,6 +260,13 @@ decode_test() ->
 
     ?assertEqual(Result1, lib_json:decode({pretty, Json1})).
 
+%% @doc
+%% Function: encode_decode_test/0
+%% Purpose: Test the json_lib:encode/1 and lib_json:decode/1 by attempting to 
+%%          decode and encode consecutive calls of the functions
+%% Returns: ok | {error, term()}
+%%
+%% @end
 encode_decode_test() ->
     Json1 = 
 	"{"
@@ -263,6 +289,13 @@ encode_decode_test() ->
 		   ?assertEqual(Result1, lib_json:encode(lib_json:decode(lib_json:encode(Json1)))),
 		   ?assertEqual(Result2, lib_json:decode({pretty, lib_json:encode(Json1)})).
 
+%% @doc
+%% Function: json_macros_test/0
+%% Purpose: Test the to see if macros in json.hrl produces the same result as 
+%%          the manual built-up jsob objects
+%% Returns: ok | {error, term()}
+%%
+%% @end
 json_macro_test() ->
     Json1 = 
 	"{"
