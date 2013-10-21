@@ -26,8 +26,6 @@
 encode(Json) when is_list(Json) ->
     JsonObj = mochijson2:decode(Json),
     mochijson2:encode(JsonObj);
-encode({non_mochi, Json}) when is_tuple(Json) ->
-    encode_help(Json);
 encode(Json) when is_tuple(Json)->
     mochijson2:encode(Json).
 
@@ -74,31 +72,6 @@ get_field_help(Json, Query) ->
 %%          returns 'false' value. Handles  wildcard searches for fields (not 
 %%          wildcard for values)
 %% @end
-get_field_value(Json, Query, Value) when is_list(Value)->
-    QueryParts = find_wildcard_fields(Query),
-    SearchFor = case {hd(Value),lists:last(Value)} of
-		 {$*,$*} -> {contains, lists:sublist(Value)};
-		 {_ ,$*} -> {suffix,   Value};
-		 {$*, _} -> {prefix,   Value};
-		 _ ->  Value
-	     end,
-    Search = field_recursion(Json, QueryParts, SearchFor),
-    case SearchFor of
-	{contains, SearchVal} ->
-	    Value;
-	{suffix,   SearchVal} ->
-	    Value;
-	{prefix, Value} ->
-	    %% case lists:prefix() of;
-		Value;
-	_ ->
-	    case Search of
-		Value ->
-		    Value;
-		_ ->
-		    undefined
-	    end
-    end;
 get_field_value(Json, Query, Value) ->
     QueryParts = find_wildcard_fields(Query),
     case field_recursion(Json, QueryParts, Value) of
@@ -150,25 +123,6 @@ mk_pretty(Json) ->
 %% ====================================================================
 %% Internal functions
 %% ====================================================================
-%% @doc
-%% Function: encode_help/1
-%% Purpose: Helper function for making a string of a tuple and list 
-%%          representation of a json object
-%% Returns: string()
-%% TODO: NOT COMPLETED YET
-%% @end
-encode_help(Json) when is_tuple(Json)->
-    JsonList = tuple_to_list(Json),
-    encode_help(JsonList, "").
-
-encode_help([], Acc) ->
-    Acc;
-encode_help([{Attr, Value} | Tl], Acc) when is_tuple(Value) ->
-    Acc;
-encode_help([{Attr, Value} | Tl], Acc) when is_list(Value) ->
-    Acc.
-
-    
     
 
 %% @doc
