@@ -158,7 +158,7 @@ get_user(ReqData, State) ->
                         case id_from_path(ReqData) of
                                 undefined ->
                                         % Get all users
-                                        case erlastic_search:search(?INDEX,"user","*:*") of
+                                        case erlastic_search:search_limit(?INDEX,"user","*:*",2000) of
                                                 {ok, Result} ->
                                                         SearchRemoved = api_help:remove_search_part(api_help:make_to_string(api_help:json_encode(Result)),false,0),
 														ExtraRemoved = api_help:remove_extra_info(SearchRemoved,0),
@@ -178,6 +178,7 @@ get_user(ReqData, State) ->
                 true ->                        
                         process_search(ReqData,State, get)                        
         end.
+
 
 
 %% @doc
