@@ -60,7 +60,6 @@ post_test() ->
  	Response2 = get_request(?SUGGEST_URL++"testsmartphone2"),     
  	check_returned_code(Response2, 200),
  	{ok, {_, _ ,Body}} = Response2,
-	erlang:display(Body),
 	?assertEqual("testtag",lib_json:get_field(Body, "testsuggest[0].options[0].payload.tags")).
 
 
@@ -82,7 +81,6 @@ get_suggestion_test() ->
 	Response2 = get_request(?SUGGEST_URL ++ "testanother"),
 	check_returned_code(Response2, 200),
 	{ok, {_, _ ,Body}} = Response2,
-	erlang:display(Body),
 	?assertEqual("ericsson",lib_json:get_field(Body, "testsuggest[0].options[0].payload.manufacturer")).
 
 
