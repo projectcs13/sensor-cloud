@@ -246,7 +246,7 @@ find_field([],_) ->
 	[];
 
 find_field([First|Rest],Field) ->
-	case string:str(First,Field) of
+	case string:str(First,"\"" ++ Field ++ "\"") of
 		0 -> find_field(Rest,Field);
 		_ -> First
 	end.
@@ -264,16 +264,18 @@ remove_special_characters([],_) ->
 	[];
 
 remove_special_characters([First|Rest],false) ->
-	Character = (First < 91) and (First > 64) or (First < 123) and (First > 96) or (First > 47) and (First < 58),
-	case Character of
+	Character1 = (First < 91) and (First > 64) or (First < 123) and (First > 96) or (First > 47) and (First < 58),
+	Character2 = Character1 or (First == $-) or (First == $_),
+	case Character2 of
 		true ->
 			[First|remove_special_characters(Rest,true)];
 		false ->
 			remove_special_characters(Rest,false)
 	end;
 remove_special_characters([First|Rest],true) ->
-	Character = (First < 91) and (First > 64) or (First < 123) and (First > 96) or (First > 47) and (First < 58),
-	case Character of
+	Character1 = (First < 91) and (First > 64) or (First < 123) and (First > 96) or (First > 47) and (First < 58),
+	Character2 = Character1 or (First == $-) or (First == $_),
+	case Character2 of
 		true ->
 			[First|remove_special_characters(Rest,true)];
 		false ->
@@ -316,6 +318,26 @@ remove_extra_info([First|Rest],Val) ->
                         [First|remove_extra_info(Rest,Val)]
         end.
 
+remove_object([],_) ->
+	[];
+remove_object([First|Rest],0) ->
+	case First of
+		$, ->
+			Rest;
+		${ ->
+			remove_object(Rest,1);
+		_ ->
+			[First|remove_object(Rest,0)]
+	end;
+remove_object([First|Rest],Val) ->
+	case First of
+		${ ->
+			remove_object(Rest,Val+1);
+		$} ->
+			remove_object(Rest,Val-1);
+		_-> 
+			remove_object(Rest,Val)
+	end.
 
 
 convert_binary_to_string([]) ->

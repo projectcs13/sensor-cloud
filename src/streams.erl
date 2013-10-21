@@ -122,7 +122,7 @@ process_post(ReqData, State) ->
 				undefined ->
 					UserAdded = Stream;
 				UserId ->
-					UserAdded = api_help:add_field(Stream,"owner_id",UserId)
+					UserAdded = api_help:add_field(Stream,"user_id",UserId)
 			end,
 			case proplists:get_value('res', wrq:path_info(ReqData)) of
 				undefined ->
@@ -166,7 +166,7 @@ process_search_post(ReqData, State) ->
 			UserQuery = [],
 			UserDef = false;
 		UserId ->
-			UserQuery = "owner_id:" ++ UserId,
+			UserQuery = "user_id:" ++ UserId,
 			UserDef = true
 		end,
 	case proplists:get_value('res', wrq:path_info(ReqData)) of
@@ -207,7 +207,7 @@ process_search_get(ReqData, State) ->
 			UserQuery = [],
 			UserDef = false;
 		UserId ->
-			UserQuery = "owner_id:" ++ UserId,
+			UserQuery = "user_id:" ++ UserId,
 			UserDef = true
 		end,
 	case proplists:get_value('res', wrq:path_info(ReqData)) of
@@ -279,7 +279,7 @@ get_stream(ReqData, State) ->
 							UserQuery = [],
 							UserDef = false;
 						UserId ->
-							UserQuery = "owner_id:" ++ UserId,
+							UserQuery = "user_id:" ++ UserId,
 							UserDef = true
 					end,
 					case proplists:get_value('res', wrq:path_info(ReqData)) of

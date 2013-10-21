@@ -1,5 +1,5 @@
 %%%-------------------------------------------------------------------
-%%% @author ProjectCS13 <> Andreas, Carl
+%%% @author ProjectCS13 <> Andreas, Carl, Tomas
 %%% @doc
 %%% This module handles the uri requests that are related to resources.
 %%% @end
@@ -80,18 +80,9 @@ delete_resource(ReqData, State) ->
 	Id = proplists:get_value('resourceid', wrq:path_info(ReqData)),
 	erlang:display("DELETE request - check permission here"),
 	%% TODO Authentication
-	case erlastic_search:get_doc(?INDEX, "resource", Id,  [{"fields", "_source.streams"}]) of
-			{ok,{struct,Json}} ->
-				case proplists:get_value(<<"fields">>, Json) of
-					undefined -> erlang:display("NO STREAMS");
-					{struct,Fields} ->
-						Streams = proplists:get_value(<<"_source.streams">>, Fields),
-						case delete_streams(Streams) of
-							{{error,_Reason}, StreamId, _Rest} -> erlang:display("failed to delete stream " ++ StreamId);
-							ok -> erlang:display("streams have been deleted")
-						end
-				end;
-			_ -> erlang:display("Search error")
+	case delete_streams_with_resource_id(Id) of
+		{error,Reason} -> {{halt,404}, ReqData, State};
+		{ok} -> {true,ReqData,State}
 	end,
 	case erlastic_search:delete_doc(?INDEX,"resource", Id) of
 			{error,_} -> {{halt,404}, ReqData, State};
@@ -99,20 +90,59 @@ delete_resource(ReqData, State) ->
 	end.
 
 %% @doc
+%% Function: delete_streams_with_resource_id/1
+%% Purpose: Deletes the streams associated with the given resourceid
+%% Returns:  ERROR = {error,Errorcode}
+%%			 OK = {ok}
+%% @end
+-spec delete_streams_with_resource_id(Id::string()) -> term().
+
+delete_streams_with_resource_id(Id) ->
+	erlang:display("In here"),
+	Query = "resource_id:" ++ Id, 
+	case erlastic_search:search_limit(?INDEX, "stream", Query,100) of
+		{error,Reason} -> erlang:display(Reason),
+						  {error, Reason};
+						  
+		{ok,List} -> SearchRemoved = api_help:remove_search_part(api_help:make_to_string(api_help:json_encode(List)),false,0),
+					 ExtraRemoved = api_help:remove_extra_info(SearchRemoved, 0),
+					case get_streams(ExtraRemoved) of
+						 [] -> {ok};
+						 Streams ->
+							 case delete_streams(Streams) of
+						 		{error,Reason} -> {error, Reason};
+						 		{ok} -> delete_streams_with_resource_id(Id)
+							 end
+					 end
+	end.
+
+%% @doc
+%% Function: get_streams/1
+%% Purpose: get a list of ids of a list of JSON objects
+%% Returns:  a list with the ids of the JSON objects given
+%% @end
+-spec get_streams(JSON::string()) -> list().
+
+get_streams(JSON) ->
+	case api_help:get_value_field(JSON, "id") of
+		[] -> [];
+		Id -> [Id] ++ get_streams(api_help:remove_object(JSON,0))
+	end.
+
+
+
+
+%% @doc
 %% Function: delete_streams/1
 %% Purpose: Deletes all streams in the given list, the list elements are streamIds as binaries
 %% Returns:  ok, or {{error,_Reason}, StreamId, Rest} where StreamId is the binary Id of the stream for which deletion failed
 %% @end
-delete_streams([]) -> ok;
+delete_streams([]) -> timer:sleep(100),
+					  {ok};
 delete_streams([StreamId|Rest]) ->
-	case erlastic_search:delete_doc(?INDEX, "stream", binary_to_list(StreamId)) of 
-		{error,Reason} -> {{error,Reason},StreamId, Rest};
-		{ok,_List} -> delete_streams(Rest)
-	end;
-delete_streams(StreamId) ->
 	case erlastic_search:delete_doc(?INDEX, "stream", StreamId) of 
-		{error,Reason} -> {{error,Reason},StreamId, []};
-		{ok,_List} -> ok
+		{error,Reason} -> {error,Reason};
+		{ok,_List} -> delete_streams(Rest)
 	end.
 	
 
@@ -147,7 +177,7 @@ process_post(ReqData, State) ->
 				undefined ->
 					Query = [];
 				UserId ->
-					Query = "owner:" ++ UserId
+					Query = "user_id:" ++ UserId
 			end,
 			FullQuery = lists:append(api_help:transform(URIQuery,true),Query),
 			erlang:display(FullQuery),
@@ -204,7 +234,7 @@ get_resource(ReqData, State) ->
 						undefined ->
 							Query = [];
 						UserId ->
-							Query = "owner:" ++ UserId
+							Query = "user_id:" ++ UserId
 					end,
 					case erlastic_search:search_limit(?INDEX, "resource", Query, 100) of % Maybe wanna take more
 						{error,Reason} -> {{halt, Reason}, ReqData, State};
