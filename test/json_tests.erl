@@ -29,6 +29,9 @@
 	"\"friend\": {\"name\":\"FriendName2\", \"nickname\":[\"NickName2\", \"NickName3\"]}"
 	"}").
 
+-define(JSON3, 
+	"{\"took\":1,\"timed_out\":false,\"_shards\":{\"total\":5,\"successful\":5,\"failed\":0},\"hits\":{\"total\":0,\"max_score\":null,\"hits\":[]}}").
+
 -define(GET_FIELD_RESULT1, 
 	[[{"name","FriendName1"},{"nickname","NickName1"}],
 	 [{"name","FriendName2"},{"nickname",["NickName2","NickName3"]}],
@@ -69,7 +72,7 @@ get_field_test() ->
     ?assertEqual(["NickName2", "NickName3"], lib_json:get_field(?JSON1, "friend[1].nickname")),
     ?assertEqual("NickName2", lib_json:get_field(?JSON1, "friend[1].nickname[0]")),
     ?assertEqual(undefined, lib_json:get_field(?JSON1, "friend[0].nick")),
-    ?assertEqual([{"name","FriendName2"}, {"nickname",["NickName2","NickName3"]}],
+    ?assertEqual([{"name","FriendName2"}, {"nickname",["NickName2","NickName3"]}], 
 		 lib_json:get_field(?JSON2, "friend")).
 
 %% @doc
@@ -81,16 +84,16 @@ get_field_test() ->
 %% @end
 get_field_value_test() ->
     ?assertEqual("FriendName2", lib_json:get_field_value(?JSON1, "friend[1].name", "FriendName2")),
-    ?assertEqual(false, lib_json:get_field_value(?JSON1, "friend[0].name", "FriendName2")),
+    ?assertEqual(undefined, lib_json:get_field_value(?JSON1, "friend[0].name", "FriendName2")),
     ?assertEqual("NickName1", lib_json:get_field_value(?JSON1, "friend[*].nickname", "NickName1")),
     ?assertEqual("NickName3", lib_json:get_field_value(?JSON1, "friend[*].nickname", "NickName3")),
-    ?assertEqual(false, lib_json:get_field_value(?JSON1, "friend[*].name", "NickName3")),
-    ?assertEqual(false, lib_json:get_field_value(?JSON2, "friend[*].name", "NickName3")),
+    ?assertEqual(undefined, lib_json:get_field_value(?JSON1, "friend[*].name", "NickName3")),
+    ?assertEqual(undefined, lib_json:get_field_value(?JSON2, "friend[*].name", "NickName3")),
     ?assertEqual("NickName3", lib_json:get_field_value(?JSON2, "friend.nickname", "NickName3")),
     ?assertEqual([{"name", "FriendName1"}, {"nickname", "NickName1"}], 
-		 lib_json:get_field_value(?JSON1, "friend[0]", 
-					  [{"name", "FriendName1"}, {"nickname", "NickName1"}])),
+		 lib_json:get_field_value(?JSON1, "friend[0]", [{"name", "FriendName1"}, {"nickname", "NickName1"}])),
     ?assertEqual(?GET_FIELD_RESULT1, lib_json:get_field_value(?JSON1, "friend", ?GET_FIELD_RESULT1)),
+    ?assertEqual(null, lib_json:get_field_value(?JSON3, "hits.max_score", null)),
 
     %% This call will produce an error. Added here as an example of how 
     %% lib_json:get_field_value/3 NOT should be used. The second argument is not

@@ -91,7 +91,7 @@ get_suggestion(ReqData, State) ->
 		Term ->
 			%forms the query
 			Query = "{                   
-    					\"test-suggest\" : {     
+    					\"testsuggest\" : {     
         					\"text\" : \""++Term++"\",
         					\"completion\" : {                    
             					\"field\" : \"suggest\",
@@ -122,35 +122,51 @@ get_suggestion(ReqData, State) ->
 %% @end
 add_suggestion(Resource, Json) ->
 	ResourceId = binary_to_list(proplists:get_value(<<"_id">>, Json)),
-	Manufacturer = lib_json:get_value_field(Resource, "manufacturer"),
-	Model = lib_json:get_value_field(Resource, "model"),
-	Tags = lib_json:get_value_field(Resource, "tags"),
-	Polling_freq = lib_json:get_value_field(Resource, "polling_freq"),
+	Manufacturer = lib_json:get_field(Resource, "manufacturer"),
+	Model = lib_json:get_field(Resource, "model"),
+	Tags = lib_json:get_field(Resource, "tags"),
+	Polling_freq = lib_json:get_field(Resource, "polling_freq"),
 	Weight = scoring:calc(Resource, resource),
+	erlang:display("+++++++++++++1+++++++++++++++"),
 	erlang:display(ResourceId),
 	erlang:display(Manufacturer),
 	erlang:display(Model),
 	erlang:display(Tags),
 	erlang:display(Polling_freq),
 	erlang:display(Weight),
-	Suggestion = "{
-		\"resource_id\" : \"" ++ ResourceId++ "\",
-		\"suggest\" : {
-			\"input\" : [ \"" ++ Model ++ "\" ], 
-			\"output\" : \"" ++ get_timestamp() ++ "\",
-			\"payload\" : { 
-				\"manufacturer\" : \"" ++ Manufacturer ++ "\",
-				\"tags\" : \"" ++ Tags ++ "\",
-				\"polling_freq\" : \"" ++ Polling_freq ++ "\"
-			},
-			\"weight\" : " ++ integer_to_list(Weight) ++ "
-		}				
-	}",
-	case erlastic_search:index_doc(?INDEX, "suggestion", Suggestion) of 
-		{error, S} -> erlang:display("Suggestion not saved ");
-		{ok, _} -> 	ok
+	case Model of 
+		undefined ->
+			{error, "no model"};
+		_ ->
+			Suggestion = "{
+				\"resource_id\" : \"" ++ undefined_to_string(ResourceId) ++ "\",
+				\"suggest\" : {
+					\"input\" : [ \"" ++ undefined_to_string(Model) ++ "\" ], 
+					\"output\" : \"" ++ get_timestamp() ++ "\",
+					\"payload\" : { 
+						\"manufacturer\" : \"" ++ undefined_to_string(Manufacturer) ++ "\",
+						\"tags\" : \"" ++ undefined_to_string(Tags) ++ "\",
+						\"polling_freq\" : \"" ++ undefined_to_string(Polling_freq) ++ "\"
+					},
+					\"weight\" : " ++ integer_to_list(Weight) ++ "
+				}				
+			}",
+			erlang:display("++++++++++++++++++++++++++++"),
+			erlang:display(Suggestion),
+			case erlastic_search:index_doc(?INDEX, "suggestion", Suggestion) of 
+				{error, S} -> erlang:display("Suggestion not saved ");
+				{ok, _} -> 	ok
+			end
 	end.
 
+
+undefined_to_string(Text) ->
+	case Text of
+		undefined ->
+			"";
+		_ ->
+			Text
+	end.
 
 
 %% @doc
