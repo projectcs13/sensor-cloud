@@ -318,6 +318,13 @@ remove_extra_info([First|Rest],Val) ->
                         [First|remove_extra_info(Rest,Val)]
         end.
 
+%% @doc
+%% Function: remove_object/2
+%% Purpose: Used to remove one object from the list
+%% Returns: Returns the list of JSON objects left
+%% @end
+-spec remove_object(JSONString::string(),OpenBrackets::integer()) -> string().
+
 remove_object([],_) ->
 	[];
 remove_object([First|Rest],0) ->
@@ -339,6 +346,12 @@ remove_object([First|Rest],Val) ->
 			remove_object(Rest,Val)
 	end.
 
+%% @doc
+%% Function: convert_binary_to_string/1
+%% Purpose: convert binary parts of the list to string
+%% Returns: Returns the list with the binary parts converted to strings
+%% @end
+-spec convert_binary_to_string(JSONString::string()) -> string().
 
 convert_binary_to_string([]) ->
 	[];
