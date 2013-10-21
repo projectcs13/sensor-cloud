@@ -85,73 +85,9 @@ get_resource_test() ->
 	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(get, {"http://localhost:8000/users/0/resources/" ++ DocId, []}, [], []),
 	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(get, {"http://localhost:8000/users/0/resources/_search?test=get", []}, [], []),
 	?assertEqual("get",lib_json:get_field(Body2,"_source.test")),
-	?assertEqual("get",lib_json:get_field(Body3,"_source.test")).	
-	%erlang:display(Body4),
-	%?assertEqual("get",lib_json:get_field(Body4,"test")).
+	?assertEqual("get",lib_json:get_field(Body3,"_source.test")),
+	?assertEqual(true,lib_json:field_value_exist(Body4,"hits.hits[*]._source.test","get")).
 
-%% @doc
-%% Function: get_field/2
-%% Purpose: Return the value of a certain field in the given JSON string.
-%% Returns: Return the value of the specified field, if it exists, 
-%%          otherwise returns the empty string.
-%% @end
-%% -spec get_field_value(String::string(),Field::string()) -> string().
-%% 
-%% get_field_value(JSONString,Field) ->
-%% 	Tokens = string:tokens(JSONString, ","),
-%% 	ResourceField = find_field(Tokens,Field),
-%% 	case ResourceField of 
-%% 		[] -> "";
-%% 		_ -> FieldValue = string:tokens(ResourceField,":"),
-%% 			 remove_special_characters(lists:nth(length(FieldValue),FieldValue),false)
-%% 	end.
-%% 
-%% %% @doc
-%% %% Function: find_field/2
-%% %% Purpose: Help function to find the first string containing the given string
-%% %%          in the list.
-%% %% Returns: The first string containing the given string
-%% %%          in the list, the empty string if non exists.
-%% %% @end
-%% -spec find_field(List::list(),Field::string()) -> string().
-%% 
-%% find_field([],_) ->
-%% 	[];
-%% 
-%% find_field([First|Rest],Field) ->
-%% 	case string:str(First,Field) of
-%% 		0 -> find_field(Rest,Field);
-%% 		_ -> First
-%% 	end.
-%% 
-%% 
-%% %% @doc
-%% %% Function: remove_special_characters/2
-%% %% Purpose: Help function to remove non alphanumerical characters
-%% %% Returns: First string of alphanumerical characters that can be found,
-%% %%          empty string if non exists
-%% %% @end
-%% -spec remove_special_characters(String::string(),CharactersFound::boolean()) -> string().
-%% 
-%% remove_special_characters([],_) ->
-%% 	[];
-%% 
-%% remove_special_characters([First|Rest],false) ->
-%% 	Character = (First < 91) and (First > 64) or (First < 123) and (First > 96) or (First > 47) and (First < 58),
-%% 	case Character of
-%% 		true ->
-%% 			[First|remove_special_characters(Rest,true)];
-%% 		false ->
-%% 			remove_special_characters(Rest,false)
-%% 	end;
-%% remove_special_characters([First|Rest],true) ->
-%% 	Character = (First < 91) and (First > 64) or (First < 123) and (First > 96) or (First > 47) and (First < 58),
-%% 	case Character of
-%% 		true ->
-%% 			[First|remove_special_characters(Rest,true)];
-%% 		false ->
-%% 			[]
-%% 	end.
 
 %% @doc
 %% Function: get_id_value/2

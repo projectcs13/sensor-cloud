@@ -36,8 +36,6 @@ init([]) ->
 -spec allowed_methods(ReqData::term(),State::term()) -> {list(), term(), term()}.
 
 allowed_methods(ReqData, State) ->
-	%erlang:display(ReqData),
-	%erlang:display(parse_path(wrq:path(ReqData))),
 	case parse_path(wrq:path(ReqData)) of
 		[{"streams", "_search"}] ->
 			{['POST', 'GET'], ReqData, State};
@@ -100,7 +98,6 @@ content_types_accepted(ReqData, State) ->
 
 delete_resource(ReqData, State) ->
 	Id = proplists:get_value('stream', wrq:path_info(ReqData)),
-	erlang:display("delete request"),
 	case erlastic_search:delete_doc(?INDEX,"stream", Id) of
 			{error,Reason} -> {false, wrq:set_resp_body(json_encode(Reason),ReqData), State};
 			{ok,List} -> {true,wrq:set_resp_body(json_encode(List),ReqData),State}
@@ -118,7 +115,6 @@ delete_resource(ReqData, State) ->
 process_post(ReqData, State) ->
 	case is_search(ReqData) of 
 		false ->
-			erlang:display("Create request"),
 			{Stream,_,_} = json_handler(ReqData, State),
 			case proplists:get_value('user', wrq:path_info(ReqData)) of
 				undefined ->
@@ -154,7 +150,6 @@ process_post(ReqData, State) ->
 -spec process_search_post(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 
 process_search_post(ReqData, State) ->
-	erlang:display("search request"),
 	URIQuery = wrq:req_qs(ReqData),
 	case proplists:get_value('user', wrq:path_info(ReqData)) of
 		undefined ->
@@ -195,7 +190,6 @@ process_search_post(ReqData, State) ->
 -spec process_search_get(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 
 process_search_get(ReqData, State) ->
-	erlang:display("search request"),
 	URIQuery = wrq:req_qs(ReqData),
 	case proplists:get_value('user', wrq:path_info(ReqData)) of
 		undefined ->
@@ -236,7 +230,6 @@ process_search_get(ReqData, State) ->
 -spec put_stream(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 
 put_stream(ReqData, State) ->
-	erlang:display("update request"),
 	StreamId = proplists:get_value('stream', wrq:path_info(ReqData)),
 	{Stream,_,_} = json_handler(ReqData,State),
 	Update = create_update(Stream),
@@ -265,7 +258,6 @@ get_stream(ReqData, State) ->
 	case is_search(ReqData) of
 		true -> process_search_get(ReqData,State);
 		false ->
-			erlang:display("fetch request"),
 			case proplists:get_value('stream', wrq:path_info(ReqData)) of
 				undefined ->
 				% List streams based on URI
@@ -294,7 +286,9 @@ get_stream(ReqData, State) ->
 					end,
 					case erlastic_search:search_limit(?INDEX, "stream", Query,200) of % Maybe wanna take more
 						{error,Reason} -> {{error, Reason}, ReqData, State};
-						{ok,List} -> {remove_search_part(make_to_string(json_encode(List)),false,0), ReqData, State} 
+						{ok,List} -> 
+							{"{\"hits\":"++remove_search_part(make_to_string(json_encode(List)),false,0)++"}", ReqData, State} 
+						%%{ok,List} -> {lib_json:get_field(lib_json:encode(List), "hits.hits"), ReqData, State}
 					end;
 				StreamId ->
 				% Get specific stream

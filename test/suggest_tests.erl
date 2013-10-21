@@ -36,15 +36,16 @@
 post_test() ->
 	Response1 = post_request(?RESOURCE_URL, "application/json", 
 							"{
-								\"model\" : \"test-smartphone1\",
-								\"tags\" : \"test-tag\"
+								\"model\" : \"testsmartphone2\",
+								\"tags\" : \"testtag\"
 							}"),
 	check_returned_code(Response1, 200),
- 	Response2 = get_request(?SUGGEST_URL++"test-smartphone1"),     
+	timer:sleep(800),
+ 	Response2 = get_request(?SUGGEST_URL++"testsmartphone2"),     
  	check_returned_code(Response2, 200),
  	{ok, {_, _ ,Body}} = Response2,
 	erlang:display(Body),
-	?assertEqual("test-tag",lib_json:get_field(Body, "testsuggest[0].options[0].payload.tags")).
+	?assertEqual("testtag",lib_json:get_field(Body, "testsuggest[0].options[0].payload.tags")).
 
 
 %% @doc
@@ -57,11 +58,12 @@ post_test() ->
 get_suggestion_test() ->
 	Response1 = post_request(?RESOURCE_URL, "application/json", 
 							"{
-								\"model\" : \"test-smartphone2\",
+								\"model\" : \"testanother\",
 								\"manufacturer\" : \"ericsson\"
 							}"),
 	check_returned_code(Response1, 200),
-	Response2 = get_request(?SUGGEST_URL ++ "/test-smartphone2"),
+	timer:sleep(800),
+	Response2 = get_request(?SUGGEST_URL ++ "testanother"),
 	check_returned_code(Response2, 200),
 	{ok, {_, _ ,Body}} = Response2,
 	erlang:display(Body),
