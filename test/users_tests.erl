@@ -28,6 +28,17 @@
 -define(TEST_EMAIL, "weird_test_email").
 
 
+%% @doc
+%% Function: inti_test/0
+%% Purpose: Used to start the inets to be able to do HTTP requests
+%% Returns: ok | {error, term()}
+%%
+%% Side effects: Start inets
+%% @end
+-spec init_test() -> ok | {error, term()}.
+
+init_test() ->
+	inets:start().
 
 
 %% @doc
@@ -41,7 +52,7 @@ post_test() ->
 	Response1 = post_request(?USERS_URL, "application/json", 
 					 "{\"user_name\":\""++?TEST_NAME++"\"}"),
 	check_returned_code(Response1, 200),
-	timer:sleep(2000),
+	timer:sleep(100),
 	?assertNotMatch({error, "no match"}, get_index_id(?TEST_NAME)).
 
 

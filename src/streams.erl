@@ -36,8 +36,6 @@ init([]) ->
 -spec allowed_methods(ReqData::term(),State::term()) -> {list(), term(), term()}.
 
 allowed_methods(ReqData, State) ->
-	%erlang:display(ReqData),
-	%erlang:display(parse_path(wrq:path(ReqData))),
 	case parse_path(wrq:path(ReqData)) of
 		[{"streams", "_search"}] ->
 			{['POST', 'GET'], ReqData, State};
@@ -100,7 +98,6 @@ content_types_accepted(ReqData, State) ->
 
 delete_resource(ReqData, State) ->
 	Id = proplists:get_value('stream', wrq:path_info(ReqData)),
-	erlang:display("delete request"),
 	case erlastic_search:delete_doc(?INDEX,"stream", Id) of
 			{error,Reason} -> {false, wrq:set_resp_body(json_encode(Reason),ReqData), State};
 			{ok,List} -> {true,wrq:set_resp_body(json_encode(List),ReqData),State}
@@ -118,7 +115,6 @@ delete_resource(ReqData, State) ->
 process_post(ReqData, State) ->
 	case is_search(ReqData) of 
 		false ->
-			erlang:display("Create request"),
 			{Stream,_,_} = json_handler(ReqData, State),
 			case proplists:get_value('user', wrq:path_info(ReqData)) of
 				undefined ->
@@ -132,7 +128,7 @@ process_post(ReqData, State) ->
 				ResId ->
 					ResAdded = add_field(UserAdded,"resource_id",ResId)
 			end,
-			case get_value_field(ResAdded,"resource_id") == [] of
+			case lib_json:get_field(ResAdded,"resource_id") == undefined of
 				true -> {false, wrq:set_resp_body("\"resource_id_missing\"",ReqData), State};
 				false ->
 					case erlastic_search:index_doc(?INDEX, "stream", ResAdded) of	
@@ -154,7 +150,6 @@ process_post(ReqData, State) ->
 -spec process_search_post(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 
 process_search_post(ReqData, State) ->
-	erlang:display("search request"),
 	URIQuery = wrq:req_qs(ReqData),
 	case proplists:get_value('user', wrq:path_info(ReqData)) of
 		undefined ->
@@ -195,7 +190,6 @@ process_search_post(ReqData, State) ->
 -spec process_search_get(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 
 process_search_get(ReqData, State) ->
-	erlang:display("search request"),
 	URIQuery = wrq:req_qs(ReqData),
 	case proplists:get_value('user', wrq:path_info(ReqData)) of
 		undefined ->
@@ -236,7 +230,6 @@ process_search_get(ReqData, State) ->
 -spec put_stream(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 
 put_stream(ReqData, State) ->
-	erlang:display("update request"),
 	StreamId = proplists:get_value('stream', wrq:path_info(ReqData)),
 	{Stream,_,_} = json_handler(ReqData,State),
 	Update = create_update(Stream),
@@ -265,7 +258,6 @@ get_stream(ReqData, State) ->
 	case is_search(ReqData) of
 		true -> process_search_get(ReqData,State);
 		false ->
-			erlang:display("fetch request"),
 			case proplists:get_value('stream', wrq:path_info(ReqData)) of
 				undefined ->
 				% List streams based on URI
@@ -294,7 +286,9 @@ get_stream(ReqData, State) ->
 					end,
 					case erlastic_search:search_limit(?INDEX, "stream", Query,200) of % Maybe wanna take more
 						{error,Reason} -> {{error, Reason}, ReqData, State};
-						{ok,List} -> {remove_search_part(make_to_string(json_encode(List)),false,0), ReqData, State} 
+						{ok,List} -> 
+							{"{\"hits\":"++remove_search_part(make_to_string(json_encode(List)),false,0)++"}", ReqData, State} 
+						%%{ok,List} -> {lib_json:get_field(lib_json:encode(List), "hits.hits"), ReqData, State}
 					end;
 				StreamId ->
 				% Get specific stream
@@ -480,76 +474,6 @@ update_doc(Index, Type, Id, Json, Qs) ->
     Id1 = mochiweb_util:quote_plus(Id),
     ReqPath = Index ++ [$/ | Type] ++ [$/ | Id1] ++ "/_update",
     erls_resource:post(#erls_params{}, ReqPath, [], Qs, Json, []).
-
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Should be moved to own module later
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-%% @doc
-%% Function: get_value_field/2
-%% Purpose: Return the value of a certain field in the given JSON string.
-%% Returns: Return the value of the specified field, if it exists, 
-%%          otherwise returns the empty string.
-%% @end
--spec get_value_field(String::string(),Field::string()) -> string().
-
-get_value_field(JSONString,Field) ->
-	Tokens = string:tokens(JSONString, ","),
-	ResourceField = find_field(Tokens,Field),
-	case ResourceField of 
-		[] -> "";
-		_ -> FieldValue = string:tokens(ResourceField,":"),
-			 remove_special_characters(lists:nth(length(FieldValue),FieldValue),false)
-	end.
-
-%% @doc
-%% Function: find_field/2
-%% Purpose: Help function to find the first string containing the given string
-%%          in the list.
-%% Returns: The first string containing the given string
-%%          in the list, the empty string if non exists.
-%% @end
--spec find_field(List::list(),Field::string()) -> string().
-
-find_field([],_) ->
-	[];
-
-find_field([First|Rest],Field) ->
-	case string:str(First,Field) of
-		0 -> find_field(Rest,Field);
-		_ -> First
-	end.
-
-
-%% @doc
-%% Function: remove_special_characters/2
-%% Purpose: Help function to remove non alphanumerical characters
-%% Returns: First string of alphanumerical characters that can be found,
-%%          empty string if non exists
-%% @end
--spec remove_special_characters(String::string(),CharactersFound::boolean()) -> string().
-
-remove_special_characters([],_) ->
-	[];
-
-remove_special_characters([First|Rest],false) ->
-	Character = (First < 91) and (First > 64) or (First < 123) and (First > 96) or (First > 47) and (First < 58),
-	case Character of
-		true ->
-			[First|remove_special_characters(Rest,true)];
-		false ->
-			remove_special_characters(Rest,false)
-	end;
-remove_special_characters([First|Rest],true) ->
-	Character = (First < 91) and (First > 64) or (First < 123) and (First > 96) or (First > 47) and (First < 58),
-	case Character of
-		true ->
-			[First|remove_special_characters(Rest,true)];
-		false ->
-			[]
-	end.
 
 
 
