@@ -131,7 +131,14 @@ process_post(ReqData, State) ->
 			{Resource,_,_} = api_help:json_handler(ReqData,State),
 			case erlastic_search:index_doc(?INDEX,"resource",Resource) of 
 				{error, Reason} -> {false, wrq:set_resp_body(api_help:json_encode(Reason), ReqData), State};
-				{ok,List} -> 	{true, wrq:set_resp_body(api_help:json_encode(List), ReqData), State}
+				{ok,List} -> Json = api_help:make_to_string(api_help:json_encode(List)),
+                             Id = api_help:get_id_value(Json,"_id"),
+                             NewJson = "{\"id\" : \"" ++ Id ++ "\"}",
+                             Update = api_help:create_update(NewJson),
+                             case api_help:update_doc(?INDEX,"resource", Id, Update, []) of
+								 {error, Reason} -> {false, wrq:set_resp_body(api_help:json_encode(Reason), ReqData), State};
+                                 {ok,_} ->{true, wrq:set_resp_body(api_help:json_encode(List), ReqData), State}
+                             end
 			end;
 		true ->
 			% Search
@@ -146,14 +153,7 @@ process_post(ReqData, State) ->
 			erlang:display(FullQuery),
 			case erlastic_search:search_limit(?INDEX, "resource", FullQuery,10) of % Maybe wanna take more
 				{error,Reason} -> {{halt,Reason}, ReqData, State};
-				{ok,List} -> Json = api_help:make_to_string(api_help:json_encode(List)),
-                             Id = api_help:get_id_value(Json,"_id"),
-                             NewJson = "{\"id\" : \"" ++ Id ++ "\"}",
-                             Update = api_help:create_update(NewJson),
-                             case api_help:update_doc(?INDEX,"resource", Id, Update, []) of
-								 {error, Reason} -> {false, wrq:set_resp_body(api_help:json_encode(Reason), ReqData), State};
-                                 {ok,_} ->{true, wrq:set_resp_body(api_help:json_encode(List), ReqData), State}
-                             end
+				{ok,List} -> {true, wrq:set_resp_body(api_help:json_encode(List), ReqData), State}
 			end
 
 	end.
