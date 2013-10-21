@@ -62,26 +62,15 @@
 %% @end
 get_field_test() ->
     ?assertEqual("Name1", lib_json:get_field(?JSON1, "name")),
-
-
     ?assertEqual(?GET_FIELD_RESULT1, lib_json:get_field(?JSON1, "friend")),
-
-    Result3 = [{"name", "FriendName1"}, {"nickname", "NickName1"}],
-    ?assertEqual(Result3, lib_json:get_field(?JSON1, "friend[0]")),
-
+    ?assertEqual([{"name", "FriendName1"}, {"nickname", "NickName1"}], lib_json:get_field(?JSON1, "friend[0]")),
     ?assertEqual("FriendName1", lib_json:get_field(?JSON1, "friend[0].name")),
-
     ?assertEqual("NickName1", lib_json:get_field(?JSON1, "friend[0].nickname")),
-
-    Result6 = ["NickName2", "NickName3"],
-    ?assertEqual(Result6, lib_json:get_field(?JSON1, "friend[1].nickname")),
-
+    ?assertEqual(["NickName2", "NickName3"], lib_json:get_field(?JSON1, "friend[1].nickname")),
     ?assertEqual("NickName2", lib_json:get_field(?JSON1, "friend[1].nickname[0]")),
-
     ?assertEqual(undefined, lib_json:get_field(?JSON1, "friend[0].nick")),
-
-    Result9 = [{"name","FriendName2"}, {"nickname",["NickName2","NickName3"]}],
-    ?assertEqual(Result9, lib_json:get_field(?JSON2, "friend")).
+    ?assertEqual([{"name","FriendName2"}, {"nickname",["NickName2","NickName3"]}] 
+		 lib_json:get_field(?JSON2, "friend")).
 
 %% @doc
 %% Function: get_field_value_test/0
@@ -98,12 +87,9 @@ get_field_value_test() ->
     ?assertEqual(false, lib_json:get_field_value(?JSON1, "friend[*].name", "NickName3")),
     ?assertEqual(false, lib_json:get_field_value(?JSON2, "friend[*].name", "NickName3")),
     ?assertEqual("NickName3", lib_json:get_field_value(?JSON2, "friend.nickname", "NickName3")),
-
-    Result8 = [{"name", "FriendName1"}, {"nickname", "NickName1"}],
-    ?assertEqual(Result8, lib_json:get_field_value(?JSON1, "friend[0]", Result8)),
-
+    ?assertEqual([{"name", "FriendName1"}, {"nickname", "NickName1"}], 
+		 lib_json:get_field_value(?JSON1, "friend[0]", Result8)),
     ?assertEqual(?GET_FIELD_RESULT1, lib_json:get_field_value(?JSON1, "friend", ?GET_FIELD_RESULT1)),
-
 
     %% This call will produce an error. Added here as an example of how 
     %% lib_json:get_field_value/3 NOT should be used. The second argument is not
