@@ -45,8 +45,6 @@ decode({pretty, Json}) when is_list(Json)->
 %% decode({pretty, Json}) when is_tuple(Json) ->
 %%     mk_pretty(Json).
 
-    
-    
 %% @doc
 %% Function: get_field/2
 %% Purpose: Get the value at a certain field
@@ -182,38 +180,28 @@ field_recursion(Json, QueryParts, Value) ->
     field_recursion(Json, QueryParts, Value, "").
 
 field_recursion(Json, [{wildcard, Field} | Rest], Value, Query) ->
-    %% erlang:display("2"++Query),
     case get_field_max_index(Json, Field) of
 	N when is_integer(N) ->
 	    case index_recursion(Json, [{wildcard, Field, N}| Rest], Value, Query) of
 		Value ->
-		    %% erlang:display("3"),
 		    Value;
 		R ->
-		    %% erlang:display("4a"),
-		    %% erlang:display(R),
-		    %% erlang:display("4b"),
 		    R
-		    %field_recursion(Json, Rest, Value, Query)
 	    end;
 	R ->
 	    R
     end;
 field_recursion(Json, [{no_wildcard, Field}], Value, Query) ->
     NewQuery = lists:concat([Query, Field]),
-    %% erlang:display("5"++NewQuery),
     case mk_pretty(get_field_help(Json, NewQuery)) of
 	R when is_list(R) ->
 	    case lists:member(Value, R) of
 		true ->
-		    %% erlang:display("6a"),
 		    Value;
 		false ->
-		    %% erlang:display("6b"),
 		    R
 	    end;
 	R ->
-	    %% erlang:display("6c"++R),
 	    R
     end.
 
@@ -225,18 +213,14 @@ field_recursion(Json, [{no_wildcard, Field}], Value, Query) ->
 index_recursion(Json, [{wildcard, Field, 0 = N} | Rest], Value, Query) ->
     NewQuery = lists:concat([Query, Field]),
     NewIndexQuery = query_index_prep(NewQuery, N),
-    %% erlang:display("7a"++NewIndexQuery),
     field_recursion(Json, Rest, Value, NewIndexQuery);
 index_recursion(Json, [{wildcard, Field, N} | Rest], Value, Query) ->
     NewQuery = lists:concat([Query, Field]),
     NewIndexQuery = query_index_prep(NewQuery, N),
-    %% erlang:display("8"++NewIndexQuery),
     case field_recursion(Json, Rest, Value, NewIndexQuery) of
 	Value ->
-	    %% erlang:display("9"),
 	    Value;
 	_ ->
-	    %% erlang:display("10"),
 	    index_recursion(Json, [{wildcard, Field, N-1} | Rest], Value, Query)
     end.
     
