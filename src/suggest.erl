@@ -89,8 +89,6 @@ get_suggestion(ReqData, State) ->
 		undefined ->
 			{{halt, 400}, ReqData, State};
 		Term ->
-			erlang:display(Term),
-			erlang:display("AAAAAA"),
 			%forms the query
 			Query = "{                   
     					\"testsuggest\" : {     
@@ -129,13 +127,6 @@ add_suggestion(Resource, Json) ->
 	Tags = lib_json:get_field(Resource, "tags"),
 	Polling_freq = lib_json:get_field(Resource, "polling_freq"),
 	Weight = scoring:calc(Resource, resource),
-	erlang:display("+++++++++++++1+++++++++++++++"),
-	erlang:display(ResourceId),
-	erlang:display(Manufacturer),
-	erlang:display(Model),
-	erlang:display(Tags),
-	erlang:display(Polling_freq),
-	erlang:display(Weight),
 	case Model of 
 		undefined ->
 			{error, "no model"};
@@ -153,8 +144,6 @@ add_suggestion(Resource, Json) ->
 					\"weight\" : " ++ integer_to_list(Weight) ++ "
 				}				
 			}",
-			erlang:display("++++++++++++++++++++++++++++"),
-			erlang:display(Suggestion),
 			case erlastic_search:index_doc(?INDEX, "suggestion", Suggestion) of 
 				{error, S} -> erlang:display("Suggestion not saved ");
 				{ok, _} -> 	ok

@@ -55,7 +55,6 @@ get_stream_test() ->
 	?assertEqual(true,lib_json:get_field(Body3,"_source.test") == "get"),
 	?assertEqual(true,lib_json:get_field(Body3,"_source.private") == "true"),
 	?assertEqual(true,lib_json:field_value_exist(Body4,"hits[*]._source.test", "get")),
-	erlang:display(Body5),
 	?assertEqual(true, lib_json:field_value_exist(Body5,"hits.hits[*]._source.test", "get")),
 	?assertEqual(true,list_to_integer(lib_json:get_field(Body5,"hits.total")) >= 2), % Needed in case unempty elasticsearch
 	?assertEqual(true,lib_json:field_value_exist(Body5,"hits.hits[*]._source.test", "get")),
@@ -91,7 +90,7 @@ put_stream_test() ->
 	% Test update on missing doc
 	{ok, {{_Version9, 200, _ReasonPhrase9}, _Headers9, Body9}} = httpc:request(put, {"http://localhost:8000/streams/1", [], "application/json", "{\n\"test\" : \"put\"\n}"}, [], []),
 	
-			erlang:display("*****************A*********************"),?assertEqual(true,lib_json:get_field(Body5,"_source.private") == "false"),
+	?assertEqual(true,lib_json:get_field(Body5,"_source.private") == "false"),
 	?assertEqual(true,lib_json:get_field(Body5,"_source.private") =/= "true"),
 	?assertEqual(true,lib_json:get_field(Body6,"_source.private") =/= "false"),
 	?assertEqual(true,lib_json:get_field(Body6,"_source.private") == "true"),
