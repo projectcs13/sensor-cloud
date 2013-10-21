@@ -33,8 +33,8 @@ process_post_test() ->
 	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/resources", [],"application/json", "{\"test\" : \"post\",\"owner\" : \"0\",\"streams\" : \"1\"}"}, [], []),
 	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/users/0/resources/", [],"application/json", "{\"test\" : \"post\",\"owner\" : \"0\",\"streams\" : \"1\"}"}, [], []),
 	timer:sleep(100),
-	?assertEqual(true,lib_json:get_value_field(Body1,"ok")),	
-	?assertEqual(true,lib_json:get_value_field(Body2,"ok")).
+	?assertEqual(true,lib_json:get_field(Body1,"ok")),	
+	?assertEqual(true,lib_json:get_field(Body2,"ok")).
 
 %% @doc
 %% Function: delete_resource_test/0
@@ -50,8 +50,8 @@ delete_resource_test() ->
 	DocId = get_id_value(Body2,"_id"),
 	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} =
 	httpc:request(delete, {"http://localhost:8000/resources/" ++ DocId, []}, [], []),
-	?assertEqual(true,lib_json:get_value_field(Body2,"ok")),
-	?assertEqual(true,lib_json:get_value_field(Body3,"ok")).
+	?assertEqual(true,lib_json:get_field(Body2,"ok")),
+	?assertEqual(true,lib_json:get_field(Body3,"ok")).
 	
 %% @doc
 %% Function: put_resource_test/0
@@ -66,9 +66,9 @@ put_resource_test() ->
 	DocId = get_id_value(Body1,"_id"),
 	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(put, {"http://localhost:8000/resources/" ++ DocId , [],"application/json", "{\"doc\" :{\"test\" : \"put2\",\"owner\" : \"0\",\"streams\" : \"1\"}}"}, [], []),
 	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(get, {"http://localhost:8000/resources/" ++ DocId, []}, [], []),
-	?assertEqual(true,lib_json:get_value_field(Body1,"ok")),
-	?assertEqual(true,lib_json:get_value_field(Body2,"ok")),
-	?assertEqual("put2",lib_json:get_value_field(Body3,"_source.test")).
+	?assertEqual(true,lib_json:get_field(Body1,"ok")),
+	?assertEqual(true,lib_json:get_field(Body2,"ok")),
+	?assertEqual("put2",lib_json:get_field(Body3,"_source.test")).
 	
 %% @doc
 %% Function: get_resource_test/0
@@ -84,13 +84,13 @@ get_resource_test() ->
 	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(get, {"http://localhost:8000/resources/" ++ DocId, []}, [], []),
 	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(get, {"http://localhost:8000/users/0/resources/" ++ DocId, []}, [], []),
 	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(get, {"http://localhost:8000/users/0/resources/_search?test=get", []}, [], []),
-	?assertEqual("get",lib_json:get_value_field(Body2,"_source.test")),
-	?assertEqual("get",lib_json:get_value_field(Body3,"_source.test")).	
+	?assertEqual("get",lib_json:get_field(Body2,"_source.test")),
+	?assertEqual("get",lib_json:get_field(Body3,"_source.test")).	
 	%erlang:display(Body4),
-	%?assertEqual("get",lib_json:get_value_field(Body4,"test")).
+	%?assertEqual("get",lib_json:get_field(Body4,"test")).
 
 %% @doc
-%% Function: get_value_field/2
+%% Function: get_field/2
 %% Purpose: Return the value of a certain field in the given JSON string.
 %% Returns: Return the value of the specified field, if it exists, 
 %%          otherwise returns the empty string.

@@ -82,7 +82,7 @@ get_field_value(Json, Query, Value) ->
 	Value ->
 	    Value;
 	_ ->
-	    false
+	    undefined
     end.
 
 %% @doc
@@ -95,7 +95,7 @@ field_value_exist(Json, Query, Value) ->
     case get_field_value(Json, Query, Value) of
 	Value ->
 	    true;
-	false ->
+	undefined ->
 	    false
     end.
 
@@ -254,56 +254,4 @@ find_wildcard_fields(Query) ->
 	    NewWildCards2 = lists:map(fun(X) -> {wildcard, X} end, NewWildCards),
 	    NewWildCards2 ++ [{no_wildcard, R}]
     end.
-
-
-
-
-
-%trims white spaces and quote from beggining and ending of the string
-%% trim(String)->
-%% 	Temp = re:replace(re:replace(String, "\\s+$", "", [global,{return,list}]), "^\\s+", "", [global,{return,list}]),
-%% 	case re:run(Temp, "^{.*$}", [{capture, first, list}]) of
-%% 		{match, _} -> 
-%% 			A = Temp;
-%% 		_->
-%% 			case re:run(Temp, "$}", [{capture, first, list}]) of
-%% 				{match, _} -> 
-%% 					A = string:substr(Temp, 1, length(Temp)-1);
-%% 				_->
-%% 					A = Temp
-%% 			end
-%% 	end,
-%% 	Temp = re:replace(re:replace(String, "\\s+$", "", [global,{return,list}]), "^\\s+", "", [global,{return,list}]),
-%% 	string:strip(Temp, both, $").
-
-
-
-%% @doc
-%% Function: remove_special_characters/2
-%% Purpose: Help function to remove non alphanumerical characters
-%% Returns: First string of alphanumerical characters that can be found,
-%%          empty string if non exists
-%% @end
-%% -spec remove_special_characters(String::string(),CharactersFound::boolean()) -> string().
-
-%% remove_special_characters([],_) ->
-%% 	[];
-
-%% remove_special_characters([First|Rest],false) ->
-%% 	Character = (First < $[) and (First > $@) or (First < ${) and (First > $`) or (First > $/) and (First < $:),
-%% 	case Character of
-%% 		true ->
-%% 			[First|remove_special_characters(Rest,true)];
-%% 		false ->
-%% 			remove_special_characters(Rest,false)
-%% 	end;
-%% remove_special_characters([First|Rest],true) ->
-%% 	Character = (First < $[) and (First > $@) or (First < ${) and (First > $`) or (First > $/) and (First < $:),
-%% 	case Character of
-%% 		true ->
-%% 			[First|remove_special_characters(Rest,true)];
-%% 		false ->
-%% 			[]
-%% 	end.
-
 

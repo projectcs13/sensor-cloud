@@ -53,22 +53,22 @@ get_stream_test() ->
 	{ok, {{_Version9, 200, _ReasonPhrase9}, _Headers9, Body9}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ DocId2, []}, [], []),
 	
 			erlang:display("******************1********************"),
-	?assertEqual(true,lib_json:get_value_field(Body3,"_source.test") == "get"),
+	?assertEqual(true,lib_json:get_field(Body3,"_source.test") == "get"),
 			erlang:display("******************2********************"),
-	?assertEqual(true,lib_json:get_value_field(Body3,"_source.private") == "true"),
+	?assertEqual(true,lib_json:get_field(Body3,"_source.private") == "true"),
 			erlang:display("******************3********************"),
-	%?assertEqual(true,lib_json:get_value_field(Body4,"_source.test") == "get"),
+	%?assertEqual(true,lib_json:get_field(Body4,"_source.test") == "get"),
 			erlang:display("*****************4*********************"),
-	%?assertEqual(true,lib_json:get_value_field(Body5,"hits.hits[0]._source.test") == "get"),
+	%?assertEqual(true,lib_json:get_field(Body5,"hits.hits[0]._source.test") == "get"),
 	%we should add a function that checks every one in the list..
 %or with regex
 			erlang:display("*****************5*********************"),
-	?assertEqual(true,list_to_integer(lib_json:get_value_field(Body5,"hits.total")) >= 2), % Needed in case unempty elasticsearch
+	?assertEqual(true,list_to_integer(lib_json:get_field(Body5,"hits.total")) >= 2), % Needed in case unempty elasticsearch
 	
 			erlang:display("*****************6*********************"),
-	%?assertEqual(true,lib_json:get_value_field(Body6,"_source.test") == "get"),
+	%?assertEqual(true,lib_json:get_field(Body6,"_source.test") == "get"),
 			erlang:display("*****************7*********************"),
-	?assertEqual(true,list_to_integer(lib_json:get_value_field(Body6,"hits.total")) >= 2), % Needed in case unempty elasticsearch
+	?assertEqual(true,list_to_integer(lib_json:get_field(Body6,"hits.total")) >= 2), % Needed in case unempty elasticsearch
 	
 			erlang:display("*****************8*********************"),
 	?assertEqual(true,string:str(Body7,"not_found") =/= 0),
@@ -104,14 +104,14 @@ put_stream_test() ->
 	% Test update on missing doc
 	{ok, {{_Version9, 200, _ReasonPhrase9}, _Headers9, Body9}} = httpc:request(put, {"http://localhost:8000/streams/1", [], "application/json", "{\n\"test\" : \"put\"\n}"}, [], []),
 	
-			erlang:display("*****************A*********************"),?assertEqual(true,lib_json:get_value_field(Body5,"_source.private") == "false"),
-	?assertEqual(true,lib_json:get_value_field(Body5,"_source.private") =/= "true"),
-	?assertEqual(true,lib_json:get_value_field(Body6,"_source.private") =/= "false"),
-	?assertEqual(true,lib_json:get_value_field(Body6,"_source.private") == "true"),
-	?assertEqual(true,lib_json:get_value_field(Body5,"_source.test") == "put"),
-	?assertEqual(true,lib_json:get_value_field(Body5,"_source.test") =/= "get"),
-	?assertEqual(true,lib_json:get_value_field(Body6,"_source.test") == "put"),
-	?assertEqual(true,lib_json:get_value_field(Body6,"_source.test") =/= "get"),
+			erlang:display("*****************A*********************"),?assertEqual(true,lib_json:get_field(Body5,"_source.private") == "false"),
+	?assertEqual(true,lib_json:get_field(Body5,"_source.private") =/= "true"),
+	?assertEqual(true,lib_json:get_field(Body6,"_source.private") =/= "false"),
+	?assertEqual(true,lib_json:get_field(Body6,"_source.private") == "true"),
+	?assertEqual(true,lib_json:get_field(Body5,"_source.test") == "put"),
+	?assertEqual(true,lib_json:get_field(Body5,"_source.test") =/= "get"),
+	?assertEqual(true,lib_json:get_field(Body6,"_source.test") == "put"),
+	?assertEqual(true,lib_json:get_field(Body6,"_source.test") =/= "get"),
 	?assertEqual(true,get_id_value(Body7,"_id") == DocId1),
 	?assertEqual(true,get_id_value(Body8,"_id") == DocId2),
 	?assertEqual(true,string:str(Body9,"not_found") =/= 0).
