@@ -26,6 +26,22 @@
 -define(RESOURCE_URL, "http://localhost:8000/resources/").
 
 
+init_test() ->
+	Response1 = post_request(?RESOURCE_URL, "application/json", 
+							"{
+								\"suggestion\" : {           
+									\"properties\" : {      
+										\"resource_id\" : { \"type\" : \"string\" },
+										\"suggest\" : { \"type\" : \"completion\",
+											\"index_analyzer\" : \"simple\",      
+											\"search_analyzer\" : \"simple\",
+											\"payloads\" : true
+										}
+									}
+							    }
+							}").
+
+
 %% @doc
 %% Function: post_test/0
 %% Purpose: Test a post request
