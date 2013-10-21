@@ -132,7 +132,7 @@ process_post(ReqData, State) ->
 				ResId ->
 					ResAdded = add_field(UserAdded,"resource_id",ResId)
 			end,
-			case lib_json:get_value_field(ResAdded,"resource_id") == [] of
+			case lib_json:get_value_field(ResAdded,"resource_id") == undefined of
 				true -> {false, wrq:set_resp_body("\"resource_id_missing\"",ReqData), State};
 				false ->
 					case erlastic_search:index_doc(?INDEX, "stream", ResAdded) of	

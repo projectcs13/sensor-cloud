@@ -91,7 +91,7 @@ get_suggestion(ReqData, State) ->
 		Term ->
 			%forms the query
 			Query = "{                   
-    					\"test-suggest\" : {     
+    					\"testsuggest\" : {     
         					\"text\" : \""++Term++"\",
         					\"completion\" : {                    
             					\"field\" : \"suggest\",
@@ -134,14 +134,14 @@ add_suggestion(Resource, Json) ->
 	erlang:display(Polling_freq),
 	erlang:display(Weight),
 	Suggestion = "{
-		\"resource_id\" : \"" ++ ResourceId++ "\",
+		\"resource_id\" : \"" ++ undefined_to_string(ResourceId) ++ "\",
 		\"suggest\" : {
-			\"input\" : [ \"" ++ Model ++ "\" ], 
+			\"input\" : [ \"" ++ undefined_to_string(Model) ++ "\" ], 
 			\"output\" : \"" ++ get_timestamp() ++ "\",
 			\"payload\" : { 
-				\"manufacturer\" : \"" ++ Manufacturer ++ "\",
-				\"tags\" : \"" ++ Tags ++ "\",
-				\"polling_freq\" : \"" ++ Polling_freq ++ "\"
+				\"manufacturer\" : \"" ++ undefined_to_string(Manufacturer) ++ "\",
+				\"tags\" : \"" ++ undefined_to_string(Tags) ++ "\",
+				\"polling_freq\" : \"" ++ undefined_to_string(Polling_freq) ++ "\"
 			},
 			\"weight\" : " ++ integer_to_list(Weight) ++ "
 		}				
@@ -151,6 +151,14 @@ add_suggestion(Resource, Json) ->
 		{ok, _} -> 	ok
 	end.
 
+
+undefined_to_string(Text) ->
+	case Text of
+		undefined ->
+			"";
+		_ ->
+			Text
+	end.
 
 
 %% @doc

@@ -44,7 +44,7 @@ post_test() ->
  	check_returned_code(Response2, 200),
  	{ok, {_, _ ,Body}} = Response2,
 	erlang:display(Body),
-	?assertMatch({match, _}, re:run(Body, "\"payload\":{\"tag\":\"test-tag\"}", [{capture, first, list}])).
+	?assertEqual("test-tag",lib_json:get_value_field(Body, "testsuggest[0].options[0].payload.tags")).
 
 
 %% @doc
@@ -70,7 +70,7 @@ get_suggestion_test() ->
 	check_returned_code(Response2, 200),
 	{ok, {_, _ ,Body}} = Response2,
 	erlang:display(Body),
-	?assertMatch({match, _}, re:run(Body, "\"payload\":{\"brand\":\"ericsson\"}", [{capture, first, list}])).
+	?assertEqual("ericsson",lib_json:get_value_field(Body, "testsuggest[0].options[0].payload.brand")).
 
 
 %% @doc
