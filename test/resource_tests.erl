@@ -53,7 +53,7 @@ delete_resource_test() ->
 	timer:sleep(100),
 	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} =
 	httpc:request(delete, {"http://localhost:8000/resources/" ++ DocId, []}, [], []),
-	erlang:display("http://localhost:8000/resources/"++DocId++"/streams"),
+	timer:sleep(100),
 	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} =
 	httpc:request(get, {"http://localhost:8000/users/1/resources/"++DocId++"/streams", []}, [], []),
 	?assertEqual("[]",Body4),
