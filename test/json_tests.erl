@@ -69,7 +69,7 @@ get_field_test() ->
     ?assertEqual(["NickName2", "NickName3"], lib_json:get_field(?JSON1, "friend[1].nickname")),
     ?assertEqual("NickName2", lib_json:get_field(?JSON1, "friend[1].nickname[0]")),
     ?assertEqual(undefined, lib_json:get_field(?JSON1, "friend[0].nick")),
-    ?assertEqual([{"name","FriendName2"}, {"nickname",["NickName2","NickName3"]}] 
+    ?assertEqual([{"name","FriendName2"}, {"nickname",["NickName2","NickName3"]}],
 		 lib_json:get_field(?JSON2, "friend")).
 
 %% @doc
@@ -88,7 +88,8 @@ get_field_value_test() ->
     ?assertEqual(false, lib_json:get_field_value(?JSON2, "friend[*].name", "NickName3")),
     ?assertEqual("NickName3", lib_json:get_field_value(?JSON2, "friend.nickname", "NickName3")),
     ?assertEqual([{"name", "FriendName1"}, {"nickname", "NickName1"}], 
-		 lib_json:get_field_value(?JSON1, "friend[0]", Result8)),
+		 lib_json:get_field_value(?JSON1, "friend[0]", 
+					  [{"name", "FriendName1"}, {"nickname", "NickName1"}])),
     ?assertEqual(?GET_FIELD_RESULT1, lib_json:get_field_value(?JSON1, "friend", ?GET_FIELD_RESULT1)),
 
     %% This call will produce an error. Added here as an example of how 

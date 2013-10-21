@@ -77,8 +77,13 @@ get_field_help(Json, Query) ->
 %%          wildcard for values)
 %% @end
 get_field_value(Json, Query, Value) ->
+    Search = case (hd(Value),lists:last(Value)) of
+		 ($*,$*) -> {contains, Value};
+		 (_ ,$*) -> {suffix    Value};
+		 ($", _) -> {prefix,   Value}
+	     end,
     QueryParts = find_wildcard_fields(Query),
-    case field_recursion(Json, QueryParts, Value) of
+    case field_recursion(Json, QueryParts, Search) of
 	Value ->
 	    Value;
 	_ ->
