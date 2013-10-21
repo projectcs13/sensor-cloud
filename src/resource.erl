@@ -201,7 +201,7 @@ get_resource(ReqData, State) ->
 					case erlastic_search:search_limit(?INDEX, "resource", Query, 100) of % Maybe wanna take more
 						{error,Reason} -> {{halt, Reason}, ReqData, State};
 						{ok,List} -> 
-							{remove_search_part(make_to_string(json_encode(List)),false,0), ReqData, State} % Maybe need to convert
+							{"{\"hits\":"++remove_search_part(make_to_string(json_encode(List)),false,0)++"}", ReqData, State} % Maybe need to convert
 					end;
 				ResourceId ->
 				% Get specific resource

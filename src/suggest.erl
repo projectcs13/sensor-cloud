@@ -89,6 +89,8 @@ get_suggestion(ReqData, State) ->
 		undefined ->
 			{{halt, 400}, ReqData, State};
 		Term ->
+			erlang:display(Term),
+			erlang:display("AAAAAA"),
 			%forms the query
 			Query = "{                   
     					\"testsuggest\" : {     

@@ -52,29 +52,16 @@ get_stream_test() ->
 	{ok, {{_Version8, 200, _ReasonPhrase8}, _Headers8, Body8}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ DocId1, []}, [], []),
 	{ok, {{_Version9, 200, _ReasonPhrase9}, _Headers9, Body9}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ DocId2, []}, [], []),
 	
-			erlang:display("******************1********************"),
 	?assertEqual(true,lib_json:get_field(Body3,"_source.test") == "get"),
-			erlang:display("******************2********************"),
 	?assertEqual(true,lib_json:get_field(Body3,"_source.private") == "true"),
-			erlang:display("******************3********************"),
-	%?assertEqual(true,lib_json:get_field(Body4,"_source.test") == "get"),
-			erlang:display("*****************4*********************"),
-	%?assertEqual(true,lib_json:get_field(Body5,"hits.hits[0]._source.test") == "get"),
-	%we should add a function that checks every one in the list..
-%or with regex
-			erlang:display("*****************5*********************"),
+	?assertEqual(true,lib_json:field_value_exist(Body4,"hits[*]._source.test", "get")),
+	erlang:display(Body5),
+	?assertEqual(true, lib_json:field_value_exist(Body5,"hits.hits[*]._source.test", "get")),
 	?assertEqual(true,list_to_integer(lib_json:get_field(Body5,"hits.total")) >= 2), % Needed in case unempty elasticsearch
-	
-			erlang:display("*****************6*********************"),
-	%?assertEqual(true,lib_json:get_field(Body6,"_source.test") == "get"),
-			erlang:display("*****************7*********************"),
+	?assertEqual(true,lib_json:field_value_exist(Body5,"hits.hits[*]._source.test", "get")),
 	?assertEqual(true,list_to_integer(lib_json:get_field(Body6,"hits.total")) >= 2), % Needed in case unempty elasticsearch
-	
-			erlang:display("*****************8*********************"),
 	?assertEqual(true,string:str(Body7,"not_found") =/= 0),
-			erlang:display("*****************9*********************"),
 	?assertEqual(true,get_id_value(Body8,"_id") == DocId1),
-			erlang:display("*****************10********************"),
 	?assertEqual(true,get_id_value(Body9,"_id") == DocId2).
 
 %% @doc
@@ -127,7 +114,7 @@ put_stream_test() ->
 
 delete_stream_test() ->
 	% Test create
-	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [], "application/json", "{\n\"test\" : \"get\"\n, \"resource_id\" : 0}"}, [], []),
+	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [], "application/json", "{\n\"test\" : \"get\"\n, \"resource_id\" : \"0\"}"}, [], []),
 	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/users/0/resources/0/streams", [], "application/json", "{\n\"test\" : \"get\"\n}"}, [], []),
 	DocId1 = get_id_value(Body1,"_id"),
 	DocId2 = get_id_value(Body2,"_id"),
