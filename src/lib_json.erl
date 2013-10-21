@@ -76,19 +76,40 @@ get_field_help(Json, Query) ->
 %%          returns 'false' value. Handles  wildcard searches for fields (not 
 %%          wildcard for values)
 %% @end
-get_field_value(Json, Query, Value) ->
-    Search = case (hd(Value),lists:last(Value)) of
-		 ($*,$*) -> {contains, Value};
-		 (_ ,$*) -> {suffix    Value};
-		 ($", _) -> {prefix,   Value}
-	     end,
+get_field_value(Json, Query, Value) when is_list(Value)->
     QueryParts = find_wildcard_fields(Query),
-    case field_recursion(Json, QueryParts, Search) of
+    SearchFor = case {hd(Value),lists:last(Value)} of
+		 {$*,$*} -> {contains, lists:sublist(Value)};
+		 {_ ,$*} -> {suffix,   Value};
+		 {$*, _} -> {prefix,   Value};
+		 _ ->  Value
+	     end,
+    Search = field_recursion(Json, QueryParts, SearchFor),
+    case SearchFor of
+	{contains, SearchVal} ->
+	    Value;
+	{suffix,   SearchVal} ->
+	    Value;
+	{prefix, Value} ->
+	    %% case lists:prefix() of;
+		Value;
+	_ ->
+	    case Search of
+		Value ->
+		    Value;
+		_ ->
+		    undefined
+	    end
+    end;
+get_field_value(Json, Query, Value) ->
+    QueryParts = find_wildcard_fields(Query),
+    case field_recursion(Json, QueryParts, Value) of
 	Value ->
 	    Value;
 	_ ->
 	    undefined
     end.
+
 
 %% @doc
 %% Function: field_value_exists/3
