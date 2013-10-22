@@ -86,7 +86,7 @@ get_resource_test() ->
 	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(get, {"http://localhost:8000/users/0/resources/_search?test=get", []}, [], []),
 	?assertEqual("get",lib_json:get_field(Body2,"_source.test")),
 	?assertEqual("get",lib_json:get_field(Body3,"_source.test")),
-	?assertEqual(true,lib_json:field_value_exist(Body4,"hits.hits[*]._source.test","get")).
+	?assertEqual(true,lib_json:field_value_exists(Body4,"hits.hits[*]._source.test","get")).
 
 
 %% @doc

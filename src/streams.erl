@@ -286,9 +286,10 @@ get_stream(ReqData, State) ->
 					end,
 					case erlastic_search:search_limit(?INDEX, "stream", Query,200) of % Maybe wanna take more
 						{error,Reason} -> {{error, Reason}, ReqData, State};
-						{ok,List} -> 
-							{"{\"hits\":"++remove_search_part(make_to_string(json_encode(List)),false,0)++"}", ReqData, State} 
-						%%{ok,List} -> {lib_json:get_field(lib_json:encode(List), "hits.hits"), ReqData, State}
+						{ok,JsonStruct} -> 
+						         HitJson = lib_json:get_field(JsonStruct, "hits"),
+						         StrJson = lib_json:to_string(HitJson),
+						         {StrJson, ReqData, State}
 					end;
 				StreamId ->
 				% Get specific stream
@@ -301,23 +302,6 @@ get_stream(ReqData, State) ->
 				end
 	end.
 
-%% @doc
-%% Function: make_to_string/1
-%% Purpose: Used to convert JSON with binary data left to string
-%% Returns: Returns the string represented by the given list
-%% @end
-
-make_to_string([]) ->
-	[];
-make_to_string([First|Rest]) ->
-	case is_list(First) of
-		true -> make_to_string(First) ++ make_to_string(Rest);
-		false ->
-			case is_binary(First) of
-				true -> binary:bin_to_list(First) ++ make_to_string(Rest);
-				false -> [First] ++ make_to_string(Rest)
-			end
-	end.
 %% @doc
 %% Function: remove_search_part/3
 %% Purpose: Used to remove the search header of a search JSON 

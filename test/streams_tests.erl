@@ -54,11 +54,11 @@ get_stream_test() ->
 	
 	?assertEqual(true,lib_json:get_field(Body3,"_source.test") == "get"),
 	?assertEqual(true,lib_json:get_field(Body3,"_source.private") == "true"),
-	?assertEqual(true,lib_json:field_value_exist(Body4,"hits[*]._source.test", "get")),
-	?assertEqual(true, lib_json:field_value_exist(Body5,"hits.hits[*]._source.test", "get")),
-	?assertEqual(true,list_to_integer(lib_json:get_field(Body5,"hits.total")) >= 2), % Needed in case unempty elasticsearch
-	?assertEqual(true,lib_json:field_value_exist(Body5,"hits.hits[*]._source.test", "get")),
-	?assertEqual(true,list_to_integer(lib_json:get_field(Body6,"hits.total")) >= 2), % Needed in case unempty elasticsearch
+	?assertEqual(true,lib_json:field_value_exists(Body4,"hits[*]._source.test", "get")),
+	?assertEqual(true,lib_json:field_value_exists(Body5,"hits.hits[*]._source.test", "get")),
+	?assertEqual(true,lib_json:get_field(Body5,"hits.total") >= 2), % Needed in case unempty elasticsearch
+	?assertEqual(true,lib_json:field_value_exists(Body5,"hits.hits[*]._source.test", "get")),
+	?assertEqual(true,lib_json:get_field(Body6,"hits.total") >= 2), % Needed in case unempty elasticsearch
 	?assertEqual(true,string:str(Body7,"not_found") =/= 0),
 	?assertEqual(true,get_id_value(Body8,"_id") == DocId1),
 	?assertEqual(true,get_id_value(Body9,"_id") == DocId2).
