@@ -110,7 +110,7 @@ post_user_search_test() ->
 	check_returned_code(Response1, 200),
 	{ok, Rest} = Response1,
 	{_,_,A} = Rest,
-	?assertMatch({match, _}, re:run(A, "\"user_name\":\""++?TEST_NAME++"\"", [{capture, first, list}])).
+	?assertMatch({match, _}, re:run(A, "\\\"user_name\\\":\\\""++?TEST_NAME++"\\\"", [{capture, first, list}])).
 
 
 %% @doc
@@ -130,7 +130,7 @@ put_user_search_test() ->
 	{ok, Rest} = Response2,
 	{_,_,A} = Rest,
 	erlang:display(A),
-	?assertMatch({match, _}, re:run(A, "\"email\":\""++?TEST_EMAIL++"\"", [{capture, first, list}])).
+	?assertMatch({match, _}, re:run(A, "\\\"email\\\":\\\""++?TEST_EMAIL++"\\\"", [{capture, first, list}])).
 
 
 %% @doc
@@ -172,8 +172,7 @@ delete_non_existing_user_test() ->
 get_index_id(Uname) ->
 	Response1 = get_request(?USERS_URL ++ "_search?user_name="++Uname),
 	check_returned_code(Response1, 200),
-	{ok, Rest} = Response1,
-	{_,_,A} = Rest,
+	{ok, {_,_,A}} = Response1,
 	case re:run(A, "id\":\"[^\"]*", [{capture, first, list}]) of
 		{match, ["id\":\"" ++ Id]} -> Id;
 		nomatch -> {error, "no match"}
