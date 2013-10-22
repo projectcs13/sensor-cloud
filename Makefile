@@ -23,6 +23,8 @@ compile:
 get_libs:
 	@./rebar get-deps
 	@./rebar compile
+	$(MAKE) -C lib/rabbitmq-server
+	$(MAKE) -C lib/rabbitmq-erlang-client
 
 clean_emacs_vsn_files:
 	rm -rf *~
