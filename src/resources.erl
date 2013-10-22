@@ -5,7 +5,7 @@
 %%% @end
 %%% Created : 9 Oct 2013 by ProjectCS13 <>
 %%%-------------------------------------------------------------------
--module(resource).
+-module(resources).
 -compile(export_all).
 
 -include_lib("webmachine.hrl").

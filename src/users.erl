@@ -141,7 +141,7 @@ get_resources(JSON) ->
 
 delete_resources([]) -> {ok};
 delete_resources([ResourceId|Rest]) ->
-    case resource:delete_streams_with_resource_id(ResourceId) of
+    case resources:delete_streams_with_resource_id(ResourceId) of
         {error,Reason} -> {error,Reason};
         {ok} ->
             case erlastic_search:delete_doc(?INDEX,"resource", ResourceId) of

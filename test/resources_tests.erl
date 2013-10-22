@@ -7,7 +7,7 @@
 %%
 %% @end
 
--module(resource_tests).
+-module(resources_tests).
 -include_lib("eunit/include/eunit.hrl").
 
 %% @doc
