@@ -66,6 +66,7 @@ post_test() ->
 get_existing_user_test() ->
 	Id = get_index_id(?TEST_NAME),
 	?assertNotMatch("{error, \"no match\"}", Id),
+	erlang:display(?USERS_URL ++ Id),
 	Response1 = get_request(?USERS_URL ++ Id),
 	check_returned_code(Response1, 200).
 
