@@ -68,7 +68,7 @@ get_existing_user_test() ->
 -spec get_non_existing_user_test() -> ok | {error, term()}.
 get_non_existing_user_test() ->
 	Response1 = get_request(?USERS_URL ++ "non-existing-key"),
-	check_returned_code(Response1, 404).
+	check_returned_code(Response1, 500).
 
 
 %% @doc
@@ -114,7 +114,7 @@ put_user_search_test() ->
 	?assertNotMatch({error, "no match"}, Id),
 	Response1 = put_request(?USERS_URL++Id, "application/json", "{\"user_name\":\""++?TEST_NAME++"\","++
 						"\"email\":\""++ ?TEST_EMAIL++"\"}"),
-	check_returned_code(Response1, 204),
+	check_returned_code(Response1, 200),
 	Response2 = get_request(?USERS_URL ++ Id),
 	{ok, Rest} = Response2,
 	{_,_,A} = Rest,
@@ -132,10 +132,10 @@ delete_user_test() ->
 	Id = get_index_id(?TEST_NAME),
 	?assertNotMatch({error, "no match"}, Id),
 	Response1 = delete_request(?USERS_URL++Id),
-	check_returned_code(Response1, 204),
+	check_returned_code(Response1, 200),
 	
 	Response2 = get_request(?USERS_URL ++ Id),
-	check_returned_code(Response2, 404).
+	check_returned_code(Response2, 500).
 
 
 %% @doc
@@ -147,7 +147,7 @@ delete_user_test() ->
 -spec delete_non_existing_user_test() -> ok | {error, term()}.
 delete_non_existing_user_test() ->	
 	Response1 = delete_request(?USERS_URL++"non-existing-key"),
-	check_returned_code(Response1, 404).
+	check_returned_code(Response1, 500).
 
 
 %% @doc
