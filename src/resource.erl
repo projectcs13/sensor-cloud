@@ -79,20 +79,7 @@ content_types_accepted(ReqData, State) ->
 delete_resource(ReqData, State) ->
 	Id = proplists:get_value('resourceid', wrq:path_info(ReqData)),
 	erlang:display("DELETE request - check permission here"),
-	%% TODO Authentication
-	case erlastic_search:get_doc(?INDEX, "resource", Id,  [{"fields", "_source.streams"}]) of
-			{ok,{struct,Json}} ->
-				case proplists:get_value(<<"fields">>, Json) of
-					undefined -> erlang:display("NO STREAMS");
-					{struct,Fields} ->
-						Streams = proplists:get_value(<<"_source.streams">>, Fields),
-						case delete_streams(Streams) of
-							{{error,_Reason}, StreamId, _Rest} -> erlang:display("failed to delete stream " ++ StreamId);
-							ok -> erlang:display("streams have been deleted")
-						end
-				end;
-			_ -> erlang:display("Search error")
-	end,
+	delete_streams(Id),
 	case erlastic_search:delete_doc(?INDEX,"resource", Id) of
 			{error,_} -> {{halt,404}, ReqData, State};
 			{ok,List} -> {true,wrq:set_resp_body(json_encode(List),ReqData),State}
@@ -103,18 +90,40 @@ delete_resource(ReqData, State) ->
 %% Purpose: Deletes all streams in the given list, the list elements are streamIds as binaries
 %% Returns:  ok, or {{error,_Reason}, StreamId, Rest} where StreamId is the binary Id of the stream for which deletion failed
 %% @end
-delete_streams([]) -> ok;
-delete_streams([StreamId|Rest]) ->
-	case erlastic_search:delete_doc(?INDEX, "stream", binary_to_list(StreamId)) of 
-		{error,Reason} -> {{error,Reason},StreamId, Rest};
-		{ok,_List} -> delete_streams(Rest)
-	end;
-delete_streams(StreamId) ->
-	case erlastic_search:delete_doc(?INDEX, "stream", StreamId) of 
-		{error,Reason} -> {{error,Reason},StreamId, []};
-		{ok,_List} -> ok
-	end.
+
+%delete_streams([]) -> ok;
+%delete_streams([StreamId|Rest]) ->
+	%case erlastic_search:delete_doc(?INDEX, "stream", binary_to_list(StreamId)) of 
+	%	{error,Reason} -> {{error,Reason},StreamId, Rest};
+	%	{ok,_List} -> delete_streams(Rest)
+	%end;
+%delete_streams(Resourceid) ->
+%	case erlastic_search:delete_doc(?INDEX, "stream", StreamId) of 
+%		{error,Reason} -> {{error,Reason},StreamId, []};
+%		{ok,_List} -> ok
+%	end.
 	
+delete_streams(ResourceId) ->
+	case erlastic_search:search_limit(?INDEX, "stream", "\"resource_id\":\""  ++ ResourceId ++ "\"",200) of % Maybe wanna take more
+		{ok,{struct,Json}} ->
+			case proplists:get_value(<<"hits">>, Json) of
+	        	undefined -> erlang:display("NO STREAMS");
+	            {ok,Fields} -> 
+	            	erlang:display(Fields),
+	                erlang:display(is_list(Fields))
+
+	%                                                Streams = proplists:get_value(<<"_source.streams">>, Fields),
+	%                                                case delete_streams(Streams) of
+	 %                                                       {{error,_Reason}, StreamId, _Rest} -> erlang:display("failed to delete stream " ++ StreamId);
+	 %                                                       ok -> erlang:display("streams have been deleted")
+	 %                                               end
+	        end;
+	    _ -> erlang:display("Search error")
+	end.
+
+
+
+
 
 %% @doc
 %% Function: process_post/2
