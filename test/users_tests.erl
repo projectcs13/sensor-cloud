@@ -52,10 +52,10 @@ post_test() ->
 	Response1 = post_request(?USERS_URL, "application/json", 
 					 "{\"user_name\":\""++?TEST_NAME++"\"}"),
 	check_returned_code(Response1, 200),
-	timer:sleep(100), 
+	timer:sleep(1500), 
 	{ok, {_,_,Body}} = Response1,
 	erlang:display(get_index_id(?TEST_NAME)),
-	?assertNotMatch("{error, \"no match\"}", get_index_id(?TEST_NAME)).
+	?assertNotMatch({error, "no match"}, get_index_id(?TEST_NAME)).
 
 
 %% @doc
@@ -67,7 +67,7 @@ post_test() ->
 -spec get_existing_user_test() -> ok | {error, term()}.
 get_existing_user_test() ->
 	Id = get_index_id(?TEST_NAME),
-	?assertNotMatch("{error, \"no match\"}", Id),
+	?assertNotMatch({error, "no match"}, Id),
 	erlang:display(?USERS_URL ++ Id),
 	Response1 = get_request(?USERS_URL ++ Id),
 	check_returned_code(Response1, 200).
@@ -125,7 +125,7 @@ post_user_search_test() ->
 -spec put_user_search_test() -> ok | {error, term()}.
 put_user_search_test() ->	
 	Id = get_index_id(?TEST_NAME),
-	?assertNotMatch("{error, \"no match\"}", Id),
+	?assertNotMatch({error, "no match"}, Id),
 	Response1 = put_request(?USERS_URL++Id, "application/json", "{\"user_name\":\""++?TEST_NAME++"\","++
 						"\"email\":\""++ ?TEST_EMAIL++"\"}"),
 	check_returned_code(Response1, 204),
@@ -144,7 +144,7 @@ put_user_search_test() ->
 -spec delete_user_test() -> ok | {error, term()}.
 delete_user_test() ->	
 	Id = get_index_id(?TEST_NAME),
-	?assertNotMatch("{error, \"no match\"}", Id),
+	?assertNotMatch({error, "no match"}, Id),
 	Response1 = delete_request(?USERS_URL++Id),
 	check_returned_code(Response1, 204),
 	
@@ -184,10 +184,7 @@ get_index_id(Uname) ->
 		_ ->
 			Response
 	end.
-%% 	case re:run(A, "id\":\"[^\"]*", [{capture, first, list}]) of
-%% 		{match, ["id\":\"" ++ Id]} -> Id;
-%% 		nomatch -> {error, "no match"}
-%% 	end.
+
 		
 
 %% @doc
