@@ -40,7 +40,7 @@
 post_test() ->
 	Response1 = post_request(?USERS_URL, "application/json", 
 					 "{\"user_name\":\""++?TEST_NAME++"\"}"),
-	check_returned_code(Response1, 204),
+	check_returned_code(Response1, 200),
 	timer:sleep(2000),
 	?assertNotMatch({error, "no match"}, get_index_id(?TEST_NAME)).
 

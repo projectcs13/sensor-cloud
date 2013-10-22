@@ -1,5 +1,5 @@
 %%%-------------------------------------------------------------------
-%%% @author ProjectCS13 <> Andreas, Carl
+%%% @author ProjectCS13 <> Andreas, Carl, Tomas
 %%% @doc
 %%% This module handles the uri requests that are related to resources.
 %%% @end
@@ -30,7 +30,7 @@ init([]) ->
 %% @end
 -spec allowed_methods(ReqData::tuple(), State::string()) -> {list(), tuple(), string()}.
 allowed_methods(ReqData, State) ->
-	case parse_path(wrq:path(ReqData)) of
+	case api_help:parse_path(wrq:path(ReqData)) of
 		[ {"resources"}] ->
 			{['POST'], ReqData, State};
 		[ {"resources", _ResourceID}] ->
@@ -80,41 +80,69 @@ delete_resource(ReqData, State) ->
 	Id = proplists:get_value('resourceid', wrq:path_info(ReqData)),
 	erlang:display("DELETE request - check permission here"),
 	%% TODO Authentication
-	case erlastic_search:get_doc(?INDEX, "resource", Id,  [{"fields", "_source.streams"}]) of
-			{ok,{struct,Json}} ->
-				case proplists:get_value(<<"fields">>, Json) of
-					undefined -> erlang:display("NO STREAMS");
-					{struct,Fields} ->
-						Streams = proplists:get_value(<<"_source.streams">>, Fields),
-						case delete_streams(Streams) of
-							{{error,_Reason}, StreamId, _Rest} -> erlang:display("failed to delete stream " ++ StreamId);
-							ok -> erlang:display("streams have been deleted")
-						end
-				end;
-			_ -> erlang:display("Search error")
-	end,
-	case erlastic_search:delete_doc(?INDEX,"resource", Id) of
-			{error,_} -> {{halt,404}, ReqData, State};
-			{ok,List} -> {true,wrq:set_resp_body(json_encode(List),ReqData),State}
+ 	case delete_streams_with_resource_id(Id) of
+   		{error,_Reason} -> {{halt,404}, ReqData, State};
+   		{ok} ->
+			case erlastic_search:delete_doc(?INDEX,"resource", Id) of
+					{error,_} -> {{halt,404}, ReqData, State};
+					{ok,List} -> {true,wrq:set_resp_body(api_help:json_encode(List),ReqData),State}
+			end
 	end.
+
+%% @doc
+%% Function: delete_streams_with_resource_id/1
+%% Purpose: Deletes the first 500 streams associated with the given resourceid
+%% Returns:  ERROR = {error,Errorcode}
+%%			 OK = {ok}
+%% @end
+-spec delete_streams_with_resource_id(Id::string()) -> term().
+
+delete_streams_with_resource_id(Id) ->
+	Query = "resource_id:" ++ Id, 
+	case erlastic_search:search_limit(?INDEX, "stream", Query,500) of
+		{error,Reason} -> erlang:display(Reason),
+						  {error, Reason};
+						  
+		{ok,List} -> 
+			SearchRemoved = api_help:remove_search_part(api_help:make_to_string(api_help:json_encode(List)),false,0),
+			ExtraRemoved = api_help:remove_extra_info(SearchRemoved, 0),
+			case get_streams(ExtraRemoved) of
+				[] -> {ok};
+				Streams ->
+					case delete_streams(Streams) of
+						{error,Reason} -> {error, Reason};
+						{ok} -> {ok}
+					end
+			end
+	end.
+
+%% @doc
+%% Function: get_streams/1
+%% Purpose: get a list of ids of a list of JSON objects
+%% Returns:  a list with the ids of the JSON objects given
+%% @end
+-spec get_streams(JSON::string()) -> list().
+
+get_streams(JSON) ->
+	case api_help:get_value_field(JSON, "id") of
+		[] -> [];
+		Id -> [Id] ++ get_streams(api_help:remove_object(JSON,0))
+	end.
+
 
 %% @doc
 %% Function: delete_streams/1
 %% Purpose: Deletes all streams in the given list, the list elements are streamIds as binaries
 %% Returns:  ok, or {{error,_Reason}, StreamId, Rest} where StreamId is the binary Id of the stream for which deletion failed
 %% @end
-delete_streams([]) -> ok;
+
+delete_streams([]) -> {ok};
 delete_streams([StreamId|Rest]) ->
-	case erlastic_search:delete_doc(?INDEX, "stream", binary_to_list(StreamId)) of 
-		{error,Reason} -> {{error,Reason},StreamId, Rest};
-		{ok,_List} -> delete_streams(Rest)
-	end;
-delete_streams(StreamId) ->
 	case erlastic_search:delete_doc(?INDEX, "stream", StreamId) of 
-		{error,Reason} -> {{error,Reason},StreamId, []};
-		{ok,_List} -> ok
+		{error,Reason} -> {error,Reason};
+		{ok,_List} -> delete_streams(Rest)
 	end.
-	
+
 
 %% @doc
 %% Function: process_post/2
@@ -128,10 +156,17 @@ process_post(ReqData, State) ->
 	case IsSearch of 
 		false ->
 			% Create
-			{Resource,_,_} = json_handler(ReqData,State),
+			{Resource,_,_} = api_help:json_handler(ReqData,State),
 			case erlastic_search:index_doc(?INDEX,"resource",Resource) of 
-				{error, Reason} -> {false, wrq:set_resp_body(json_encode(Reason), ReqData), State};
-				{ok,List} -> 	{true, wrq:set_resp_body(json_encode(List), ReqData), State}
+				{error, Reason} -> {false, wrq:set_resp_body(api_help:json_encode(Reason), ReqData), State};
+				{ok,List} -> Json = api_help:make_to_string(api_help:json_encode(List)),
+                             Id = api_help:get_id_value(Json,"_id"),
+                             NewJson = "{\"id\" : \"" ++ Id ++ "\"}",
+                             Update = api_help:create_update(NewJson),
+                             case api_help:update_doc(?INDEX,"resource", Id, Update, []) of
+								 {error, Reason} -> {false, wrq:set_resp_body(api_help:json_encode(Reason), ReqData), State};
+                                 {ok,_} ->{true, wrq:set_resp_body(api_help:json_encode(List), ReqData), State}
+                             end
 			end;
 		true ->
 			% Search
@@ -140,18 +175,16 @@ process_post(ReqData, State) ->
 				undefined ->
 					Query = [];
 				UserId ->
-					Query = "owner:" ++ UserId
+					Query = "user_id:" ++ UserId
 			end,
-			FullQuery = lists:append(transform(URIQuery,true),Query),
+			FullQuery = lists:append(api_help:transform(URIQuery,true),Query),
 			erlang:display(FullQuery),
 			case erlastic_search:search_limit(?INDEX, "resource", FullQuery,10) of % Maybe wanna take more
 				{error,Reason} -> {{halt,Reason}, ReqData, State};
-				{ok,List} -> {true,wrq:set_resp_body(json_encode(List),ReqData),State} % May need to convert
+				{ok,List} -> {true, wrq:set_resp_body(api_help:json_encode(List), ReqData), State}
 			end
 
 	end.
-
-
 
 %% @doc
 %% Function: put_resource/2
@@ -170,12 +203,12 @@ put_resource(ReqData, State) ->
 				{error, _} ->
 					{{halt, 404}, ReqData, State};
 				{ok, _} ->
-					{UserJson,_,_} = json_handler(ReqData, State),
-					case update_doc(?INDEX,"resource", Id, UserJson, []) of 
+					{UserJson,_,_} = api_help:json_handler(ReqData, State),
+					case api_help:update_doc(?INDEX,"resource", Id, UserJson, []) of 
 						{error, Reason} -> 
 							{{halt,Reason}, ReqData, State};
 						{ok,List} ->
-							{true,wrq:set_resp_body(json_encode(List),ReqData),State}
+							{true,wrq:set_resp_body(api_help:json_encode(List),ReqData),State}
 					end
 			end
 	end.
@@ -188,7 +221,7 @@ put_resource(ReqData, State) ->
 -spec get_resource(ReqData::tuple(), State::string()) -> {list(), tuple(), string()}.
 get_resource(ReqData, State) ->
 	erlang:display("GET request"),
-	case is_search(ReqData) of
+	case api_help:is_search(ReqData) of
 		false ->
 			case proplists:get_value('resourceid', wrq:path_info(ReqData)) of
 				undefined ->
@@ -197,13 +230,13 @@ get_resource(ReqData, State) ->
 						undefined ->
 							Query = [];
 						UserId ->
-							Query = "owner:" ++ UserId
+							Query = "user_id:" ++ UserId
 					end,
 					case erlastic_search:search_limit(?INDEX, "resource", Query, 100) of % Maybe wanna take more
 						{error,Reason} -> {{halt, Reason}, ReqData, State};
-						{ok,List} -> 
-				    		erlang:display(Query),
-							{remove_search_part(make_to_string(json_encode(List)),false,0), ReqData, State} % Maybe need to convert
+						{ok,List} -> SearchRemoved = api_help:remove_search_part(api_help:make_to_string(api_help:json_encode(List)),false,0),
+                                     ExtraRemoved = api_help:remove_extra_info(SearchRemoved,0),
+                                     {ExtraRemoved, ReqData, State}
 					end;
 				ResourceId ->
 				% Get specific resource
@@ -211,25 +244,13 @@ get_resource(ReqData, State) ->
 						{error,_Msg} -> 
 								{{halt, 404}, ReqData, State};
 						{ok,List} -> 
-							     {json_encode(List), ReqData, State}
+							     {api_help:json_encode(List), ReqData, State}
 					end
 		end;
 		true ->
 			erlang:display("Processing _search"),
 				process_search(ReqData,State, get)
 	end.
-
-
-%% @doc
-%% Function: is_search/2
-%% Purpose: Returns true if it is a search POST/GET request.
-%% Returns: {true | false}
-%% @end
--spec is_search(string()) -> boolean().
-is_search(ReqData) ->
-	URIList = string:tokens(wrq:path(ReqData), "/"),
-	(string:sub_string(lists:nth(length(URIList),URIList),1,7) == "_search").
-
 
 
 %% @doc
@@ -240,89 +261,21 @@ is_search(ReqData) ->
 -spec process_search(ReqData::tuple(), State::string(), term()) ->
 		{list(), tuple(), string()}.
 process_search(ReqData, State, post) ->
-		{Json,_,_} = json_handler(ReqData,State),
+		{Json,_,_} = api_help:json_handler(ReqData,State),
 		{struct, JsonData} = mochijson2:decode(Json),
-		Query = transform(JsonData),
+		Query = api_help:transform(JsonData),
 		case erlastic_search:search_limit(?INDEX, "resource", Query, 10) of
 			{error,Reason} -> {{error,Reason}, ReqData, State};
-			{ok,List} -> {true, wrq:set_resp_body(json_encode(List),ReqData),State}
+			{ok,List} -> {true, wrq:set_resp_body(api_help:json_encode(List),ReqData),State}
 		end;
 process_search(ReqData, State, get) ->
 		TempQuery = wrq:req_qs(ReqData),
-		TransformedQuery =transform(TempQuery),
+		TransformedQuery = api_help:transform(TempQuery),
 		erlang:display("Query "++TransformedQuery),
 		case erlastic_search:search_limit(?INDEX, "resource", TransformedQuery, 10) of
 			{error,Reason} -> {{error,Reason}, ReqData, State};
-			{ok,List} -> {json_encode(List),ReqData,State} % May need to convert
+			{ok,List} -> {api_help:json_encode(List),ReqData,State} % May need to convert
 		end.
-
-
-
-%% @doc
-%% Function: json_handler/2
-%% Purpose: Handles JSON 
-%% Returns: A string with fields and values formatted in a correct way
-%% @end
--spec json_handler(tuple(), string()) -> {string(), tuple(), string()}.
-json_handler(ReqData, State) ->
-	[{Value,_ }] = mochiweb_util:parse_qs(wrq:req_body(ReqData)), 
-	erlang:display(Value),
-	%%{struct, JsonData} = mochijson2:decode(Value),
-	{Value, ReqData, State}.
-
-%% @doc
-%% Function: make_to_string/1
-%% Purpose: Used to convert JSON with binary data left to string
-%% Returns: Returns the string represented by the given list
-%% @end
-
-make_to_string([]) ->
-	[];
-make_to_string([First|Rest]) ->
-	case is_list(First) of
-		true -> make_to_string(First) ++ make_to_string(Rest);
-		false ->
-			case is_binary(First) of
-				true -> binary:bin_to_list(First) ++ make_to_string(Rest);
-				false -> [First] ++ make_to_string(Rest)
-			end
-	end.
-
-%% @doc
-%% Function: remove_search_part/3
-%% Purpose: Used to remove the search header of a search JSON 
-%% Returns: Returns the list of JSON objects return from the search
-%% @end
--spec remove_search_part(JSONString::string(),FoundLeft::boolean(),OpenBrackets::integer()) -> string().
-
-remove_search_part([],_,_) ->
-	[];
-remove_search_part([First|Rest],true,1) ->
-	case First of
-		$] ->
-			[First];
-		$[ ->
-			[First|remove_search_part(Rest,true,2)];
-		_ ->
-			[First|remove_search_part(Rest,true,1)]
-	end;
-remove_search_part([First|Rest],true,Val) ->
-  	case First of
-		$] ->
-			[First|remove_search_part(Rest,true,Val-1)];
-		$[ ->
-			[First|remove_search_part(Rest,true,Val+1)];
-		_ ->
-			[First|remove_search_part(Rest,true,Val)]
-	end;
-remove_search_part([First|Rest],false,Val) ->
-	case First of
-		$[ ->
-			[First|remove_search_part(Rest,true,1)];
-		_ ->
-			remove_search_part(Rest,false,Val)
-	end.
-
 
 %% @doc
 %% Function: id_from_path/1
@@ -337,98 +290,4 @@ id_from_path(RD) ->
             Id;
         Id -> Id
     end.
-
-%% @doc
-%% Function: parse_path/1
-%% Purpose: Parses the path into a paired list
-%% Returns: A list returned by pair()
-%% @end
--spec parse_path(string()) -> list().
-parse_path(Path) -> 
-	[_|T] = filename:split(Path),
-	pair(T).
-
-%% @doc
-%% Function: pair
-%% Purpose: Pairs the values of the input list
-%% Returns: A list with paired values
-%% @end
--spec pair(list()) -> list().
-pair([]) -> [];
-pair([A]) -> [{A}];
-pair([A,B|T]) ->
-	[{A,B}|pair(T)].
-
-
-%% @doc
-%% Function: transform/1
-%% Purpose: Transforms the query into the proper query language
-%% Returns: string()
-%% @end
--spec transform(tuple()) -> {string()}.
-transform([]) -> "";
-transform([{Field,Value}|Rest]) when is_binary(Field) andalso is_binary(Value)->
-	case Rest of
-		[] -> binary_to_list(Field) ++ ":" ++ binary_to_list(Value) ++ transform(Rest);
-		_ -> binary_to_list(Field) ++ ":" ++ binary_to_list(Value) ++ "&" ++ transform(Rest)
-	end;
-transform([{Field,Value}|Rest]) ->
-	case Rest of
-		[] -> Field ++ ":" ++ Value ++ transform(Rest);
-		_ -> Field ++ ":" ++ Value ++ "&" ++ transform(Rest)
-	end.
-
-
-%% @doc
-%% Function: transform/2
-%% Purpose: Takes the fields and values from the input list and parses them to a string
-%% Returns: A string with fields and values formatted in a correct way
-%% @end
--spec transform(list(),boolean()) -> string().
-transform([],true) -> "&";
-transform([],false) -> "";
-transform([{Field,Value}|Rest],AddAnd) ->
-	case Rest of 
-		[] -> Field ++ ":" ++ Value ++ transform(Rest,AddAnd);
-		_ -> Field ++ ":" ++ Value ++ "&" ++ transform(Rest,AddAnd)
-	end.
-
-% Taken from erlasticsearch
-
-
-%% @doc
-%% Function: update_doc/5
-%% Purpose: Used to update document in elastic search
-%% Returns: JSON response from elastic search server
-%% @end
-
-update_doc(Index, Type, Id, Json, Qs) ->
-    Id1 = mochiweb_util:quote_plus(Id),
-    ReqPath = Index ++ [$/ | Type] ++ [$/ | Id1] ++ "/_update",
-    erls_resource:post(#erls_params{}, ReqPath, [], Qs, Json, []).
-
-
-%% @doc
-%% Function: json_encode/2
-%% Purpose: To encode utf8-json WITHOUT converting multi-byte utf8-chars into ASCII '\uXXXX'.
-%% Returns: A string with fields and values formatted in a correct way
-%% @ref <https://github.com/tsloughter/erlastic_search/blob/helllamer_changes/src/erls_utils.erl>
-%% @end
-%% 
--spec json_encode(string()) -> string().
-json_encode(Data) ->
-    (mochijson2:encoder([{utf8, true}]))(Data).
-
-%% To-do : HTTP Caching support w etags / header expiration.
-
-convert_binary_to_string([]) ->
-	[];
-convert_binary_to_string([First|Rest]) ->
-	case is_binary(First) of
-		true -> binary_to_list(First) ++ convert_binary_to_string(Rest);
-		false -> case is_list(First) of
-					 true -> convert_binary_to_string(First) ++ convert_binary_to_string(Rest);
-					 false -> [First] ++ convert_binary_to_string(Rest)
-				 end
-	end.
 
