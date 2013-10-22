@@ -102,6 +102,7 @@ post_user_search_test() ->
 	?assertMatch({match, _}, re:run(A, "\"user_name\":\""++?TEST_NAME++"\"", [{capture, first, list}])).
 
 
+
 %% @doc
 %% Function: put_user_search_test/0
 %% Purpose: Checks if PUT requests work
@@ -127,15 +128,47 @@ put_user_search_test() ->
 %% Returns: ok | {error, term()}
 %%
 %% @end
--spec delete_user_test() -> ok | {error, term()}.
-delete_user_test() ->	
-	Id = get_index_id(?TEST_NAME),
-	?assertNotMatch({error, "no match"}, Id),
-	Response1 = delete_request(?USERS_URL++Id),
-	check_returned_code(Response1, 200),
+% -spec delete_user_test() -> ok | {error, term()}.
+% delete_user_test() ->	
+% 	Id = get_index_id(?TEST_NAME),
+% 	?assertNotMatch({error, "no match"}, Id),
+% 	Response1 = delete_request(?USERS_URL++Id),
+% 	erlang:display(Response1),
+% 	check_returned_code(Response1, 200),
 	
-	Response2 = get_request(?USERS_URL ++ Id),
-	check_returned_code(Response2, 500).
+% 	Response2 = get_request(?USERS_URL ++ Id),
+% 	check_returned_code(Response2, 500).
+
+%% @doc
+%% Function: delete_resource_test/0
+%% Purpose: Test the delete_resource_test function by doing some HTTP requests
+%% Returns: ok | {error, term()}
+%%
+%% Side effects: creates and deletes documents in elasticsearch
+%% @end
+delete_user_test() ->
+	% Create a resource and two streams, then delete the resource and check if streams are automatically deleted
+	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/users", [],"application/json", "{\"name\" : \"test\"}"}, [], []),
+	DocId = get_field_value(Body2,"_id"),
+	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(post, {"http://localhost:8000/resources", [],"application/json", "{\"test\" : \"delete\",\"user_id\" : \"" ++ DocId ++ "\"}"}, [], []),
+	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(post, {"http://localhost:8000/resources", [],"application/json", "{\"test\" : \"delete\",\"user_id\" : \"" ++ DocId ++ "\"}"}, [], []),
+	DocId2 = get_field_value(Body3,"_id"),
+	{ok, {{_Version5, 200, _ReasonPhrase5}, _Headers5, Body5}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"delete\",\"resource_id\" : \"" ++ DocId2 ++ "\"}"}, [], []),
+	{ok, {{_Version6, 200, _ReasonPhrase6}, _Headers6, Body6}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"delete\",\"resource_id\" : \"" ++ DocId2 ++ "\"}"}, [], []),
+	DocId3 = get_field_value(Body4,"_id"),
+	{ok, {{_Version7, 200, _ReasonPhrase7}, _Headers7, Body7}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"delete\",\"resource_id\" : \"" ++ DocId3 ++ "\"}"}, [], []),
+	{ok, {{_Version8, 200, _ReasonPhrase8}, _Headers8, Body8}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"delete\",\"resource_id\" : \"" ++ DocId3 ++ "\"}"}, [], []),
+	refresh(),
+	{ok, {{_Version9, 200, _ReasonPhrase9}, _Headers9, Body9}} = httpc:request(delete, {"http://localhost:8000/users/" ++ DocId, []}, [], []),
+	refresh(),
+	{ok, {{_Version10, 200, _ReasonPhrase10}, _Headers10, Body10}} = httpc:request(get, {"http://localhost:8000/users/"++DocId++"/resources", []}, [], []),
+	{ok, {{_Version11, 200, _ReasonPhrase11}, _Headers11, Body11}} = httpc:request(get, {"http://localhost:8000/users/"++DocId++"/resources/"++DocId2++ "/streams", []}, [], []),
+	{ok, {{_Version12, 200, _ReasonPhrase12}, _Headers12, Body12}} = httpc:request(get, {"http://localhost:8000/users/"++DocId++"/resources/"++DocId3++ "/streams", []}, [], []),
+	% Delete a resource that doesn't exist
+	?assertEqual("[]",Body10),
+	?assertEqual("[]",Body11),
+	?assertEqual("[]",Body12).
+
 
 
 %% @doc
@@ -166,7 +199,42 @@ get_index_id(Uname) ->
 		{match, ["id\":\"" ++ Id]} -> Id;
 		nomatch -> {error, "no match"}
 	end.
-		
+	
+
+%% @doc
+%% Function: get_value_field/2
+%% Purpose: Return the value of a certain field in the given JSON string.
+%% Returns: Return the value of the specified field, if it exists, 
+%%          otherwise returns the empty string.
+%% @end
+-spec get_field_value(String::string(),Field::string()) -> string().
+
+get_field_value(JSONString,Field) ->
+	Tokens = string:tokens(JSONString, ","),
+	ResourceField = find_field(Tokens,Field),
+	case ResourceField of 
+		[] -> "";
+		_ -> FieldValue = string:tokens(ResourceField,":"),
+			 api_help:remove_special_characters(lists:nth(length(FieldValue),FieldValue),false)
+	end.
+
+%% @doc
+%% Function: find_field/2
+%% Purpose: Help function to find the first string containing the given string
+%%          in the list.
+%% Returns: The first string containing the given string
+%%          in the list, the empty string if non exists.
+%% @end
+-spec find_field(List::list(),Field::string()) -> string().
+
+find_field([],_) ->
+	[];
+
+find_field([First|Rest],Field) ->
+	case string:str(First,Field) of
+		0 -> find_field(Rest,Field);
+		_ -> First
+	end.	
 
 %% @doc
 %% Function: check_returned_code/0

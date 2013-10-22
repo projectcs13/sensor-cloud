@@ -30,11 +30,14 @@ init_test() ->
 %% Side effects: creates documents in elasticsearch
 %% @end
 process_post_test() ->
-	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/resources", [],"application/json", "{\"test\" : \"post\",\"user_id\" : 0,\"streams\" : 1}"}, [], []),
-	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/users/0/resources/", [],"application/json", "{\"test\" : \"post\",\"user_id\" : 0,\"streams\" : 1}"}, [], []),
+	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/resources", [],"application/json", "{\"test\" : \"post\",\"user_id\" : \"abc\"}"}, [], []),
+	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/users/abc/resources/", [],"application/json", "{\"test\" : \"post\",\"user_id\" : \"abc\"}"}, [], []),
 	refresh(),
 	?assertEqual("true",get_field_value(Body1,"ok")),	
-	?assertEqual("true",get_field_value(Body2,"ok")).
+	?assertEqual("true",get_field_value(Body2,"ok")),
+	%Clean up after the test
+	httpc:request(delete, {"http://localhost:8000/resources/" ++ get_id_value(Body1,"_id"), []}, [], []),
+	httpc:request(delete, {"http://localhost:8000/resources/" ++ get_id_value(Body2,"_id"), []}, [], []).
 
 %% @doc
 %% Function: delete_resource_test/0
@@ -48,8 +51,8 @@ delete_resource_test() ->
 	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/resources", [],"application/json", "{\"test\" : \"delete\",\"user_id\" : 1}"}, [], []),
 	DocId = get_id_value(Body2,"_id"),
 	refresh(),
-	httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"delete\",\"user_id\" : 1, \"resource_id\" : \"" ++ DocId ++ "\"}"}, [], []),
-	httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"delete\",\"user_id\" : 1, \"resource_id\" : \"" ++ DocId ++ "\"}"}, [], []),
+	httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"delete\",\"user_id\" : \"1\", \"resource_id\" : \"" ++ DocId ++ "\"}"}, [], []),
+	httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"delete\",\"user_id\" : \"1\", \"resource_id\" : \"" ++ DocId ++ "\"}"}, [], []),
 	refresh(),
 	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(delete, {"http://localhost:8000/resources/" ++ DocId, []}, [], []),
 	refresh(),
@@ -69,16 +72,18 @@ delete_resource_test() ->
 %% Side effects: creates and updatess a document in elasticsearch
 %% @end
 put_resource_test() ->
-	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/resources/", [],"application/json", "{\"test\" : \"put1\",\"user_id\" : 0,\"streams\" : 1}"}, [], []),
+	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/resources/", [],"application/json", "{\"test\" : \"put1\",\"user_id\" : \"0\"}"}, [], []),
 	refresh(),
 	DocId = get_id_value(Body1,"_id"),
-	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(put, {"http://localhost:8000/resources/" ++ DocId , [],"application/json", "{\"doc\" :{\"test\" : \"put2\",\"user_id\" : 0,\"streams\" : 1}}"}, [], []),
+	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(put, {"http://localhost:8000/resources/" ++ DocId , [],"application/json", "{\"test\" : \"put2\",\"user_id\" : \"0\"}"}, [], []),
 	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(get, {"http://localhost:8000/resources/" ++ DocId, []}, [], []),
 	%Try to put to a resource that doesn't exist
-	{ok, {{_Version4, 500, _ReasonPhrase4}, _Headers4, _Body4}} = httpc:request(put, {"http://localhost:8000/resources/1", [],"application/json", "{\"doc\" :{\"test\" : \"put2\",\"user_id\" : 0,\"streams\" : 1}}"}, [], []),
+	{ok, {{_Version4, 500, _ReasonPhrase4}, _Headers4, _Body4}} = httpc:request(put, {"http://localhost:8000/resources/derp", [],"application/json", "{\"test\" : \"put3\",\"user_id\" : \"0\"}"}, [], []),
 	?assertEqual("true",get_field_value(Body1,"ok")),
 	?assertEqual("true",get_field_value(Body2,"ok")),
-	?assertEqual("put2",get_field_value(Body3,"test")).
+	?assertEqual("put2",get_field_value(Body3,"test")),
+	%Clean up
+	httpc:request(delete, {"http://localhost:8000/resources/" ++ get_id_value(Body1,"_id"), []}, [], []).
 	
 %% @doc
 %% Function: get_resource_test/0
@@ -98,7 +103,9 @@ get_resource_test() ->
 	{ok, {{_Version5, 500, _ReasonPhrase5}, _Headers5, _Body5}} = httpc:request(get, {"http://localhost:8000/resources/1" ++ DocId, []}, [], []),
 	?assertEqual("get",get_field_value(Body2,"test")),
 	?assertEqual("get",get_field_value(Body3,"test")),
-	?assertEqual("get",get_field_value(Body4,"test")).
+	?assertEqual("get",get_field_value(Body4,"test")),
+	%Clean up
+	httpc:request(delete, {"http://localhost:8000/resources/" ++ get_id_value(Body1,"_id"), []}, [], []).
 
 %% @doc
 %% Function: get_value_field/2
