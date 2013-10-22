@@ -79,11 +79,15 @@ content_types_accepted(ReqData, State) ->
 delete_resource(ReqData, State) ->
 	Id = proplists:get_value('resourceid', wrq:path_info(ReqData)),
 	erlang:display("DELETE request - check permission here"),
-	delete_streams(Id),
-	case erlastic_search:delete_doc(?INDEX,"resource", Id) of
-			{error,_} -> {{halt,404}, ReqData, State};
-			{ok,List} -> {true,wrq:set_resp_body(api_help:json_encode(List),ReqData),State}
-	end.
+	%% TODO Authentication
+-  case delete_streams_with_resource_id(Id) of
+-    {error,Reason} -> {{halt,404}, ReqData, State};
+-    {ok} ->
+		case erlastic_search:delete_doc(?INDEX,"resource", Id) of
+				{error,_} -> {{halt,404}, ReqData, State};
+				{ok,List} -> {true,wrq:set_resp_body(api_help:json_encode(List),ReqData),State}
+		end
+-  end.
 
 %% @doc
 %% Function: delete_streams_with_resource_id/1
