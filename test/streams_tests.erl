@@ -40,7 +40,7 @@ get_stream_test() ->
 	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"get\",\"user_id\" : 0, \"resource_id\" : \"asdascvsr213sda\", \"private\" : \"true\"}"}, [], []),
 	DocId1 = get_id_value(Body1,"_id"),
 	DocId2 = get_id_value(Body2,"_id"),
-	timer:sleep(800),
+	refresh(),
 	% Test get and search
 	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(get, {"http://localhost:8000/streams/" ++ DocId1, []}, [], []),
 	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(get, {"http://localhost:8000/users/0/resources/asdascvsr213sda/streams", []}, [], []),
@@ -78,10 +78,12 @@ put_stream_test() ->
 	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/users/0/resources/asdascvsr213sda/streams", [], "application/json", "{\n\"test\" : \"get\",\n\"private\" : \"true\"\n}}"}, [], []),
 	DocId1 = get_id_value(Body1,"_id"),
 	DocId2 = get_id_value(Body2,"_id"),
+	refresh(),
 	% Test update
 	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, _Body3}} = httpc:request(put, {"http://localhost:8000/streams/" ++ DocId1, [], "application/json", "{\n\"test\" : \"put\",\n\"private\" : \"false\"\n}"}, [], []),
 	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, _Body4}} = httpc:request(put, {"http://localhost:8000/streams/" ++ DocId2, [], "application/json", "{\n\"test\" : \"put\"\n}"}, [], []),
 	% Test get
+
 	{ok, {{_Version5, 200, _ReasonPhrase5}, _Headers5, Body5}} = httpc:request(get, {"http://localhost:8000/streams/" ++ DocId1, []}, [], []),
 	{ok, {{_Version6, 200, _ReasonPhrase6}, _Headers6, Body6}} = httpc:request(get, {"http://localhost:8000/streams/" ++ DocId2, []}, [], []),
 	% Test delete
@@ -116,6 +118,7 @@ delete_stream_test() ->
 	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/users/0/resources/asdascvsr213sda/streams", [], "application/json", "{\n\"test\" : \"get\"\n}"}, [], []),
 	DocId1 = get_id_value(Body1,"_id"),
 	DocId2 = get_id_value(Body2,"_id"),
+	refresh(),
 	% Test delete
 	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ DocId1, []}, [], []),
 	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ DocId2, []}, [], []),
@@ -226,3 +229,12 @@ get_id_value(String,Field) ->
 		false ->
 			string:substr(RestOfString, 1,NextBracket-2)
 	end.
+
+
+	%% @doc
+%% Function: refresh/0
+%% Purpose: Help function to find refresh the sensorcloud index
+%% Returns: {ok/error, {{Version, Code, Reason}, Headers, Body}}
+%% @end
+refresh() ->
+	httpc:request(post, {"http://localhost:9200/sensorcloud/_refresh", [],"", ""}, [], []).
