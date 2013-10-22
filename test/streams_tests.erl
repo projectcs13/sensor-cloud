@@ -36,15 +36,15 @@ inets:start().
 
 get_stream_test() ->
 	% Test create
-	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"get\",\"owner_id\" : 0, \"resource_id\" : 0, \"private\" : \"true\"}"}, [], []),
-	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"get\",\"owner_id\" : 0, \"resource_id\" : 0, \"private\" : \"true\"}"}, [], []),
+	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"get\",\"user_id\" : 0, \"resource_id\" : \"asdascvsr213sda\", \"private\" : \"true\"}"}, [], []),
+	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"get\",\"user_id\" : 0, \"resource_id\" : \"asdascvsr213sda\", \"private\" : \"true\"}"}, [], []),
 	DocId1 = get_id_value(Body1,"_id"),
 	DocId2 = get_id_value(Body2,"_id"),
 	timer:sleep(800),
 	% Test get and search
 	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(get, {"http://localhost:8000/streams/" ++ DocId1, []}, [], []),
-	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(get, {"http://localhost:8000/users/0/resources/0/streams", []}, [], []),
-	{ok, {{_Version5, 200, _ReasonPhrase5}, _Headers5, Body5}} = httpc:request(get, {"http://localhost:8000/streams/_search?owner_id=0", []}, [], []),
+	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(get, {"http://localhost:8000/users/0/resources/asdascvsr213sda/streams", []}, [], []),
+	{ok, {{_Version5, 200, _ReasonPhrase5}, _Headers5, Body5}} = httpc:request(get, {"http://localhost:8000/streams/_search?user_id=0", []}, [], []),
 	{ok, {{_Version6, 200, _ReasonPhrase6}, _Headers6, Body6}} = httpc:request(post, {"http://localhost:8000/streams/_search?test=get",[],"",""}, [], []),
 	% Test get for missing index
 	{ok, {{_Version7, 200, _ReasonPhrase7}, _Headers7, Body7}} = httpc:request(get, {"http://localhost:8000/streams/1", []}, [], []),
@@ -74,7 +74,7 @@ get_stream_test() ->
 
 put_stream_test() ->
 	% Test create
-	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [], "application/json", "{\n\"test\" : \"get\",\n\"private\" : \"true\"\n, \"resource_id\" : 0}"}, [], []),
+	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [], "application/json", "{\n\"test\" : \"get\",\n\"private\" : \"true\"\n, \"resource_id\" : \"asdascvsr213sda\"}"}, [], []),
 	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/users/0/resources/asdascvsr213sda/streams", [], "application/json", "{\n\"test\" : \"get\",\n\"private\" : \"true\"\n}}"}, [], []),
 	DocId1 = get_id_value(Body1,"_id"),
 	DocId2 = get_id_value(Body2,"_id"),
@@ -112,8 +112,8 @@ put_stream_test() ->
 
 delete_stream_test() ->
 	% Test create
-	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [], "application/json", "{\n\"test\" : \"get\"\n, \"resource_id\" : 0}"}, [], []),
-	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/users/0/resources/0/streams", [], "application/json", "{\n\"test\" : \"get\"\n}"}, [], []),
+	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [], "application/json", "{\n\"test\" : \"get\"\n, \"resource_id\" : \"asdascvsr213sda\"}"}, [], []),
+	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/users/0/resources/asdascvsr213sda/streams", [], "application/json", "{\n\"test\" : \"get\"\n}"}, [], []),
 	DocId1 = get_id_value(Body1,"_id"),
 	DocId2 = get_id_value(Body2,"_id"),
 	% Test delete
