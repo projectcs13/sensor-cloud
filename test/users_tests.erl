@@ -54,7 +54,7 @@ post_test() ->
 	check_returned_code(Response1, 200),
 	timer:sleep(100), 
 	{ok, {_,_,Body}} = Response1,
-	erlang:display(Body),
+	erlang:display(get_index_id(?TEST_NAME)),
 	?assertNotMatch("{error, \"no match\"}", get_index_id(?TEST_NAME)).
 
 
@@ -175,10 +175,19 @@ get_index_id(Uname) ->
 	Response1 = get_request(?USERS_URL ++ "_search?user_name="++Uname),
 	check_returned_code(Response1, 200),
 	{ok, {_,_,A}} = Response1,
-	case re:run(A, "id\":\"[^\"]*", [{capture, first, list}]) of
-		{match, ["id\":\"" ++ Id]} -> Id;
-		nomatch -> {error, "no match"}
+	erlang:display("Term "),
+	erlang:display(A),
+	Response = lib_json:get_field(A, "hits.hits[0]._id"),
+	case Response of
+		undefined ->
+			{error, "no match"};
+		_ ->
+			Response
 	end.
+%% 	case re:run(A, "id\":\"[^\"]*", [{capture, first, list}]) of
+%% 		{match, ["id\":\"" ++ Id]} -> Id;
+%% 		nomatch -> {error, "no match"}
+%% 	end.
 		
 
 %% @doc
