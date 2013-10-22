@@ -94,7 +94,7 @@ get_user_search_test() ->
 	check_returned_code(Response1, 200),
 	{ok, Rest} = Response1,
 	{_,_,A} = Rest,
-	?assertMatch({match, _}, re:run(A, "\"user_name\":\""++?TEST_NAME++"\"", [{capture, first, list}])).
+	?assertEqual(true, lib_json:field_value_exist(A, "hits.hits[*]._source.user_name", ?TEST_NAME)).
 
 
 %% @doc
@@ -110,7 +110,7 @@ post_user_search_test() ->
 	check_returned_code(Response1, 200),
 	{ok, Rest} = Response1,
 	{_,_,A} = Rest,
-	?assertMatch({match, _}, re:run(A, "\\\"user_name\\\":\\\""++?TEST_NAME++"\\\"", [{capture, first, list}])).
+	?assertEqual(true, lib_json:field_value_exist(A, "hits.hits[*]._source.user_name", ?TEST_NAME)).
 
 
 %% @doc
@@ -129,8 +129,7 @@ put_user_search_test() ->
 	Response2 = get_request(?USERS_URL ++ Id),
 	{ok, Rest} = Response2,
 	{_,_,A} = Rest,
-	erlang:display(A),
-	?assertMatch({match, _}, re:run(A, "\\\"email\\\":\\\""++?TEST_EMAIL++"\\\"", [{capture, first, list}])).
+	?assertEqual(true, lib_json:field_value_exist(A, "email", ?TEST_EMAIL)).
 
 
 %% @doc
