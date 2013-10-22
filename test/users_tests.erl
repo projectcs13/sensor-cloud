@@ -53,6 +53,8 @@ post_test() ->
 					 "{\"user_name\":\""++?TEST_NAME++"\"}"),
 	check_returned_code(Response1, 200),
 	timer:sleep(100), 
+	{ok, {_,_,Body}} = Response1,
+	erlang:display(Body),
 	?assertNotMatch("{error, \"no match\"}", get_index_id(?TEST_NAME)).
 
 
