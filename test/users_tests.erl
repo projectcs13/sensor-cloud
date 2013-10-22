@@ -190,10 +190,8 @@ check_returned_code(Response, Code) ->
 	?assertMatch({_, Code, _}, Header).
 
 
-post_request(URL, ContentType, Body) -> request(post, {URL, [], ContentType, Body}).
-put_request(URL, ContentType, Body) -> request(put, {URL, [], ContentType, Body}).
-get_request(URL)                     -> request(get,  {URL, []}).
-delete_request(URL)                     -> request(delete,  {URL, []}).
+post_request(URL, ContentType, Body) -> httpc:request(post, {URL, [], ContentType, Body}, [], []).
+put_request(URL, ContentType, Body) -> httpc:request(put, {URL, [], ContentType, Body}, [], []).
+get_request(URL)                     -> httpc:request(get,  {URL, []}, [], []).
+delete_request(URL)                     -> httpc:request(delete,  {URL, []}, [], []).
 
-request(Method, Request) ->
-    httpc:request(Method, Request, [], []).
