@@ -35,8 +35,8 @@ init([]) ->
 %% @end
 
 allowed_methods(ReqData, State) ->
-	erlang:display(parse_path(wrq:path(ReqData))),
-	case parse_path(wrq:path(ReqData)) of
+	erlang:display(api_help:parse_path(wrq:path(ReqData))),
+	case api_help:parse_path(wrq:path(ReqData)) of
 		[{"users", _UserID}, {"groups", "_search"}] ->
 		  	{['GET'], ReqData, State};
 		[{"users", _UserID}, {"groups", _GroupID}] ->
@@ -82,7 +82,7 @@ content_types_accepted(ReqData, State) ->
 
 
 put_handler(ReqData, State) ->
-	case parse_path(wrq:path(ReqData)) of
+	case api_help:parse_path(wrq:path(ReqData)) of
 		[{"users", UserID}, {"groups", "_search"}] ->
 			case exists(?INDEX, ?USER, UserID) of
 				true -> put_group(ReqData, State);
@@ -121,52 +121,11 @@ put_handler(ReqData, State) ->
 
 put_group(ReqData, State) ->
 	GroupId = proplists:get_value(group, wrq:path_info(ReqData)),
-	{ReqBody,_,_} = json_handler(ReqData,State),
-	Update = create_update(ReqBody),
-	case update_doc(?INDEX, ?GROUP, GroupId, Update) of 
+	{ReqBody,_,_} = api_help:json_handler(ReqData,State),
+	Update = api_help:create_update(ReqBody),
+	case api_help:update_doc(?INDEX, ?GROUP, GroupId, Update) of 
 		{error,Reason} -> {{error,Reason}, ReqData, State};
 		{ok,List} -> {List,ReqData,State}
 	end.
 
-%%% @doc
-%% Function: json_handler/2
-%% Purpose : Returns the request body of a request.
-%% Returns : {Value, ReqData, State}
-
-json_handler(ReqData, State) ->
-	[{Value,_ }] = mochiweb_util:parse_qs(wrq:req_body(ReqData)), 
-	%%{struct, JsonData} = mochijson2:decode(Value),
-	{Value, ReqData, State}.
-
-%% @doc
-%% Function : create_update/1
-%% Purpose : creates a string that is used to update a field in a document.
-%% Returns String :: list()
-create_update(Stream) ->
-	"{\n\"doc\" : " ++ Stream ++ "\n}".
-
-%% @doc
-%% Function : parse_path/1
-%% Purpose : Pairs elements in a list 'Path' so that the first element pairs with the second.
-%% Returns : [] | [{Element}] | [{A1, A2}...{An-1, An}]
-parse_path(Path) -> 
-	[_|T] = filename:split(Path),
-	pair(T).
-
-%% @doc
-%% Function : pair/2
-%% Purpose : Helper function for parse path, 
-%% 			 Pairs elements in a list 'Path' so that the first element pairs with the second.
-%% Returns : [] | [{Element}] | [{A1, A2}...{An-1, An}]
-pair([]) -> [];
-pair([A]) -> [{A}];
-pair([A,B|T]) ->
-	[{A,B}|pair(T)].
-
-update_doc(Index, Type, Id, Mochijson) ->
-    update_doc(Index, Type, Id, Mochijson, []).
-update_doc(Index, Type, Id, Mochijson, Qs) ->
-    Id1 = mochiweb_util:quote_plus(Id),
-    ReqPath = Index ++ [$/ | Type] ++ [$/ | Id1] ++ "/_update",
-    erls_resource:post(#erls_params{}, ReqPath, [], Qs, Mochijson, []).
 

@@ -13,7 +13,7 @@
 		 delete_resource/2, process_post/2, put_stream/2, get_stream/2]).
 
 
--include_lib("erlastic_search.hrl").
+
 -include("webmachine.hrl").
 
 
@@ -36,7 +36,7 @@ init([]) ->
 -spec allowed_methods(ReqData::term(),State::term()) -> {list(), term(), term()}.
 
 allowed_methods(ReqData, State) ->
-	case parse_path(wrq:path(ReqData)) of
+	case api_help:parse_path(wrq:path(ReqData)) of
 		[{"streams", "_search"}] ->
 			{['POST', 'GET'], ReqData, State};
 		[{"users", _UserID}, {"streams","_search"}] ->
@@ -86,8 +86,6 @@ content_types_accepted(ReqData, State) ->
 
 
 
-
-
 %% @doc
 %% Function: delete_resource/2
 %% Purpose: Used to handle DELETE requests by deleting the stream in elastic search
@@ -99,8 +97,8 @@ content_types_accepted(ReqData, State) ->
 delete_resource(ReqData, State) ->
 	Id = proplists:get_value('stream', wrq:path_info(ReqData)),
 	case erlastic_search:delete_doc(?INDEX,"stream", Id) of
-			{error,Reason} -> {false, wrq:set_resp_body(json_encode(Reason),ReqData), State};
-			{ok,List} -> {true,wrq:set_resp_body(json_encode(List),ReqData),State}
+			{error,Reason} -> {false, wrq:set_resp_body(lib_json:encode(Reason),ReqData), State};
+			{ok,List} -> {true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
 	end.
 
 
@@ -113,27 +111,34 @@ delete_resource(ReqData, State) ->
 -spec process_post(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 
 process_post(ReqData, State) ->
-	case is_search(ReqData) of 
+	case api_help:is_search(ReqData) of 
 		false ->
-			{Stream,_,_} = json_handler(ReqData, State),
+			{Stream,_,_} = api_help:json_handler(ReqData, State),
 			case proplists:get_value('user', wrq:path_info(ReqData)) of
 				undefined ->
 					UserAdded = Stream;
 				UserId ->
-					UserAdded = add_field(Stream,"owner_id",UserId)
+					UserAdded = api_help:add_field(Stream,"user_id",UserId)
 			end,
 			case proplists:get_value('res', wrq:path_info(ReqData)) of
 				undefined ->
 					ResAdded = UserAdded;
 				ResId ->
-					ResAdded = add_field(UserAdded,"resource_id",ResId)
+					ResAdded = api_help:add_field(UserAdded,"resource_id",ResId)
 			end,
 			case lib_json:get_field(ResAdded,"resource_id") == undefined of
 				true -> {false, wrq:set_resp_body("\"resource_id_missing\"",ReqData), State};
 				false ->
 					case erlastic_search:index_doc(?INDEX, "stream", ResAdded) of	
-						{error, Reason} -> {false, wrq:set_resp_body(json_encode(Reason),ReqData), State};
-						{ok,List} -> {true, wrq:set_resp_body(json_encode(List),ReqData), State}
+						{error, Reason} -> {false, wrq:set_resp_body(lib_json:encode(Reason),ReqData), State};
+						{ok,List} -> Json = api_help:make_to_string(lib_json:encode(List)),
+                                     Id = api_help:get_id_value(Json,"_id"),
+                                     NewJson = "{\"id\" : \"" ++ Id ++ "\"}",
+                                     Update = api_help:create_update(NewJson),
+                                     case api_help:update_doc(?INDEX,"stream", Id, Update, []) of
+										 {error, Reason} -> {false, wrq:set_resp_body(lib_json:encode(Reason), ReqData), State};
+                                         {ok,_} ->{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
+                                     end
 					end
 			end;
 		true ->
@@ -156,7 +161,7 @@ process_search_post(ReqData, State) ->
 			UserQuery = [],
 			UserDef = false;
 		UserId ->
-			UserQuery = "owner_id:" ++ UserId,
+			UserQuery = "user_id:" ++ UserId,
 			UserDef = true
 		end,
 	case proplists:get_value('res', wrq:path_info(ReqData)) of
@@ -174,10 +179,10 @@ process_search_post(ReqData, State) ->
 					 false -> Query = ""
 				 end
 	end,
-	FullQuery = lists:append(transform(URIQuery,ResDef or UserDef),Query),
+	FullQuery = lists:append(api_help:transform(URIQuery,ResDef or UserDef),Query),
 	case erlastic_search:search_limit(?INDEX, "stream", FullQuery,200) of % Maybe wanna take more
-		{error,Reason} -> {false, wrq:set_resp_body(json_encode(Reason),ReqData), State};
-		{ok,List} -> {true,wrq:set_resp_body(json_encode(List),ReqData),State} 
+		{error,Reason} -> {false, wrq:set_resp_body(lib_json:encode(Reason),ReqData), State};
+		{ok,List} -> {true,wrq:set_resp_body(lib_json:encode(List),ReqData),State} 
 	end.
 
 
@@ -196,7 +201,7 @@ process_search_get(ReqData, State) ->
 			UserQuery = [],
 			UserDef = false;
 		UserId ->
-			UserQuery = "owner_id:" ++ UserId,
+			UserQuery = "user_id:" ++ UserId,
 			UserDef = true
 		end,
 	case proplists:get_value('res', wrq:path_info(ReqData)) of
@@ -214,10 +219,10 @@ process_search_get(ReqData, State) ->
 					 false -> Query = ""
 				 end
 	end,
-	FullQuery = lists:append(transform(URIQuery,ResDef or UserDef),Query),
+	FullQuery = lists:append(api_help:transform(URIQuery,ResDef or UserDef),Query),
 	case erlastic_search:search_limit(?INDEX, "stream", FullQuery,200) of % Maybe wanna take more
 		{error,Reason} -> {Reason, ReqData, State};
-		{ok,List} -> {json_encode(List),ReqData,State} 
+		{ok,List} -> {lib_json:encode(List),ReqData,State} 
 	end.
 
 
@@ -231,14 +236,12 @@ process_search_get(ReqData, State) ->
 
 put_stream(ReqData, State) ->
 	StreamId = proplists:get_value('stream', wrq:path_info(ReqData)),
-	{Stream,_,_} = json_handler(ReqData,State),
-	Update = create_update(Stream),
-	case update_doc(?INDEX, "stream", StreamId, Update) of 
-		{error,Reason} -> {false, wrq:set_resp_body(json_encode(Reason),ReqData), State};
-		{ok,List} -> {true,wrq:set_resp_body(json_encode(List),ReqData),State}
+	{Stream,_,_} = api_help:json_handler(ReqData,State),
+	Update = api_help:create_update(Stream),
+	case api_help:update_doc(?INDEX, "stream", StreamId, Update) of 
+		{error,Reason} -> {false, wrq:set_resp_body(lib_json:encode(Reason),ReqData), State};
+		{ok,List} -> {true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
 	end.
-
-
 
 
 
@@ -255,7 +258,7 @@ put_stream(ReqData, State) ->
 
 
 get_stream(ReqData, State) ->
-	case is_search(ReqData) of
+	case api_help:is_search(ReqData) of
 		true -> process_search_get(ReqData,State);
 		false ->
 			case proplists:get_value('stream', wrq:path_info(ReqData)) of
@@ -266,7 +269,7 @@ get_stream(ReqData, State) ->
 							UserQuery = [],
 							UserDef = false;
 						UserId ->
-							UserQuery = "owner_id:" ++ UserId,
+							UserQuery = "user_id:" ++ UserId,
 							UserDef = true
 					end,
 					case proplists:get_value('res', wrq:path_info(ReqData)) of
@@ -286,194 +289,19 @@ get_stream(ReqData, State) ->
 					end,
 					case erlastic_search:search_limit(?INDEX, "stream", Query,200) of % Maybe wanna take more
 						{error,Reason} -> {{error, Reason}, ReqData, State};
-						{ok,List} -> 
-							{"{\"hits\":"++remove_search_part(make_to_string(json_encode(List)),false,0)++"}", ReqData, State} 
-						%%{ok,List} -> {lib_json:get_field(lib_json:encode(List), "hits.hits"), ReqData, State}
+						{ok,List} -> SearchRemoved = api_help:remove_search_part(api_help:make_to_string(lib_json:encode(List)),false,0),
+                                     ExtraRemoved = api_help:remove_extra_info(SearchRemoved,0),
+                                     {"{\"hits\":"++ExtraRemoved++"}", ReqData, State} 
 					end;
 				StreamId ->
 				% Get specific stream
 					case erlastic_search:get_doc(?INDEX, "stream", StreamId) of 
 						{error, Msg} -> 
-							{json_encode(Msg), ReqData, State};
+							{lib_json:encode(Msg), ReqData, State};
 						{ok,List} -> 
-					     	{json_encode(List), ReqData, State}
+					     	ExtraRemoved = api_help:remove_extra_info(api_help:make_to_string(lib_json:encode(List)),0),
+                            {ExtraRemoved, ReqData, State}
 					end
 				end
 	end.
-
-%% @doc
-%% Function: make_to_string/1
-%% Purpose: Used to convert JSON with binary data left to string
-%% Returns: Returns the string represented by the given list
-%% @end
-
-make_to_string([]) ->
-	[];
-make_to_string([First|Rest]) ->
-	case is_list(First) of
-		true -> make_to_string(First) ++ make_to_string(Rest);
-		false ->
-			case is_binary(First) of
-				true -> binary:bin_to_list(First) ++ make_to_string(Rest);
-				false -> [First] ++ make_to_string(Rest)
-			end
-	end.
-%% @doc
-%% Function: remove_search_part/3
-%% Purpose: Used to remove the search header of a search JSON 
-%% Returns: Returns the list of JSON objects return from the search
-%% @end
--spec remove_search_part(JSONString::string(),FoundLeft::boolean(),OpenBrackets::integer()) -> string().
-
-remove_search_part([],_,_) ->
-	[];
-remove_search_part([First|Rest],true,1) ->
-	case First of
-		$] ->
-			[First];
-		$[ ->
-			[First|remove_search_part(Rest,true,2)];
-		_ ->
-			[First|remove_search_part(Rest,true,1)]
-	end;
-remove_search_part([First|Rest],true,Val) ->
-  	case First of
-		$] ->
-			[First|remove_search_part(Rest,true,Val-1)];
-		$[ ->
-			[First|remove_search_part(Rest,true,Val+1)];
-		_ ->
-			[First|remove_search_part(Rest,true,Val)]
-	end;
-remove_search_part([First|Rest],false,Val) ->
-	case First of
-		$[ ->
-			[First|remove_search_part(Rest,true,1)];
-		_ ->
-			remove_search_part(Rest,false,Val)
-	end.
-
-%% @doc
-%% Function: is_search/1
-%% Purpose: Used to deiced if the URI specify a search
-%% Returns: True if URI specify a search, false otherwise
-%% @end
--spec is_search(ReqData::term()) -> boolean().
-
-is_search(ReqData) ->
-	URIList = string:tokens(wrq:path(ReqData), "/"),
-	IsSearch = (string:sub_string(lists:nth(length(URIList),URIList),1,7) == "_search").
-
-%% @doc
-%% Function: json_handler/2
-%% Purpose: Used to get the json object from the request
-%% Returns: {Json,ReqData,State}
-%% @end
--spec json_handler(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
-
-json_handler(ReqData, State) ->
-	[{Value,_ }] = mochiweb_util:parse_qs(wrq:req_body(ReqData)), 
-	{Value, ReqData, State}.
-
-%% @doc
-%% Function: create_update/1
-%% Purpose: Used to create the update document sent to erlastic search
-%% Returns: The update document to send to erlasticsearch
-%% @end
--spec create_update(Stream::string()) -> string().
-
-create_update(Stream) ->
-	"{\n\"doc\" : " ++ Stream ++ "\n}".
-
-%% @doc
-%% Function: add_field/3
-%% Purpose: Used to add a new field to the given string representation of
-%%          of a JSON object, the field will be FieldName : FieldValue
-%% Returns: The string representation of the JSON object with the new field
-%% @end
--spec add_field(Stream::string(),FieldName::string(),FieldValue::term()) -> string().
-
-add_field(Stream,FieldName,FieldValue) ->
-	case is_integer(FieldValue) of
-		true ->
-			string:substr(Stream,1,length(Stream)-1) ++ ",\n\"" ++ FieldName ++ "\" : " ++ FieldValue ++ "\n}";
-		false ->
-			string:substr(Stream,1,length(Stream)-1) ++ ",\n\"" ++ FieldName ++ "\" : \"" ++ FieldValue ++ "\"\n}"
-	end.
-			
-
-%% @doc
-%% Function: parse_path/1
-%% Purpose: Used to parse the URI path
-%% Returns: The parsed URI path as a list
-%% @end
--spec parse_path(Path::file:name_all()) -> list().
-
-parse_path(Path) -> 
-	[_|T] = filename:split(Path),
-	pair(T).
-
-%% @doc
-%% Function: pair/1
-%% Purpose: Used to create a new list of tuples where each 
-%%          2 elements are paired
-%% Returns: The paired list
-%% @end
--spec pair(PathList::list()) -> list().
-
-pair([]) -> [];
-pair([A]) -> [{A}];
-pair([A,B|T]) ->
-	[{A,B}|pair(T)].
-
-%% @doc
-%% Function: transform/2
-%% Purpose: Used to create the query for search, expects more fields
-%% if AddAnd euqal to true
-%% Returns: The query string from given from the list
-%% were the list will be {Field,Value} tuples
-%% @end
--spec transform(QueryList::list(),AddAnd::boolean()) -> list().
-
-transform([],true) -> "&";
-transform([],false) -> "";
-transform([{Field,Value}|Rest],AddAnd) ->
-	case Rest of 
-		[] -> Field ++ ":" ++ Value ++ transform(Rest,AddAnd);
-		_ -> Field ++ ":" ++ Value ++ "&" ++ transform(Rest,AddAnd)
-	end.
-
-%% @doc
-%% Function: json_encode/1
-%% Purpose: Used to transform the given data to json
-%% Returns: JSON that is created
-%% @end
-
-% Taken from erlasticsearch
-json_encode(Data) ->
-    (mochijson2:encoder([{utf8, true}]))(Data).
-
-%% @doc
-%% Function: update_doc/4
-%% Purpose: Used to update document in elastic search
-%% Returns: JSON response from elastic search server
-%% @end
-
-% Taken from erlasticsearch and modified to not encode
-update_doc(Index, Type, Id, Mochijson) ->
-    update_doc(Index, Type, Id, Mochijson, []).
-
-%% @doc
-%% Function: update_doc/5
-%% Purpose: Used to update document in elastic search
-%% Returns: JSON response from elastic search server
-%% @end
-
-% Taken from erlasticsearch and modified to not encode
-update_doc(Index, Type, Id, Json, Qs) ->
-    Id1 = mochiweb_util:quote_plus(Id),
-    ReqPath = Index ++ [$/ | Type] ++ [$/ | Id1] ++ "/_update",
-    erls_resource:post(#erls_params{}, ReqPath, [], Qs, Json, []).
-
-
 

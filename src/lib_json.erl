@@ -27,7 +27,10 @@ encode(Json) when is_list(Json) ->
     JsonObj = mochijson2:decode(Json),
     mochijson2:encode(JsonObj);
 encode(Json) when is_tuple(Json)->
+    mochijson2:encode(Json);
+encode(Json)->
     mochijson2:encode(Json).
+
 
 %% @doc
 %% Function: decode/1

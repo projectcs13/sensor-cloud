@@ -52,8 +52,7 @@ post_test() ->
 	Response1 = post_request(?USERS_URL, "application/json", 
 					 "{\"user_name\":\""++?TEST_NAME++"\"}"),
 	check_returned_code(Response1, 200),
-	timer:sleep(1500), 
-	{ok, {_,_,Body}} = Response1,
+	refresh(),
 	?assertNotMatch({error, "no match"}, get_index_id(?TEST_NAME)).
 
 
@@ -195,8 +194,18 @@ check_returned_code(Response, Code) ->
 	?assertMatch({_, Code, _}, Header).
 
 
-post_request(URL, ContentType, Body) -> httpc:request(post, {URL, [], ContentType, Body}, [], []).
-put_request(URL, ContentType, Body) -> httpc:request(put, {URL, [], ContentType, Body}, [], []).
-get_request(URL)                     -> httpc:request(get,  {URL, []}, [], []).
-delete_request(URL)                     -> httpc:request(delete,  {URL, []}, [], []).
 
+post_request(URL, ContentType, Body) -> request(post, {URL, [], ContentType, Body}).
+put_request(URL, ContentType, Body) -> request(put, {URL, [], ContentType, Body}).
+get_request(URL)                     -> request(get,  {URL, []}).
+delete_request(URL)                     -> request(delete,  {URL, []}).
+
+request(Method, Request) ->
+    httpc:request(Method, Request, [], []).
+
+%% Function: refresh/0
+%% Purpose: Help function to find refresh the sensorcloud index
+%% Returns: {ok/error, {{Version, Code, Reason}, Headers, Body}}
+%% @end
+refresh() ->
+	httpc:request(post, {"http://localhost:9200/sensorcloud/_refresh", [],"", ""}, [], []).
