@@ -135,14 +135,7 @@ process_post(ReqData, State) ->
 				false ->
 					case erlastic_search:index_doc(?INDEX, "stream", ResAdded) of	
 						{error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ api_help:json_encode(Reason) ++ "\"}", ReqData), State};
-						{ok,List} -> Json = api_help:make_to_string(api_help:json_encode(List)),
-                                     Id = api_help:get_id_value(Json,"_id"),
-                                     NewJson = "{\"id\" : \"" ++ Id ++ "\"}",
-                                     Update = api_help:create_update(NewJson),
-                                     case api_help:update_doc(?INDEX,"stream", Id, Update, []) of
-										 {error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ api_help:json_encode(Reason) ++ "\"}", ReqData), State};
-                                         {ok,_} -> {true, wrq:set_resp_body(api_help:json_encode(List), ReqData), State}
-                                     end
+						{ok,List} -> {true, wrq:set_resp_body(api_help:json_encode(List), ReqData), State}
 					end
 			end;
 		true ->
@@ -300,8 +293,9 @@ get_stream(ReqData, State) ->
 					case erlastic_search:search_limit(?INDEX, "stream", Query,200) of % Maybe wanna take more
 						{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ api_help:json_encode(Reason) ++ "\"}", ReqData), State};
 						{ok,List} -> SearchRemoved = api_help:remove_search_part(api_help:make_to_string(api_help:json_encode(List)),false,0),
-                                     ExtraRemoved = api_help:remove_extra_info(SearchRemoved,0),
-                                     {ExtraRemoved, ReqData, State} 
+                                     ExtraRemoved = api_help:remove_extra_and_add_id(SearchRemoved),
+									 ReturnJson = "{\"hits\":[" ++ ExtraRemoved ++ "]}",
+                                     {ReturnJson, ReqData, State} 
 					end;
 				StreamId ->
 				% Get specific stream
@@ -309,7 +303,7 @@ get_stream(ReqData, State) ->
 						{error, Reason} -> 
 							{{error,Reason}, wrq:set_resp_body("{\"error\":\""++ api_help:json_encode(Reason) ++ "\"}", ReqData), State};
 						{ok,List} -> 
-					     	ExtraRemoved = api_help:remove_extra_info(api_help:make_to_string(api_help:json_encode(List)),0),
+					     	ExtraRemoved = api_help:remove_extra_and_add_id(api_help:make_to_string(api_help:json_encode(List))),
                             {ExtraRemoved, ReqData, State}
 					end
 				end

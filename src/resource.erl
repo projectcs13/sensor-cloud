@@ -104,7 +104,7 @@ delete_streams_with_resource_id(Id) ->
 			{error,Reason};
 		{ok,List} -> 
 			SearchRemoved = api_help:remove_search_part(api_help:make_to_string(api_help:json_encode(List)),false,0),
-			ExtraRemoved = api_help:remove_extra_info(SearchRemoved, 0),
+			ExtraRemoved = "[" ++ api_help:remove_extra_and_add_id(SearchRemoved) ++ "]",
 			case get_streams(ExtraRemoved) of
 				[] -> {ok};
 				Streams ->
@@ -158,14 +158,7 @@ process_post(ReqData, State) ->
 			{Resource,_,_} = api_help:json_handler(ReqData,State),
 			case erlastic_search:index_doc(?INDEX,"resource",Resource) of 
 				{error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ api_help:json_encode(Reason) ++ "\"}", ReqData), State};
-				{ok,List} -> Json = api_help:make_to_string(api_help:json_encode(List)),
-                             Id = api_help:get_id_value(Json,"_id"),
-                             NewJson = "{\"id\" : \"" ++ Id ++ "\"}",
-                             Update = api_help:create_update(NewJson),
-                             case api_help:update_doc(?INDEX,"resource", Id, Update, []) of
-								 {error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ api_help:json_encode(Reason) ++ "\"}", ReqData), State};
-                                 {ok,_} ->{true, wrq:set_resp_body(api_help:json_encode(List), ReqData), State}
-                             end
+				{ok,List} -> {true, wrq:set_resp_body(api_help:json_encode(List), ReqData), State}
 			end;
 		true ->
 			% Search
@@ -232,8 +225,9 @@ get_resource(ReqData, State) ->
 					case erlastic_search:search_limit(?INDEX, "resource", Query, 100) of % Maybe wanna take more
 						{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ api_help:json_encode(Reason) ++ "\"}", ReqData), State};
 						{ok,List} -> SearchRemoved = api_help:remove_search_part(api_help:make_to_string(api_help:json_encode(List)),false,0),
-                                     ExtraRemoved = api_help:remove_extra_info(SearchRemoved,0),
-                                     {ExtraRemoved, ReqData, State}
+                                     ExtraRemoved = api_help:remove_extra_and_add_id(SearchRemoved),
+                                     ReturnJson = "{\"hits\":[" ++ ExtraRemoved ++ "]}",
+                                     {ReturnJson, ReqData, State} 
 					end;
 				ResourceId ->
 				% Get specific resource
@@ -241,7 +235,7 @@ get_resource(ReqData, State) ->
 						{error,Reason} -> 
 								{{error,Reason}, wrq:set_resp_body("{\"error\":\""++ api_help:json_encode(Reason) ++ "\"}", ReqData), State};
 						{ok,List} -> 
-							     {api_help:json_encode(List), ReqData, State}
+							     {api_help:remove_extra_and_add_id(api_help:make_to_string(api_help:json_encode(List))), ReqData, State}
 					end
 		end;
 		true ->
