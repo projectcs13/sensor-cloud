@@ -104,7 +104,7 @@ delete_streams_with_resource_id(Id) ->
 			{error,Reason};
 		{ok,List} -> 
 			SearchRemoved = api_help:remove_search_part(api_help:make_to_string(api_help:json_encode(List)),false,0),
-			ExtraRemoved = api_help:remove_extra_info(SearchRemoved, 0),
+			ExtraRemoved = "[" ++ api_help:remove_extra_and_add_id(SearchRemoved) ++ "]",
 			case get_streams(ExtraRemoved) of
 				[] -> {ok};
 				Streams ->
@@ -234,7 +234,7 @@ get_resource(ReqData, State) ->
 						{error,Reason} -> 
 								{{error,Reason}, wrq:set_resp_body("{\"error\":\""++ api_help:json_encode(Reason) ++ "\"}", ReqData), State};
 						{ok,List} -> 
-							     {api_help:remove_extra_and_add_id(api_help:json_encode(List)), ReqData, State}
+							     {api_help:remove_extra_and_add_id(api_help:make_to_string(api_help:json_encode(List))), ReqData, State}
 					end
 		end;
 		true ->

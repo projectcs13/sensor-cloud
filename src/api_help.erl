@@ -322,7 +322,6 @@ remove_extra_info([First|Rest],Val) ->
 remove_extra_and_add_id([]) ->
 	[];
 remove_extra_and_add_id(Json) ->
-	erlang:display(Json),
 	Id = get_value_field(Json,"_id"),
 	case Id of
 		[] -> [];
