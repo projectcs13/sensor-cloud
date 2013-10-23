@@ -84,13 +84,71 @@ content_types_accepted(ReqData, State) ->
 -spec delete_resource(ReqData::tuple(), State::string()) -> {string(), tuple(), string()}.
 delete_resource(ReqData, State) ->
         Id = id_from_path(ReqData),
-        case erlastic_search:delete_doc(?INDEX,"user", Id) of
-                {error, Reason} -> 
-                    {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ api_help:json_encode(Reason) ++ "\"}", ReqData), State};              
-                {ok, List} -> 
-                    {true, wrq:set_resp_body(api_help:json_encode(List), ReqData), State}
-        end.
+        case delete_resources_with_user_id(Id) of
+        {error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ api_help:json_encode(Reason) ++ "\"}", ReqData), State};
+        {ok} ->
+            case erlastic_search:delete_doc(?INDEX,"user", Id) of
+                    {error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ api_help:json_encode(Reason) ++ "\"}", ReqData), State};
+                    {ok,List} -> {true,wrq:set_resp_body(api_help:json_encode(List),ReqData),State}
+            end
+    end.
 
+
+%% @doc
+%% Function: delete_resources_with_resource_id/1
+%% Purpose: Deletes the first 500 resources associated with the given user_id
+%% Returns:  ERROR = {error,Errorcode}
+%%           OK = {ok}
+%% @end
+-spec delete_resources_with_user_id(Id::string()) -> term().
+delete_resources_with_user_id(Id) ->
+    Query = "user_id:" ++ Id, 
+    case erlastic_search:search_limit(?INDEX, "resource", Query,500) of
+        {error,Reason} -> 
+            {error,Reason};
+        {ok,List} -> 
+            SearchRemoved = api_help:remove_search_part(api_help:make_to_string(api_help:json_encode(List)),false,0),
+            ExtraRemoved = "[" ++ api_help:remove_extra_and_add_id(SearchRemoved) ++ "]",
+            case get_resources(ExtraRemoved) of
+                [] -> {ok};
+                Streams ->
+                    case delete_resources(Streams) of
+                        {error,Reason} -> {error, Reason};
+                        {ok} -> {ok}
+                    end
+            end
+    end.
+
+%% @doc
+%% Function: get_resources/1
+%% Purpose: get a list of ids of a list of JSON objects
+%% Returns:  a list with the ids of the JSON objects given
+%% @end
+-spec get_resources(JSON::string()) -> list().
+
+get_resources(JSON) ->
+    case api_help:get_value_field(JSON, "id") of
+        [] -> [];
+        Id -> [Id] ++ get_resources(api_help:remove_object(JSON,0))
+    end.
+
+
+%% @doc
+%% Function: delete_resources/1
+%% Purpose: Deletes all resources in the given list, the list elements are resource_ids as binaries
+%% Returns:  ok, or {error,Reason} where StreamId is the binary Id of the stream for which deletion failed
+%% @end
+
+delete_resources([]) -> {ok};
+delete_resources([ResourceId|Rest]) ->
+    case resources:delete_streams_with_resource_id(ResourceId) of
+        {error,Reason} -> {error,Reason};
+        {ok} ->
+            case erlastic_search:delete_doc(?INDEX,"resource", ResourceId) of
+                    {error,Reason} -> {error,Reason};
+                    {ok,_List} -> delete_resources(Rest)
+            end
+    end.
 
 %% @doc
 %% Function: put_user/2

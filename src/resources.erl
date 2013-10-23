@@ -5,7 +5,7 @@
 %%% @end
 %%% Created : 9 Oct 2013 by ProjectCS13 <>
 %%%-------------------------------------------------------------------
--module(resource).
+-module(resources).
 -compile(export_all).
 
 -include_lib("webmachine.hrl").
@@ -193,7 +193,8 @@ put_resource(ReqData, State) ->
 			{{error,Reason}, wrq:set_resp_body("{\"error\":\""++ api_help:json_encode(Reason) ++ "\"}", ReqData), State};
 		{ok, _} ->
 			{UserJson,_,_} = api_help:json_handler(ReqData, State),
-			case api_help:update_doc(?INDEX,"resource", Id, UserJson, []) of 
+			UpdatedJson = api_help:create_update(UserJson),
+			case api_help:update_doc(?INDEX,"resource", Id, UpdatedJson, []) of 
 				{error, Reason} -> 
 					{{error,Reason}, wrq:set_resp_body("{\"error\":\""++ api_help:json_encode(Reason) ++ "\"}", ReqData), State};
 				{ok,List} ->
