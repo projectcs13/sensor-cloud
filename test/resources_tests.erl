@@ -61,7 +61,7 @@ delete_resource_test() ->
 	{ok, {{_Version5, 500, _ReasonPhrase5}, _Headers5, _Body5}} = httpc:request(delete, {"http://localhost:8000/resources/1", []}, [], []),
 	?assertEqual("true",get_field_value(Body2,"ok")),
 	?assertEqual("true",get_field_value(Body3,"ok")),
-	?assertEqual("[]",Body4).
+	?assertEqual("{\"hits\":[]}",Body4).
 
 	
 %% @doc
