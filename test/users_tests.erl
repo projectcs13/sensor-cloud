@@ -29,7 +29,7 @@
 
 
 %% @doc
-%% Function: inti_test/0
+%% Function: init_test/0
 %% Purpose: Used to start the inets to be able to do HTTP requests
 %% Returns: ok | {error, term()}
 %%
@@ -203,6 +203,7 @@ delete_request(URL)                     -> request(delete,  {URL, []}).
 request(Method, Request) ->
     httpc:request(Method, Request, [], []).
 
+%% @doc
 %% Function: refresh/0
 %% Purpose: Help function to find refresh the sensorcloud index
 %% Returns: {ok/error, {{Version, Code, Reason}, Headers, Body}}
