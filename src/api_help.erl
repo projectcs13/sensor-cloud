@@ -286,7 +286,7 @@ remove_special_characters([First|Rest],true) ->
 %% @doc
 %% Function: remove_extra_info/3
 %% Purpose: Used to remove the extra info for documents
-%% Returns: Returns the list of JSON objects return from the search
+%% Returns: Returns the list of JSON objects without the extra info
 %% @end
 -spec remove_extra_info(JSONString::string(),OpenBrackets::integer()) -> string().
 
@@ -318,6 +318,14 @@ remove_extra_info([First|Rest],Val) ->
                         [First|remove_extra_info(Rest,Val)]
         end.
 
+
+%% @doc
+%% Function: remove_extra_and_add_id/1
+%% Purpose: Used to remove the extra info for documents and add the id as
+%%          a field in the document
+%% Returns: Returns the list of JSON objects with id and without extra info
+%% @end
+-spec remove_extra_and_add_id(JSONString::string()) -> string().
 
 remove_extra_and_add_id([]) ->
 	[];
