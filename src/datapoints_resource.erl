@@ -7,9 +7,12 @@
 
 -module(datapoints_resource).
 -export([init/1, allowed_methods/2, content_types_provided/2,
-		 		process_post/2, get_datapoint/2]).
+				process_post/2, get_datapoint/2]).
 
 -include("webmachine.hrl").
+
+-include_lib("amqp_client.hrl").
+-include_lib("pubsub.hrl").
 
 -define(INDEX, "sensorcloud").
 
@@ -187,14 +190,14 @@ transform([{Field,Value}|Rest]) ->
 %% @end
 -spec id_from_path(string()) -> string().
 id_from_path(RD) ->
-    case wrq:path_info(id, RD) of
-        undefined ->
-            case string:tokens(wrq:disp_path(RD), "/") of
+	case wrq:path_info(id, RD) of
+		undefined ->
+			case string:tokens(wrq:disp_path(RD), "/") of
 					["streams", Id, "data"] -> Id;
 					_ -> undefined
 			end;
-        Id -> Id
-    end.
+		Id -> Id
+	end.
 
 
 %% @doc
@@ -228,4 +231,4 @@ pair([A,B|T]) ->
 %% @end
 -spec json_encode(string()) -> string().
 json_encode(Data) ->
-    (mochijson2:encoder([{utf8, true}]))(Data).
+	(mochijson2:encoder([{utf8, true}]))(Data).

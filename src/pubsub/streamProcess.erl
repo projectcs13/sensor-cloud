@@ -6,7 +6,7 @@
 -export([create/2]).
 
 create(StreamId, ResourceId) ->
-	%% Exchange name strings
+	%% Exchange name binarys
 	ResourceExchange = list_to_binary("resources."++ResourceId),
 	StreamExchange = list_to_binary("streams."++StreamId),
 
@@ -24,13 +24,13 @@ create(StreamId, ResourceId) ->
 	amqp_channel:call(ChannelIn, #'queue.bind'{exchange = ResourceExchange, queue = QueueIn}),
 
 	%% Subscribe to INPUT queue
-	io:format(" [*] Waiting for data. To exit press CTRL+C~n"),
 	amqp_channel:subscribe(ChannelIn, #'basic.consume'{queue = QueueIn, no_ack = true}, self()),
 	receive
 		#'basic.consume_ok'{} -> ok
 	end,
 
 	%% Declare OUTPUT exchange
+	io:format("Listening to ~p~n", [binary_to_list(ResourceExchange)]),
 	amqp_channel:call(ChannelOut, #'exchange.declare'{exchange = StreamExchange, type = <<"fanout">>}),
 	
 	loop(ChannelIn, {ChannelOut, StreamExchange}).
@@ -48,7 +48,7 @@ loop(ChannelIn, {ChannelOut, StreamExchange}) ->
 				{post, JSON} ->
 					io:format("POST: ~p~n", [JSON]);
 					%% Parse JSON
-					
+
 					%% Store value
 
 					%% Propagete
@@ -63,7 +63,10 @@ loop(ChannelIn, {ChannelOut, StreamExchange}) ->
 					%% Store value
 
 					%% Propagete
-					send(ChannelOut, StreamExchange, Body)
+					send(ChannelOut, StreamExchange, Body),
+					io:format("DATAPOINT: {\"timestamp\" : ~p, \"value\" : ~p} -> ~p~n", [TimeStamp, Value, StreamExchange]);
+				_ ->
+					io:format("CRAP! We are getting CRAP!~n")
 			end,
 			%% Recurse
 			loop(ChannelIn, {ChannelOut, StreamExchange})
@@ -75,7 +78,6 @@ send(Channel, Exchange, Message) ->
 					  #amqp_msg{payload = Message}).
 
 %% HOW TO SEND TO A STREAMPROCESS
-%% SEND INTO PUB SUB!
 %			StreamId = "1",
 %			ResourceId = "1",
 %			Exchange = list_to_binary("resources."++ResourceId),
