@@ -13,9 +13,7 @@
 		 delete_resource/2, process_post/2, put_stream/2, get_stream/2]).
 
 
-
 -include("webmachine.hrl").
-
 
 -define(INDEX, "sensorcloud").
 
@@ -86,8 +84,6 @@ content_types_accepted(ReqData, State) ->
 
 
 
-
-
 %% @doc
 %% Function: delete_resource/2
 %% Purpose: Used to handle DELETE requests by deleting the stream in elastic search
@@ -98,10 +94,9 @@ content_types_accepted(ReqData, State) ->
 
 delete_resource(ReqData, State) ->
 	Id = proplists:get_value('stream', wrq:path_info(ReqData)),
-	erlang:display("delete request"),
 	case erlastic_search:delete_doc(?INDEX,"stream", Id) of
-			{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ api_help:json_encode(Reason) ++ "\"}", ReqData), State};
-			{ok,List} -> {true,wrq:set_resp_body(api_help:json_encode(List),ReqData),State}
+			{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
+			{ok,List} -> {true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
 	end.
 
 
@@ -116,7 +111,6 @@ delete_resource(ReqData, State) ->
 process_post(ReqData, State) ->
 	case api_help:is_search(ReqData) of 
 		false ->
-			erlang:display("Create request"),
 			{Stream,_,_} = api_help:json_handler(ReqData, State),
 			case proplists:get_value('user', wrq:path_info(ReqData)) of
 				undefined ->
@@ -130,12 +124,12 @@ process_post(ReqData, State) ->
 				ResId ->
 					ResAdded = api_help:add_field(UserAdded,"resource_id",ResId)
 			end,
-			case api_help:get_value_field(ResAdded,"resource_id") == [] of
+			case lib_json:get_field(ResAdded,"resource_id") == undefined of
 				true -> {false, wrq:set_resp_body("\"resource_id_missing\"",ReqData), State};
 				false ->
 					case erlastic_search:index_doc(?INDEX, "stream", ResAdded) of	
-						{error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ api_help:json_encode(Reason) ++ "\"}", ReqData), State};
-						{ok,List} -> {true, wrq:set_resp_body(api_help:json_encode(List), ReqData), State}
+						{error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
+						{ok,List} -> {true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
 					end
 			end;
 		true ->
@@ -152,7 +146,6 @@ process_post(ReqData, State) ->
 -spec process_search_post(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 
 process_search_post(ReqData, State) ->
-	erlang:display("search request"),
 	URIQuery = wrq:req_qs(ReqData),
 	case proplists:get_value('user', wrq:path_info(ReqData)) of
 		undefined ->
@@ -179,8 +172,8 @@ process_search_post(ReqData, State) ->
 	end,
 	FullQuery = lists:append(api_help:transform(URIQuery,ResDef or UserDef),Query),
 	case erlastic_search:search_limit(?INDEX, "stream", FullQuery,200) of % Maybe wanna take more
-		{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ api_help:json_encode(Reason) ++ "\"}", ReqData), State};
-		{ok,List} -> {true,wrq:set_resp_body(api_help:json_encode(List),ReqData),State} 
+		{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
+		{ok,List} -> {true,wrq:set_resp_body(lib_json:encode(List),ReqData),State} 
 	end.
 
 
@@ -193,7 +186,6 @@ process_search_post(ReqData, State) ->
 -spec process_search_get(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 
 process_search_get(ReqData, State) ->
-	erlang:display("search request"),
 	URIQuery = wrq:req_qs(ReqData),
 	case proplists:get_value('user', wrq:path_info(ReqData)) of
 		undefined ->
@@ -220,8 +212,8 @@ process_search_get(ReqData, State) ->
 	end,
 	FullQuery = lists:append(api_help:transform(URIQuery,ResDef or UserDef),Query),
 	case erlastic_search:search_limit(?INDEX, "stream", FullQuery,200) of % Maybe wanna take more
-		{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ api_help:json_encode(Reason) ++ "\"}", ReqData), State};
-		{ok,List} -> {api_help:json_encode(List),ReqData,State} 
+		{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
+		{ok,List} -> {lib_json:encode(List),ReqData,State} 
 	end.
 
 
@@ -234,16 +226,13 @@ process_search_get(ReqData, State) ->
 -spec put_stream(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 
 put_stream(ReqData, State) ->
-	erlang:display("update request"),
 	StreamId = proplists:get_value('stream', wrq:path_info(ReqData)),
 	{Stream,_,_} = api_help:json_handler(ReqData,State),
 	Update = api_help:create_update(Stream),
 	case api_help:update_doc(?INDEX, "stream", StreamId, Update) of 
-		{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ api_help:json_encode(Reason) ++ "\"}", ReqData), State};
-		{ok,List} -> {true,wrq:set_resp_body(api_help:json_encode(List),ReqData),State}
+		{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
+		{ok,List} -> {true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
 	end.
-
-
 
 
 
@@ -263,7 +252,6 @@ get_stream(ReqData, State) ->
 	case api_help:is_search(ReqData) of
 		true -> process_search_get(ReqData,State);
 		false ->
-			erlang:display("fetch request"),
 			case proplists:get_value('stream', wrq:path_info(ReqData)) of
 				undefined ->
 				% List streams based on URI
@@ -291,20 +279,25 @@ get_stream(ReqData, State) ->
 								 end
 					end,
 					case erlastic_search:search_limit(?INDEX, "stream", Query,200) of % Maybe wanna take more
-						{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ api_help:json_encode(Reason) ++ "\"}", ReqData), State};
-						{ok,List} -> SearchRemoved = api_help:remove_search_part(api_help:make_to_string(api_help:json_encode(List)),false,0),
-                                     ExtraRemoved = api_help:remove_extra_and_add_id(SearchRemoved),
-									 ReturnJson = "{\"hits\":[" ++ ExtraRemoved ++ "]}",
-                                     {ReturnJson, ReqData, State} 
+						{error,Reason} -> 
+						      {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ api_help:json_encode(Reason) ++ "\"}", ReqData), State};
+					        {ok,JsonStruct} ->
+                                                       HitsList = lib_json:get_field(JsonStruct, "hits.hits"),
+						       HitsAttr = lib_json:set_attr(hits, HitsList), 
+						       FinalJson = lib_json:to_string(HitsAttr),
+						       {FinalJson, ReqData, State} 
 					end;
 				StreamId ->
 				% Get specific stream
 					case erlastic_search:get_doc(?INDEX, "stream", StreamId) of 
 						{error, Reason} -> 
-							{{error,Reason}, wrq:set_resp_body("{\"error\":\""++ api_help:json_encode(Reason) ++ "\"}", ReqData), State};
-						{ok,List} -> 
-					     	ExtraRemoved = api_help:remove_extra_and_add_id(api_help:make_to_string(api_help:json_encode(List))),
-                            {ExtraRemoved, ReqData, State}
+							{{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
+						{ok,JsonStruct} -> 
+	  					        JsonStr = lib_json:to_string(JsonStruct),
+						        StreamId  = lib_json:get_field(JsonStruct, "_id"),
+						        SourceJson  = lib_json:get_field(JsonStruct, "_source"),
+						        FinalJson = lib_json:add_field(SourceJson, "id", StreamId),
+						        {FinalJson, ReqData, State}
 					end
 				end
 	end.

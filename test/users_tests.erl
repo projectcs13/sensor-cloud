@@ -28,6 +28,17 @@
 -define(TEST_EMAIL, "weird_test_email").
 
 
+%% @doc
+%% Function: init_test/0
+%% Purpose: Used to start the inets to be able to do HTTP requests
+%% Returns: ok | {error, term()}
+%%
+%% Side effects: Start inets
+%% @end
+-spec init_test() -> ok | {error, term()}.
+
+init_test() ->
+	inets:start().
 
 
 %% @doc
@@ -83,7 +94,7 @@ get_user_search_test() ->
 	check_returned_code(Response1, 200),
 	{ok, Rest} = Response1,
 	{_,_,A} = Rest,
-	?assertMatch({match, _}, re:run(A, "\"user_name\":\""++?TEST_NAME++"\"", [{capture, first, list}])).
+	?assertEqual(true, lib_json:field_value_exists(A, "hits.hits[*]._source.user_name", ?TEST_NAME)).
 
 
 %% @doc
@@ -99,7 +110,7 @@ post_user_search_test() ->
 	check_returned_code(Response1, 200),
 	{ok, Rest} = Response1,
 	{_,_,A} = Rest,
-	?assertMatch({match, _}, re:run(A, "\"user_name\":\""++?TEST_NAME++"\"", [{capture, first, list}])).
+	?assertEqual(true, lib_json:field_value_exists(A, "hits.hits[*]._source.user_name", ?TEST_NAME)).
 
 
 %% @doc
@@ -118,7 +129,7 @@ put_user_search_test() ->
 	Response2 = get_request(?USERS_URL ++ Id),
 	{ok, Rest} = Response2,
 	{_,_,A} = Rest,
-	?assertMatch({match, _}, re:run(A, "\"email\":\""++?TEST_EMAIL++"\"", [{capture, first, list}])).
+	?assertEqual(true, lib_json:field_value_exists(A, "email", ?TEST_EMAIL)).
 
 
 %% @doc
@@ -160,12 +171,15 @@ delete_non_existing_user_test() ->
 get_index_id(Uname) ->
 	Response1 = get_request(?USERS_URL ++ "_search?user_name="++Uname),
 	check_returned_code(Response1, 200),
-	{ok, Rest} = Response1,
-	{_,_,A} = Rest,
-	case re:run(A, "id\":\"[^\"]*", [{capture, first, list}]) of
-		{match, ["id\":\"" ++ Id]} -> Id;
-		nomatch -> {error, "no match"}
+	{ok, {_,_,A}} = Response1,
+	Response = lib_json:get_field(A, "hits.hits[0]._id"),
+	case Response of
+		undefined ->
+			{error, "no match"};
+		_ ->
+			Response
 	end.
+
 		
 
 %% @doc
@@ -178,6 +192,7 @@ check_returned_code(Response, Code) ->
 	{ok, Rest} = Response,
 	{Header,_,_} = Rest,
 	?assertMatch({_, Code, _}, Header).
+
 
 
 post_request(URL, ContentType, Body) -> request(post, {URL, [], ContentType, Body}).
