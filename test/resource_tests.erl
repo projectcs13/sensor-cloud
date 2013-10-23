@@ -34,15 +34,13 @@ process_search_post_test() ->
         {ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/resources", [],"application/json", "{\"test\" : \"post\",\"owner\" : 7,\"streams\" : 1}"}, [], []),
         timer:sleep(100),
         DocId1 = get_id_value(Body1,"_id"),
-        ?assertEqual("true",get_field_value(Body1,"ok")),        
+        ?assertEqual(true,lib_json:get_field(Body1,"ok")),        
 		refresh(),
         {ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(post, {"http://localhost:8000/users/7/resources/_search", [],"application/json", "{\"query\":{\"match_all\":{}}}"}, [], []),
         {ok, {{_Version3, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(post, {"http://localhost:8000/users/5/resources/_search", [],"application/json", "{\"query\":{\"match_all\":{}}}"}, [], []),
-        {ok, {{_Version8, 200, _ReasonPhrase5}, _Headers5, Body5}} = httpc:request(delete, {"http://localhost:8000/resources/" ++ DocId1, []}, [], []),
-        ?assertEqual("1",get_field_value(Body3,"hits")),
-        ?assertEqual("0",get_field_value(Body4,"hits")).
-
-        
+        {ok, {{_Version8, 200, _ReasonPhrase5}, _Headers5, _Body5}} = httpc:request(delete, {"http://localhost:8000/resources/" ++ DocId1, []}, [], []),
+        ?assertEqual(true,lib_json:get_field(Body3,"hits.total") >= 1),
+        ?assertEqual(true,lib_json:get_field(Body4,"hits.total") >= 0).   
 
 %% @doc
 %% Function: process_post_test/0
