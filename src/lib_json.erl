@@ -13,7 +13,7 @@
 %% ====================================================================
 %% API functions
 %% ====================================================================
--export([encode/1, decode/1, get_field/2, get_field_value/3, field_value_exist/3]).
+-export([encode/1, decode/1, get_field/2, get_field_value/3, field_value_exists/3, to_string/1, set_attr/2]).
 -include("misc.hrl").
 
 
@@ -24,10 +24,12 @@
 %%           representation of a json object: json_term()
 %% @end
 encode(Json) when is_list(Json) ->
-    JsonObj = mochijson2:decode(Json),
-    mochijson2:encode(JsonObj);
+    JsonObj = decode(Json),
+    Encoder = mochijson2:encoder([{utf8, true}]),
+    Encoder(JsonObj);
 encode(Json) when is_tuple(Json)->
-    mochijson2:encode(Json);
+    Encoder = mochijson2:encoder([{utf8, true}]),
+    Encoder(Json);
 encode(Json)->
     mochijson2:encode(Json).
 
@@ -39,34 +41,42 @@ encode(Json)->
 %%           or a more readable version which only contains lists, tuples and string
 %% @end
 decode(Json) when is_list(Json) ->
-     mochijson2:decode(Json);
-decode({pretty, Json}) when is_list(Json)->
-     JsonObj = decode(Json),
-     mk_pretty(JsonObj).
-%% decode({pretty, Json}) when is_tuple(Json) ->
-%%     mk_pretty(Json).
+     mochijson2:decode(Json).
 
+
+%% @doc
+%% Function: get_field/1
+%% Purpose: Get the value at a certain field
+%% Returns: Return the string representation of the value of the specified 
+%%          field, if it exists, otherwise returns 'false' value. If the desired
+%%          value is a struct then no adaptation is performed.
+%% @end
+-spec get_field({Json::string() | tuple(), Query::string()}) -> string() | atom().
+get_field({Json, Query})->
+    JsonParser = destructure_json:parse("Obj."++Query),
+    try JsonParser(Json) of
+	Result when is_binary(Result) ->
+	    ?TO_STRING(Result);
+	Result ->
+	    Result
+    catch
+	error:function_clause -> undefined;
+	error:{badfun, _} -> improper_usage
+    end.
 %% @doc
 %% Function: get_field/2
 %% Purpose: Get the value at a certain field
 %% Returns: Return the string representation of the value of the specified 
-%%          field, if it exists, otherwise returns 'false' value.
+%%          field, if it exists, otherwise returns 'false' value. If the desired
+%%          value is a struct then no adaptation is performed.
 %% @end
--spec get_field(String::string(), Field::string()) -> string() | atom().
-get_field(Json, Query) ->
-    Result = get_field_help(Json, Query),
-    mk_pretty(Result).
+-spec get_field(Json::string() | tuple(), Query::string()) -> string() | atom().
+get_field(Json, Query) when is_list(Json)->
+    JsonObj = decode(Json),
+    get_field({JsonObj, Query});
+get_field(Json, Query) when is_tuple(Json) ->
+    get_field({Json, Query}).
 
-%% @doc
-%% Function: get_field_help/2
-%% Purpose: Get a value at a certain field.
-%% Returns: Return the value of the specified field, if it exists, otherwise
-%%          returns 'false' value.
-%% @end
-get_field_help(Json, Query) ->
-    JsonObj = mochijson2:decode(Json),
-    JsonParser = destructure_json:parse("Obj."++Query),
-    JsonParser(JsonObj).
 
 %% @doc
 %% Function: get_field_value/3
@@ -75,6 +85,33 @@ get_field_help(Json, Query) ->
 %%          returns 'false' value. Handles  wildcard searches for fields (not 
 %%          wildcard for values)
 %% @end
+get_field_value(Json, Query, Value) when is_list(Value)->
+    QueryParts = find_wildcard_fields(Query),
+    SearchFor = case {hd(Value),lists:last(Value)} of
+		 {$*,$*} -> {contains, lists:sublist(Value)};
+		 {_ ,$*} -> {suffix,   Value};
+		 {$*, _} -> {prefix,   Value};
+		 _ ->  Value
+	     end,
+    Search = field_recursion(Json, QueryParts, SearchFor),
+    case SearchFor of
+	{contains, SearchVal} ->
+	    Value;
+	{suffix,   SearchVal} ->
+	    Value;
+	{prefix, Value} ->
+	    %% case lists:prefix() of;
+		Value;
+	_ ->
+	    case Search of
+		Value ->
+		    Value;
+		improper_usage ->
+		    improper_usage;
+		_ ->
+		    undefined
+	    end
+    end;
 get_field_value(Json, Query, Value) ->
     QueryParts = find_wildcard_fields(Query),
     case field_recursion(Json, QueryParts, Value) of
@@ -91,7 +128,7 @@ get_field_value(Json, Query, Value) ->
 %%          Handles wildcard searches for fields (not wildcard for values)
 %% Returns: Return true if the value exists, otherwise false
 %% @end
-field_value_exist(Json, Query, Value) ->
+field_value_exists(Json, Query, Value) ->
     case get_field_value(Json, Query, Value) of
 	Value ->
 	    true;
@@ -101,33 +138,38 @@ field_value_exist(Json, Query, Value) ->
 
 
 %% @doc
-%% Function: mk_pretty/1
-%% Purpose:  Make a json representation more readable. The functions in the 
-%%           mochijson2 module is hard to read because it is often binaries
-%% Returns:  list, tuple and string representation of the json object
+%% Function: to_string/1
+%% Purpose:  Make a json representation into a string
+%% Returns:  string()
 %% @end
-mk_pretty(Json) when is_binary(Json) ->
-    binary_to_list(Json);
+%% to_string(Json) when is_list(Json) ->
+%%     Json.
 
-mk_pretty(Json) when is_integer(Json) ->
-    integer_to_list(Json);
+to_string(Json) when is_tuple(Json) ->
+    to_string(encode(Json));
+to_string([Hd|Tl]) when is_binary(Hd) ->
+    %% erlang:display(Hd),
+    binary:bin_to_list(Hd) ++ to_string(Tl);
+to_string([]) ->
+	[];
+to_string([Hd|Tl]) when is_list(Hd)->
+    %% erlang:display(Hd),
+    to_string(Hd) ++ to_string(Tl);
+to_string([Hd|Tl]) when is_integer(Hd) ->
+    %% erlang:display(Hd),
+    [Hd] ++ to_string(Tl).
 
-mk_pretty(Json) when is_list(Json) ->
-    lists:map(fun mk_pretty/1, Json);
-
-mk_pretty({struct, Values})  ->
-    ValuesList = lists:map(fun tuple_to_list/1, Values),
-    StringValues = lists:map(fun mk_pretty/1, ValuesList),
-    lists:map(fun list_to_tuple/1, StringValues);
-
-mk_pretty(Json) ->
-    Json.
+set_attr(Attr, Value) when is_atom(Attr) ->
+    set_attr(binary:list_to_bin(atom_to_list(Attr)), Value);
+set_attr(Attr, Value) when is_binary(Attr) ->
+    {struct, [{Attr, Value}]};
+set_attr(Attr, Value) when is_list(Attr) ->
+    set_attr(binary:list_to_bin(Attr), Value).
+    
 
 %% ====================================================================
 %% Internal functions
 %% ====================================================================
-    
-
 %% @doc
 %% Function: field_recursion/3
 %% Purpose: Handles recursion over the specific fields in a json object 
@@ -150,9 +192,11 @@ field_recursion(Json, [{wildcard, Field} | Rest], Value, Query) ->
     end;
 field_recursion(Json, [{no_wildcard, Field}], Value, Query) ->
     NewQuery = lists:concat([Query, Field]),
-    case mk_pretty(get_field_help(Json, NewQuery)) of
+    case get_field(Json, NewQuery) of
 	R when is_list(R) ->
-	    case lists:member(Value, R) of
+	    case lists:member(Value, lists:map(fun(X) when is_binary(X) -> binary:bin_to_list(X);
+						  (X) -> X
+					       end, R)) of
 		true ->
 		    Value;
 		false ->
@@ -188,7 +232,7 @@ index_recursion(Json, [{wildcard, Field, N} | Rest], Value, Query) ->
 %% Returns: The length of the item list or 'false' if the field was not found
 %% @end    
 get_field_max_index(Json, Query) ->
-    case get_field_help(Json, Query) of
+    case get_field(Json, Query) of
 	R when is_list(R) ->
 	    length(R) - 1;
 	R ->
@@ -221,4 +265,3 @@ find_wildcard_fields(Query) ->
 	    NewWildCards2 = lists:map(fun(X) -> {wildcard, X} end, NewWildCards),
 	    NewWildCards2 ++ [{no_wildcard, R}]
     end.
-

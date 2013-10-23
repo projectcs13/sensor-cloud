@@ -104,9 +104,9 @@ delete_streams_with_resource_id(Id) ->
 						  {error, Reason};
 						  
 		{ok,List} -> 
-			SearchRemoved = api_help:remove_search_part(api_help:make_to_string(lib_json:encode(List)),false,0),
-			ExtraRemoved = api_help:remove_extra_info(SearchRemoved, 0),
-			case get_streams(ExtraRemoved) of
+			%SearchRemoved = api_help:remove_search_part(api_help:make_to_string(lib_json:encode(List)),false,0),
+			%ExtraRemoved = api_help:remove_extra_info(SearchRemoved, 0),
+			case get_streams(List) of
 				[] -> {ok};
 				Streams ->
 					case delete_streams(Streams) of
@@ -123,11 +123,21 @@ delete_streams_with_resource_id(Id) ->
 %% @end
 -spec get_streams(JSON::string()) -> list().
 
-get_streams(JSON) ->
-	case lib_json:get_field(JSON, "id") of
+get_streams(JSON) when is_tuple(JSON)->
+	Result = lib_json:get_field(JSON, "hits.hits"),
+	get_streams(Result);
+get_streams(undefined) ->
+	[];
+
+get_streams([]) ->
+	[];
+
+get_streams([JSON | Tl]) ->
+	case lib_json:get_field(JSON, "_id") of
 		undefined -> [];
-		Id -> [Id] ++ get_streams(api_help:remove_object(JSON,0))
+		Id -> [Id] ++ get_streams(Tl)
 	end.
+
 
 
 %% @doc

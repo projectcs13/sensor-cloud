@@ -13,9 +13,7 @@
 		 delete_resource/2, process_post/2, put_stream/2, get_stream/2]).
 
 
-
 -include("webmachine.hrl").
-
 
 -define(INDEX, "sensorcloud").
 
@@ -289,9 +287,10 @@ get_stream(ReqData, State) ->
 					end,
 					case erlastic_search:search_limit(?INDEX, "stream", Query,200) of % Maybe wanna take more
 						{error,Reason} -> {{error, Reason}, ReqData, State};
-						{ok,List} -> SearchRemoved = api_help:remove_search_part(api_help:make_to_string(lib_json:encode(List)),false,0),
-                                     ExtraRemoved = api_help:remove_extra_info(SearchRemoved,0),
-                                     {"{\"hits\":"++ExtraRemoved++"}", ReqData, State} 
+						{ok,JsonStruct} -> 
+						         HitJson = lib_json:get_field(JsonStruct, "hits"),
+						         StrJson = lib_json:to_string(HitJson),
+						         {StrJson, ReqData, State}
 					end;
 				StreamId ->
 				% Get specific stream

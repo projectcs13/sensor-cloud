@@ -51,14 +51,13 @@ get_stream_test() ->
 	% Test delete
 	{ok, {{_Version8, 200, _ReasonPhrase8}, _Headers8, Body8}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ DocId1, []}, [], []),
 	{ok, {{_Version9, 200, _ReasonPhrase9}, _Headers9, Body9}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ DocId2, []}, [], []),
-	
-	?assertEqual(true,lib_json:get_field(Body3,"_source.test") == "get"),
-	?assertEqual(true,lib_json:get_field(Body3,"_source.private") == "true"),
-	?assertEqual(true,lib_json:field_value_exist(Body4,"hits[*]._source.test", "get")),
-	?assertEqual(true, lib_json:field_value_exist(Body5,"hits.hits[*]._source.test", "get")),
-	?assertEqual(true,list_to_integer(lib_json:get_field(Body5,"hits.total")) >= 2), % Needed in case unempty elasticsearch
-	?assertEqual(true,lib_json:field_value_exist(Body5,"hits.hits[*]._source.test", "get")),
-	?assertEqual(true,list_to_integer(lib_json:get_field(Body6,"hits.total")) >= 2), % Needed in case unempty elasticsearch
+	?assertEqual("get",lib_json:get_field(Body3,"test")),
+	?assertEqual(true,lib_json:get_field(Body3,"private") == "true"),
+	?assertEqual(true,lib_json:field_value_exists(Body4,"hits[*]._source.test", "get")),
+	?assertEqual(true,lib_json:field_value_exists(Body5,"hits.hits[*]._source.test", "get")),
+	?assertEqual(true,lib_json:get_field(Body5,"hits.total") >= 2), % Needed in case unempty elasticsearch
+	?assertEqual(true,lib_json:field_value_exists(Body5,"hits.hits[*]._source.test", "get")),
+	?assertEqual(true,lib_json:get_field(Body6,"hits.total") >= 2), % Needed in case unempty elasticsearch
 	?assertEqual(true,string:str(Body7,"not_found") =/= 0),
 	?assertEqual(true,get_id_value(Body8,"_id") == DocId1),
 	?assertEqual(true,get_id_value(Body9,"_id") == DocId2).
@@ -75,7 +74,7 @@ get_stream_test() ->
 put_stream_test() ->
 	% Test create
 	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [], "application/json", "{\n\"test\" : \"get\",\n\"private\" : \"true\"\n, \"resource_id\" : \"asdascvsr213sda\"}"}, [], []),
-	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/users/0/resources/asdascvsr213sda/streams", [], "application/json", "{\n\"test\" : \"get\",\n\"private\" : \"true\"\n}}"}, [], []),
+	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/users/0/resources/asdascvsr213sda/streams", [], "application/json", "{\n\"test\" : \"get\",\n\"private\" : \"true\"\n}"}, [], []),
 	DocId1 = get_id_value(Body1,"_id"),
 	DocId2 = get_id_value(Body2,"_id"),
 	refresh(),
@@ -92,14 +91,14 @@ put_stream_test() ->
 	% Test update on missing doc
 	{ok, {{_Version9, 200, _ReasonPhrase9}, _Headers9, Body9}} = httpc:request(put, {"http://localhost:8000/streams/1", [], "application/json", "{\n\"test\" : \"put\"\n}"}, [], []),
 	
-	?assertEqual(true,lib_json:get_field(Body5,"_source.private") == "false"),
-	?assertEqual(true,lib_json:get_field(Body5,"_source.private") =/= "true"),
-	?assertEqual(true,lib_json:get_field(Body6,"_source.private") =/= "false"),
-	?assertEqual(true,lib_json:get_field(Body6,"_source.private") == "true"),
-	?assertEqual(true,lib_json:get_field(Body5,"_source.test") == "put"),
-	?assertEqual(true,lib_json:get_field(Body5,"_source.test") =/= "get"),
-	?assertEqual(true,lib_json:get_field(Body6,"_source.test") == "put"),
-	?assertEqual(true,lib_json:get_field(Body6,"_source.test") =/= "get"),
+	?assertEqual(true,lib_json:get_field(Body5,"private") == "false"),
+	?assertEqual(true,lib_json:get_field(Body5,"private") =/= "true"),
+	?assertEqual(true,lib_json:get_field(Body6,"private") =/= "false"),
+	?assertEqual(true,lib_json:get_field(Body6,"private") == "true"),
+	?assertEqual(true,lib_json:get_field(Body5,"test") == "put"),
+	?assertEqual(true,lib_json:get_field(Body5,"test") =/= "get"),
+	?assertEqual(true,lib_json:get_field(Body6,"test") == "put"),
+	?assertEqual(true,lib_json:get_field(Body6,"test") =/= "get"),
 	?assertEqual(true,get_id_value(Body7,"_id") == DocId1),
 	?assertEqual(true,get_id_value(Body8,"_id") == DocId2),
 	?assertEqual(true,string:str(Body9,"not_found") =/= 0).
@@ -166,7 +165,6 @@ get_id_value(String,Field) ->
 		false ->
 			string:substr(RestOfString, 1,NextBracket-2)
 	end.
-
 
 	%% @doc
 %% Function: refresh/0
