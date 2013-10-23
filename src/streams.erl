@@ -13,7 +13,7 @@
 		 delete_resource/2, process_post/2, put_stream/2, get_stream/2]).
 
 
-
+-include_lib("erlastic_search.hrl").
 -include("webmachine.hrl").
 
 
@@ -152,37 +152,20 @@ process_post(ReqData, State) ->
 -spec process_search_post(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 
 process_search_post(ReqData, State) ->
-	erlang:display("search request"),
-	URIQuery = wrq:req_qs(ReqData),
-	case proplists:get_value('user', wrq:path_info(ReqData)) of
-		undefined ->
-			UserQuery = [],
-			UserDef = false;
-		UserId ->
-			UserQuery = "user_id:" ++ UserId,
-			UserDef = true
-		end,
-	case proplists:get_value('res', wrq:path_info(ReqData)) of
-		undefined ->
-			ResQuery = [],
-			ResDef = false;
-		ResId ->
-			ResQuery = "resource_id:" ++ ResId,
-			ResDef = true
-	end,
-	case ResDef and UserDef of
-		true -> Query = UserQuery ++ "&" ++ ResQuery; 
-		false -> case ResDef or UserDef of
-					 true -> Query = UserQuery ++ ResQuery;
-					 false -> Query = ""
-				 end
-	end,
-	FullQuery = lists:append(api_help:transform(URIQuery,ResDef or UserDef),Query),
-	case erlastic_search:search_limit(?INDEX, "stream", FullQuery,200) of % Maybe wanna take more
-		{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ api_help:json_encode(Reason) ++ "\"}", ReqData), State};
-		{ok,List} -> {true,wrq:set_resp_body(api_help:json_encode(List),ReqData),State} 
-	end.
-
+        erlang:display("search with json request"),
+        {Json,_,_} = api_help:json_handler(ReqData,State),
+        case proplists:get_value('res', wrq:path_info(ReqData)) of
+                undefined ->
+                        FilteredJson = filter_json(Json);
+                ResId ->
+                        ResQuery = "\"resource\":" ++ ResId,
+                        FilteredJson = filter_json(Json, ResQuery)
+        end,
+        erlang:display(FilteredJson),
+        case erlastic_search:search_json(#erls_params{},?INDEX, "stream", FilteredJson) of % Maybe wanna take more
+                {error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ api_help:json_encode(Reason) ++ "\"}", ReqData), State};
+                {ok,List} -> {true,wrq:set_resp_body(api_help:json_encode(List),ReqData),State} % May need to convert
+        end.
 
 %% @doc
 %% Function: process_search_get/2
@@ -308,4 +291,22 @@ get_stream(ReqData, State) ->
 					end
 				end
 	end.
+
+%% @doc
+%% Function: filter_json/1
+%% Purpose: Used to add private filters to the json query
+%% Returns: JSON string that is updated with filter
+%% @end
+filter_json(Json) ->
+        NewJson = string:sub_string(Json,1,string:len(Json)-1),
+        "{\"query\":{\"filtered\":"++NewJson++",\"filter\":{\"bool\":{\"must\":{\"term\":{\"private\":0}}}}}}}".
+
+%% @doc
+%% Function: filter_json/2
+%% Purpose: Used to add private and resource filters to the json query
+%% Returns: JSON string that is updated with filter
+%% @end
+filter_json(Json,ResourceQuery) ->
+        NewJson = string:sub_string(Json,1,string:len(Json)-1),
+        "{\"query\":{\"filtered\":"++NewJson++",\"filter\":{\"bool\":{\"must\":[{\"term\":{\"private\":0}},{\"term\":{"++ResourceQuery++"}}]}}}}}".
 

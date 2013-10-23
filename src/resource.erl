@@ -142,7 +142,6 @@ delete_streams([StreamId|Rest]) ->
 		{ok,_List} -> delete_streams(Rest)
 	end.
 
-
 %% @doc
 %% Function: process_post/2
 %% Purpose: Handle POST request, only working for create and not search - AS OF SPRINT 3
@@ -150,33 +149,44 @@ delete_streams([StreamId|Rest]) ->
 %% @end
 -spec process_post(ReqData::tuple(), State::string()) -> {atom(), tuple(), string()}.
 process_post(ReqData, State) ->
-	URIList = string:tokens(wrq:path(ReqData), "/"),
-	IsSearch = (string:sub_string(lists:nth(length(URIList),URIList),1,7) == "_search"),
-	case IsSearch of 
-		false ->
-			% Create
-			{Resource,_,_} = api_help:json_handler(ReqData,State),
-			case erlastic_search:index_doc(?INDEX,"resource",Resource) of 
-				{error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ api_help:json_encode(Reason) ++ "\"}", ReqData), State};
-				{ok,List} -> {true, wrq:set_resp_body(api_help:json_encode(List), ReqData), State}
-			end;
-		true ->
-			% Search
-			URIQuery = wrq:req_qs(ReqData),
-			case proplists:get_value('userid', wrq:path_info(ReqData)) of
-				undefined ->
-					Query = [];
-				UserId ->
-					Query = "user_id:" ++ UserId
-			end,
-			FullQuery = lists:append(api_help:transform(URIQuery,true),Query),
-			erlang:display(FullQuery),
-			case erlastic_search:search_limit(?INDEX, "resource", FullQuery,10) of % Maybe wanna take more
-				{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ api_help:json_encode(Reason) ++ "\"}", ReqData), State};
-				{ok,List} -> {true, wrq:set_resp_body(api_help:json_encode(List), ReqData), State}
-			end
+        URIList = string:tokens(wrq:path(ReqData), "/"),
+        IsSearch = (string:sub_string(lists:nth(length(URIList),URIList),1,7) == "_search"),
+        case IsSearch of 
+                false ->
+                        % Create
+                        {Resource,_,_} = api_help:json_handler(ReqData,State),
+                        case erlastic_search:index_doc(?INDEX,"resource",Resource) of 
+                                {error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ api_help:json_encode(Reason) ++ "\"}", ReqData), State};
+                                {ok,List} -> {true, wrq:set_resp_body(api_help:json_encode(List), ReqData), State}
+                        end;
+                true ->
+                        % Search
+                		 process_search_post(ReqData,State)
+        end.
 
-	end.
+%% @doc
+%% Function: process_search_post/2
+%% Purpose: Used to handle search requests that come from POST requests
+%% Returns: {Success, ReqData, State}, where Success is true if the search request is
+%% successful and false otherwise.
+%% @end
+-spec process_search_post(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
+
+process_search_post(ReqData, State) ->
+        erlang:display("search with json request"),
+        {Json,_,_} = api_help:json_handler(ReqData,State),
+        case proplists:get_value('userid', wrq:path_info(ReqData)) of
+                undefined ->
+                        {{halt,405}, ReqData, State};
+                UserId ->
+                        UserQuery = "\"owner\":" ++ UserId,
+                        FilteredJson = filter_json(Json, UserQuery),
+                        erlang:display(FilteredJson),
+                        case erlastic_search:search_json(#erls_params{},?INDEX, "resource", FilteredJson) of % Maybe wanna take more
+                                {error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ api_help:json_encode(Reason) ++ "\"}", ReqData), State};
+                                {ok,List} -> {true,wrq:set_resp_body(api_help:json_encode(List),ReqData),State} % May need to convert
+                        end
+        end.
 
 %% @doc
 %% Function: put_resource/2
@@ -281,3 +291,11 @@ id_from_path(RD) ->
         Id -> Id
     end.
 
+%% @doc
+%% Function: filter_json/2
+%% Purpose: Used to add private and resource filters to the json query
+%% Returns: JSON string that is updated with filter
+%% @end
+filter_json(Json,UserQuery) ->
+        NewJson = string:sub_string(Json,1,string:len(Json)-1),
+        "{\"query\":{\"filtered\":"++NewJson++",\"filter\":{\"bool\":{\"must\":[{\"term\":{"++UserQuery++"}}]}}}}}".
