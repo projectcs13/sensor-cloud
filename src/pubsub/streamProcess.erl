@@ -1,76 +1,99 @@
 -module(streamProcess).
 
--include_lib("../../lib/rabbitmq-erlang-client/include/amqp_client.hrl").
--include_lib("../../include/pubsub.hrl").
+-include_lib("amqp_client.hrl").
+-include_lib("pubsub.hrl").
 
 -export([create/2]).
 
 create(StreamId, ResourceId) ->
+	%% Exchange name strings
+	ResourceExchange = list_to_binary("resources."++ResourceId),
+	StreamExchange = list_to_binary("streams."++StreamId),
 
-    %% Connect
-    {ok, Connection} =
-        amqp_connection:start(#amqp_params_network{host = "localhost"}),
-    %% Open a channel?
-    {ok, Channel} = amqp_connection:open_channel(Connection),
+	%% Connect
+	{ok, Connection} =
+		amqp_connection:start(#amqp_params_network{host = "localhost"}),
+	
+	%% Open In and OUT channels
+	{ok, ChannelIn} = amqp_connection:open_channel(Connection),
+	{ok, ChannelOut} = amqp_connection:open_channel(Connection),
 
-    %% Declare global Exchange? 
-    amqp_channel:call(Channel, #'exchange.declare'{exchange = <<"exchange">>,
-                                                   type = <<"topic">>}),
-    %% Declare INPUT queue, stored in the ResourceId
-    #'queue.declare_ok'{queue = Queue} =
-        amqp_channel:call(Channel, #'queue.declare'{exclusive = true}),
+	%% Declare INPUT queue
+	amqp_channel:call(ChannelIn, #'exchange.declare'{exchange = ResourceExchange, type = <<"fanout">>}),
+	#'queue.declare_ok'{queue = QueueIn} = amqp_channel:call(ChannelIn, #'queue.declare'{exclusive = true}),
+	amqp_channel:call(ChannelIn, #'queue.bind'{exchange = ResourceExchange, queue = QueueIn}),
 
-    amqp_channel:call(Channel, #'queue.bind'{exchange = <<"exchange">>,
-                                              routing_key = list_to_binary("resources."++ResourceId),
-                                              queue = Queue}),
+	%% Subscribe to INPUT queue
+	io:format(" [*] Waiting for data. To exit press CTRL+C~n"),
+	amqp_channel:subscribe(ChannelIn, #'basic.consume'{queue = QueueIn, no_ack = true}, self()),
+	receive
+		#'basic.consume_ok'{} -> ok
+	end,
 
-    amqp_channel:subscribe(Channel, #'basic.consume'{queue = Queue,
-                                                     no_ack = true}, self()),
-    receive
-        #'basic.consume_ok'{} -> ok
-    end,
+	%% Declare OUTPUT exchange
+	amqp_channel:call(ChannelOut, #'exchange.declare'{exchange = StreamExchange, type = <<"fanout">>}),
+	
+	loop(ChannelIn, {ChannelOut, StreamExchange}).
 
-    {ok, ChannelOut} = amqp_connection:open_channel(Connection),
+loop(ChannelIn, {ChannelOut, StreamExchange}) ->
+	%% Receive from the subscribeTopic!
+	receive
+		{#'basic.deliver'{}, #amqp_msg{payload = Body}} ->
+			case binary_to_term(Body) of
+				%% Get request
+				{get, GetVar} ->
+					io:format("GET: ~p~n", [GetVar]);
 
-    amqp_channel:call(ChannelOut, #'exchange.declare'{exchange = <<"exchange">>,
-                                                      type = <<"topic">>}),
-    loop(Channel, ChannelOut, list_to_binary("streams."++StreamId)).
+				%% Post request
+				{post, JSON} ->
+					io:format("POST: ~p~n", [JSON]);
+					%% Store value
 
-loop(Channel, ChannelOut, RoutingKeyOut) ->
-    %% Receive from the subscribeTopic!
-    receive
-        {#'basic.deliver'{routing_key = RoutingKey}, #amqp_msg{payload = Body}} ->
-            io:format(" [x] ~p:~p~n", [RoutingKey, Body]),
-            case binary_to_term(Body) of
-                %% Get request
-                {get, GetVar} ->
-                    io:format("GET: ~p~n", [GetVar]);
+					%% Propagete
+					%send(ChannelOut, RoutingKeyOut, Body),
 
-                %% Put request
-                {put, JSON} ->
-                    io:format("PUT: ~p~n", [JSON]);
-                    %% Store value
+				%% Delete request
+				{delete} ->
+					io:format("DELETE~n");
 
-                    %% Propagete
-                    %send(ChannelOut, RoutingKeyOut, Body),
+				%% New value from the source
+				#'datapoint'{timestamp = TimeStamp, value = Value} ->
+					%% Store value
 
-                %% Delete request
-                {delete} ->
-                    io:format("DELETE~n");
+					%% Propagete
+					send(ChannelOut, StreamExchange, Body)
+			end,
+			%% Recurse
+			loop(ChannelIn, {ChannelOut, StreamExchange})
+	end.
 
-                %% New value from the source
-                #'datapoint'{timestamp = TimeStamp, value = Value} ->
-                    %% Store value
+send(Channel, Exchange, Message) ->
+	amqp_channel:cast(Channel,
+					  #'basic.publish'{exchange = Exchange},
+					  #amqp_msg{payload = Message}).
 
-                    %% Propagete
-                    send(ChannelOut, RoutingKeyOut, Body)
-            end,
-            %% Recurse
-            loop(Channel, ChannelOut, RoutingKeyOut)
-    end.
-
-send(Channel, RoutingKey, Message) ->
-    amqp_channel:cast(Channel,
-                      #'basic.publish'{exchange = <<"exchange">>,
-                                       routing_key = RoutingKey},
-                                       #amqp_msg{payload = Message}).
+%% HOW TO SEND TO A STREAMPROCESS
+%% SEND INTO PUB SUB!
+%			StreamId = "1",
+%			ResourceId = "1",
+%			Exchange = list_to_binary("resources."++ResourceId),
+%
+%			{ok, Connection} = amqp_connection:start(#amqp_params_network{host = "localhost"}),
+%			{ok, Channel} = amqp_connection:open_channel(Connection),
+%
+%			amqp_channel:call(Channel,
+%					#'exchange.declare'{exchange = Exchange,
+%							type = <<"fanout">>}),
+%
+%			PID = spawn(streamProcess, create, [StreamId, ResourceId]),
+%			io:format("Node Created: ~p~n", [PID]),
+%
+%			%% Needed for the RabbitMQ to have time to set up the system.
+%			timer:sleep(1000),
+%
+%			amqp_channel:cast(Channel,
+%					  #'basic.publish'{exchange = Exchange},
+%					  #amqp_msg{payload = term_to_binary({post, DatapointJson})}),
+%
+%			ok = amqp_channel:close(Channel),
+%			ok = amqp_connection:close(Connection),
