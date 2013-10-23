@@ -131,7 +131,7 @@ put_user_search_test() ->
 %% @end
 -spec delete_user_test() -> ok | {error, term()}.
 delete_user_test() ->
-	% Create a resource and two streams, then delete the resource and check if streams are automatically deleted
+	% Create two resources and four streams, then delete the user and check if streams and resources are automatically deleted
 	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/users", [],"application/json", "{\"name\" : \"test\"}"}, [], []),
 	DocId = get_field_value(Body2,"_id"),
 	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(post, {"http://localhost:8000/resources", [],"application/json", "{\"test\" : \"delete\",\"user_id\" : \"" ++ DocId ++ "\"}"}, [], []),
