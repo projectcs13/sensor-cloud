@@ -184,13 +184,10 @@ set_attr(Attr, Value) when is_list(Attr) ->
 
 add_field(Json,FieldName,FieldValue) when is_tuple(Json)->
     add_field(to_string(Json), FieldName, FieldValue);
+add_field(Stream,FieldName,FieldValue) when is_integer(FieldValue) ->
+    string:substr(Stream,1,length(Stream)-1) ++ ",\"" ++ FieldName ++ "\":" ++ FieldValue ++ "}";
 add_field(Stream,FieldName,FieldValue) ->
-	case is_integer(FieldValue) of
-		true ->
-			string:substr(Stream,1,length(Stream)-1) ++ ",\"" ++ FieldName ++ "\":" ++ FieldValue ++ "}";
-		false ->
-			string:substr(Stream,1,length(Stream)-1) ++ ",\"" ++ FieldName ++ "\":\"" ++ FieldValue ++ "\"}"
-	end.
+    string:substr(Stream,1,length(Stream)-1) ++ ",\"" ++ FieldName ++ "\":\"" ++ FieldValue ++ "\"}".
 
 
 %% ====================================================================
