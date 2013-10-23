@@ -1,0 +1,8 @@
+language: erlang
+script: "make install && make test"
+services:
+  - elasticsearch
+otp_release:
+#  - R16B02
+#  - R16B01
+  - R16B
