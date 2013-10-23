@@ -166,14 +166,7 @@ process_post(ReqData, State) ->
 			{Resource,_,_} = api_help:json_handler(ReqData,State),
 			case erlastic_search:index_doc(?INDEX,"resource",Resource) of 
 				{error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
-				{ok,List} -> Json = lib_json:to_string(List),
-                             Id = api_help:get_id_value(Json,"_id"),
-                             NewJson = "{\"id\" : \"" ++ Id ++ "\"}",
-                             Update = api_help:create_update(NewJson),
-                             case api_help:update_doc(?INDEX,"resource", Id, Update, []) of
-				 {error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
-                                 {ok,_} ->{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
-                             end
+				{ok,List} -> {true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
 			end;
 		true ->
 			% Search
@@ -234,18 +227,31 @@ get_resource(ReqData, State) ->
 							Query = "user_id:" ++ UserId
 					end,
 					case erlastic_search:search_limit(?INDEX, "resource", Query, 100) of % Maybe wanna take more
-						{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
-						{ok,List} -> SearchRemoved = api_help:remove_search_part(lib_json:to_string(List),false,0),
-                                     ExtraRemoved = api_help:remove_extra_info(SearchRemoved,0),
-                                     {"{\"hits\":"++ExtraRemoved++"}", ReqData, State}
+						{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ api_help:json_encode(Reason) ++ "\"}", ReqData), State};
+					        {ok,JsonStruct} ->
+                                                       HitsList = lib_json:get_field(JsonStruct, "hits.hits"),
+						       HitsAttr = lib_json:set_attr(hits, HitsList), 
+						       FinalJson = lib_json:to_string(HitsAttr),
+						       {FinalJson, ReqData, State} 
+
+						%% {ok,List} -> SearchRemoved = api_help:remove_search_part(api_help:make_to_string(api_help:json_encode(List)),false,0),
+						%% 	     ExtraRemoved = api_help:remove_extra_and_add_id(SearchRemoved),
+						%% 	     ReturnJson = "{\"hits\":[" ++ ExtraRemoved ++ "]}",
+						%% 	     {ReturnJson, ReqData, State} 
 					end;
 				ResourceId ->
 				% Get specific resource
 					case erlastic_search:get_doc(?INDEX, "resource", ResourceId) of 
 						{error,Reason} -> 
-								{{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
-						{ok,List} -> 
-							     {lib_json:encode(List), ReqData, State}
+								{{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};			
+					        {ok,JsonStruct} ->
+	  					        JsonStr = lib_json:to_string(JsonStruct),
+						        ResourceId  = lib_json:get_field(JsonStruct, "_id"),
+						        SourceJson  = lib_json:get_field(JsonStruct, "_source"),
+						        FinalJson = lib_json:add_field(SourceJson, "id", ResourceId),
+						       {FinalJson, ReqData, State} 
+
+								      %% {api_help:remove_extra_and_add_id(lib_json:to_string(List)), ReqData, State}
 					end
 		end;
 		true ->

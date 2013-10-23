@@ -114,9 +114,9 @@ create_update(Stream) ->
 add_field(Stream,FieldName,FieldValue) ->
 	case is_integer(FieldValue) of
 		true ->
-			string:substr(Stream,1,length(Stream)-1) ++ ",\n\"" ++ FieldName ++ "\" : " ++ FieldValue ++ "\n}";
+			string:substr(Stream,1,length(Stream)-1) ++ ",\"" ++ FieldName ++ "\":" ++ FieldValue ++ "}";
 		false ->
-			string:substr(Stream,1,length(Stream)-1) ++ ",\n\"" ++ FieldName ++ "\" : \"" ++ FieldValue ++ "\"\n}"
+			string:substr(Stream,1,length(Stream)-1) ++ ",\"" ++ FieldName ++ "\":\"" ++ FieldValue ++ "\"}"
 	end.
 			
 
@@ -209,7 +209,7 @@ update_doc(Index, Type, Id, Json, Qs) ->
 %% @doc
 %% Function: remove_extra_info/3
 %% Purpose: Used to remove the extra info for documents
-%% Returns: Returns the list of JSON objects return from the search
+%% Returns: Returns the list of JSON objects without the extra info
 %% @end
 -spec remove_extra_info(JSONString::string(),OpenBrackets::integer()) -> string().
 
@@ -240,6 +240,60 @@ remove_extra_info([First|Rest],Val) ->
                 _ ->
                         [First|remove_extra_info(Rest,Val)]
         end.
+
+
+%% @doc
+%% Function: remove_extra_and_add_id/1
+%% Purpose: Used to remove the extra info for documents and add the id as
+%%          a field in the document
+%% Returns: Returns the list of JSON objects with id and without extra info
+%% @end
+-spec remove_extra_and_add_id(JSONString::string()) -> string().
+
+remove_extra_and_add_id([]) ->
+	[];
+remove_extra_and_add_id(Json) ->
+	Id = lib_json:get_field(Json,"_id"),
+	case Id of
+		undefined -> [];
+		_->
+			NewJson = add_field(remove_extra_info(get_object(Json,0),0),"id",Id),
+			case lib_json:get_field(remove_object(Json,0),"_id") of
+				undefined ->
+					NewJson ++ remove_extra_and_add_id(remove_object(Json,0));
+				_ ->
+					NewJson ++ "," ++ remove_extra_and_add_id(remove_object(Json,0))
+			end
+	end.
+
+	
+%% @doc
+%% Function: get_object/2
+%% Purpose: Used to return the first JSON of the list
+%% Returns: Returns first JSON in the list
+%% @end
+-spec get_object(JSONString::string(),OpenBrackets::integer()) -> string().
+
+get_object([],_) ->
+	[];
+get_object([First|Rest],0) ->
+	case First of
+		$, ->
+			[];
+		${ ->
+			[First|get_object(Rest,1)];
+		_ ->
+			get_object(Rest,0)
+	end;
+get_object([First|Rest],Val) ->
+	case First of
+		${ ->
+			[First|get_object(Rest,Val+1)];
+		$} ->
+			[First|get_object(Rest,Val-1)];
+		_-> 
+			[First|get_object(Rest,Val)]
+	end.
 
 %% @doc
 %% Function: remove_object/2
@@ -285,24 +339,4 @@ convert_binary_to_string([First|Rest]) ->
 					 true -> convert_binary_to_string(First) ++ convert_binary_to_string(Rest);
 					 false -> [First] ++ convert_binary_to_string(Rest)
 				 end
-	end.
-
-%% @doc
-%% Function: get_id_value/2
-%% Purpose: Help function to find value of a field in the string
-%% Returns: String with value of the field
-%% @end
--spec get_id_value(String::string(),Field::string()) -> string().
-
-get_id_value(String,Field) ->
-	Location = string:str(String,Field),
-	Start = Location + 3 + length(Field),
-	RestOfString = string:substr(String, Start),
-	NextComma = string:str(RestOfString,","),
-	NextBracket = string:str(RestOfString,"}"),
-	case (NextComma < NextBracket) and (NextComma =/= 0) of
-		true ->
-			string:substr(RestOfString, 1,NextComma-2);
-		false ->
-			string:substr(RestOfString, 1,NextBracket-2)
 	end.

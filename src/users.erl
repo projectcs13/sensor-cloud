@@ -132,15 +132,8 @@ process_post(ReqData, State) ->
                 false ->
                         {UserJson,_,_} = api_help:json_handler(ReqData, State),
                         case erlastic_search:index_doc(?INDEX, "user", UserJson) of
-                                {error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
-                                {ok,List} -> Json = lib_json:to_string(List),
-					     Id = api_help:get_id_value(Json,"_id"),
-					     NewJson = "{\"id\" : \"" ++ Id ++ "\"}",
-					     Update = api_help:create_update(NewJson),
-					     case api_help:update_doc(?INDEX,"user", Id, Update, []) of
-						 {error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
-						 {ok,_} -> {true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
-                                     		 end
+                                {error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ api_help:json_encode(Reason) ++ "\"}", ReqData), State};
+                                {ok,List} -> {true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
                         end;
                 true ->
                         process_search(ReqData,State, post)                        
@@ -164,17 +157,22 @@ get_user(ReqData, State) ->
                                                         {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
                                                 {ok, Result} ->
                                                         SearchRemoved = api_help:remove_search_part(lib_json:to_string(Result),false,0),
-                                                        ExtraRemoved = api_help:remove_extra_info(SearchRemoved,0),
-                                                        {ExtraRemoved, ReqData, State} 
+                                                        ExtraRemoved = api_help:remove_extra_and_add_id(SearchRemoved),
+						        ReturnJson = "{\"hits\":[" ++ ExtraRemoved ++ "]}",
+							{ReturnJson, ReqData, State} 
                                         end;
                                 Id ->
 				        %% Get specific user
                                         case erlastic_search:get_doc(?INDEX, "user", Id) of
                                                 {error, Reason} ->
                                                         {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
-                                                {ok,List} ->
-						        ExtraRemoved = api_help:remove_extra_info(lib_json:to_string(List),0),
-						        {ExtraRemoved, ReqData, State}
+                                                {ok,JsonStruct} ->
+						        JsonStr = lib_json:to_string(JsonStruct),
+						        UserId  = lib_json:get_field(JsonStruct, "_id"),
+						        SourceJson  = lib_json:get_field(JsonStruct, "_source"),
+						        AddField = lib_json:add_field(SourceJson, "id", UserId),
+						        {AddField, ReqData, State}
+
                                         end
                         end;
                 true ->                        

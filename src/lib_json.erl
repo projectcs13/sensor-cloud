@@ -13,7 +13,14 @@
 %% ====================================================================
 %% API functions
 %% ====================================================================
--export([encode/1, decode/1, get_field/2, get_field_value/3, field_value_exists/3, to_string/1, set_attr/2]).
+-export([add_field/3, 
+	 decode/1, 
+	 encode/1, 
+	 field_value_exists/3, 
+	 get_field/2, 
+	 get_field_value/3, 
+	 set_attr/2,
+	 to_string/1]).
 -include("misc.hrl").
 
 
@@ -166,6 +173,25 @@ set_attr(Attr, Value) when is_binary(Attr) ->
 set_attr(Attr, Value) when is_list(Attr) ->
     set_attr(binary:list_to_bin(Attr), Value).
     
+
+%% @doc
+%% Function: add_field/3
+%% Purpose: Used to add a new field to the given string representation of
+%%          of a JSON object, the field will be FieldName : FieldValue
+%% Returns: The string representation of the JSON object with the new field
+%% @end
+-spec add_field(Stream::string(),FieldName::string(),FieldValue::term()) -> string().
+
+add_field(Json,FieldName,FieldValue) when is_tuple(Json)->
+    add_field(to_string(Json), FieldName, FieldValue);
+add_field(Stream,FieldName,FieldValue) ->
+	case is_integer(FieldValue) of
+		true ->
+			string:substr(Stream,1,length(Stream)-1) ++ ",\"" ++ FieldName ++ "\":" ++ FieldValue ++ "}";
+		false ->
+			string:substr(Stream,1,length(Stream)-1) ++ ",\"" ++ FieldName ++ "\":\"" ++ FieldValue ++ "\"}"
+	end.
+
 
 %% ====================================================================
 %% Internal functions
