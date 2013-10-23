@@ -53,7 +53,7 @@ get_stream_test() ->
 	{ok, {{_Version9, 200, _ReasonPhrase9}, _Headers9, Body9}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ DocId2, []}, [], []),
 	?assertEqual("get",lib_json:get_field(Body3,"test")),
 	?assertEqual(true,lib_json:get_field(Body3,"private") == "true"),
-	?assertEqual(true,lib_json:field_value_exists(Body4,"hits[*]._source.test", "get")),
+	?assertEqual(true,lib_json:field_value_exists(Body4,"hits[*].test", "get")),
 	?assertEqual(true,lib_json:field_value_exists(Body5,"hits.hits[*]._source.test", "get")),
 	?assertEqual(true,lib_json:get_field(Body5,"hits.total") >= 2), % Needed in case unempty elasticsearch
 	?assertEqual(true,lib_json:field_value_exists(Body5,"hits.hits[*]._source.test", "get")),
