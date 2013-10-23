@@ -233,11 +233,6 @@ get_resource(ReqData, State) ->
 						       HitsAttr = lib_json:set_attr(hits, HitsList), 
 						       FinalJson = lib_json:to_string(HitsAttr),
 						       {FinalJson, ReqData, State} 
-
-						%% {ok,List} -> SearchRemoved = api_help:remove_search_part(api_help:make_to_string(api_help:json_encode(List)),false,0),
-						%% 	     ExtraRemoved = api_help:remove_extra_and_add_id(SearchRemoved),
-						%% 	     ReturnJson = "{\"hits\":[" ++ ExtraRemoved ++ "]}",
-						%% 	     {ReturnJson, ReqData, State} 
 					end;
 				ResourceId ->
 				% Get specific resource
@@ -249,9 +244,7 @@ get_resource(ReqData, State) ->
 						        ResourceId  = lib_json:get_field(JsonStruct, "_id"),
 						        SourceJson  = lib_json:get_field(JsonStruct, "_source"),
 						        FinalJson = lib_json:add_field(SourceJson, "id", ResourceId),
-						       {FinalJson, ReqData, State} 
-
-								      %% {api_help:remove_extra_and_add_id(lib_json:to_string(List)), ReqData, State}
+						        {FinalJson, ReqData, State} 
 					end
 		end;
 		true ->

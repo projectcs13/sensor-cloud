@@ -296,9 +296,8 @@ get_stream(ReqData, State) ->
 	  					        JsonStr = lib_json:to_string(JsonStruct),
 						        StreamId  = lib_json:get_field(JsonStruct, "_id"),
 						        SourceJson  = lib_json:get_field(JsonStruct, "_source"),
-						        AddField = lib_json:add_field(SourceJson, "id", StreamId),
-
-						{AddField, ReqData, State}
+						        FinalJson = lib_json:add_field(SourceJson, "id", StreamId),
+						        {FinalJson, ReqData, State}
 					end
 				end
 	end.

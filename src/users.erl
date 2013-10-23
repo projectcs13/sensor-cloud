@@ -155,11 +155,11 @@ get_user(ReqData, State) ->
                                         case erlastic_search:search_limit(?INDEX,"user","*:*",2000) of
                                                 {error, Reason} -> 
                                                         {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
-                                                {ok, Result} ->
-                                                        SearchRemoved = api_help:remove_search_part(lib_json:to_string(Result),false,0),
-                                                        ExtraRemoved = api_help:remove_extra_and_add_id(SearchRemoved),
-						        ReturnJson = "{\"hits\":[" ++ ExtraRemoved ++ "]}",
-							{ReturnJson, ReqData, State} 
+					        {ok,JsonStruct} ->
+                                                       HitsList = lib_json:get_field(JsonStruct, "hits.hits"),
+						       HitsAttr = lib_json:set_attr(hits, HitsList), 
+						       FinalJson = lib_json:to_string(HitsAttr),
+						       {FinalJson, ReqData, State}  
                                         end;
                                 Id ->
 				        %% Get specific user
@@ -170,8 +170,9 @@ get_user(ReqData, State) ->
 						        JsonStr = lib_json:to_string(JsonStruct),
 						        UserId  = lib_json:get_field(JsonStruct, "_id"),
 						        SourceJson  = lib_json:get_field(JsonStruct, "_source"),
-						        AddField = lib_json:add_field(SourceJson, "id", UserId),
-						        {AddField, ReqData, State}
+						        FinalJson = lib_json:add_field(SourceJson, "id", UserId),
+						        {FinalJson, ReqData, State} 
+
 
                                         end
                         end;
