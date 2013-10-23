@@ -47,7 +47,7 @@ allowed_methods(ReqData, State) ->
                 [{"users"}] ->
                         {['POST','GET'], ReqData, State};
                 [error] ->
-                        {['POST','GET'], ReqData, State}
+                        {[], ReqData, State}
         end.
 
 
@@ -85,9 +85,10 @@ content_types_accepted(ReqData, State) ->
 delete_resource(ReqData, State) ->
         Id = id_from_path(ReqData),
         case erlastic_search:delete_doc(?INDEX,"user", Id) of
-                {error, not_found} -> {{halt,404}, ReqData, State};
-                {error, _} -> {{halt,400}, ReqData, State};                
-                {ok, _} -> {true, ReqData, State}
+                {error, Reason} -> 
+                    {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};              
+                {ok, List} -> 
+                    {true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
         end.
 
 
@@ -102,16 +103,16 @@ delete_resource(ReqData, State) ->
 -spec put_user(ReqData::tuple(), State::string()) -> {true, tuple(), string()}.
 put_user(ReqData, State) ->
         case id_from_path(ReqData) of
-                undefined -> {{halt, 400}, ReqData, State};
+                undefined -> {false ,wrq:set_resp_body("{\"error\":\"Incorrect user\"}", ReqData), State};
                 Id ->        
                         %check if doc already exists
                         case erlastic_search:get_doc(?INDEX, "user", Id) of
-                                {error, _} ->
-                                        {{halt, 404}, ReqData, State};
-                                {ok, _} ->
+                                {error, Reason} ->
+                                        {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
+                                {ok, List} ->
                                         {UserJson,_,_} = api_help:json_handler(ReqData, State),
                                         erlastic_search:index_doc_with_id(?INDEX, "user", Id, UserJson),
-                                        {true, ReqData, State}
+                                        {true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
                         end
         end.
 
@@ -131,14 +132,14 @@ process_post(ReqData, State) ->
                 false ->
                         {UserJson,_,_} = api_help:json_handler(ReqData, State),
                         case erlastic_search:index_doc(?INDEX, "user", UserJson) of
-                                {error, Reason} -> {{error, Reason}, ReqData, State};
-                                {ok,List} -> Json = api_help:make_to_string(lib_json:encode(List)),
-                   							 Id = api_help:get_id_value(Json,"_id"),
-                                    		 NewJson = "{\"id\" : \"" ++ Id ++ "\"}",
-                                     		 Update = api_help:create_update(NewJson),
-                                     		 case api_help:update_doc(?INDEX,"user", Id, Update, []) of
-												 {error, Reason} -> {false, wrq:set_resp_body(lib_json:encode(Reason), ReqData), State};
-                                        		 {ok,_} ->{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
+                                {error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
+                                {ok,List} -> Json = lib_json:to_string(List),
+					     Id = api_help:get_id_value(Json,"_id"),
+					     NewJson = "{\"id\" : \"" ++ Id ++ "\"}",
+					     Update = api_help:create_update(NewJson),
+					     case api_help:update_doc(?INDEX,"user", Id, Update, []) of
+						 {error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
+						 {ok,_} -> {true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
                                      		 end
                         end;
                 true ->
@@ -159,20 +160,21 @@ get_user(ReqData, State) ->
                                 undefined ->
                                         % Get all users
                                         case erlastic_search:search_limit(?INDEX,"user","*:*",2000) of
+                                                {error, Reason} -> 
+                                                        {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
                                                 {ok, Result} ->
-                                                        SearchRemoved = api_help:remove_search_part(api_help:make_to_string(lib_json:encode(Result)),false,0),
-														ExtraRemoved = api_help:remove_extra_info(SearchRemoved,0),
-                                     					{ExtraRemoved, ReqData, State}; 
-                                                _ -> {{halt, 404}, ReqData, State}
+                                                        SearchRemoved = api_help:remove_search_part(lib_json:to_string(Result),false,0),
+                                                        ExtraRemoved = api_help:remove_extra_info(SearchRemoved,0),
+                                                        {ExtraRemoved, ReqData, State} 
                                         end;
                                 Id ->
-                                        % Get specific user
+				        %% Get specific user
                                         case erlastic_search:get_doc(?INDEX, "user", Id) of
-                                                {error, _} ->
-                                                        {{halt, 404}, ReqData, State};
+                                                {error, Reason} ->
+                                                        {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
                                                 {ok,List} ->
-                                                        ExtraRemoved = api_help:remove_extra_info(api_help:make_to_string(lib_json:encode(List)),0),
-														{ExtraRemoved, ReqData, State}
+						        ExtraRemoved = api_help:remove_extra_info(lib_json:to_string(List),0),
+						        {ExtraRemoved, ReqData, State}
                                         end
                         end;
                 true ->                        
@@ -193,14 +195,15 @@ process_search(ReqData, State, post) ->
         {struct, JsonData} = mochijson2:decode(Json),
         Query = api_help:transform(JsonData),
         case erlastic_search:search_limit(?INDEX, "user", Query, 10) of
-                {error,Reason} -> {{error,Reason}, ReqData, State};
+                {error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
                 {ok,List} -> {true, wrq:set_resp_body(lib_json:encode(List),ReqData),State}
+
         end;
 process_search(ReqData, State, get) ->
         TempQuery = wrq:req_qs(ReqData),
         TransformedQuery = api_help:transform(TempQuery),
         case erlastic_search:search_limit(?INDEX, "user", TransformedQuery, 10) of
-                {error,Reason} -> {{error,Reason}, ReqData, State};
+                {error,Reason} -> {"{\"error\": \""++ lib_json:encode(Reason) ++ "\"}", ReqData, State};
                 {ok,List} -> {lib_json:encode(List),ReqData,State} % May need to convert
         end.
 
@@ -223,6 +226,3 @@ id_from_path(RD) ->
                         end;
                 Id -> Id
         end.
-
-
-

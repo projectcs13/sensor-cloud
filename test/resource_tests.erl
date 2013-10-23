@@ -44,21 +44,22 @@ process_post_test() ->
 %% Side effects: creates and deletes documents in elasticsearch
 %% @end
 delete_resource_test() ->
-	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} =
-	httpc:request(post, {"http://localhost:8000/resources", [],"application/json", "{\"test\" : \"delete\",\"user_id\" : \"1\"}"}, [], []),
-	refresh(),
+	% Create a resource and two streams, then delete the resource and check if streams are automatically deleted
+	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/resources", [],"application/json", "{\"test\" : \"delete\",\"user_id\" : \"1\"}"}, [], []),
 	DocId = get_id_value(Body2,"_id"),
-	httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"delete\",\"user_id\" : 1, \"resource_id\" : \"" ++ DocId ++ "\"}"}, [], []),
-	httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"delete\",\"user_id\" : 1, \"resource_id\" : \"" ++ DocId ++ "\"}"}, [], []),
 	refresh(),
-	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} =
-	httpc:request(delete, {"http://localhost:8000/resources/" ++ DocId, []}, [], []),
+	httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"delete\",\"user_id\" : \"1\", \"resource_id\" : \"" ++ DocId ++ "\"}"}, [], []),
+	httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"delete\",\"user_id\" : \"1\", \"resource_id\" : \"" ++ DocId ++ "\"}"}, [], []),
 	refresh(),
-	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} =
-	httpc:request(get, {"http://localhost:8000/users/1/resources/"++DocId++"/streams", []}, [], []),
-	?assertEqual([], lib_json:get_field(Body4, "hits")),
+	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(delete, {"http://localhost:8000/resources/" ++ DocId, []}, [], []),
+	refresh(),
+	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(get, {"http://localhost:8000/users/1/resources/"++DocId++"/streams", []}, [], []),
+	% Delete a resource that doesn't exist
+	{ok, {{_Version5, 500, _ReasonPhrase5}, _Headers5, _Body5}} = httpc:request(delete, {"http://localhost:8000/resources/1", []}, [], []),
+
 	?assertEqual(true, lib_json:get_field(Body2,"ok")),
-	?assertEqual(true, lib_json:get_field(Body3,"ok")).
+	?assertEqual(true, lib_json:get_field(Body3,"ok")),
+        ?assertEqual([], lib_json:get_field(Body4, "hits")).
 	
 %% @doc
 %% Function: put_resource_test/0
@@ -73,9 +74,12 @@ put_resource_test() ->
 	DocId = get_id_value(Body1,"_id"),
 	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(put, {"http://localhost:8000/resources/" ++ DocId , [],"application/json", "{\"doc\" :{\"test\" : \"put2\",\"user_id\" : \"0\",\"streams\" : \"1\"}}"}, [], []),
 	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(get, {"http://localhost:8000/resources/" ++ DocId, []}, [], []),
+	%Try to put to a resource that doesn't exist
+	{ok, {{_Version4, 500, _ReasonPhrase4}, _Headers4, _Body4}} = httpc:request(put, {"http://localhost:8000/resources/1", [],"application/json", "{\"doc\" :{\"test\" : \"put2\",\"user_id\" : 0,\"streams\" : 1}}"}, [], []),
 	?assertEqual(true,lib_json:get_field(Body1,"ok")),
 	?assertEqual(true,lib_json:get_field(Body2,"ok")),
 	?assertEqual("put2",lib_json:get_field(Body3,"_source.test")).
+
 	
 %% @doc
 %% Function: get_resource_test/0
@@ -91,6 +95,8 @@ get_resource_test() ->
 	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(get, {"http://localhost:8000/resources/" ++ DocId, []}, [], []),
 	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(get, {"http://localhost:8000/users/0/resources/" ++ DocId, []}, [], []),
 	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(get, {"http://localhost:8000/users/0/resources/_search?test=get", []}, [], []),
+	%Get resource that doesn't exist
+	{ok, {{_Version5, 500, _ReasonPhrase5}, _Headers5, _Body5}} = httpc:request(get, {"http://localhost:8000/resources/1" ++ DocId, []}, [], []),
 	?assertEqual("get",lib_json:get_field(Body2,"_source.test")),
 	?assertEqual("get",lib_json:get_field(Body3,"_source.test")),
 	?assertEqual(true,lib_json:field_value_exists(Body4,"hits.hits[*]._source.test","get")).
