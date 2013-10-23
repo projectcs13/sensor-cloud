@@ -30,10 +30,14 @@
 %% Returns : Either a string() representation of the json object or a mochiweb
 %%           representation of a json object: json_term()
 %% @end
+
+%% This case is for when Json is a string representation of the json object
 encode(Json) when is_list(Json) ->
     JsonObj = decode(Json),
     Encoder = mochijson2:encoder([{utf8, true}]),
     Encoder(JsonObj);
+
+%% This case is for when Json is a internal mochijson representation of the json object
 encode(Json) when is_tuple(Json)->
     Encoder = mochijson2:encoder([{utf8, true}]),
     Encoder(Json);
