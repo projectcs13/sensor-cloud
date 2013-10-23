@@ -108,7 +108,7 @@ delete_resources_with_user_id(Id) ->
             {error,Reason};
         {ok,List} -> 
             SearchRemoved = api_help:remove_search_part(api_help:make_to_string(api_help:json_encode(List)),false,0),
-            ExtraRemoved = api_help:remove_extra_info(SearchRemoved, 0),
+            ExtraRemoved = "[" ++ api_help:remove_extra_and_add_id(SearchRemoved) ++ "]",
             case get_resources(ExtraRemoved) of
                 [] -> {ok};
                 Streams ->

@@ -122,7 +122,6 @@ put_user_search_test() ->
 	?assertMatch({match, _}, re:run(A, "\"email\":\""++?TEST_EMAIL++"\"", [{capture, first, list}])).
 
 
-
 %% @doc
 %% Function: delete_user_test/0
 %% Purpose: Test the delete_resource function by doing some HTTP requests
