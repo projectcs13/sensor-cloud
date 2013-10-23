@@ -18,6 +18,9 @@
 	 encode/1, 
 	 field_value_exists/3, 
 	 get_field/2, 
+	 get_fields/2,
+	 get_and_add_id/1,
+	 get_list_and_add_id/1,
 	 get_field_value/3, 
 	 set_attr/2,
 	 to_string/1]).
@@ -87,6 +90,14 @@ get_field(Json, Query) when is_list(Json)->
     get_field({JsonObj, Query});
 get_field(Json, Query) when is_tuple(Json) ->
     get_field({Json, Query}).
+
+get_fields(Json, []) ->
+    [];
+get_fields(Json, [Field|Tl]) ->
+    Result = get_field(Json, Field),
+    [Result | get_fields(json, Tl)].
+    
+    
 
 
 %% @doc
@@ -194,6 +205,19 @@ add_field(Stream,FieldName,FieldValue) ->
     string:substr(Stream,1,length(Stream)-1) ++ ",\"" ++ FieldName ++ "\":\"" ++ FieldValue ++ "\"}".
 
 
+get_and_add_id(JsonStruct) ->
+    Id  = get_field(JsonStruct, "_id"),
+    SourceJson  = get_field(JsonStruct, "_source"),
+    add_field(SourceJson, "id", Id).
+
+get_list_and_add_id(JsonStruct) ->
+    HitsList = get_field(JsonStruct, "hits.hits"),
+    AddedId = lists:map(fun(X) -> decode(get_and_add_id(X)) end, HitsList),
+    HitsAttr = set_attr(hits, AddedId),
+    to_string(HitsAttr).
+
+
+
 %% ====================================================================
 %% Internal functions
 %% ====================================================================
@@ -292,3 +316,7 @@ find_wildcard_fields(Query) ->
 	    NewWildCards2 = lists:map(fun(X) -> {wildcard, X} end, NewWildCards),
 	    NewWildCards2 ++ [{no_wildcard, R}]
     end.
+
+
+
+
