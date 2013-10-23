@@ -47,10 +47,12 @@ loop(ChannelIn, {ChannelOut, StreamExchange}) ->
 				%% Post request
 				{post, JSON} ->
 					io:format("POST: ~p~n", [JSON]);
+					%% Parse JSON
+					
 					%% Store value
 
 					%% Propagete
-					%send(ChannelOut, RoutingKeyOut, Body),
+%					send(ChannelOut, StreamExchange, Body),
 
 				%% Delete request
 				{delete} ->
