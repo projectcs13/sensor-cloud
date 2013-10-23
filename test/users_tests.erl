@@ -122,26 +122,11 @@ put_user_search_test() ->
 	?assertMatch({match, _}, re:run(A, "\"email\":\""++?TEST_EMAIL++"\"", [{capture, first, list}])).
 
 
-%% @doc
-%% Function: delete_user_test/0
-%% Purpose: Checks user deletion
-%% Returns: ok | {error, term()}
-%%
-%% @end
-% -spec delete_user_test() -> ok | {error, term()}.
-% delete_user_test() ->	
-% 	Id = get_index_id(?TEST_NAME),
-% 	?assertNotMatch({error, "no match"}, Id),
-% 	Response1 = delete_request(?USERS_URL++Id),
-% 	erlang:display(Response1),
-% 	check_returned_code(Response1, 200),
-	
-% 	Response2 = get_request(?USERS_URL ++ Id),
-% 	check_returned_code(Response2, 500).
+
 
 %% @doc
-%% Function: delete_resource_test/0
-%% Purpose: Test the delete_resource_test function by doing some HTTP requests
+%% Function: delete_user_test/0
+%% Purpose: Test the delete_resource function by doing some HTTP requests
 %% Returns: ok | {error, term()}
 %%
 %% Side effects: creates and deletes documents in elasticsearch
@@ -165,9 +150,9 @@ delete_user_test() ->
 	{ok, {{_Version11, 200, _ReasonPhrase11}, _Headers11, Body11}} = httpc:request(get, {"http://localhost:8000/users/"++DocId++"/resources/"++DocId2++ "/streams", []}, [], []),
 	{ok, {{_Version12, 200, _ReasonPhrase12}, _Headers12, Body12}} = httpc:request(get, {"http://localhost:8000/users/"++DocId++"/resources/"++DocId3++ "/streams", []}, [], []),
 	% Delete a resource that doesn't exist
-	?assertEqual("[]",Body10),
-	?assertEqual("[]",Body11),
-	?assertEqual("[]",Body12).
+	?assertEqual("{\"hits\":[]}",Body10),
+	?assertEqual("{\"hits\":[]}",Body11),
+	?assertEqual("{\"hits\":[]}",Body12).
 
 
 
