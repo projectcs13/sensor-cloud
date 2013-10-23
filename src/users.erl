@@ -165,7 +165,8 @@ get_user(ReqData, State) ->
                                                 {ok, Result} ->
                                                         SearchRemoved = api_help:remove_search_part(api_help:make_to_string(api_help:json_encode(Result)),false,0),
                                                         ExtraRemoved = api_help:remove_extra_info(SearchRemoved,0),
-                                                        {ExtraRemoved, ReqData, State} 
+														ReturnJson = "{\"hits\":" ++ ExtraRemoved ++ "}",
+														{ReturnJson, ReqData, State} 
                                         end;
                                 Id ->
                                         % Get specific user
