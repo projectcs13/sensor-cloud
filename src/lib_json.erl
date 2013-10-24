@@ -13,17 +13,19 @@
 %% ====================================================================
 %% API functions
 %% ====================================================================
--export([add_field/3, 
-	 decode/1, 
-	 encode/1, 
-	 field_value_exists/3, 
-	 get_field/2, 
-	 get_fields/2,
-	 get_and_add_id/1,
-	 get_list_and_add_id/1,
-	 get_field_value/3, 
-	 set_attr/2,
-	 to_string/1]).
+-export([add_field/3,
+	replace_attr/3,	
+	decode/1, 
+	add_value_in_list/2,
+	encode/1, 
+	field_value_exists/3, 
+	get_field/2, 
+	get_fields/2,
+	get_and_add_id/1,
+	get_list_and_add_id/1,
+	get_field_value/3, 
+	set_attr/2,
+	to_string/1]).
 -include("misc.hrl").
 
 
@@ -187,7 +189,11 @@ set_attr(Attr, Value) when is_binary(Attr) ->
     {struct, [{Attr, Value}]};
 set_attr(Attr, Value) when is_list(Attr) ->
     set_attr(binary:list_to_bin(Attr), Value).
-    
+
+replace_attr(Json, Path, Value) ->
+	erlang:display("replace_attr should be implemented"),
+	Json.
+
 
 %% @doc
 %% Function: add_field/3
@@ -203,6 +209,11 @@ add_field(Stream,FieldName,FieldValue) when is_integer(FieldValue) ->
     string:substr(Stream,1,length(Stream)-1) ++ ",\"" ++ FieldName ++ "\":" ++ FieldValue ++ "}";
 add_field(Stream,FieldName,FieldValue) ->
     string:substr(Stream,1,length(Stream)-1) ++ ",\"" ++ FieldName ++ "\":\"" ++ FieldValue ++ "\"}".
+
+add_value_in_list(List, Value) when is_list(List) ->
+	A= [Value | List],
+	erlang:display(to_string(A)),
+	A.
 
 
 get_and_add_id(JsonStruct) ->

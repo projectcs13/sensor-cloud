@@ -151,6 +151,63 @@ add_suggestion(Resource, Json) ->
 	end.
 
 
+update_suggestion(Stream) ->
+	ResourceId = lib_json:get_field(Stream, "resource_id"),
+	erlang:display(ResourceId),
+	case erlastic_search:search(?INDEX, "suggestion", "resource_id:"++ResourceId) of
+		{error, _} -> erlang:display("ERROR");
+		{ok, Response} -> 
+			case lib_json:get_field(Response, "hits.hits[0]._source.resource_id") of
+				ResourceId ->
+					Weight = lib_json:get_field(Response, "hits.hits[0]._source.suggest.weight"),
+					Id = lib_json:get_field(Response, "hits.hits[0]._id"),
+					%Output = lib_json:get_field(Response, "hits.hits[0]._source.output"),
+					%Input = lib_json:get_field(Response, "hits.hits[0]._source.input"),
+					Payload = lib_json:get_field(Response, "hits.hits[0]._source.payload"),
+					{AddWeight, StreamInfo} = get_stream_info(Stream),
+					NewWeight = Weight + AddWeight,
+					Sugg = lib_json:get_field(Response, "hits.hits[0]._source"),
+					case lib_json:get_field(Response, "hits.hits[0]._source.payload.streams") of
+						undefined ->
+							NewPayload = lib_json:add_field(Payload, "streams", "["++StreamInfo++"]"),
+							TempSugg = lib_json:replace_attr(Sugg, "suggest.payload", NewPayload),
+							NewSugg = lib_json:replace_attr(TempSugg, "suggest.weight", NewWeight);
+						OldStream ->
+							NewStreamList = lib_json:add_value_in_list(OldStream, StreamInfo),
+							TempSugg = lib_json:replace_attr(Sugg, "suggest.payload.streams", NewStreamList),
+							NewSugg = lib_json:replace_attr(TempSugg, "suggest.weight", NewWeight)
+					end,
+					case erlastic_search:index_doc_with_id(?INDEX, "suggestion", Id, NewSugg) of 
+						{error, S} -> erlang:display("Suggestion not saved ");
+						{ok, _} -> erlang:display("Stream suggestion added")
+					end;
+				_ -> 
+					erlang:display("error-2")
+			end
+	end.
+
+get_stream_info(Stream) ->
+	Name = lib_json:get_field(Stream, "name"),
+	Description = lib_json:get_field(Stream, "description"),
+	Min_val  = lib_json:get_field(Stream, "min_val"),
+	Max_val  = lib_json:get_field(Stream, "max_val"),
+	Tags  = lib_json:get_field(Stream, "tags"),
+	Type  = lib_json:get_field(Stream, "Type"),
+	Weight = scoring:calc([Name, Description, Min_val, Max_val, Tags, Type]),
+	Result ="{
+		\"name\":\"" ++ undefined_to_string(Name)++"\"
+		\"description\":\"" ++ undefined_to_string(Description)++"\"
+		\"min_value\":\"" ++ undefined_to_string(Min_val)++"\"
+		\"max_value\":\"" ++ undefined_to_string(Max_val)++"\"
+		\"tags\":\"" ++ undefined_to_string(Tags)++"\"
+		\"type\":\"" ++ undefined_to_string(Type)++"\"
+		}",
+	erlang:display(Result),
+	{Weight, Result}.
+
+
+
+
 undefined_to_string(Text) ->
 	case Text of
 		undefined ->

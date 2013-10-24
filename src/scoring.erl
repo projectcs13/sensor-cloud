@@ -14,7 +14,15 @@
 %% ====================================================================
 %% API functions
 %% ====================================================================
--export([calc/2]).
+-export([calc/2, calc/1]).
+
+
+calc(List) when is_list(List)->
+	Fun = fun(undefined, Acc) -> Acc;
+		(_,  Acc) -> Acc+1
+	end, 
+	lists:foldr(Fun, 0, List).
+
 
 calc(Resource, resource) ->
 	Manufacturer = lib_json:get_field(Resource, "manufacturer"),
