@@ -156,9 +156,7 @@ get_user(ReqData, State) ->
                                                 {error, Reason} -> 
                                                         {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
 					        {ok,JsonStruct} ->
-                                                       HitsList = lib_json:get_field(JsonStruct, "hits.hits"),
-						       HitsAttr = lib_json:set_attr(hits, HitsList), 
-						       FinalJson = lib_json:to_string(HitsAttr),
+						       FinalJson = lib_json:get_list_and_add_id(JsonStruct),
 						       {FinalJson, ReqData, State}  
                                         end;
                                 Id ->
@@ -167,10 +165,7 @@ get_user(ReqData, State) ->
                                                 {error, Reason} ->
                                                         {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
                                                 {ok,JsonStruct} ->
-						        JsonStr = lib_json:to_string(JsonStruct),
-						        UserId  = lib_json:get_field(JsonStruct, "_id"),
-						        SourceJson  = lib_json:get_field(JsonStruct, "_source"),
-						        FinalJson = lib_json:add_field(SourceJson, "id", UserId),
+						        FinalJson = lib_json:get_and_add_id(JsonStruct),
 						        {FinalJson, ReqData, State} 
 
 
