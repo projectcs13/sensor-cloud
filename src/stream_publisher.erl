@@ -22,11 +22,11 @@
 
 main(Argv) ->
     {ok, Connection} =
-        amqp_connection:start(#amqp_params_network{host = "localhost"}),
+        amqp_connection:start(#amqp_params_network{host = "localhost", port = 5672}),
     {ok, Channel} = amqp_connection:open_channel(Connection),
 
     amqp_channel:call(Channel, #'exchange.declare'{exchange = <<"topic_logs">>,
-                                                   type = <<"topic">>}),
+                                                   type = <<"fanout">>}),
 
     {RoutingKey, Message} = case Argv of
                                 [] ->
