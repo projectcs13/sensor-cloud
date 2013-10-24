@@ -114,9 +114,9 @@ create_update(Stream) ->
 add_field(Stream,FieldName,FieldValue) ->
 	case is_integer(FieldValue) of
 		true ->
-			string:substr(Stream,1,length(Stream)-1) ++ ",\n\"" ++ FieldName ++ "\" : " ++ FieldValue ++ "\n}";
+			string:substr(Stream,1,length(Stream)-1) ++ ",\"" ++ FieldName ++ "\":" ++ FieldValue ++ "}";
 		false ->
-			string:substr(Stream,1,length(Stream)-1) ++ ",\n\"" ++ FieldName ++ "\" : \"" ++ FieldValue ++ "\"\n}"
+			string:substr(Stream,1,length(Stream)-1) ++ ",\"" ++ FieldName ++ "\":\"" ++ FieldValue ++ "\"}"
 	end.
 			
 
@@ -182,17 +182,6 @@ transform([{Field,Value}|Rest],AddAnd) ->
 	end.
 
 
-
-%% @doc
-%% Function: json_encode/1
-%% Purpose: Used to transform the given data to json
-%% Returns: JSON that is created
-%% @end
-
-% Taken from erlasticsearch
-json_encode(Data) ->
-    (mochijson2:encoder([{utf8, true}]))(Data).
-
 %% @doc
 %% Function: update_doc/4
 %% Purpose: Used to update document in elastic search
@@ -216,77 +205,11 @@ update_doc(Index, Type, Id, Json, Qs) ->
     erls_resource:post(#erls_params{}, ReqPath, [], Qs, Json, []).
 
 
-%% @doc
-%% Function: get_value_field/2
-%% Purpose: Return the value of a certain field in the given JSON string.
-%% Returns: Return the value of the specified field, if it exists, 
-%%          otherwise returns the empty string.
-%% @end
--spec get_value_field(String::string(),Field::string()) -> string().
-
-get_value_field(JSONString,Field) ->
-	Tokens = string:tokens(JSONString, ","),
-	ResourceField = find_field(Tokens,Field),
-	case ResourceField of 
-		[] -> "";
-		_ -> FieldValue = string:tokens(ResourceField,":"),
-			 remove_special_characters(lists:nth(length(FieldValue),FieldValue),false)
-	end.
-
-%% @doc
-%% Function: find_field/2
-%% Purpose: Help function to find the first string containing the given string
-%%          in the list.
-%% Returns: The first string containing the given string
-%%          in the list, the empty string if non exists.
-%% @end
--spec find_field(List::list(),Field::string()) -> string().
-
-find_field([],_) ->
-	[];
-
-find_field([First|Rest],Field) ->
-	case string:str(First,"\"" ++ Field ++ "\"") of
-		0 -> find_field(Rest,Field);
-		_ -> First
-	end.
-
-
-%% @doc
-%% Function: remove_special_characters/2
-%% Purpose: Help function to remove non alphanumerical characters
-%% Returns: First string of alphanumerical characters that can be found,
-%%          empty string if non exists
-%% @end
--spec remove_special_characters(String::string(),CharactersFound::boolean()) -> string().
-
-remove_special_characters([],_) ->
-	[];
-
-remove_special_characters([First|Rest],false) ->
-	Character1 = (First < 91) and (First > 64) or (First < 123) and (First > 96) or (First > 47) and (First < 58),
-	Character2 = Character1 or (First == $-) or (First == $_),
-	case Character2 of
-		true ->
-			[First|remove_special_characters(Rest,true)];
-		false ->
-			remove_special_characters(Rest,false)
-	end;
-remove_special_characters([First|Rest],true) ->
-	Character1 = (First < 91) and (First > 64) or (First < 123) and (First > 96) or (First > 47) and (First < 58),
-	Character2 = Character1 or (First == $-) or (First == $_),
-	case Character2 of
-		true ->
-			[First|remove_special_characters(Rest,true)];
-		false ->
-			[]
-	end.
-
 
 %% @doc
 %% Function: remove_extra_info/3
 %% Purpose: Used to remove the extra info for documents
-%% Returns: Returns the list of JSON objects return from the search
+%% Returns: Returns the list of JSON objects without the extra info
 %% @end
 -spec remove_extra_info(JSONString::string(),OpenBrackets::integer()) -> string().
 
@@ -317,6 +240,60 @@ remove_extra_info([First|Rest],Val) ->
                 _ ->
                         [First|remove_extra_info(Rest,Val)]
         end.
+
+
+%% @doc
+%% Function: remove_extra_and_add_id/1
+%% Purpose: Used to remove the extra info for documents and add the id as
+%%          a field in the document
+%% Returns: Returns the list of JSON objects with id and without extra info
+%% @end
+-spec remove_extra_and_add_id(JSONString::string()) -> string().
+
+remove_extra_and_add_id([]) ->
+	[];
+remove_extra_and_add_id(Json) ->
+	Id = lib_json:get_field(Json,"_id"),
+	case Id of
+		undefined -> [];
+		_->
+			NewJson = add_field(remove_extra_info(get_object(Json,0),0),"id",Id),
+			case lib_json:get_field(remove_object(Json,0),"_id") of
+				undefined ->
+					NewJson ++ remove_extra_and_add_id(remove_object(Json,0));
+				_ ->
+					NewJson ++ "," ++ remove_extra_and_add_id(remove_object(Json,0))
+			end
+	end.
+
+	
+%% @doc
+%% Function: get_object/2
+%% Purpose: Used to return the first JSON of the list
+%% Returns: Returns first JSON in the list
+%% @end
+-spec get_object(JSONString::string(),OpenBrackets::integer()) -> string().
+
+get_object([],_) ->
+	[];
+get_object([First|Rest],0) ->
+	case First of
+		$, ->
+			[];
+		${ ->
+			[First|get_object(Rest,1)];
+		_ ->
+			get_object(Rest,0)
+	end;
+get_object([First|Rest],Val) ->
+	case First of
+		${ ->
+			[First|get_object(Rest,Val+1)];
+		$} ->
+			[First|get_object(Rest,Val-1)];
+		_-> 
+			[First|get_object(Rest,Val)]
+	end.
 
 %% @doc
 %% Function: remove_object/2
@@ -362,24 +339,4 @@ convert_binary_to_string([First|Rest]) ->
 					 true -> convert_binary_to_string(First) ++ convert_binary_to_string(Rest);
 					 false -> [First] ++ convert_binary_to_string(Rest)
 				 end
-	end.
-
-%% @doc
-%% Function: get_id_value/2
-%% Purpose: Help function to find value of a field in the string
-%% Returns: String with value of the field
-%% @end
--spec get_id_value(String::string(),Field::string()) -> string().
-
-get_id_value(String,Field) ->
-	Location = string:str(String,Field),
-	Start = Location + 3 + length(Field),
-	RestOfString = string:substr(String, Start),
-	NextComma = string:str(RestOfString,","),
-	NextBracket = string:str(RestOfString,"}"),
-	case (NextComma < NextBracket) and (NextComma =/= 0) of
-		true ->
-			string:substr(RestOfString, 1,NextComma-2);
-		false ->
-			string:substr(RestOfString, 1,NextBracket-2)
 	end.

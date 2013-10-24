@@ -25,14 +25,13 @@ create(ResourceId) ->
     loop(Channel, ResourceExchange).
 
 loop(Channel, Exchange) ->
-    %% get Timestamp
-    {{Year,Month,Day},{Hour,Min,Sec}} = erlang:localtime(),
     {S1,S2,S3} = erlang:now(),
     %% Seed random generator
     random:seed(S1,S2,S3),
     %% Random a value
     Data = random:uniform(5),
-
+    %% get Timestamp
+    {{Year,Month,Day},{Hour,Min,Sec}} = erlang:localtime(),
     %% Create Message
     Msg = term_to_binary(#'datapoint'{timestamp = string:join([integer_to_list(Year),
                                                                integer_to_list(Month),
