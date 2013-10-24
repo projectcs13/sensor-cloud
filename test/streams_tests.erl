@@ -164,8 +164,6 @@ create_doc_without_resource_test() ->
  	{ok, {{_Version2, 500, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/users/0/streams", [], "application/json", "{\n\"test\" : \"get\"\n}"}, [], []),
 	?assertEqual(true,string:str(Body1,"resource_id_missing") =/= 0),
 	?assertEqual(true,string:str(Body2,"resource_id_missing") =/= 0).
-
-
 		
 %% @doc
 %% Function: get_id_value/2
