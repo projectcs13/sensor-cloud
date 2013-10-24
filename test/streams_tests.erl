@@ -25,6 +25,24 @@
 init_test() ->
 inets:start().
 
+
+
+%% @doc
+%% Function: process_search_post_test/0
+%% Purpose: Test the process_post_test function by doing some HTTP requests
+%% Returns: ok | {error, term()}
+%% @end
+process_search_post_test() ->
+        {ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"search\",\"resource_id\" : \"0\", \"private\" : \"false\"}"}, [], []),
+        {ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"search\",\"resource_id\" : \"0\", \"private\" : \"true\"}"}, [], []),
+        DocId1 = lib_json:get_field(Body1,"_id"),
+        DocId2 = lib_json:get_field(Body2,"_id"),
+        timer:sleep(1000),
+        {ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(post, {"http://localhost:8000/streams/_search", [],"application/json", "{\"query\":{\"match_all\":{}}}"}, [], []),
+        {ok, {{_Version8, 200, _ReasonPhrase8}, _Headers8, Body8}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ DocId1, []}, [], []),
+        {ok, {{_Version9, 200, _ReasonPhrase9}, _Headers9, Body9}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ DocId2, []}, [], []),
+        ?assertEqual(true,lib_json:get_field(Body3,"hits.total") >= 1).
+
 %% @doc
 %% Function: get_stream_test/0
 %% Purpose: Test the get_stream function by doing some HTTP requests
@@ -36,31 +54,35 @@ inets:start().
 
 get_stream_test() ->
 	% Test create
-	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"get\",\"user_id\" : \"0\", \"resource_id\" : \"asdascvsr213sda\", \"private\" : \"true\"}"}, [], []),
-	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"get\",\"user_id\" : \"0\", \"resource_id\" : \"asdascvsr213sda\", \"private\" : \"true\"}"}, [], []),
-	DocId1 = get_id_value(Body1,"_id"),
-	DocId2 = get_id_value(Body2,"_id"),
+
+	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"get\",\"user_id\" : \"0\", \"resource_id\" : \"asdascvsr213sda\", \"private\" : \"false\"}"}, [], []),
+	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"get\",\"user_id\" : \"0\", \"resource_id\" : \"asdascvsr213sda\", \"private\" : \"false\"}"}, [], []),
+	DocId1 = lib_json:get_field(Body1,"_id"),
+	DocId2 = lib_json:get_field(Body2,"_id"),
 	refresh(),
 	% Test get and search
 	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(get, {"http://localhost:8000/streams/" ++ DocId1, []}, [], []),
 	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(get, {"http://localhost:8000/users/0/resources/asdascvsr213sda/streams", []}, [], []),
 	{ok, {{_Version5, 200, _ReasonPhrase5}, _Headers5, Body5}} = httpc:request(get, {"http://localhost:8000/streams/_search?user_id=0", []}, [], []),
-	{ok, {{_Version6, 200, _ReasonPhrase6}, _Headers6, Body6}} = httpc:request(post, {"http://localhost:8000/streams/_search?test=get",[],"",""}, [], []),
+	{ok, {{_Version6, 200, _ReasonPhrase6}, _Headers6, Body6}} = httpc:request(post, {"http://localhost:8000/streams/_search",[],"application/json", "{\"query\":{\"term\" : { \"test\" : \"get\" }}}"}, [], []),
+
+
 	% Test get for missing index
 	{ok, {{_Version7, 500, _ReasonPhrase7}, _Headers7, Body7}} = httpc:request(get, {"http://localhost:8000/streams/1", []}, [], []),
 	% Test delete
 	{ok, {{_Version8, 200, _ReasonPhrase8}, _Headers8, Body8}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ DocId1, []}, [], []),
 	{ok, {{_Version9, 200, _ReasonPhrase9}, _Headers9, Body9}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ DocId2, []}, [], []),
 	?assertEqual("get",lib_json:get_field(Body3,"test")),
-	?assertEqual(true,lib_json:get_field(Body3,"private") == "true"),
+
+	?assertEqual(true,lib_json:get_field(Body3,"private") == "false"),
 	?assertEqual(true,lib_json:field_value_exists(Body4,"hits[*].test", "get")),
 	?assertEqual(true,lib_json:field_value_exists(Body5,"hits.hits[*]._source.test", "get")),
 	?assertEqual(true,lib_json:get_field(Body5,"hits.total") >= 2), % Needed in case unempty elasticsearch
 	?assertEqual(true,lib_json:field_value_exists(Body5,"hits.hits[*]._source.test", "get")),
 	?assertEqual(true,lib_json:get_field(Body6,"hits.total") >= 2), % Needed in case unempty elasticsearch
 	?assertEqual(true,string:str(Body7,"not_found") =/= 0),
-	?assertEqual(true,get_id_value(Body8,"_id") == DocId1),
-	?assertEqual(true,get_id_value(Body9,"_id") == DocId2).
+	?assertEqual(true,lib_json:get_field(Body8,"_id") == DocId1),
+	?assertEqual(true,lib_json:get_field(Body9,"_id") == DocId2).
 
 %% @doc
 %% Function: get_stream_test/0
@@ -75,8 +97,8 @@ put_stream_test() ->
 	% Test create
 	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [], "application/json", "{\n\"test\" : \"get\",\n\"private\" : \"true\"\n, \"resource_id\" : \"asdascvsr213sda\"}"}, [], []),
 	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/users/0/resources/asdascvsr213sda/streams", [], "application/json", "{\n\"test\" : \"get\",\n\"private\" : \"true\"\n}"}, [], []),
-	DocId1 = get_id_value(Body1,"_id"),
-	DocId2 = get_id_value(Body2,"_id"),
+	DocId1 = lib_json:get_field(Body1,"_id"),
+	DocId2 = lib_json:get_field(Body2,"_id"),
 	refresh(),
 	% Test update
 	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, _Body3}} = httpc:request(put, {"http://localhost:8000/streams/" ++ DocId1, [], "application/json", "{\n\"test\" : \"put\",\n\"private\" : \"false\"\n}"}, [], []),
@@ -98,8 +120,8 @@ put_stream_test() ->
 	?assertEqual(true,lib_json:get_field(Body5,"test") =/= "get"),
 	?assertEqual(true,lib_json:get_field(Body6,"test") == "put"),
 	?assertEqual(true,lib_json:get_field(Body6,"test") =/= "get"),
-	?assertEqual(true,get_id_value(Body7,"_id") == DocId1),
-	?assertEqual(true,get_id_value(Body8,"_id") == DocId2),
+	?assertEqual(true,lib_json:get_field(Body7,"_id") == DocId1),
+	?assertEqual(true,lib_json:get_field(Body8,"_id") == DocId2),
 	?assertEqual(true,string:str(Body9,"not_found") =/= 0).
 
 %% @doc
@@ -115,8 +137,8 @@ delete_stream_test() ->
 	% Test create
 	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [], "application/json", "{\n\"test\" : \"get\"\n, \"resource_id\" : \"asdascvsr213sda\"}"}, [], []),
 	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/users/0/resources/asdascvsr213sda/streams", [], "application/json", "{\n\"test\" : \"get\"\n}"}, [], []),
-	DocId1 = get_id_value(Body1,"_id"),
-	DocId2 = get_id_value(Body2,"_id"),
+	DocId1 = lib_json:get_field(Body1,"_id"),
+	DocId2 = lib_json:get_field(Body2,"_id"),
 	refresh(),
 	% Test delete
 	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ DocId1, []}, [], []),
@@ -124,8 +146,8 @@ delete_stream_test() ->
 	% Test delete on missing index
 	{ok, {{_Version5, 500, _ReasonPhrase5}, _Headers5, Body5}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ DocId1, []}, [], []),
 	{ok, {{_Version6, 500, _ReasonPhrase6}, _Headers6, Body6}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ DocId2, []}, [], []),
-	?assertEqual(true,get_id_value(Body3,"_id") == DocId1),
-	?assertEqual(true,get_id_value(Body4,"_id") == DocId2),
+	?assertEqual(true,lib_json:get_field(Body3,"_id") == DocId1),
+	?assertEqual(true,lib_json:get_field(Body4,"_id") == DocId2),
 	?assertEqual(true,string:str(Body5,"not_found") =/= 0),
 	?assertEqual(true,string:str(Body6,"not_found") =/= 0).
 
