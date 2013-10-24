@@ -166,7 +166,9 @@ process_post(ReqData, State) ->
 			{Resource,_,_} = api_help:json_handler(ReqData,State),
 			case erlastic_search:index_doc(?INDEX,"resource",Resource) of 
 				{error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
-				{ok,List} -> {true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
+				{ok,List = {struct, Json}} -> 
+					suggest:add_suggestion(Resource, Json),
+					{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
 			end;
 		true ->
 			% Search
