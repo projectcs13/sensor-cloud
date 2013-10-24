@@ -72,6 +72,26 @@ test: compile
 	-@mkdir test-results
 	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname test -s test run
 
+test_json: compile
+	-@mkdir test-results
+	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname test -eval 'test:run(json)'
+
+test_resource: compile
+	-@mkdir test-results
+	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname test -eval 'test:run(resource)'
+
+test_streams: compile
+	-@mkdir test-results
+	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname test -eval 'test:run(streams)'
+
+test_suggest: compile
+	-@mkdir test-results
+	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname test -eval 'test:run(suggest)'
+
+test_users: compile
+	-@mkdir test-results
+	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname test -eval 'test:run(users)'
+
 ### Command: make docs
 ### Genereats all of the documentation files
 docs:
