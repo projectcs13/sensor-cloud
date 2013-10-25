@@ -137,7 +137,6 @@ get_datapoint(ReqData, State) ->
 -spec is_search(string()) -> boolean().
 is_search(ReqData) ->
 		URIList = string:tokens(wrq:path(ReqData), "/"),
-		
 		A = string:sub_string(lists:nth(length(URIList),URIList),1,7) == "_search".
 
 
