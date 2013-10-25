@@ -30,9 +30,14 @@
 -include("misc.hrl").
 
 add_value_in_list(List, Value) when is_list(List) ->    
-    NewValue = Value,
-    [NewValue | List].
-
+        erlang:display(List),
+        V = decode(Value),
+        erlang:display(V),
+        [L] = List,
+        A = [V , L],
+        erlang:display("AAA"),
+        erlang:display(to_string(A)),
+        A.
 
 %% @doc
 %% Function: encode/1
@@ -79,8 +84,7 @@ field_replace(Json, Field, Value) when is_tuple(Value) ->
     field_replace(Json, Field, internal, erlson:from_json(encode(Value)));
 
 field_replace(Json, Field, Value) when is_list(Value) ->
-    NewValue = erlson:from_json(Value),
-    field_replace(Json, Field, internal, NewValue);
+    field_replace(Json, Field, internal, Value);
 	
 field_replace(Json, Field, Value)  ->
     field_replace(Json, Field, internal, Value).
