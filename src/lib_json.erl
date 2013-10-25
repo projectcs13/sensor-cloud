@@ -211,7 +211,12 @@ add_field(Stream,FieldName,FieldValue) ->
     string:substr(Stream,1,length(Stream)-1) ++ ",\"" ++ FieldName ++ "\":\"" ++ FieldValue ++ "\"}".
 
 add_value_in_list(List, Value) when is_list(List) ->
-	A= [Value | List],
+	erlang:display(List),
+	V = decode(Value),
+	erlang:display(V),
+	[L] = List, 
+	A= [V , L],
+	erlang:display("AAA"),
 	erlang:display(to_string(A)),
 	A.
 

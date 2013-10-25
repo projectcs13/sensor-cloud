@@ -9,8 +9,13 @@
 %%
 %% @end
 -module(suggest).
--export([init/1, allowed_methods/2, process_post/2, content_types_provided/2, 
-		 get_suggestion/2, add_suggestion/2]).
+-export([init/1, 
+	allowed_methods/2, 
+	process_post/2, 
+	content_types_provided/2, 
+	get_suggestion/2, 
+	add_suggestion/2,
+	update_suggestion/1]).
 
 
 -include_lib("erlastic_search.hrl").
@@ -152,33 +157,45 @@ add_suggestion(Resource, Json) ->
 
 
 update_suggestion(Stream) ->
+	erlang:display("*******Starting Update********"),
 	ResourceId = lib_json:get_field(Stream, "resource_id"),
 	erlang:display(ResourceId),
 	case erlastic_search:search(?INDEX, "suggestion", "resource_id:"++ResourceId) of
 		{error, _} -> erlang:display("ERROR");
-		{ok, Response} -> 
+		{ok, Response} ->
+			erlang:display("HEEEREEEEE"),
+			erlang:display(lib_json:to_string(Response)),	
 			case lib_json:get_field(Response, "hits.hits[0]._source.resource_id") of
 				ResourceId ->
+					erlang:display("Getting from response"),
 					Weight = lib_json:get_field(Response, "hits.hits[0]._source.suggest.weight"),
 					Id = lib_json:get_field(Response, "hits.hits[0]._id"),
 					%Output = lib_json:get_field(Response, "hits.hits[0]._source.output"),
 					%Input = lib_json:get_field(Response, "hits.hits[0]._source.input"),
-					Payload = lib_json:get_field(Response, "hits.hits[0]._source.payload"),
+					Payload = lib_json:get_field(Response, "hits.hits[0]._source.suggest.payload"),
 					{AddWeight, StreamInfo} = get_stream_info(Stream),
 					NewWeight = Weight + AddWeight,
 					Sugg = lib_json:get_field(Response, "hits.hits[0]._source"),
-					case lib_json:get_field(Response, "hits.hits[0]._source.payload.streams") of
+					erlang:display("---------"),
+					case lib_json:get_field(Response, "hits.hits[0]._source.suggest.payload.streams") of
 						undefined ->
+							erlang:display("000000000"),
 							NewPayload = lib_json:add_field(Payload, "streams", "["++StreamInfo++"]"),
+							erlang:display(NewPayload),
+							erlang:display("111111111"),
 							TempSugg = lib_json:replace_attr(Sugg, "suggest.payload", NewPayload),
+							erlang:display("222222222"),
 							NewSugg = lib_json:replace_attr(TempSugg, "suggest.weight", NewWeight);
 						OldStream ->
+							erlang:display("333333333"),
 							NewStreamList = lib_json:add_value_in_list(OldStream, StreamInfo),
+							erlang:display("444444444"),
 							TempSugg = lib_json:replace_attr(Sugg, "suggest.payload.streams", NewStreamList),
+							erlang:display("555555555"),
 							NewSugg = lib_json:replace_attr(TempSugg, "suggest.weight", NewWeight)
 					end,
 					case erlastic_search:index_doc_with_id(?INDEX, "suggestion", Id, NewSugg) of 
-						{error, S} -> erlang:display("Suggestion not saved ");
+						{error, _} -> erlang:display("Suggestion not saved ");
 						{ok, _} -> erlang:display("Stream suggestion added")
 					end;
 				_ -> 
@@ -195,11 +212,11 @@ get_stream_info(Stream) ->
 	Type  = lib_json:get_field(Stream, "Type"),
 	Weight = scoring:calc([Name, Description, Min_val, Max_val, Tags, Type]),
 	Result ="{
-		\"name\":\"" ++ undefined_to_string(Name)++"\"
-		\"description\":\"" ++ undefined_to_string(Description)++"\"
-		\"min_value\":\"" ++ undefined_to_string(Min_val)++"\"
-		\"max_value\":\"" ++ undefined_to_string(Max_val)++"\"
-		\"tags\":\"" ++ undefined_to_string(Tags)++"\"
+		\"name\":\"" ++ undefined_to_string(Name)++"\",
+		\"description\":\"" ++ undefined_to_string(Description)++"\",
+		\"min_value\":\"" ++ undefined_to_string(Min_val)++"\",
+		\"max_value\":\"" ++ undefined_to_string(Max_val)++"\",
+		\"tags\":\"" ++ undefined_to_string(Tags)++"\",
 		\"type\":\"" ++ undefined_to_string(Type)++"\"
 		}",
 	erlang:display(Result),

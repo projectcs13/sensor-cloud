@@ -22,6 +22,26 @@
 init_test() ->
 	inets:start().
 
+
+	%% @doc
+%% Function: process_search_post_test/0
+%% Purpose: Test the process_post_test function by doing some HTTP requests
+%% Returns: ok | {error, term()}
+%%
+%% Side effects: creates documents in elasticsearch
+%% @end
+process_search_post_test() ->
+        {ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/resources", [],"application/json", "{\"test\" : \"post\",\"owner\" : 7,\"streams\" : 1}"}, [], []),
+        timer:sleep(100),
+        DocId1 = get_id_value(Body1,"_id"),
+        ?assertEqual(true,lib_json:get_field(Body1,"ok")),        
+		refresh(),
+        {ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(post, {"http://localhost:8000/users/7/resources/_search", [],"application/json", "{\"query\":{\"match_all\":{}}}"}, [], []),
+        {ok, {{_Version3, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(post, {"http://localhost:8000/users/5/resources/_search", [],"application/json", "{\"query\":{\"match_all\":{}}}"}, [], []),
+        {ok, {{_Version8, 200, _ReasonPhrase5}, _Headers5, _Body5}} = httpc:request(delete, {"http://localhost:8000/resources/" ++ DocId1, []}, [], []),
+        ?assertEqual(true,lib_json:get_field(Body3,"hits.total") >= 1),
+        ?assertEqual(true,lib_json:get_field(Body4,"hits.total") >= 0).   
+
 %% @doc
 %% Function: process_post_test/0
 %% Purpose: Test the process_post_test function by doing some HTTP requests
@@ -71,10 +91,10 @@ put_resource_test() ->
 	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/resources/", [],"application/json", "{\"test\" : \"put1\",\"user_id\" : \"0\",\"streams\" : \"1\"}"}, [], []),
 	refresh(),
 	DocId = lib_json:get_field(Body1,"_id"),
-	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(put, {"http://localhost:8000/resources/" ++ DocId , [],"application/json", "{\"doc\" :{\"test\" : \"put2\",\"user_id\" : \"0\",\"streams\" : \"1\"}}"}, [], []),
+	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(put, {"http://localhost:8000/resources/" ++ DocId , [],"application/json", "{\"test\" : \"put2\"}"}, [], []),
 	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(get, {"http://localhost:8000/resources/" ++ DocId, []}, [], []),
 	%Try to put to a resource that doesn't exist
-	{ok, {{_Version4, 500, _ReasonPhrase4}, _Headers4, _Body4}} = httpc:request(put, {"http://localhost:8000/resources/1", [],"application/json", "{\"doc\" :{\"test\" : \"put2\",\"user_id\" : 0,\"streams\" : 1}}"}, [], []),
+	{ok, {{_Version4, 500, _ReasonPhrase4}, _Headers4, _Body4}} = httpc:request(put, {"http://localhost:8000/resources/1", [],"application/json", "{\"test\" : \"put2\"}"}, [], []),
 	?assertEqual(true,lib_json:get_field(Body1,"ok")),
 	?assertEqual(true,lib_json:get_field(Body2,"ok")),
 	?assertEqual("put2",lib_json:get_field(Body3,"test")).
