@@ -60,7 +60,7 @@ run: compile
 ### Runs elastic search
 run_es:
 	lib/elasticsearch/bin/elasticsearch -f
-	
+
 ### Command: make run_rabbit
 ### Runs rabbitMQ server
 run_rabbit:
@@ -94,7 +94,7 @@ test_users: compile
 
 ### Command: make docs
 ### Genereats all of the documentation files
-docs:
+docs: all
 	./rebar skip_deps=true doc
 
 ### Command: make clean
