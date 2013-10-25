@@ -183,16 +183,16 @@ update_suggestion(Stream) ->
 							NewPayload = lib_json:add_field(Payload, "streams", "["++StreamInfo++"]"),
 							erlang:display(NewPayload),
 							erlang:display("111111111"),
-							TempSugg = lib_json:replace_attr(Sugg, "suggest.payload", NewPayload),
+							TempSugg = lib_json:field_replace(Sugg, "suggest.payload", NewPayload),
 							erlang:display("222222222"),
-							NewSugg = lib_json:replace_attr(TempSugg, "suggest.weight", NewWeight);
+							NewSugg = lib_json:field_replace(TempSugg, "suggest.weight", NewWeight);
 						OldStream ->
 							erlang:display("333333333"),
 							NewStreamList = lib_json:add_value_in_list(OldStream, StreamInfo),
 							erlang:display("444444444"),
-							TempSugg = lib_json:replace_attr(Sugg, "suggest.payload.streams", NewStreamList),
+							TempSugg = lib_json:field_replace(Sugg, "suggest.payload.streams", NewStreamList),
 							erlang:display("555555555"),
-							NewSugg = lib_json:replace_attr(TempSugg, "suggest.weight", NewWeight)
+							NewSugg = lib_json:field_replace(TempSugg, "suggest.weight", NewWeight)
 					end,
 					case erlastic_search:index_doc_with_id(?INDEX, "suggestion", Id, NewSugg) of 
 						{error, _} -> erlang:display("Suggestion not saved ");

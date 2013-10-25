@@ -9,12 +9,12 @@
 %%
 %% @end
 -module(lib_json).
-
+-include_lib("erlson/include/erlson.hrl").
 %% ====================================================================
 %% API functions
 %% ====================================================================
 -export([add_field/3,
-	replace_attr/3,	
+	field_replace/3,
 	decode/1, 
 	add_value_in_list/2,
 	encode/1, 
@@ -59,6 +59,32 @@ encode(Json)->
 decode(Json) when is_list(Json) ->
      mochijson2:decode(Json).
 
+field_replace({Json, Field, Value}) ->
+    Attrs = re:split(Field, "\\.", [{return, list}]),
+    AtomAttrs = lists:map(fun list_to_atom/1, Attrs),
+    try erlson:store(AtomAttrs, Value, Json) of
+	Result ->
+	    to_string(erlson:to_json(Result))
+    catch
+	_:_ ->
+	    Json
+    end.
+
+field_replace(Json, Field, Value) when is_tuple(Value) ->
+    field_replace(Json, Field, internal, erlson:from_json(encode(Value)));
+
+field_replace(Json, Field, Value) when is_list(Value) ->
+    field_replace(Json, Field, internal, erlson:from_json(Value));
+field_replace(Json, Field, Value)  ->
+    field_replace(Json, Field, internal, Value).
+
+
+
+field_replace(Json, Field, internal, Value) when is_tuple(Json) ->
+    field_replace({erlson:from_json(encode(Json)), Field, Value});
+
+field_replace(Json, Field, internal, Value) when is_list(Json)->
+    field_replace({erlson:from_json(Json), Field, Value}).
 
 %% @doc
 %% Function: get_field/1
@@ -93,15 +119,14 @@ get_field(Json, Query) when is_list(Json)->
 get_field(Json, Query) when is_tuple(Json) ->
     get_field({Json, Query}).
 
+
+
 get_fields(Json, []) ->
     [];
 get_fields(Json, [Field|Tl]) ->
     Result = get_field(Json, Field),
-    [Result | get_fields(json, Tl)].
+    [Result | get_fields(Json, Tl)].
     
-    
-
-
 %% @doc
 %% Function: get_field_value/3
 %% Purpose: Get a certain value of a certain field
@@ -171,17 +196,11 @@ field_value_exists(Json, Query, Value) ->
 
 to_string(Json) when is_tuple(Json) ->
     to_string(encode(Json));
-to_string([Hd|Tl]) when is_binary(Hd) ->
-    %% erlang:display(Hd),
-    binary:bin_to_list(Hd) ++ to_string(Tl);
-to_string([]) ->
-	[];
-to_string([Hd|Tl]) when is_list(Hd)->
-    %% erlang:display(Hd),
-    to_string(Hd) ++ to_string(Tl);
-to_string([Hd|Tl]) when is_integer(Hd) ->
-    %% erlang:display(Hd),
-    [Hd] ++ to_string(Tl).
+to_string(Json) ->
+    %% Flattens a list and converts the entire thing into a binary.
+    BinaryJson = binary:list_to_bin(Json),
+    %% Converts the binary into a string.
+    binary:bin_to_list(BinaryJson).
 
 set_attr(Attr, Value) when is_atom(Attr) ->
     set_attr(binary:list_to_bin(atom_to_list(Attr)), Value);
@@ -231,7 +250,6 @@ get_list_and_add_id(JsonStruct) ->
     AddedId = lists:map(fun(X) -> decode(get_and_add_id(X)) end, HitsList),
     HitsAttr = set_attr(hits, AddedId),
     to_string(HitsAttr).
-
 
 
 %% ====================================================================
