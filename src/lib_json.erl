@@ -14,6 +14,7 @@
 %% API functions
 %% ====================================================================
 -export([add_field/3,
+	add_field2/3,
 	 add_value_in_list/2,
 	 decode/1, 
 	 encode/1, 
@@ -226,6 +227,13 @@ add_field(Stream,FieldName,FieldValue) when is_integer(FieldValue) ->
     string:substr(Stream,1,length(Stream)-1) ++ ",\"" ++ FieldName ++ "\":" ++ FieldValue ++ "}";
 add_field(Stream,FieldName,FieldValue) ->
     string:substr(Stream,1,length(Stream)-1) ++ ",\"" ++ FieldName ++ "\":\"" ++ FieldValue ++ "\"}".
+
+add_field2(Json,FieldName,FieldValue) when is_tuple(Json)->
+    add_field2(to_string(Json), FieldName, FieldValue);
+add_field2(Stream,FieldName,FieldValue) when is_integer(FieldValue) ->
+    string:substr(Stream,1,length(Stream)-1) ++ ",\"" ++ FieldName ++ "\":" ++ FieldValue ++ "}";
+add_field2(Stream,FieldName,FieldValue) ->
+    string:substr(Stream,1,length(Stream)-1) ++ ",\"" ++ FieldName ++ "\":" ++ FieldValue ++ "}".
 
 add_value_in_list(List, Value) when is_list(List) ->
 	erlang:display(List),
