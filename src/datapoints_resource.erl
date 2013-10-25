@@ -51,7 +51,6 @@ content_types_provided(ReqData, State) ->
 		{[{"application/json", get_datapoint}], ReqData, State}.
 
 
-
 %% @doc
 %% Function: process_post/2
 %% Purpose: decodes a JSON object and either adds the new datapoint in the DB or
@@ -78,7 +77,6 @@ process_post(ReqData, State) ->
 				end;
 			true ->
 				process_search(ReqData,State, post)	
-		
 	end.
 
 
@@ -137,7 +135,6 @@ get_datapoint(ReqData, State) ->
 -spec is_search(string()) -> boolean().
 is_search(ReqData) ->
 		URIList = string:tokens(wrq:path(ReqData), "/"),
-
 		A = string:sub_string(lists:nth(length(URIList),URIList),1,7) == "_search".
 
 
@@ -199,7 +196,7 @@ transform([{Field,Value}|Rest]) ->
 		"timestampFrom" ->
 				case Rest of
 					[{"timestampTo",ValueTo}] -> "%20AND%20" ++ "timestamp:[" ++ Value ++ "+TO+" ++ ValueTo ++ "]";
-					[] -> "%20AND%20" ++ "timestamp:[" ++ Value ++ "+TO+null" ++ "]"
+					[] -> "%20AND%20" ++ "timestamp:[" ++ Value ++ "+TO+*" ++ "]"
 				end;
 		_ ->	
 				case Rest of
