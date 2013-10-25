@@ -14,6 +14,7 @@
 %% API functions
 %% ====================================================================
 -export([add_field/3, 
+	 add_value_in_list/2,
 	 decode/1, 
 	 encode/1, 
 	 field_value_exists/3, 
@@ -24,9 +25,19 @@
 	 get_list_and_add_id/1,
 	 get_field_value/3, 
 	 set_attr/2,
-	 to_string/1]).
+	 to_string/1,
+	 erlson_test/0]).
 -include("misc.hrl").
 
+add_value_in_list(List, Value) when is_list(List) ->    
+        erlang:display(List),
+        V = decode(Value),
+        erlang:display(V),
+        [L] = List,
+        A = [V , L],
+        erlang:display("AAA"),
+        erlang:display(to_string(A)),
+        A.
 
 %% @doc
 %% Function: encode/1
@@ -235,6 +246,69 @@ get_list_and_add_id(JsonStruct) ->
     AddedId = lists:map(fun(X) -> decode(get_and_add_id(X)) end, HitsList),
     HitsAttr = set_attr(hits, AddedId),
     to_string(HitsAttr).
+
+
+erlson_test() ->
+    %% create an empty dictionary
+    X = #{},
+    
+    %%associate fields 'foo' with 1, 'bar' with "abc" and 'fum' with 'true'
+    D = #{foo = 1, bar = <<"abc">>, fum},
+    %$ access dictionary element
+    1 = D.foo,
+    
+    %$ add nested dictionaries to dictionary D
+    D1 = D#{baz = #{fum = #{i = 0}}},
+    %% access elements of the nested dictionary
+    0 = D1.baz.fum.i,
+
+    %% modify elements of the nested dictionary
+    D2 = D1#{baz.fum.i = 100, baz.fum.j = <<"new nested value">>},
+
+    ErlJson = erlson:to_json(D2),
+    erlang:display("1*****************************************************************"),
+    erlang:display(ErlJson),
+
+
+    Json = to_string(ErlJson),
+    erlang:display("2*****************************************************************"),
+    erlang:display(Json),
+
+    ErlJsonEncode = encode(ErlJson),
+    erlang:display("3*****************************************************************"),
+    erlang:display(ErlJsonEncode),
+
+
+    JsonEncode = encode(Json),
+    erlang:display("4*****************************************************************"),
+    erlang:display(JsonEncode),
+
+    case JsonEncode =:= ErlJsonEncode of
+	true ->
+	    erlang:display("poff");
+	false ->
+	    erlang:display("pang")
+    end,
+
+    Json2 = erlson:from_json(JsonEncode),
+    erlang:display("5*****************************************************************"),
+    erlang:display(Json2),
+
+    erlang:display("6*****************************************************************"),
+    erlang:display(Json2),       
+    Json3 = erlson:from_json(Json),
+    erlang:display("7*****************************************************************"),
+    erlang:display(Json3),
+    NewJson3 = field_replace(Json, "baz.fum.i", [1,2,3,4,5]),
+    erlang:display("8*****************************************************************"),
+    erlang:display(NewJson3),
+
+    NewJson4 = field_replace(NewJson3, "baz.fum.i.0", 9999999),
+    erlang:display("9*****************************************************************"),
+    erlang:display(NewJson4)
+
+
+	.
 
 
 %% ====================================================================
