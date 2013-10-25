@@ -23,6 +23,8 @@ compile:
 get_libs:
 	@./rebar get-deps
 	@./rebar compile
+	$(MAKE) -C lib/rabbitmq-server
+	$(MAKE) -C lib/rabbitmq-erlang-client
 
 clean_emacs_vsn_files:
 	rm -rf *~
@@ -58,6 +60,11 @@ run: compile
 ### Runs elastic search
 run_es:
 	lib/elasticsearch/bin/elasticsearch -f
+	
+### Command: make run_rabbit
+### Runs rabbitMQ server
+run_rabbit:
+	sudo lib/rabbitmq-server/scripts/rabbitmq-server
 
 ### Command: make test
 ### Compile project resources (not libraries) and runs all eunit tests.
@@ -130,6 +137,9 @@ help:
 	@echo ""
 	@echo "'make run_es'"
 	@echo "Runs the elastic search server"
+	@echo ""
+	@echo "make run_rabbit"
+	@echo "Runs the rabbitMQ server"
 	@echo ""
 	@echo "'make docs'"
 	@echo "Generates documentation for the project"

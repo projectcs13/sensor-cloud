@@ -13,31 +13,26 @@
 %% ====================================================================
 %% API functions
 %% ====================================================================
--export([add_field/3, 
+-export([add_field/3,
 	 add_value_in_list/2,
 	 decode/1, 
 	 encode/1, 
-	 field_value_exists/3, 
 	 field_replace/3,
+	 field_value_exists/3, 
 	 get_field/2, 
 	 get_fields/2,
 	 get_and_add_id/1,
 	 get_list_and_add_id/1,
 	 get_field_value/3, 
 	 set_attr/2,
-	 to_string/1,
+	 to_string/1, 
 	 erlson_test/0]).
 -include("misc.hrl").
 
 add_value_in_list(List, Value) when is_list(List) ->    
-        erlang:display(List),
-        V = decode(Value),
-        erlang:display(V),
-        [L] = List,
-        A = [V , L],
-        erlang:display("AAA"),
-        erlang:display(to_string(A)),
-        A.
+    NewValue = Value,
+    [NewValue | List].
+
 
 %% @doc
 %% Function: encode/1
@@ -84,7 +79,9 @@ field_replace(Json, Field, Value) when is_tuple(Value) ->
     field_replace(Json, Field, internal, erlson:from_json(encode(Value)));
 
 field_replace(Json, Field, Value) when is_list(Value) ->
-    field_replace(Json, Field, internal, erlson:from_json(Value));
+    NewValue = erlson:from_json(Value),
+    field_replace(Json, Field, internal, NewValue);
+	
 field_replace(Json, Field, Value)  ->
     field_replace(Json, Field, internal, Value).
 
@@ -218,7 +215,11 @@ set_attr(Attr, Value) when is_binary(Attr) ->
     {struct, [{Attr, Value}]};
 set_attr(Attr, Value) when is_list(Attr) ->
     set_attr(binary:list_to_bin(Attr), Value).
-    
+
+replace_attr(Json, Path, Value) ->
+	erlang:display("replace_attr should be implemented"),
+	Json.
+
 
 %% @doc
 %% Function: add_field/3
