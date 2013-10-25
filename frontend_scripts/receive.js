@@ -10,6 +10,7 @@ var exchange = process.argv[2],
 
 sub.setEncoding('utf8');
 
+
 // A websocket is connected (eg: browser).
 io.sockets.on('connection', function(socket) {
     console.log("Websocket is connected.");
@@ -22,10 +23,12 @@ io.sockets.on('connection', function(socket) {
     sub.on('data', function(data) {
         var type = data.substring(6, 15),
             time = data.substring(18, 37),
-            rest = data.substring(40);
+            rest = data.substring(40).split("k\0"),
+	    id = rest[0],
+	    value = rest[1].substring(1);
             //Add support for stream_id
-        console.log("TYPE : "+type+" TIME : "+time+" VALUE : "+value);
+        console.log("TYPE : "+type+" TIME : "+time+" VALUE : "+ value + " ID : " + id);
 
-        //socket.emit(message.type, message.data);
+        socket.emit(type, time + " :: " + rest);
     });
 });

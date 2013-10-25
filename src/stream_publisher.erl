@@ -12,18 +12,18 @@
 -module(stream_publisher).
 
 -include_lib("amqp_client.hrl").
+-include_lib("pubsub.hrl").
 
 %% ====================================================================
 %% API functions
 %% ====================================================================
 -export([main/1]).
 
--record(datapoint, {timestamp, value, streamid}).
--define(EXCHANGE, "test").
+-define(EXCHANGE, "resources.1").
 
 main(Argv) ->
     {ok, Connection} =
-        amqp_connection:start(#amqp_params_network{host = "130.238.15.236", port = 5672}),
+        amqp_connection:start(#amqp_params_network{host = "130.238.15.206", port = 5672}),
     {ok, Channel} = amqp_connection:open_channel(Connection),
 
     amqp_channel:call(Channel, #'exchange.declare'{exchange = <<?EXCHANGE>>,
