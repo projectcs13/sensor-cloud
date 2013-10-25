@@ -199,7 +199,7 @@ field_value_exists(Json, Query, Value) ->
 
 %% @doc
 %% Function: to_string/1
-%% Purpose:  Make a json representation into a string
+%% Purpose:  Make a mochijson representation into a string
 %% Returns:  string()
 %% @end
 %% to_string(Json) when is_list(Json) ->
@@ -219,10 +219,6 @@ set_attr(Attr, Value) when is_binary(Attr) ->
     {struct, [{Attr, Value}]};
 set_attr(Attr, Value) when is_list(Attr) ->
     set_attr(binary:list_to_bin(Attr), Value).
-
-replace_attr(Json, Path, Value) ->
-	erlang:display("replace_attr should be implemented"),
-	Json.
 
 
 %% @doc
@@ -310,10 +306,7 @@ erlson_test() ->
 
     NewJson4 = field_replace(NewJson3, "baz.fum.i.0", 9999999),
     erlang:display("9*****************************************************************"),
-    erlang:display(NewJson4)
-
-
-	.
+    erlang:display(NewJson4).
 
 
 %% ====================================================================
