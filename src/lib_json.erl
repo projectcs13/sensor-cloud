@@ -1,35 +1,86 @@
-%% @author Tommy Mattsson, Georgios Koutsoumpakis
-%%   [www.csproj13.student.it.uu.se]
-%% @version 1.0
+%% @author Tommy Mattsson, Georgios Koutsoumpakis [www.csproj13.student.it.uu.se]
 %% @copyright [Copyright information]
-%%
-%% @doc == Library for accessing fields in JSON objects ==
-%% 
-%%  
-%%
+%% @version 1.0
+%% @doc == Library for creating, reading, updating, and deleting fields in JSON objects ==
 %% @end
 -module(lib_json).
 -include_lib("erlson/include/erlson.hrl").
 %% ====================================================================
-%% API functions
+%% API functions - Exports
 %% ====================================================================
 -export([add_field/3,
-	add_field2/3,
+	 add_field2/3,
 	 add_value_in_list/2,
 	 decode/1, 
 	 encode/1, 
-	 field_replace/3,
 	 field_value_exists/3, 
 	 get_field/2, 
 	 get_fields/2,
-	 get_and_add_id/1,
-	 get_list_and_add_id/1,
 	 get_field_value/3, 
+	 replace_field/3,
 	 rm_field/2,
 	 set_attr/2,
 	 to_string/1]).
+%% ====================================================================
+%% Specialized functions - Exports
+%% ====================================================================
+-export([get_and_add_id/1, 
+	 get_list_and_add_id/1
+	]).
 -include("misc.hrl").
+%% ====================================================================
+%% Type definitions
+%% ====================================================================
+%% @type attr() = atom() | string()
+-type attr() :: atom() | string().
+%% @type field() = json_string() | mochijson()
+-type field() :: atom() | string() | [atom()] .
+%% @type json() = json_string() | mochijson()
+-type json() :: json_string() | mochijson().
+%% @type json_string() = string()
+-type json_string() :: string().
+%% @type json_value() = atom() | binary() | integer() | string() | json()
+-type json_value() :: atom() | binary() | integer() | string() | json() | [json()].
+%% @type mochijson() = tuple() 
+-type mochijson() :: tuple(). 
 
+
+%% ====================================================================
+%% API functions
+%% ====================================================================
+%% @doc 
+%% Adds a new field with the name 'Field' and the value 'Value' to a JSON object.
+%%
+%% Example:
+%% ```
+%% > Json = "{\"attr1\":\"value1\"}".
+%% > Field = "attr2".
+%% > Value = "value2".
+%% > lib_json:add_field(Json, Field, Value).
+%% "{\"attr1\":\"value1\", \"attr2\":\"value2\"}"
+%% '''
+%% @end
+-spec add_field(Json::json(),Field::field(),Value::json_value()) -> json_string().
+add_field(Json, Field, Value) when is_tuple(Json) ->
+    add_field_internal(erlson:from_json(encode(Json)), Field, Value);
+add_field(Json, Field, Value) when is_list(Json) ->
+    add_field_internal(erlson:from_json(Json), Field, Value).
+
+%% @doc 
+%% TODO Should be removed after add_field/1 has been improved.
+%% @end    
+-spec add_field2(Json::json(),Field::string(),Value::json_value()) -> json_string().
+add_field2(Json,Field,Value) when is_tuple(Json)->
+    add_field2(to_string(Json), Field, Value);
+add_field2(Stream,Field,Value) when is_integer(Value) ->
+    string:substr(Stream,1,length(Stream)-1) ++ ",\"" ++ Field ++ "\":" ++ Value ++ "}";
+add_field2(Stream,Field,Value) ->
+    string:substr(Stream,1,length(Stream)-1) ++ ",\"" ++ Field ++ "\":" ++ Value ++ "}".
+
+%% @doc 
+%% TODO Should be improved to a general add_value(Json, Query, Value) function
+%% @end 
+-spec add_value_in_list(List::list(),Value::json_value()) -> list().
 add_value_in_list(List, Value) when is_list(List) ->
 	erlang:display(List),
 	V = decode(Value),
@@ -39,104 +90,91 @@ add_value_in_list(List, Value) when is_list(List) ->
 	erlang:display(to_string(A)),
 	A.
 
-
-%% @doc
-%% Function: decode/1
-%% Purpose : Decodes a json object. 
-%% Returns : Either a mochiweb, json_term(), representation of the json object
-%%           or a more readable version which only contains lists, tuples and string
+%% @doc 
+%% Decodes a json object into mochijson format.
+%%
+%% Example:
+%% ```
+%% > Json = "{\"attr1\":\"value1\"}".
+%% > lib_json:decode(Json).
+%% {struct,[{<<"attr1">>,<<"value1">>}]}
+%% '''
 %% @end
+-spec decode(Json::json_string()) -> mochijson().
 decode(Json) when is_list(Json) ->
      mochijson2:decode(Json).
 
 %% @doc
-%% Function: encode/1
-%% Purpose : Encodes an json object/
-%% Returns : Either a string() representation of the json object or a mochiweb
-%%           representation of a json object: json_term()
+%% Encodes a json object into an iolist().
+%%
+%% Example:
+%% ```
+%% > Json = {struct,[{<<"attr1">>,<<"value1">>}]}".
+%% > lib_json:encode(Json).
+%% [123,[34,<<"attr1">>,34],58,[34,<<"value1">>,34],125]
+%% '''
 %% @end
-
-%% This case is for when Json is a string representation of the json object
-encode(Json) when is_list(Json) ->
-    JsonObj = decode(Json),
-    Encoder = mochijson2:encoder([{utf8, true}]),
-    Encoder(JsonObj);
-
-%% This case is for when Json is a internal mochijson representation of the json object
+-spec encode(Json::json()) -> iolist().
 encode(Json) when is_tuple(Json)->
     Encoder = mochijson2:encoder([{utf8, true}]),
     Encoder(Json);
-encode(Json)->
-    mochijson2:encode(Json).
-
-field_replace({Json, Field, Value}) ->
-    Attrs = parse_attr(Field),
-    try erlson:store(Attrs, Value, Json) of
-	Result ->
-	    to_string(erlson:to_json(Result))
-    catch
-	_:_ ->
-	    Json
-    end.
-
-field_replace(Json, Field, Value) when is_tuple(Value) ->
-    field_replace(Json, Field, internal, erlson:from_json(encode(Value)));
-
-field_replace(Json, Field, Value) when is_list(Value) ->
-    field_replace(Json, Field, internal, encode(Value));
-	
-field_replace(Json, Field, Value)  ->
-    field_replace(Json, Field, internal, Value).
-
-
-
-field_replace(Json, Field, internal, Value) when is_tuple(Json) ->
-    field_replace({erlson:from_json(encode(Json)), Field, Value});
-
-field_replace(Json, Field, internal, Value) when is_list(Json)->
-    field_replace({erlson:from_json(Json), Field, Value}).
+encode(Json) when is_list(Json) ->
+    JsonObj = decode(Json),
+    Encoder = mochijson2:encoder([{utf8, true}]),
+    Encoder(JsonObj).
 
 %% @doc
-%% Function: get_field/1
-%% Purpose: Get the value at a certain field
-%% Returns: Return the string representation of the value of the specified 
-%%          field, if it exists, otherwise returns 'false' value. If the desired
-%%          value is a struct then no adaptation is performed.
+%% Check if a specific field with a specific value exists in a JSON object.
+%% Handles wildcard searches for fields (not wildcard for values.
+%% 
+%% Example:
+%% ```
+%% > Json = "{\"attr1\":\"value1\"}".
+%% > Query = "attr1".
+%% > lib_json:field_value_exists(Json, Query, Value).
+%% true
+%% '''
 %% @end
--spec get_field({Json::string() | tuple(), Query::string()}) -> string() | atom().
-get_field({Json, Query})->
-    JsonParser = destructure_json:parse("Obj."++Query),
-    try JsonParser(Json) of
-	Result when is_binary(Result) ->
-	    ?TO_STRING(Result);
-	Result ->
-	    Result
-    catch
-	error:function_clause -> undefined;
-	error:{badfun, _} -> improper_usage
+-spec field_value_exists(Json::json(), Query::string(), Value::json_value()) -> boolean().
+field_value_exists(Json, Query, Value) ->
+    case get_field_value(Json, Query, Value) of
+	Value ->
+	    true;
+	undefined ->
+	    false
     end.
+
 %% @doc
-%% Function: get_field/2
-%% Purpose: Get the value at a certain field
-%% Returns: Return the string representation of the value of the specified 
-%%          field, if it exists, otherwise returns 'undefined' value. If the desired
-%%          value is a struct then no adaptation is performed.
+%% Get the value at a certain field in a JSON object.
+%%
+%% Example:
+%% ```
+%% > Json = "{\"attr1\":\"value1\"}".
+%% > Query = "attr1".
+%% > lib_json:get_field(Json, Query).
+%% "value1"
+%% '''
 %% @end
--spec get_field(Json::string() | tuple(), Query::string()) -> string() | atom().
+-spec get_field(Json::json(), Query::string()) -> json_value().
+get_field(Json, Query) when is_tuple(Json) ->
+    get_field_internal(Json, Query);
 get_field(Json, Query) when is_list(Json)->
     JsonObj = decode(Json),
-    get_field({JsonObj, Query});
-get_field(Json, Query) when is_tuple(Json) ->
-    get_field({Json, Query}).
+    get_field_internal(JsonObj, Query).
 
 
 %% @doc
-%% Function: get_fielsd/2
-%% Purpose: Get the values for a list of specified fields.
-%% Returns: Return the string representation of the values of the specified 
-%%          fields, if they exist, if a field does not exist it will be returned
-%%          as 'undefined' for that specific field
+%% Get the values for a list of specified fields.
+%%
+%% Example:
+%% ```
+%% > Json = "{\"attr1\":\"value1\",\"attr2\":\"value2\"}".
+%% > Fields = ["attr1", "attr2"].
+%% > lib_json:get_fields(Json, Fields).
+%% ["value1", "value2"]
+%% '''
 %% @end
+-spec get_fields(Json::json(), Fields::[field()]) -> [json_value()].
 get_fields(Json, []) ->
     [];
 get_fields(Json, [Field|Tl]) ->
@@ -144,12 +182,18 @@ get_fields(Json, [Field|Tl]) ->
     [Result | get_fields(Json, Tl)].
     
 %% @doc
-%% Function: get_field_value/3
-%% Purpose: Get a certain value of a certain field
-%% Returns: Returns the value of the specified field, if it exists, otherwise
-%%          returns 'false' value. Handles  wildcard searches for fields (not 
-%%          wildcard for values)
+%% Get a certain value of a certain field. Returns 'undefined' if there is no field with that value.
+%%
+%% Example:
+%% ```
+%% > Json = "{\"attr1\": [{\"attr2\":\"value1\"},{\"attr2\":\"value2\"}]}".
+%% > Query = "attr1[*].attr2".
+%% > Value = "value2".
+%% > lib_json:get_field_value(Json, Query, Value).
+%% "value2"
+%% '''
 %% @end
+-spec get_field_value(Json::json(), Query::field(), Value::json_value()) -> json_string().
 get_field_value(Json, Query, Value) when is_list(Value)->
     QueryParts = find_wildcard_fields(Query),
     SearchFor = case {hd(Value),lists:last(Value)} of
@@ -186,41 +230,78 @@ get_field_value(Json, Query, Value) ->
 	    undefined
     end.
 
+%% @doc
+%% Replaces the value of a field 'Query' with 'Value' in a JSON object
+%%
+%% Example:
+%% ```
+%% > Json = "{\"attr1\":\"value1\"}".
+%% > Query = "attr1".
+%% > Value = <<"poff">>.
+%% > lib_json:replace_field(Json, Query, Value).
+%% "{\"attr1\":\"poff\"}"
+%% '''
+%% @end
+-spec replace_field(Json::json(), Query::field(), Value::json_value()) -> json_string().
+replace_field(Json, Query, Value) when is_tuple(Json) ->
+    replace_field_internal(erlson:from_json(encode(Json)), Query, Value);
+replace_field(Json, Query, Value) when is_list(Json)->
+    replace_field_internal(erlson:from_json(Json), Query, Value).
 
 %% @doc
-%% Function: field_value_exists/3
-%% Purpose: Check if a specific field with a specific value exists
-%%          Handles wildcard searches for fields (not wildcard for values)
-%% Returns: Return true if the value exists, otherwise false
+%% Removes the field 'Query' from a JSON object
+%%
+%% Example:
+%% ```
+%% > Json = "{\"attr1\":\"value1\"}".
+%% > Query = "attr1".
+%% > lib_json:rm_field(Json, Query).
+%% "{}"
+%% '''
 %% @end
-field_value_exists(Json, Query, Value) ->
-    case get_field_value(Json, Query, Value) of
-	Value ->
-	    true;
-	undefined ->
-	    false
-    end.
+-spec rm_field(Json::json(), Query::field()) -> json_string().
+rm_field(Json, Query) when is_tuple(Json) ->
+    rm_field_internal(erlson:from_json(encode(Json)), Query);
+rm_field(Json, Query) when is_list(Json) ->
+    rm_field_internal(erlson:from_json(Json), Query).
 
 %% @doc
-%% Function: set_attr/2
-%% Purpose:  Sets a json attribute to a value
-%% Returns:  Returns a mochijson2
+%% Sets a json attribute 'Attr' to 'Value'
+%%
+%% Example:
+%% ```
+%% > Json = "{\"attr1\":\"value1\"}".
+%% > Attr = "attr1".
+%% > Value = value
+%% > lib_json:set_attr(Attr, Value).
+%% "{\"attr1\":\"value\"}"
+%% '''
 %% @end
+-spec set_attr(Attr::attr(), Value::json_value()) -> json_string().
 set_attr(Attr, Value) when is_atom(Attr) ->
     set_attr(binary:list_to_bin(atom_to_list(Attr)), Value);
-set_attr(Attr, Value) when is_binary(Attr) ->
-    {struct, [{Attr, Value}]};
 set_attr(Attr, Value) when is_list(Attr) ->
-    set_attr(binary:list_to_bin(Attr), Value).
+    set_attr(binary:list_to_bin(Attr), Value);
+set_attr(Attr, Value) when is_binary(Attr) ->
+    {struct, [{Attr, Value}]}.
+
 
 
 %% @doc
-%% Function: to_string/1
-%% Purpose:  Make a mochijson representation into a string
-%% Returns:  string()
+%% Converts a mochijson structure or a mochijson encoded structure into a string
+%%
+%% Example:
+%% ```
+%% > Json = {struct,[{<<"attr1">>,<<"value1">>}]}.
+%% > lib_json:to_string(Json).
+%% "{\"attr1\":\"value\"}"
+%% '''
 %% @end
+-spec to_string(Json::mochijson() | iolist()) -> json_string().
 to_string(Json) when is_tuple(Json) ->
     to_string(encode(Json));
+to_string(Json) when is_binary(Json) ->
+    binary:bin_to_list(Json);
 to_string(Json) ->
     %% Flattens a list and converts the entire thing into a binary.
     BinaryJson = binary:list_to_bin(Json),
@@ -228,56 +309,28 @@ to_string(Json) ->
     binary:bin_to_list(BinaryJson).
 
 
-%% @doc
-%% Function: add_field/3
-%% Purpose: Used to add a new field to the given string representation of
-%%          of a JSON object, the field will be FieldName : FieldValue
-%% Returns: The string representation of the JSON object with the new field
-%% @end
--spec add_field(Stream::string(),FieldName::string(),FieldValue::term()) -> string().
-add_field({Json, Field, Value}) ->
-    Attrs = parse_attr(Field),
-    NewJson = erlson:store(Attrs, Value, Json),
-    to_string(erlson:to_json(NewJson)).
-    
-
-add_field(Json, Field, Value) when is_tuple(Json) ->
-    add_field({erlson:from_json(encode(Json)), Field, Value});
-
-add_field(Json, Field, Value) when is_list(Json) ->
-    add_field({erlson:from_json(Json), Field, Value}).
-    
-%% add_field(Json,FieldName,FieldValue) when is_tuple(Json)->
-%%     add_field(to_string(Json), FieldName, FieldValue);
-%% add_field(Stream,FieldName,FieldValue) when is_integer(FieldValue) ->
-%%     string:substr(Stream,1,length(Stream)-1) ++ ",\"" ++ FieldName ++ "\":" ++ FieldValue ++ "}";
-%% add_field(Stream,FieldName,FieldValue) ->
-%%     string:substr(Stream,1,length(Stream)-1) ++ ",\"" ++ FieldName ++ "\":\"" ++ FieldValue ++ "\"}".
-
-rm_field({Json, Field}) ->
-    Attrs = parse_attr(Field),
-    NewJson = erlson:remove(Attrs, Json),
-    to_string(erlson:to_json(NewJson)).
-  
-rm_field(Json, Field) when is_tuple(Json) ->
-     rm_field({erlson:from_json(encode(Json)), Field});
-rm_field(Json, Field) when is_list(Json) ->
-    rm_field({erlson:from_json(Json), Field}).
-    
-
-add_field2(Json,FieldName,FieldValue) when is_tuple(Json)->
-    add_field2(to_string(Json), FieldName, FieldValue);
-add_field2(Stream,FieldName,FieldValue) when is_integer(FieldValue) ->
-    string:substr(Stream,1,length(Stream)-1) ++ ",\"" ++ FieldName ++ "\":" ++ FieldValue ++ "}";
-add_field2(Stream,FieldName,FieldValue) ->
-    string:substr(Stream,1,length(Stream)-1) ++ ",\"" ++ FieldName ++ "\":" ++ FieldValue ++ "}".
-
-
+%% ====================================================================
+%% Specialized functions
+%% ====================================================================
+%% @doc 
+%% Gets the '_id' from the root, gets the '_source'. Adds _id as 
+%% id' in _source and return the new JSON object.
+%%
+%% TODO Move to api_help
+%% @end 
+-spec get_and_add_id(JsonStruct::mochijson()) -> json_string().
 get_and_add_id(JsonStruct) ->
     Id  = get_field(JsonStruct, "_id"),
     SourceJson  = get_field(JsonStruct, "_source"),
     add_field(SourceJson, "id", Id).
 
+%% @doc 
+%% Get the search results and performs get_and_add_id/1 on each
+%% elements in the result list.
+%%
+%% TODO Move to api_help
+%% @end 
+-spec get_list_and_add_id(JsonStruct::mochijson()) -> json_string().
 get_list_and_add_id(JsonStruct) ->
     HitsList = get_field(JsonStruct, "hits.hits"),
     AddedId = lists:map(fun(X) -> decode(get_and_add_id(X)) end, HitsList),
@@ -289,6 +342,16 @@ get_list_and_add_id(JsonStruct) ->
 %% Internal functions
 %% ====================================================================
 %% @doc
+%% @hidden
+%% Function: add_field_internal/3
+%% @end
+add_field_internal(Json, Field, Value) ->
+    Attrs = parse_attr(Field),
+    NewJson = erlson:store(Attrs, Value, Json),
+    to_string(erlson:to_json(NewJson)).
+
+%% @doc
+%% @hidden
 %% Function: field_recursion/3
 %% Purpose: Handles recursion over the specific fields in a json object 
 %% Returns: Either the found value or 'false'
@@ -296,6 +359,12 @@ get_list_and_add_id(JsonStruct) ->
 field_recursion(Json, QueryParts, Value) ->
     field_recursion(Json, QueryParts, Value, "").
 
+%% @doc
+%% @hidden
+%% Function: field_recursion/4
+%% Purpose: Handles recursion over the specific fields in a json object 
+%% Returns: Either the found value or 'false'
+%% @end
 field_recursion(Json, [{wildcard, Field} | Rest], Value, Query) ->
     case get_field_max_index(Json, Field) of
 	N when is_integer(N) ->
@@ -325,6 +394,29 @@ field_recursion(Json, [{no_wildcard, Field}], Value, Query) ->
     end.
 
 %% @doc
+%% @hidden
+%% Function: get_field/1
+%% Purpose: Get the value at a certain field
+%% Returns: Return the string representation of the value of the specified 
+%%          field, if it exists, otherwise returns 'false' value. If the desired
+%%          value is a struct then no adaptation is performed.
+%% @end
+-spec get_field_internal(Json::string() | tuple(), Query::string()) -> string() | atom().
+get_field_internal(Json, Query)->
+    JsonParser = destructure_json:parse("Obj."++Query),
+    try JsonParser(Json) of
+	Result when is_binary(Result) ->
+	    ?TO_STRING(Result);
+	Result ->
+	    Result
+    catch
+	error:function_clause -> undefined;
+	error:{badfun, _} -> improper_usage
+    end.
+
+
+%% @doc
+%% @hidden
 %% Function: index_recursion/4
 %% Purpose: Handles recursion over indexes for one specific field
 %% Returns: Either the found value or 'false'
@@ -344,6 +436,7 @@ index_recursion(Json, [{wildcard, Field, N} | Rest], Value, Query) ->
     end.
     
 %% @doc
+%% @hidden
 %% Function: get_field_max_index/2
 %% Purpose: Makes a query for a field in order to find out the amount of items for that field.
 %%          Does NOT handle wildcard queries
@@ -358,6 +451,7 @@ get_field_max_index(Json, Query) ->
     end.
 
 %% @doc
+%% @hidden
 %% Function: query_index_prep/2
 %% Purpose: Encodes the index of a field for a json query
 %% Returns: json query encoded as string()
@@ -367,6 +461,7 @@ query_index_prep(Query, N) ->
 
 
 %% @doc
+%% @hidden
 %% Function: find_wildcard_fields/1
 %% Purpose:  Search the query for fields ending with [*]
 %% Returns:  A list containing the different parts of the query. Each element is
@@ -384,6 +479,37 @@ find_wildcard_fields(Query) ->
 	    NewWildCards2 ++ [{no_wildcard, R}]
     end.
 
-parse_attr(Field) ->
-    Attrs = re:split(Field, "\\.", [{return, list}]),
+%% @doc
+%% @hidden
+%% Function: parse_attr/1
+%% @end
+parse_attr(Query) ->
+    Attrs = re:split(Query, "\\.", [{return, list}]),
     lists:map(fun list_to_atom/1, Attrs).
+
+%% @doc
+%% @hidden
+%% Function: replace_field_internal/3
+%% @end
+replace_field_internal(Json, Query, Value) when is_tuple(Value) ->
+    replace_field_internal(Json, Query, erlson:from_json(encode(Value)));
+replace_field_internal(Json, Query, Value) when is_list(Value) ->
+    replace_field_internal(Json, Query, encode(Value));
+replace_field_internal(Json, Query, Value) ->
+    Attrs = parse_attr(Query),
+    try erlson:store(Attrs, Value, Json) of
+	Result ->
+	    to_string(erlson:to_json(Result))
+    catch
+	_:_ ->
+	    Json
+    end.
+
+%% @doc
+%% @hidden
+%% Function: rm_field_internal/2
+%% @end
+rm_field_internal(Json, Query) ->
+    Attrs = parse_attr(Query),
+    NewJson = erlson:remove(Attrs, Json),
+    to_string(erlson:to_json(NewJson)).
