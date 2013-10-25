@@ -14,6 +14,7 @@
 %% API functions
 %% ====================================================================
 -export([add_field/3,
+	add_field2/3,
 	 add_value_in_list/2,
 	 decode/1, 
 	 encode/1, 
@@ -30,15 +31,6 @@
 	 erlson_test/0]).
 -include("misc.hrl").
 
-add_value_in_list(List, Value) when is_list(List) ->    
-        erlang:display(List),
-        V = decode(Value),
-        erlang:display(V),
-        [L] = List,
-        A = [V , L],
-        erlang:display("AAA"),
-        erlang:display(to_string(A)),
-        A.
 
 %% @doc
 %% Function: encode/1
@@ -257,6 +249,22 @@ rm_field(Json, Field) when is_tuple(Json) ->
 rm_field(Json, Field) when is_list(Json) ->
     rm_field({erlson:from_json(Json), Field}).
     
+
+add_field2(Json,FieldName,FieldValue) when is_tuple(Json)->
+    add_field2(to_string(Json), FieldName, FieldValue);
+add_field2(Stream,FieldName,FieldValue) when is_integer(FieldValue) ->
+    string:substr(Stream,1,length(Stream)-1) ++ ",\"" ++ FieldName ++ "\":" ++ FieldValue ++ "}";
+add_field2(Stream,FieldName,FieldValue) ->
+    string:substr(Stream,1,length(Stream)-1) ++ ",\"" ++ FieldName ++ "\":" ++ FieldValue ++ "}".
+
+add_value_in_list(List, Value) when is_list(List) ->
+	erlang:display(List),
+	V = decode(Value),
+	erlang:display(V),
+	A= {struct,[{<<"streams">>, [V | List]}]},
+	erlang:display("AAA"),
+	erlang:display(to_string(A)),
+	A.
 
 
 get_and_add_id(JsonStruct) ->
