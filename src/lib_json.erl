@@ -24,6 +24,7 @@
 	 get_and_add_id/1,
 	 get_list_and_add_id/1,
 	 get_field_value/3, 
+	 rm_field/2,
 	 set_attr/2,
 	 to_string/1, 
 	 erlson_test/0]).
@@ -228,14 +229,13 @@ set_attr(Attr, Value) when is_list(Attr) ->
 %% @end
 -spec add_field(Stream::string(),FieldName::string(),FieldValue::term()) -> string().
 add_field({Json, Field, Value}) ->
-    %% 
     Attrs = parse_attr(Field),
     NewJson = erlson:store(Attrs, Value, Json),
     to_string(erlson:to_json(NewJson)).
     
 
 add_field(Json, Field, Value) when is_tuple(Json) ->
-     add_field({erlson:from_json(encode(Json)), Field, Value});
+    add_field({erlson:from_json(encode(Json)), Field, Value});
 
 add_field(Json, Field, Value) when is_list(Json) ->
     add_field({erlson:from_json(Json), Field, Value}).
@@ -247,7 +247,15 @@ add_field(Json, Field, Value) when is_list(Json) ->
 %% add_field(Stream,FieldName,FieldValue) ->
 %%     string:substr(Stream,1,length(Stream)-1) ++ ",\"" ++ FieldName ++ "\":\"" ++ FieldValue ++ "\"}".
 
-
+rm_field({Json, Field}) ->
+    Attrs = parse_attr(Field),
+    NewJson = erlson:remove(Attrs, Json),
+    to_string(erlson:to_json(NewJson)).
+  
+rm_field(Json, Field) when is_tuple(Json) ->
+     rm_field({erlson:from_json(encode(Json)), Field});
+rm_field(Json, Field) when is_list(Json) ->
+    rm_field({erlson:from_json(Json), Field}).
     
 
 
