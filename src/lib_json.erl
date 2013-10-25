@@ -27,10 +27,27 @@
 	 get_field_value/3, 
 	 rm_field/2,
 	 set_attr/2,
-	 to_string/1, 
-	 erlson_test/0]).
+	 to_string/1]).
 -include("misc.hrl").
 
+add_value_in_list(List, Value) when is_list(List) ->
+	erlang:display(List),
+	V = decode(Value),
+	erlang:display(V),
+	A= {struct,[{<<"streams">>, [V | List]}]},
+	erlang:display("AAA"),
+	erlang:display(to_string(A)),
+	A.
+
+
+%% @doc
+%% Function: decode/1
+%% Purpose : Decodes a json object. 
+%% Returns : Either a mochiweb, json_term(), representation of the json object
+%%           or a more readable version which only contains lists, tuples and string
+%% @end
+decode(Json) when is_list(Json) ->
+     mochijson2:decode(Json).
 
 %% @doc
 %% Function: encode/1
@@ -51,16 +68,6 @@ encode(Json) when is_tuple(Json)->
     Encoder(Json);
 encode(Json)->
     mochijson2:encode(Json).
-
-
-%% @doc
-%% Function: decode/1
-%% Purpose : Decodes a json object. 
-%% Returns : Either a mochiweb, json_term(), representation of the json object
-%%           or a more readable version which only contains lists, tuples and string
-%% @end
-decode(Json) when is_list(Json) ->
-     mochijson2:decode(Json).
 
 field_replace({Json, Field, Value}) ->
     Attrs = parse_attr(Field),
@@ -112,7 +119,7 @@ get_field({Json, Query})->
 %% Function: get_field/2
 %% Purpose: Get the value at a certain field
 %% Returns: Return the string representation of the value of the specified 
-%%          field, if it exists, otherwise returns 'false' value. If the desired
+%%          field, if it exists, otherwise returns 'undefined' value. If the desired
 %%          value is a struct then no adaptation is performed.
 %% @end
 -spec get_field(Json::string() | tuple(), Query::string()) -> string() | atom().
@@ -123,7 +130,13 @@ get_field(Json, Query) when is_tuple(Json) ->
     get_field({Json, Query}).
 
 
-
+%% @doc
+%% Function: get_fielsd/2
+%% Purpose: Get the values for a list of specified fields.
+%% Returns: Return the string representation of the values of the specified 
+%%          fields, if they exist, if a field does not exist it will be returned
+%%          as 'undefined' for that specific field
+%% @end
 get_fields(Json, []) ->
     [];
 get_fields(Json, [Field|Tl]) ->
@@ -188,15 +201,24 @@ field_value_exists(Json, Query, Value) ->
 	    false
     end.
 
+%% @doc
+%% Function: set_attr/2
+%% Purpose:  Sets a json attribute to a value
+%% Returns:  Returns a mochijson2
+%% @end
+set_attr(Attr, Value) when is_atom(Attr) ->
+    set_attr(binary:list_to_bin(atom_to_list(Attr)), Value);
+set_attr(Attr, Value) when is_binary(Attr) ->
+    {struct, [{Attr, Value}]};
+set_attr(Attr, Value) when is_list(Attr) ->
+    set_attr(binary:list_to_bin(Attr), Value).
+
 
 %% @doc
 %% Function: to_string/1
 %% Purpose:  Make a mochijson representation into a string
 %% Returns:  string()
 %% @end
-%% to_string(Json) when is_list(Json) ->
-%%     Json.
-
 to_string(Json) when is_tuple(Json) ->
     to_string(encode(Json));
 to_string(Json) ->
@@ -204,13 +226,6 @@ to_string(Json) ->
     BinaryJson = binary:list_to_bin(Json),
     %% Converts the binary into a string.
     binary:bin_to_list(BinaryJson).
-
-set_attr(Attr, Value) when is_atom(Attr) ->
-    set_attr(binary:list_to_bin(atom_to_list(Attr)), Value);
-set_attr(Attr, Value) when is_binary(Attr) ->
-    {struct, [{Attr, Value}]};
-set_attr(Attr, Value) when is_list(Attr) ->
-    set_attr(binary:list_to_bin(Attr), Value).
 
 
 %% @doc
@@ -257,15 +272,6 @@ add_field2(Stream,FieldName,FieldValue) when is_integer(FieldValue) ->
 add_field2(Stream,FieldName,FieldValue) ->
     string:substr(Stream,1,length(Stream)-1) ++ ",\"" ++ FieldName ++ "\":" ++ FieldValue ++ "}".
 
-add_value_in_list(List, Value) when is_list(List) ->
-	erlang:display(List),
-	V = decode(Value),
-	erlang:display(V),
-	A= {struct,[{<<"streams">>, [V | List]}]},
-	erlang:display("AAA"),
-	erlang:display(to_string(A)),
-	A.
-
 
 get_and_add_id(JsonStruct) ->
     Id  = get_field(JsonStruct, "_id"),
@@ -277,66 +283,6 @@ get_list_and_add_id(JsonStruct) ->
     AddedId = lists:map(fun(X) -> decode(get_and_add_id(X)) end, HitsList),
     HitsAttr = set_attr(hits, AddedId),
     to_string(HitsAttr).
-
-
-erlson_test() ->
-    %% create an empty dictionary
-    X = #{},
-    
-    %%associate fields 'foo' with 1, 'bar' with "abc" and 'fum' with 'true'
-    D = #{foo = 1, bar = <<"abc">>, fum},
-    %$ access dictionary element
-    1 = D.foo,
-    
-    %$ add nested dictionaries to dictionary D
-    D1 = D#{baz = #{fum = #{i = 0}}},
-    %% access elements of the nested dictionary
-    0 = D1.baz.fum.i,
-
-    %% modify elements of the nested dictionary
-    D2 = D1#{baz.fum.i = 100, baz.fum.j = <<"new nested value">>},
-
-    ErlJson = erlson:to_json(D2),
-    erlang:display("1*****************************************************************"),
-    erlang:display(ErlJson),
-
-
-    Json = to_string(ErlJson),
-    erlang:display("2*****************************************************************"),
-    erlang:display(Json),
-
-    ErlJsonEncode = encode(ErlJson),
-    erlang:display("3*****************************************************************"),
-    erlang:display(ErlJsonEncode),
-
-
-    JsonEncode = encode(Json),
-    erlang:display("4*****************************************************************"),
-    erlang:display(JsonEncode),
-
-    case JsonEncode =:= ErlJsonEncode of
-	true ->
-	    erlang:display("poff");
-	false ->
-	    erlang:display("pang")
-    end,
-
-    Json2 = erlson:from_json(JsonEncode),
-    erlang:display("5*****************************************************************"),
-    erlang:display(Json2),
-
-    erlang:display("6*****************************************************************"),
-    erlang:display(Json2),       
-    Json3 = erlson:from_json(Json),
-    erlang:display("7*****************************************************************"),
-    erlang:display(Json3),
-    NewJson3 = field_replace(Json, "baz.fum.i", [1,2,3,4,5]),
-    erlang:display("8*****************************************************************"),
-    erlang:display(NewJson3),
-
-    NewJson4 = field_replace(NewJson3, "baz.fum.i", 9999999),
-    erlang:display("9*****************************************************************"),
-    erlang:display(NewJson4).
 
 
 %% ====================================================================
