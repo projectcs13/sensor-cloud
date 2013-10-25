@@ -66,7 +66,7 @@ post_test() ->
 post_and_stream_test() ->
 	Response1 = post_request(?RESOURCE_URL, "application/json", 
 							"{
-								\"model\" : \"testsmartphone2\",
+								\"model\" : \"testresource\",
 								\"tags\" : \"testtag\"
 			}"),
 	check_returned_code(Response1, 200),
@@ -75,7 +75,7 @@ post_and_stream_test() ->
 	timer:sleep(800),
 	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"search\",\"resource_id\" : \""++Id++"\", \"private\" : \"false\", \"tags\":\"test_tag\"}"}, [], []),
 	{ok, {{_Version11, 200, _ReasonPhrase11}, _Headers11, Body11}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"search2\",\"resource_id\" : \""++Id++"\", \"private\" : \"false\", \"tags\":\"test_tag\"}"}, [], []),
-	Response2 = get_request(?SUGGEST_URL++"testsmartphone2"),     
+	Response2 = get_request(?SUGGEST_URL++"testresource"),     
 	check_returned_code(Response2, 200),
 	{ok, {_, _ ,Body2}} = Response2,
 	?assertEqual("testtag",lib_json:get_field(Body2, "testsuggest[0].options[0].payload.tags")).

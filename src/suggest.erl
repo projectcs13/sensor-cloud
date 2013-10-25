@@ -183,14 +183,18 @@ update_suggestion(Stream) ->
 							NewPayload = lib_json:add_field(Payload, "streams", "["++StreamInfo++"]"),
 							erlang:display(NewPayload),
 							erlang:display("111111111"),
-							TempSugg = lib_json:field_replace(Sugg, "suggest.payload", NewPayload),
+							TempSugg = lib_json:field_replace(Sugg, "suggest.payload", lib_json:to_string(NewPayload)),
 							erlang:display("222222222"),
 							NewSugg = lib_json:field_replace(TempSugg, "suggest.weight", NewWeight);
 						OldStream ->
 							erlang:display("333333333"),
+							erlang:display("oldstream"),
+							erlang:display(lib_json:to_string(OldStream)),
+
 							NewStreamList = lib_json:add_value_in_list(OldStream, StreamInfo),
 							erlang:display("444444444"),
 							TempSugg = lib_json:field_replace(Sugg, "suggest.payload.streams", NewStreamList),
+							erlang:display(lib_json:to_string(TempSugg)),
 							erlang:display("555555555"),
 							NewSugg = lib_json:field_replace(TempSugg, "suggest.weight", NewWeight)
 					end,

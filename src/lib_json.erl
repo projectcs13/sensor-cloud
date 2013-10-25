@@ -233,8 +233,7 @@ add_value_in_list(List, Value) when is_list(List) ->
 	erlang:display(List),
 	V = decode(Value),
 	erlang:display(V),
-	[L] = List, 
-	A= [V , L],
+	A= {struct,[{<<"streams">>, [V | List]}]},
 	erlang:display("AAA"),
 	erlang:display(to_string(A)),
 	A.
