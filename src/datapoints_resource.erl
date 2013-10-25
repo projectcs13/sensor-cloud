@@ -193,18 +193,7 @@ process_search(ReqData, State, get) ->
 -spec transform(tuple()) -> {string()}.
 transform([]) -> "";
 transform([{Field,Value}|Rest]) when is_binary(Field) andalso is_binary(Value)->
-	case binary_to_list(Field) of 
-		"timestampFrom" ->
-				case binary_to_list(Rest) of
-					[{"timestampTo",ValueTo}] -> "%20AND%20" ++ "timestamp:[" ++ Value ++ "+TO+" ++ ValueTo ++ "]";
-					[] -> "%20AND%20" ++ "timestamp:[" ++ Value ++ "+TO+null" ++ "]"
-				end;
-		_ ->	
-				case Rest of
-					_ -> "%20AND%20" ++ Field ++ ":" ++ Value ++ transform(Rest);
-					[] -> "%20AND%20" ++ Field ++ ":" ++ Value
-				end
-	end;
+	transform([{binary_to_list(Field), binary_to_list(Value)}]) ++ transform(Rest);
 transform([{Field,Value}|Rest]) ->
 	case Field of 
 		"timestampFrom" ->
@@ -214,8 +203,8 @@ transform([{Field,Value}|Rest]) ->
 				end;
 		_ ->	
 				case Rest of
-					_ -> "%20AND%20" ++ Field ++ ":" ++ Value ++ transform(Rest);
-					[] -> "%20AND%20" ++ Field ++ ":" ++ Value
+					[] -> "%20AND%20" ++ Field ++ ":" ++ Value;
+					_ -> "%20AND%20" ++ Field ++ ":" ++ Value ++ transform(Rest)
 				end
 	end.
 
