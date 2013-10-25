@@ -70,9 +70,8 @@ decode(Json) when is_list(Json) ->
      mochijson2:decode(Json).
 
 field_replace({Json, Field, Value}) ->
-    Attrs = re:split(Field, "\\.", [{return, list}]),
-    AtomAttrs = lists:map(fun list_to_atom/1, Attrs),
-    try erlson:store(AtomAttrs, Value, Json) of
+    Attrs = parse_attr(Field),
+    try erlson:store(Attrs, Value, Json) of
 	Result ->
 	    to_string(erlson:to_json(Result))
     catch
@@ -84,7 +83,7 @@ field_replace(Json, Field, Value) when is_tuple(Value) ->
     field_replace(Json, Field, internal, erlson:from_json(encode(Value)));
 
 field_replace(Json, Field, Value) when is_list(Value) ->
-    field_replace(Json, Field, internal, Value);
+    field_replace(Json, Field, internal, encode(Value));
 	
 field_replace(Json, Field, Value)  ->
     field_replace(Json, Field, internal, Value).
@@ -228,13 +227,28 @@ set_attr(Attr, Value) when is_list(Attr) ->
 %% Returns: The string representation of the JSON object with the new field
 %% @end
 -spec add_field(Stream::string(),FieldName::string(),FieldValue::term()) -> string().
+add_field({Json, Field, Value}) ->
+    %% 
+    Attrs = parse_attr(Field),
+    NewJson = erlson:store(Attrs, Value, Json),
+    to_string(erlson:to_json(NewJson)).
+    
 
-add_field(Json,FieldName,FieldValue) when is_tuple(Json)->
-    add_field(to_string(Json), FieldName, FieldValue);
-add_field(Stream,FieldName,FieldValue) when is_integer(FieldValue) ->
-    string:substr(Stream,1,length(Stream)-1) ++ ",\"" ++ FieldName ++ "\":" ++ FieldValue ++ "}";
-add_field(Stream,FieldName,FieldValue) ->
-    string:substr(Stream,1,length(Stream)-1) ++ ",\"" ++ FieldName ++ "\":\"" ++ FieldValue ++ "\"}".
+add_field(Json, Field, Value) when is_tuple(Json) ->
+     add_field({erlson:from_json(encode(Json)), Field, Value});
+
+add_field(Json, Field, Value) when is_list(Json) ->
+    add_field({erlson:from_json(Json), Field, Value}).
+    
+%% add_field(Json,FieldName,FieldValue) when is_tuple(Json)->
+%%     add_field(to_string(Json), FieldName, FieldValue);
+%% add_field(Stream,FieldName,FieldValue) when is_integer(FieldValue) ->
+%%     string:substr(Stream,1,length(Stream)-1) ++ ",\"" ++ FieldName ++ "\":" ++ FieldValue ++ "}";
+%% add_field(Stream,FieldName,FieldValue) ->
+%%     string:substr(Stream,1,length(Stream)-1) ++ ",\"" ++ FieldName ++ "\":\"" ++ FieldValue ++ "\"}".
+
+
+    
 
 
 get_and_add_id(JsonStruct) ->
@@ -304,7 +318,7 @@ erlson_test() ->
     erlang:display("8*****************************************************************"),
     erlang:display(NewJson3),
 
-    NewJson4 = field_replace(NewJson3, "baz.fum.i.0", 9999999),
+    NewJson4 = field_replace(NewJson3, "baz.fum.i", 9999999),
     erlang:display("9*****************************************************************"),
     erlang:display(NewJson4).
 
@@ -408,6 +422,6 @@ find_wildcard_fields(Query) ->
 	    NewWildCards2 ++ [{no_wildcard, R}]
     end.
 
-
-
-
+parse_attr(Field) ->
+    Attrs = re:split(Field, "\\.", [{return, list}]),
+    lists:map(fun list_to_atom/1, Attrs).
