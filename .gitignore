@@ -4,7 +4,9 @@ doc/*
 lib/
 erl_crash.dump
 *~
+TEST*.xml
 .project
+.settings
 
 # Do not Ignore these
 !doc/overview.edoc

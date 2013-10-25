@@ -4,7 +4,9 @@
 ### Variable assignment
 ################################################################################
 ERL ?= erl
-APP := website
+APP := engine
+REBAR=./rebar
+REBAR_URL=http://cloud.github.com/downloads/basho/rebar/rebar
 ################################################################################
 
 
@@ -14,17 +16,15 @@ APP := website
 ### The commands in this sections should not be used in general, but can be used
 ### if there is need for it
 ################################################################################
-compile: get_libs compile_src
+compile:
+	@./rebar compile skip_deps=true
 
-compile_src: get_libs
-	./rebar compile
-
+### get_libs will download and install all project libraries
 get_libs:
 	@./rebar get-deps
-
-clean_libs:
-	@./rebar delete-deps
-	rm -rf lib/
+	@./rebar compile
+	$(MAKE) -C lib/rabbitmq-server
+	$(MAKE) -C lib/rabbitmq-erlang-client
 
 clean_emacs_vsn_files:
 	rm -rf *~
@@ -44,18 +44,75 @@ clean_emacs_vsn_files:
 ################################################################################
 
 ### Command: make
-### Downloads all dependencies and builds the entire project
+### Builds the entire project, excluding the dependencies.
 all: compile
+
+### Command: make install
+### Downloads all dependencies and builds the entire project
+install: get_libs
+
+### Command: make run
+### Downloads all depenedencies, bulds entire project and runs the project.
+run: compile
+	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname engine 
+
+### Command: make run_es
+### Runs elastic search
+run_es:
+	lib/elasticsearch/bin/elasticsearch -f
+	
+### Command: make run_rabbit
+### Runs rabbitMQ server
+run_rabbit:
+	sudo lib/rabbitmq-server/scripts/rabbitmq-server
+
+### Command: make test
+### Compile project resources (not libraries) and runs all eunit tests.
+test: compile
+	-@mkdir test-results
+	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname test -s test run
+
+test_json: compile
+	-@mkdir test-results
+	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname test -eval 'test:run(json)'
+
+test_resource: compile
+	-@mkdir test-results
+	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname test -eval 'test:run(resource)'
+
+test_streams: compile
+	-@mkdir test-results
+	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname test -eval 'test:run(streams)'
+
+test_suggest: compile
+	-@mkdir test-results
+	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname test -eval 'test:run(suggest)'
+
+test_users: compile
+	-@mkdir test-results
+	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname test -eval 'test:run(users)'
+
+### Command: make docs
+### Genereats all of the documentation files
+docs:
+	./rebar skip_deps=true doc
 
 ### Command: make clean
 ### Cleans the directory of the following things:
-### * Libraries, including 'lib' folder.
 ### * Emacs versioning files.
 ### * All erlang .beam files, including 'ebin' folder
-clean: clean_libs clean_emacs_vsn_files
-	./rebar clean
+clean: clean_emacs_vsn_files
+	@./rebar clean skip_deps=true
 	rm -f erl_crash.dump
 	rm -rf ebin/
+	rm -rf test-results/
+
+### Command: make clean_libs
+### Cleans the directory of the following things:
+### * All the downloaded libraries
+clean_libs:
+	@./rebar delete-deps
+	rm -rf lib/
 
 ### Command: make clean_docs
 ### Cleans the directory of the following things:
@@ -63,12 +120,39 @@ clean: clean_libs clean_emacs_vsn_files
 clean_docs:
 	find doc/ -type f -not -name 'overview.edoc' | xargs rm
 
-### Command: make run
-### Downloads all depenedencies, bulds entire project and runs the project.
-run: compile
-	./start.sh
-
-### Command: make docs
-### Genereats all of the documentation files
-docs: compile_src
-	@$(ERL) -noshell -run edoc_run application '$(APP)' '"."' '[{packages, false},{private, true}]'
+### Command: make help
+### Prints an explanation of the commands in this Makefile
+help:
+	@echo "###################################################################"
+	@echo "Commands:"
+	@echo ""
+	@echo "'make'"
+	@echo "Compiles all the project sources. Does NOT compile libraries"
+	@echo ""
+	@echo "'make install'"
+	@echo "Downloads and compiles all libraries"
+	@echo ""
+	@echo "'make run'"
+	@echo "Compiles and runs the project. Does NOT compile libraries"
+	@echo ""
+	@echo "'make run_es'"
+	@echo "Runs the elastic search server"
+	@echo ""
+	@echo "make run_rabbit"
+	@echo "Runs the rabbitMQ server"
+	@echo ""
+	@echo "'make docs'"
+	@echo "Generates documentation for the project"
+	@echo ""
+	@echo "'make clean'"
+	@echo "Cleans all the project, including dependencies"
+	@echo ""
+	@echo "'make clean_libs'"
+	@echo "Cleans all of the libraries"
+	@echo ""
+	@echo "'make clean_docs'"
+	@echo "Cleans all of the documentation files, except for 'overview.edoc'"
+	@echo ""
+	@echo "'make help'"
+	@echo "Prints an explanation of the commands in this Makefile"
+	@echo "###################################################################"
