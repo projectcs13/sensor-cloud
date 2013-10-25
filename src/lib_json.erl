@@ -14,18 +14,19 @@
 %% API functions
 %% ====================================================================
 -export([add_field/3,
-	field_replace/3,
-	decode/1, 
-	add_value_in_list/2,
-	encode/1, 
-	field_value_exists/3, 
-	get_field/2, 
-	get_fields/2,
-	get_and_add_id/1,
-	get_list_and_add_id/1,
-	get_field_value/3, 
-	set_attr/2,
-	to_string/1]).
+	 add_value_in_list/2,
+	 decode/1, 
+	 encode/1, 
+	 field_replace/3,
+	 field_value_exists/3, 
+	 get_field/2, 
+	 get_fields/2,
+	 get_and_add_id/1,
+	 get_list_and_add_id/1,
+	 get_field_value/3, 
+	 set_attr/2,
+	 to_string/1, 
+	 erlson_test/0]).
 -include("misc.hrl").
 
 
@@ -74,7 +75,8 @@ field_replace(Json, Field, Value) when is_tuple(Value) ->
     field_replace(Json, Field, internal, erlson:from_json(encode(Value)));
 
 field_replace(Json, Field, Value) when is_list(Value) ->
-    field_replace(Json, Field, internal, erlson:from_json(Value));
+    field_replace(Json, Field, internal, Value);
+	
 field_replace(Json, Field, Value)  ->
     field_replace(Json, Field, internal, Value).
 
@@ -188,7 +190,7 @@ field_value_exists(Json, Query, Value) ->
 
 %% @doc
 %% Function: to_string/1
-%% Purpose:  Make a json representation into a string
+%% Purpose:  Make a mochijson representation into a string
 %% Returns:  string()
 %% @end
 %% to_string(Json) when is_list(Json) ->
@@ -208,10 +210,6 @@ set_attr(Attr, Value) when is_binary(Attr) ->
     {struct, [{Attr, Value}]};
 set_attr(Attr, Value) when is_list(Attr) ->
     set_attr(binary:list_to_bin(Attr), Value).
-
-replace_attr(Json, Path, Value) ->
-	erlang:display("replace_attr should be implemented"),
-	Json.
 
 
 %% @doc
@@ -249,6 +247,66 @@ get_list_and_add_id(JsonStruct) ->
     AddedId = lists:map(fun(X) -> decode(get_and_add_id(X)) end, HitsList),
     HitsAttr = set_attr(hits, AddedId),
     to_string(HitsAttr).
+
+
+erlson_test() ->
+    %% create an empty dictionary
+    X = #{},
+    
+    %%associate fields 'foo' with 1, 'bar' with "abc" and 'fum' with 'true'
+    D = #{foo = 1, bar = <<"abc">>, fum},
+    %$ access dictionary element
+    1 = D.foo,
+    
+    %$ add nested dictionaries to dictionary D
+    D1 = D#{baz = #{fum = #{i = 0}}},
+    %% access elements of the nested dictionary
+    0 = D1.baz.fum.i,
+
+    %% modify elements of the nested dictionary
+    D2 = D1#{baz.fum.i = 100, baz.fum.j = <<"new nested value">>},
+
+    ErlJson = erlson:to_json(D2),
+    erlang:display("1*****************************************************************"),
+    erlang:display(ErlJson),
+
+
+    Json = to_string(ErlJson),
+    erlang:display("2*****************************************************************"),
+    erlang:display(Json),
+
+    ErlJsonEncode = encode(ErlJson),
+    erlang:display("3*****************************************************************"),
+    erlang:display(ErlJsonEncode),
+
+
+    JsonEncode = encode(Json),
+    erlang:display("4*****************************************************************"),
+    erlang:display(JsonEncode),
+
+    case JsonEncode =:= ErlJsonEncode of
+	true ->
+	    erlang:display("poff");
+	false ->
+	    erlang:display("pang")
+    end,
+
+    Json2 = erlson:from_json(JsonEncode),
+    erlang:display("5*****************************************************************"),
+    erlang:display(Json2),
+
+    erlang:display("6*****************************************************************"),
+    erlang:display(Json2),       
+    Json3 = erlson:from_json(Json),
+    erlang:display("7*****************************************************************"),
+    erlang:display(Json3),
+    NewJson3 = field_replace(Json, "baz.fum.i", [1,2,3,4,5]),
+    erlang:display("8*****************************************************************"),
+    erlang:display(NewJson3),
+
+    NewJson4 = field_replace(NewJson3, "baz.fum.i.0", 9999999),
+    erlang:display("9*****************************************************************"),
+    erlang:display(NewJson4).
 
 
 %% ====================================================================
