@@ -4,7 +4,8 @@
 ### Variable assignment
 ################################################################################
 ERL ?= erl
-REBAR=./rebar
+REBAR = ./rebar
+# DIALYZE_INCLUDE = -I lib/erlastic_search/include/ -I lib/webmachine/include/ -I lib/rabbitmq-erlang-client/include -I lib/erlson/include/
 ################################################################################
 
 
@@ -15,7 +16,7 @@ REBAR=./rebar
 ### if there is need for it
 ################################################################################
 compile:
-	@$(REBAR) compile skip_deps=true
+	@$(REBAR) compile analyze skip_deps=true
 
 ### get_libs will download and install all project libraries
 get_libs:
@@ -23,6 +24,12 @@ get_libs:
 	@$(REBAR) compile
 	$(MAKE) -C lib/rabbitmq-server
 	$(MAKE) -C lib/rabbitmq-erlang-client
+
+# prep_dialyzer:
+# 	dialyzer --build_plt --apps kernel stdlib erts mnesia eunit
+
+# dialyze: 
+# 	dialyzer -pa ebin/ $(DIALYZE_INCLUDE) src/*.erl lib/erlson/ebin/
 
 clean_emacs_vsn_files:
 	rm -rf *~
@@ -43,11 +50,11 @@ clean_emacs_vsn_files:
 
 ### Command: make
 ### Builds the entire project, excluding the dependencies.
-all: compile
+all: compile #dialyze
 
 ### Command: make install
 ### Downloads all dependencies and builds the entire project
-install: get_libs
+install: get_libs #prep_dialyzer
 
 ### Command: make run
 ### Downloads all depenedencies, bulds entire project and runs the project.
