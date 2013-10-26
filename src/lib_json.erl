@@ -61,10 +61,9 @@
 %% '''
 %% @end
 -spec add_field(Json::json(),Field::field(),Value::json_value()) -> json_string().
-add_field(Json, Field, Value) when is_tuple(Json) ->
-    add_field_internal(erlson:from_json(encode(Json)), Field, Value);
-add_field(Json, Field, Value) when is_list(Json) ->
-    add_field_internal(erlson:from_json(Json), Field, Value).
+add_field(Json, Field, Value) ->
+    add_field_internal(prepare_json(Json), Field, prepare_value(Value)).
+
 
 %% @doc 
 %% TODO Should be removed after add_field/1 has been improved.
@@ -243,10 +242,8 @@ get_field_value(Json, Query, Value) ->
 %% '''
 %% @end
 -spec replace_field(Json::json(), Query::field(), Value::json_value()) -> json_string().
-replace_field(Json, Query, Value) when is_tuple(Json) ->
-    replace_field_internal(erlson:from_json(encode(Json)), Query, Value);
-replace_field(Json, Query, Value) when is_list(Json)->
-    replace_field_internal(erlson:from_json(Json), Query, Value).
+replace_field(Json, Query, Value) ->
+    replace_field_internal(prepare_json(Json), Query, prepare_value(Value)).
 
 %% @doc
 %% Removes the field 'Query' from a JSON object
@@ -260,10 +257,8 @@ replace_field(Json, Query, Value) when is_list(Json)->
 %% '''
 %% @end
 -spec rm_field(Json::json(), Query::field()) -> json_string().
-rm_field(Json, Query) when is_tuple(Json) ->
-    rm_field_internal(erlson:from_json(encode(Json)), Query);
-rm_field(Json, Query) when is_list(Json) ->
-    rm_field_internal(erlson:from_json(Json), Query).
+rm_field(Json, Query)  ->
+    rm_field_internal(prepare_json(Json), Query).
 
 %% @doc
 %% Sets a json attribute 'Attr' to 'Value'
@@ -283,7 +278,7 @@ set_attr(Attr, Value) when is_atom(Attr) ->
 set_attr(Attr, Value) when is_list(Attr) ->
     set_attr(binary:list_to_bin(Attr), Value);
 set_attr(Attr, Value) when is_binary(Attr) ->
-    {struct, [{Attr, Value}]}.
+    to_string({struct, [{Attr, Value}]}).
 
 
 
@@ -402,7 +397,7 @@ field_recursion(Json, [{no_wildcard, Field}], Value, Query) ->
 %%          value is a struct then no adaptation is performed.
 %% @end
 -spec get_field_internal(Json::string() | tuple(), Query::string()) -> string() | atom().
-get_field_internal(Json, Query)->
+get_field_internal(Json, Query) ->
     JsonParser = destructure_json:parse("Obj."++Query),
     try JsonParser(Json) of
 	Result when is_binary(Result) ->
@@ -450,6 +445,15 @@ get_field_max_index(Json, Query) ->
 	    R
     end.
 
+prepare_json(Json) when is_tuple(Json)->
+    erlson:from_json(encode(Json));
+prepare_json(Json) when is_list(Json)->
+    erlson:from_json(Json).
+
+prepare_value(Value) ->
+    Value.
+
+
 %% @doc
 %% @hidden
 %% Function: query_index_prep/2
@@ -491,10 +495,6 @@ parse_attr(Query) ->
 %% @hidden
 %% Function: replace_field_internal/3
 %% @end
-replace_field_internal(Json, Query, Value) when is_tuple(Value) ->
-    replace_field_internal(Json, Query, erlson:from_json(encode(Value)));
-replace_field_internal(Json, Query, Value) when is_list(Value) ->
-    replace_field_internal(Json, Query, encode(Value));
 replace_field_internal(Json, Query, Value) ->
     Attrs = parse_attr(Query),
     try erlson:store(Attrs, Value, Json) of
