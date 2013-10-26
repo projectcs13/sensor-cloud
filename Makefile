@@ -4,9 +4,7 @@
 ### Variable assignment
 ################################################################################
 ERL ?= erl
-APP := engine
 REBAR=./rebar
-REBAR_URL=http://cloud.github.com/downloads/basho/rebar/rebar
 ################################################################################
 
 
@@ -17,12 +15,12 @@ REBAR_URL=http://cloud.github.com/downloads/basho/rebar/rebar
 ### if there is need for it
 ################################################################################
 compile:
-	@./rebar compile skip_deps=true
+	@$(REBAR) compile skip_deps=true
 
 ### get_libs will download and install all project libraries
 get_libs:
-	@./rebar get-deps
-	@./rebar compile
+	@$(REBAR) get-deps
+	@$(REBAR) compile
 	$(MAKE) -C lib/rabbitmq-server
 	$(MAKE) -C lib/rabbitmq-erlang-client
 
@@ -54,7 +52,7 @@ install: get_libs
 ### Command: make run
 ### Downloads all depenedencies, bulds entire project and runs the project.
 run: compile
-	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname engine 
+	$(ERL) -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname engine 
 
 ### Command: make run_es
 ### Runs elastic search
@@ -70,27 +68,27 @@ run_rabbit:
 ### Compile project resources (not libraries) and runs all eunit tests.
 test: compile
 	-@mkdir test-results
-	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname test -s test run
+	$(ERL) -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname test -s test run
 
 test_json: compile
 	-@mkdir test-results
-	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname test -eval 'test:run(json)'
+	$(ERL) -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname test -eval 'test:run(json)'
 
 test_resource: compile
 	-@mkdir test-results
-	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname test -eval 'test:run(resource)'
+	$(ERL) -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname test -eval 'test:run(resource)'
 
 test_streams: compile
 	-@mkdir test-results
-	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname test -eval 'test:run(streams)'
+	$(ERL) -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname test -eval 'test:run(streams)'
 
 test_suggest: compile
 	-@mkdir test-results
-	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname test -eval 'test:run(suggest)'
+	$(ERL) -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname test -eval 'test:run(suggest)'
 
 test_users: compile
 	-@mkdir test-results
-	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname test -eval 'test:run(users)'
+	$(ERL) -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname test -eval 'test:run(users)'
 
 ### Command: make docs
 ### Genereats all of the documentation files
