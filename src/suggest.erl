@@ -181,7 +181,7 @@ update_suggestion(Stream) ->
 					case lib_json:get_field(Response, "hits.hits[0]._source.suggest.payload.streams") of
 						undefined ->
 							erlang:display("000000000"),
-							NewPayload = lib_json:add_field2(Payload, "streams", "["++StreamInfo++"]"),
+							NewPayload = lib_json:add_field(Payload, "streams", "["++StreamInfo++"]"),
 							erlang:display(NewPayload),
 							erlang:display("111111111"),
 							%TempSugg = lib_json:replace_field(Sugg, "suggest.payload", lib_json:to_string(NewPayload)),
