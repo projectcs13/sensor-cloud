@@ -4,11 +4,12 @@
 %% @doc == Library for creating, reading, updating, and deleting fields in JSON objects ==
 %% @end
 -module(lib_json).
--include_lib("erlson/include/erlson.hrl").
+-include("erlson.hrl").
 %% ====================================================================
 %% API functions - Exports
 %% ====================================================================
 -export([add_field/3,
+	 add_value/3,
 	 add_value_in_list/2,
 	 decode/1, 
 	 encode/1, 
@@ -75,6 +76,13 @@ add_value_in_list(List, Value) when is_list(List) ->
 	erlang:display("AAA"),
 	erlang:display(to_string(A)),
 	A.
+
+%% @doc 
+%% TODO Should be improved to a general add_value(Json, Query, Value) function
+%% @end 
+-spec add_value(Json::json(), Field::field(),Value::json_value()) -> json_string().
+add_value(Json, Field, Value)  ->
+    add_value_internal(prepare_json(Json), Field, prepare_value(Value)).
 
 %% @doc 
 %% Decodes a json object into mochijson format.
@@ -330,6 +338,20 @@ get_list_and_add_id(JsonStruct) ->
 add_field_internal(Json, Field, Value) ->
     Attrs = parse_attr(Field),
     
+    try erlson:store(Attrs, Value, Json) of
+	NewJson ->
+	    to_string(erlson:to_json(NewJson))
+    catch
+	_:_ ->
+	    to_string(erlson:to_json(Json))
+    end.
+
+%% @doc
+%% @hidden
+%% Function: add_value_internal/3
+%% @end
+add_value_internal(Json, Field, Value) ->
+    Attrs = parse_attr(Field),    
     try erlson:store(Attrs, Value, Json) of
 	NewJson ->
 	    to_string(erlson:to_json(NewJson))
