@@ -9,7 +9,6 @@
 %% API functions - Exports
 %% ====================================================================
 -export([add_field/3,
-	 add_field2/3,
 	 add_value_in_list/2,
 	 decode/1, 
 	 encode/1, 
@@ -63,18 +62,6 @@
 -spec add_field(Json::json(),Field::field(),Value::json_value()) -> json_string().
 add_field(Json, Field, Value) ->
     add_field_internal(prepare_json(Json), Field, prepare_value(Value)).
-
-
-%% @doc 
-%% TODO Should be removed after add_field/1 has been improved.
-%% @end    
--spec add_field2(Json::json(),Field::string(),Value::json_value()) -> json_string().
-add_field2(Json,Field,Value) when is_tuple(Json)->
-    add_field2(to_string(Json), Field, Value);
-add_field2(Stream,Field,Value) when is_integer(Value) ->
-    string:substr(Stream,1,length(Stream)-1) ++ ",\"" ++ Field ++ "\":" ++ Value ++ "}";
-add_field2(Stream,Field,Value) ->
-    string:substr(Stream,1,length(Stream)-1) ++ ",\"" ++ Field ++ "\":" ++ Value ++ "}".
 
 %% @doc 
 %% TODO Should be improved to a general add_value(Json, Query, Value) function
@@ -342,8 +329,14 @@ get_list_and_add_id(JsonStruct) ->
 %% @end
 add_field_internal(Json, Field, Value) ->
     Attrs = parse_attr(Field),
-    NewJson = erlson:store(Attrs, Value, Json),
-    to_string(erlson:to_json(NewJson)).
+    
+    try erlson:store(Attrs, Value, Json) of
+	NewJson ->
+	    to_string(erlson:to_json(NewJson))
+    catch
+	_:_ ->
+	    to_string(erlson:to_json(Json))
+    end.
 
 %% @doc
 %% @hidden
@@ -488,8 +481,23 @@ find_wildcard_fields(Query) ->
 %% Function: parse_attr/1
 %% @end
 parse_attr(Query) ->
+    %% Produces a list such as ["attr1", attr2[1], attr3]
     Attrs = re:split(Query, "\\.", [{return, list}]),
-    lists:map(fun list_to_atom/1, Attrs).
+    Fun = fun(X, Acc) ->
+		  %% Produces a list such as ["attr1"] or ["attr2", "1]"]
+		  case re:split(X, "\\[", [{return, list}]) of
+		      [Attr] ->
+			  %% The erlson library works on atoms
+			  [list_to_atom(Attr)| Acc];
+		      [Attr, IndexNoLeftBracket] ->
+			  [Index, _] = re:split(IndexNoLeftBracket, "\\]", [{return, list}]),
+			  %% The erlson library works on atoms and integers and the integers
+			  %% cannot be 0, but the syntax specifies 0 as the first index,
+			  %% so we add 1 to the index after conversion
+			  [list_to_atom(Attr), (list_to_integer(Index)+1) | Acc] 
+		  end
+	  end,
+    lists:foldr(Fun, [], Attrs).
 
 %% @doc
 %% @hidden
@@ -497,12 +505,18 @@ parse_attr(Query) ->
 %% @end
 replace_field_internal(Json, Query, Value) ->
     Attrs = parse_attr(Query),
-    try erlson:store(Attrs, Value, Json) of
-	Result ->
-	    to_string(erlson:to_json(Result))
-    catch
-	_:_ ->
-	    Json
+    %% Check if the value exist, if it doesn't exist it shouldn't be replaced
+    case erlson:get_value(Attrs, Json) of
+	undefined ->
+	    to_string(erlson:to_json(Json));
+	_ ->	   
+	    try erlson:store(Attrs, Value, Json) of
+		NewJson ->
+		    to_string(erlson:to_json(NewJson))
+	    catch
+		_:_ ->
+		    to_string(erlson:to_json(Json))
+	    end
     end.
 
 %% @doc
@@ -511,5 +525,10 @@ replace_field_internal(Json, Query, Value) ->
 %% @end
 rm_field_internal(Json, Query) ->
     Attrs = parse_attr(Query),
-    NewJson = erlson:remove(Attrs, Json),
-    to_string(erlson:to_json(NewJson)).
+    try erlson:remove(Attrs, Json) of
+	NewJson ->
+	    to_string(erlson:to_json(NewJson))
+    catch
+	_:_ ->
+	    to_string(erlson:to_json(Json))
+    end.
