@@ -16,7 +16,7 @@ REBAR = ./rebar
 ### if there is need for it
 ################################################################################
 compile:
-	@$(REBAR) compile analyze skip_deps=true
+	@$(REBAR) compile skip_deps=true
 
 ### get_libs will download and install all project libraries
 get_libs:
