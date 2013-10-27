@@ -8,7 +8,7 @@
 %% in the module lib_json for decoding json objects.
 %%
 %% @end
--module(json_tests).
+-module(lib_json_tests).
 -include_lib("eunit/include/eunit.hrl").
 -include("json.hrl").
 -export([]).

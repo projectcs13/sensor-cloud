@@ -3,8 +3,8 @@
 ################################################################################
 ### Variable assignment
 ################################################################################
-ERL ?= erl
-REBAR = ./rebar
+ERL := erl
+REBAR := ./rebar
 # DIALYZE_INCLUDE = -I lib/erlastic_search/include/ -I lib/webmachine/include/ -I lib/rabbitmq-erlang-client/include -I lib/erlson/include/
 ################################################################################
 
@@ -79,7 +79,7 @@ test: compile
 
 test_json: compile
 	-@mkdir test-results
-	$(ERL) -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname engine -eval 'test:run(json)'
+	$(ERL) -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname engine -eval 'test:run(lib_json)'
 
 test_resource: compile
 	-@mkdir test-results
