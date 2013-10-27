@@ -11,10 +11,6 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--ifndef(GENERIC_JSON).
--define(GENERIC_JSON, generic_json).
--endif.
-
 -ifndef(QUOTE).
 -define(QUOTE(ARG), "\"" ++ ARG ++ "\"").
 -endif.
@@ -34,21 +30,28 @@
 
 
 
--ifndef(JSON_STRUCT).
--define(JSON_STRUCT(ARG), ?TUPLE(string:join(lists:map(fun({Attr, Val}) -> ?JSON_ATTR(Attr, Val) end, ARG), ", "))).
--endif.
+%% -ifndef(JSON_STRUCT).
+%% -define(JSON_STRUCT(ARG), ?TUPLE(string:join(lists:map(fun({Attr, Val}) -> ?JSON_ATTR(Attr, Val) end, ARG), ","))).
+%% -endif.
 
 
 
--ifndef(JSON_ATTR).
--define(JSON_ATTR(Attr, Val), 
-	lists:concat([?QUOTE(?TO_STRING(Attr)), ?COLON,  
+%% -ifndef(JSON_ATTR).
+%% -define(JSON_ATTR(Attr, Val), 
+%% 	lists:concat([?QUOTE(?TO_STRING(Attr)), ?COLON,  
 		      
-		      %% indicates that Z is to be treated as a string value
-		      fun({s, Z}) -> ?QUOTE(Z);
+%% 		      %% indicates that Z is to be treated as a string value
+%% 		      fun({s, Z}) -> ?QUOTE(Z);
 			 
-			 %%indicates that Z will be treated as a list of values
-			 ({l, Z}) -> Fun = fun(Y) -> ?QUOTE(?TO_STRING(Y)) end,
-				     ?LIST(string:join(lists:map(Fun, Z), ", "))
-		      end(Val)])).
+%% 			 %%indicates that Z will be treated as a list of values
+%% 			 ({l, Z}) -> Fun = fun(Y) -> ?QUOTE(?TO_STRING(Y)) end,
+%% 				     ?LIST(string:join(lists:map(Fun, Z), ","))
+%% 		      end(Val)])).
+%% -endif.
+
+-ifndef(JSON_VALUE).
+-define(JSON_VALUE(Arg), case Arg of
+			     X when is_list(X) -> list_to_binary(X);
+			     X -> X
+			 end).
 -endif.
