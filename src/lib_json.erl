@@ -34,7 +34,7 @@
 %% @type attr() = atom() | string()
 -type attr() :: atom() | string().
 %% @type field() = json_string() | mochijson()
--type field() :: atom() | string() | [atom()] .
+-type field() :: atom() | string() | [atom()].
 %% @type json() = json_string() | mochijson()
 -type json() :: json_string() | mochijson().
 %% @type json_string() = string()
@@ -336,8 +336,7 @@ get_list_and_add_id(JsonStruct) ->
 %% Function: add_field_internal/3
 %% @end
 add_field_internal(Json, Field, Value) ->
-    Attrs = parse_attr(Field),
-    
+    Attrs = parse_attr(Field),    
     try erlson:store(Attrs, Value, Json) of
 	NewJson ->
 	    to_string(erlson:to_json(NewJson))
@@ -351,10 +350,21 @@ add_field_internal(Json, Field, Value) ->
 %% Function: add_value_internal/3
 %% @end
 add_value_internal(Json, Field, Value) ->
-    Attrs = parse_attr(Field),    
-    try erlson:store(Attrs, Value, Json) of
-	NewJson ->
-	    to_string(erlson:to_json(NewJson))
+    Attrs = parse_attr(Field),
+    try erlson:get_value(Attrs, Json) of
+	undefined ->
+	    erlang:display("undefined"),
+	    NewJson = erlson:store(Attrs, Value, Json),
+	    to_string(erlson:to_json(NewJson));
+	List when is_list(List) ->
+	    erlang:display("List"),
+	    NewList = lists:sort([Value | List]),
+	    NewJson = erlson:store(Attrs, NewList, Json),
+	    to_string(erlson:to_json(NewJson));
+	_ -> 
+	    erlang:display("non-list"),
+	    %% NewJson = erlson:store(Attrs, Value, Json),
+	    to_string(erlson:to_json(Json))
     catch
 	_:_ ->
 	    to_string(erlson:to_json(Json))
