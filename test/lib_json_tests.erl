@@ -13,87 +13,147 @@
 -include("json.hrl").
 -export([]).
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% = = Test input = =
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -define(JSON1, 
 	"{"
-	"\"name\":\"Name1\","
-	"\"friend\": ["
-	"{\"name\":\"FriendName1\", \"nickname\":\"NickName1\"},"
-	"{\"name\":\"FriendName2\", \"nickname\":[\"NickName2\", \"NickName3\"]},"
-	"{\"name\":\"FriendName3\", \"nickname\":[\"NickName4\", \"NickName5\"]}"
-	"]"
+	"\"friend\":["
+	"{\"name\":\"FriendName1\",\"nickname\":\"NickName1\"},"
+	"{\"name\":\"FriendName2\",\"nickname\":[\"NickName2\",\"NickName3\"]},"
+	"{\"name\":\"FriendName3\",\"nickname\":[\"NickName4\",\"NickName5\"]}"
+	"],"
+	"\"name\":\"Name1\""
 	"}").
 
 -define(JSON2, 
 	"{"
 	"\"name\":\"Name1\","
-	"\"friend\": {\"name\":\"FriendName2\", \"nickname\":[\"NickName2\", \"NickName3\"]}"
+	"\"friend\":{\"name\":\"FriendName2\",\"nickname\":[\"NickName2\",\"NickName3\"]}"
 	"}").
 
 -define(JSON3, 
 	"{\"took\":1,\"timed_out\":false,\"_shards\":{\"total\":5,\"successful\":5,\"failed\":0},\"hits\":{\"total\":0,\"max_score\":null,\"hits\":[]}}").
 
--define(GET_FIELD_RESULT1, 
-	[{struct,[{<<"name">>,<<"FriendName1">>},
-		  {<<"nickname">>,<<"NickName1">>}]},
-	 {struct,[{<<"name">>,<<"FriendName2">>},
-		  {<<"nickname">>,[<<"NickName2">>,<<"NickName3">>]}]},
-	 {struct,[{<<"name">>,<<"FriendName3">>},
-		  {<<"nickname">>,[<<"NickName4">>,<<"NickName5">>]}]}]).
--define(GET_FIELD_SEARCH1, 
-	[[{"name","FriendName1"},{"nickname","NickName1"}],
-	 [{"name","FriendName2"},{"nickname",["NickName2","NickName3"]}],
-	 [{"name","FriendName3"},{"nickname",["NickName4","NickName5"]}]
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% = = Test desired input = =
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-define(JSON_RESULT1, 
+	"{"
+	"\"friend\":["
+	"{\"name\":\"FriendName0\",\"nickname\":\"NickName0\"},"
+	"{\"name\":\"FriendName1\",\"nickname\":\"NickName1\"},"
+	"{\"name\":\"FriendName2\",\"nickname\":[\"NickName2\",\"NickName3\"]},"
+	"{\"name\":\"FriendName3\",\"nickname\":[\"NickName4\",\"NickName5\"]}"
+	"],"
+	"\"name\":\"Name1\""
+	"}").
+
+-define(JSON_RESULT2, 
+	"{"
+	"\"friend\":["
+	"{\"name\":\"FriendName1\",\"nickname\":\"NickName1\"},"
+	"{\"name\":\"FriendName2\",\"nickname\":[\"NickName2\",\"NickName3\",\"NickName6\"]},"
+	"{\"name\":\"FriendName3\",\"nickname\":[\"NickName4\",\"NickName5\"]}"
+	"],"
+	"\"name\":\"Name1\""
+	"}").
+
+-define(JSON_RESULT3, 
+	"{"
+	"\"friend\":["
+	"{\"height\":180,\"name\":\"FriendName1\",\"nickname\":\"NickName1\"},"
+	"{\"name\":\"FriendName2\",\"nickname\":[\"NickName2\",\"NickName3\"]},"
+	"{\"name\":\"FriendName3\",\"nickname\":[\"NickName4\",\"NickName5\"]}"
+	"],"
+	"\"name\":\"Name1\""
+	"}").
+-define(JSON_RESULT4, 
+	"{"
+	"\"friend\":["
+	"{\"height\":[180,182],\"name\":\"FriendName1\",\"nickname\":\"NickName1\"},"
+	"{\"name\":\"FriendName2\",\"nickname\":[\"NickName2\",\"NickName3\"]},"
+	"{\"name\":\"FriendName3\",\"nickname\":[\"NickName4\",\"NickName5\"]}"
+	"],"
+	"\"name\":\"Name1\""
+	"}").
+
+
+-define(JSON_RESULT5, 
+	["{\"name\":\"FriendName1\",\"nickname\":\"NickName1\"}",
+	"{\"name\":\"FriendName2\",\"nickname\":[\"NickName2\",\"NickName3\"]}",
+	"{\"name\":\"FriendName3\",\"nickname\":[\"NickName4\",\"NickName5\"]}"
 	]).
--define(GET_FIELD_VALUE_RESULT1, {struct,[{<<"name">>,<<"FriendName1">>},
-					  {<<"nickname">>,<<"NickName1">>}]}
+
+-define(JSON_RESULT6, 
+	"{\"name\":\"FriendName1\",\"nickname\":\"NickName1\"}"
        ).
 
 -define(ENCODE_RESULT1, 
-	[$\{,[$\", <<"name">>,$\"],$:,[$\",<<"Name1">>,$\"],$,,[$\",<<"friend">>,$\"],$:,[$[,
+	[$\{,[$\",<<"friend">>,$\"],$:,[$[,
 [${,[$\",<<"name">>,$\"],$:,[$\",<<"FriendName1">>,$\"],$,,[$\",<<"nickname">>,$\"],$:,[$\",<<"NickName1">>,$\"],$}],$,,
 [${,[$\",<<"name">>,$\"],$:,[$\",<<"FriendName2">>,$\"],$,,[$\",<<"nickname">>,$\"],$:,[$[,[$\",<<"NickName2">>,$\"],$,,[$\",<<"NickName3">>,$\"],$]],$}],$,,
 [${,[$\",<<"name">>,$\"],$:,[$\",<<"FriendName3">>,$\"],$,,[$\",<<"nickname">>,$\"],$:,[$[,[$\",<<"NickName4">>,$\"],$,,[$\",<<"NickName5">>,$\"],$]],$}]
-,$]],$}]).
+,$]],
+$,,[$\", <<"name">>,$\"],$:,[$\",<<"Name1">>,$\"],
+$}]).
 
 -define(DECODE_RESULT1, 
-	{struct,[{<<"name">>,<<"Name1">>},
-		 {<<"friend">>,
+	{struct,[{<<"friend">>,
 		  [{struct,[{<<"name">>,<<"FriendName1">>},
 			    {<<"nickname">>,<<"NickName1">>}]},
 		   {struct,[{<<"name">>,<<"FriendName2">>},
 			    {<<"nickname">>,[<<"NickName2">>,<<"NickName3">>]}]},
 		   {struct,[{<<"name">>,<<"FriendName3">>},
-			    {<<"nickname">>,[<<"NickName4">>,<<"NickName5">>]}]}]}]}).
+			    {<<"nickname">>,[<<"NickName4">>,<<"NickName5">>]}]}]},
+		 {<<"name">>,<<"Name1">>}]}).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% = = Test functions = =
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% @doc
+%% Purpose: Tests lib_json:add_value3
+%% @doc
+add_value_test() ->
+    ?assertEqual("{\"attr1\":\"value1\"}", lib_json:add_value("{}", attr1, <<"value1">>)),
+
+    %% For a regular string value the function does not recognize it, so 
+    %% it needs to be defined as a binary like above
+    ?assertNotEqual("{\"attr1\":\"value1\"}", lib_json:add_value("{}", attr1, "value1")),
+    ?assertEqual(?JSON_RESULT1, lib_json:add_value(?JSON1, friend, "{\"name\":\"FriendName0\", \"nickname\":\"NickName0\"}")),
+    ?assertEqual(?JSON_RESULT2, lib_json:add_value(?JSON1, "friend[1].nickname", <<"NickName6">>)),
+    ?assertEqual(?JSON_RESULT3, lib_json:add_value(?JSON1, "friend[0].height", 180)),
+    ?assertEqual(?JSON_RESULT4, lib_json:add_value(?JSON1, "friend[0].height", "[180,182]")),
+    ?assertEqual(?JSON_RESULT4, lib_json:add_value(?JSON1, "friend[0].height", [180, 182])),
+
+    %% If the field already exist and is not a list then no action is taken
+    ?assertEqual(?JSON1, lib_json:add_value(?JSON1, name, <<"poff">>)),
+
+    ?assertEqual(?JSON1, lib_json:add_value(?JSON1, "name.poff", <<"poff">>)).
 
 %% @doc
-%% Function: get_field_test/0
-%% Purpose: Test the json_lib:get_field/2 by attempting to get various fields 
-%%          from string json objects
-%% Returns: ok | {error, term()}
-%%
+%% Purpose: Tests lib_json:get_field/2
 %% @end
 get_field_test() ->
     ?assertEqual("Name1", lib_json:get_field(?JSON1, "name")),
-    ?assertEqual(?GET_FIELD_RESULT1, lib_json:get_field(?JSON1, "friend")),
-    ?assertEqual({struct,
-		  [{<<"name">>,<<"FriendName1">>},
-		   {<<"nickname">>,<<"NickName1">>}]}, lib_json:get_field(?JSON1, "friend[0]")),
+    ?assertEqual(?JSON_RESULT5, lib_json:get_field(?JSON1, "friend")),
+    ?assertEqual(?JSON_RESULT6, lib_json:get_field(?JSON1, "friend[0]")),
     ?assertEqual("FriendName1", lib_json:get_field(?JSON1, "friend[0].name")),
     ?assertEqual("NickName1", lib_json:get_field(?JSON1, "friend[0].nickname")),
-    ?assertEqual([<<"NickName2">>, <<"NickName3">>], lib_json:get_field(?JSON1, "friend[1].nickname")),
+    ?assertEqual(["NickName2", "NickName3"], lib_json:get_field(?JSON1, "friend[1].nickname")),
     ?assertEqual("NickName2", lib_json:get_field(?JSON1, "friend[1].nickname[0]")),
     ?assertEqual(undefined, lib_json:get_field(?JSON1, "friend[0].nick")),
-    ?assertEqual({struct,
-		  [{<<"name">>,<<"FriendName2">>},
-		   {<<"nickname">>,[<<"NickName2">>,<<"NickName3">>]}]},
-		 lib_json:get_field(?JSON2, "friend")).
+    ?assertEqual("{\"name\":\"FriendName2\",\"nickname\":[\"NickName2\",\"NickName3\"]}",
+		 lib_json:get_field(?JSON2, "friend")),
+
+    AddedField1 = lib_json:add_value(?JSON1, "friend[0].height", [1,2]),
+    ?assertEqual([1,2], lib_json:get_field(AddedField1, "friend[0].height")),
+    AddedField2 = lib_json:add_value(?JSON1, "friend[0].height", ["value1","value2"]),
+    ?assertEqual(["value1","value2"], lib_json:get_field(AddedField2, "friend[0].height")).
 
 %% @doc
-%% Function: get_field_value_test/0
-%% Purpose: Test the json_lib:get_field_value/2 by attempting to get various fields 
-%%          from string json objects
-%% Returns: ok | {error, term()}
-%%
+%% Purpose: Tests json_lib:get_field_value/2 
 %% @end
 get_field_value_test() ->
     ?assertEqual("FriendName2", lib_json:get_field_value(?JSON1, "friend[1].name", "FriendName2")),
@@ -103,9 +163,9 @@ get_field_value_test() ->
     ?assertEqual(undefined, lib_json:get_field_value(?JSON1, "friend[*].name", "NickName3")),
     ?assertEqual(undefined, lib_json:get_field_value(?JSON2, "friend[*].name", "NickName3")),
     ?assertEqual("NickName3", lib_json:get_field_value(?JSON2, "friend.nickname", "NickName3")),
-    ?assertEqual(?GET_FIELD_VALUE_RESULT1, 
-		 lib_json:get_field_value(?JSON1, "friend[0]", ?GET_FIELD_VALUE_RESULT1)),
-    ?assertEqual(?GET_FIELD_RESULT1, lib_json:get_field_value(?JSON1, "friend", ?GET_FIELD_RESULT1)),
+    ?assertEqual(?JSON_RESULT6, 
+		 lib_json:get_field_value(?JSON1, "friend[0]", ?JSON_RESULT6)),
+    ?assertEqual(?JSON_RESULT5, lib_json:get_field_value(?JSON1, "friend", ?JSON_RESULT5)),
     ?assertEqual(null, lib_json:get_field_value(?JSON3, "hits.max_score", null)),
 
     %% This call will produce an error. Added here as an example of how 
@@ -120,11 +180,7 @@ get_field_value_test() ->
     ?assertEqual(error, Try).
 
 %% @doc
-%% Function: field_value_exists_test/0
-%% Purpose: Test the json_lib:field_value_exists/3 by attempting to get various fields 
-%%          from string json objects
-%% Returns: ok | {error, term()}
-%%
+%% Purpose: Test the json_lib:field_value_exists/3
 %% @end
 field_value_exists_test() ->
     ?assertEqual(true, lib_json:field_value_exists(?JSON1, "friend[1].name", "FriendName2")),
@@ -134,62 +190,24 @@ field_value_exists_test() ->
     ?assertEqual(false, lib_json:field_value_exists(?JSON1, "friend[*].name", "NickName3")),
     ?assertEqual(false, lib_json:field_value_exists(?JSON2, "friend[*].name", "NickName3")),
     ?assertEqual(true, lib_json:field_value_exists(?JSON2, "friend.nickname", "NickName3")),
-    ?assertEqual(true, lib_json:field_value_exists(?JSON1, "friend[0]", ?GET_FIELD_VALUE_RESULT1)),
-    ?assertEqual(true, lib_json:field_value_exists(?JSON1, "friend", ?GET_FIELD_RESULT1)).
+    ?assertEqual(true, lib_json:field_value_exists(?JSON1, "friend[0]", ?JSON_RESULT6)),
+    ?assertEqual(true, lib_json:field_value_exists(?JSON1, "friend", ?JSON_RESULT5)).
 
 %% @doc
-%% Function: encode_test/0
-%% Purpose: Test the json_lib:encode/1 by attempting to encode various json objects
-%% Returns: ok | {error, term()}
-%%
+%% Purpose: Test the json_lib:encode/1
 %% @end
 encode_test() ->
     ?assertEqual(?ENCODE_RESULT1, lib_json:encode(?JSON1)).
 
-
 %% @doc
-%% Function: decode_test/0
-%% Purpose: Test the json_lib:decode/1 by attempting to decode various json objects
-%% Returns: ok | {error, term()}
-%%
+%% Purpose: Test the json_lib:decode/1
 %% @end
 decode_test() ->
     ?assertEqual(?DECODE_RESULT1, lib_json:decode(?JSON1)).
 
 %% @doc
-%% Function: encode_decode_test/0
-%% Purpose: Test the json_lib:encode/1 and lib_json:decode/1 by attempting to 
-%%          decode and encode consecutive calls of the functions
-%% Returns: ok | {error, term()}
-%%
+%% Purpose: Test the json_lib:encode/1 and lib_json:decode/1 in combination
 %% @end
 encode_decode_test() ->
     ?assertEqual(?DECODE_RESULT1, lib_json:decode(lib_json:encode(?JSON1))),
     ?assertEqual(?ENCODE_RESULT1, lib_json:encode(lib_json:decode(lib_json:encode(?JSON1)))).
-
-%% @doc
-%% Function: json_macros_test/0
-%% Purpose: Test the to see if macros in json.hrl produces the same result as 
-%%          the manual built-up jsob objects
-%% Returns: ok | {error, term()}
-%%
-%% @end
-json_macro_test() ->
-    Json1 = 
-	"{"
-	"\"name\":\"Name1\","
-	"\"friend\": ["
-	++ ?JSON_STRUCT([{name, {s, "FriendName1"}}, {nickname, {s, "NickName1"}}]) ++ ","	
-	++ ?JSON_STRUCT([{name, {s, "FriendName2"}}, {nickname, {l, ["NickName2", "NickName3"]}}]) ++ ","
-	++ ?JSON_STRUCT([{name, {s, "FriendName3"}}, {nickname, {l, ["NickName4", "NickName5"]}}]) ++	
-	"]"
-	"}",
-
-    Json2 = 
-	"{"
-	"\"name\":\"Name1\","
-	"\"friend\": " ++ ?JSON_STRUCT([{name, {s, "FriendName2"}}, {nickname, {l, ["NickName2", "NickName3"]}}]) ++	
-	"}",
-
-    ?assertEqual(?JSON1, Json1),
-    ?assertEqual(?JSON2, Json2).
