@@ -20,7 +20,7 @@ compile:
 
 ### get_libs will download and install all project libraries
 get_libs:
-	@$(REBAR) get-deps
+	@@$(REBAR) get-deps
 	@$(REBAR) compile
 	$(MAKE) -C lib/rabbitmq-server
 	$(MAKE) -C lib/rabbitmq-erlang-client
@@ -75,27 +75,27 @@ run_rabbit:
 ### Compile project resources (not libraries) and runs all eunit tests.
 test: compile
 	-@mkdir test-results
-	$(ERL) -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname test -s test run
+	$(ERL) -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname engine -s test run
 
 test_json: compile
 	-@mkdir test-results
-	$(ERL) -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname test -eval 'test:run(json)'
+	$(ERL) -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname engine -eval 'test:run(json)'
 
 test_resource: compile
 	-@mkdir test-results
-	$(ERL) -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname test -eval 'test:run(resource)'
+	$(ERL) -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname engine -eval 'test:run(resource)'
 
 test_streams: compile
 	-@mkdir test-results
-	$(ERL) -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname test -eval 'test:run(streams)'
+	$(ERL) -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname engine -eval 'test:run(streams)'
 
 test_suggest: compile
 	-@mkdir test-results
-	$(ERL) -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname test -eval 'test:run(suggest)'
+	$(ERL) -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname engine -eval 'test:run(suggest)'
 
 test_users: compile
 	-@mkdir test-results
-	$(ERL) -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname test -eval 'test:run(users)'
+	$(ERL) -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname engine -eval 'test:run(users)'
 
 ### Command: make docs
 ### Genereats all of the documentation files
