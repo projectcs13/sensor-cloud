@@ -16,6 +16,8 @@
 
 -include_lib("erlastic_search.hrl").
 -include("webmachine.hrl").
+-include_lib("amqp_client.hrl").
+-include_lib("pubsub.hrl").
 
 -define(INDEX, "sensorcloud").
 
@@ -131,7 +133,13 @@ process_post(ReqData, State) ->
 				false ->
 					case erlastic_search:index_doc(?INDEX, "stream", ResAdded) of	
 						{error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
-						{ok,List} -> {true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
+						{ok, List} ->
+
+							io:format("Create Stream Process: id = ~p, Resource_id = ~p",[lib_json:get_field(List,"_id"), lib_json:get_field(ResAdded,"resource_id")]),
+							%% Spawn Stream process for Pub/Sub
+							spawn(streamProcess, create, [lib_json:get_field(List,"_id"), lib_json:get_field(ResAdded,"resource_id")]),
+
+							{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
 					end
 			end;
 		true ->

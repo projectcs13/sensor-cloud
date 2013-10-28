@@ -22,9 +22,9 @@ create(ResourceId) ->
     amqp_channel:call(Channel, #'exchange.declare'{exchange = ResourceExchange, type = <<"fanout">>}),
     
     %% Start Loop
-    loop(Channel, ResourceExchange).
+    loop(ResourceId, Channel, ResourceExchange).
 
-loop(Channel, Exchange) ->
+loop(ResourceId, Channel, Exchange) ->
     {S1,S2,S3} = erlang:now(),
     %% Seed random generator
     random:seed(S1,S2,S3),
@@ -40,7 +40,8 @@ loop(Channel, Exchange) ->
                                                   string:join([integer_to_list(Hour),
                                                                integer_to_list(Min),
                                                                integer_to_list(Sec)], ":"),
-                                      value = Data}),
+                                      value = Data,
+                                      id = ResourceId}),
 
     %% Send Msg to exchange
     io:format("~p -> ~p~n", [binary_to_term(Msg) ,binary_to_list(Exchange)]),
@@ -50,4 +51,4 @@ loop(Channel, Exchange) ->
     timer:sleep(1000),
 
     %% Recurse
-    loop(Channel, Exchange).
+    loop(ResourceId, Channel, Exchange).

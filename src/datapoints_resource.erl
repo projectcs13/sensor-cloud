@@ -10,7 +10,6 @@
 				process_post/2, get_datapoint/2]).
 
 -include("webmachine.hrl").
-
 -include_lib("amqp_client.hrl").
 -include_lib("pubsub.hrl").
 
@@ -74,7 +73,25 @@ process_post(ReqData, State) ->
 			FinalJson = add_field(DatapointJson, "streamid", Id),
 			case erlastic_search:index_doc(?INDEX, "datapoint", FinalJson) of
 				{error, Reason} -> {{error, Reason}, ReqData, State};
-				{ok,_} -> {true, ReqData, State}
+				{ok,_} ->
+					io:format("RESPONSE: ~p",[FinalJson]),
+				    %% Create Message
+				    Msg = term_to_binary(#'datapoint'{id = Id, 
+				    								  timestamp = lib_json:get_field(FinalJson,"timestamp"),
+				                                      value = lib_json:get_field(FinalJson,"value")}),
+
+				    StreamExchange = list_to_binary("streams."++Id),
+				    %% Connect
+					{ok, Connection} =
+						amqp_connection:start(#amqp_params_network{host = "localhost"}),
+					%% Open channel
+					{ok, Channel} = amqp_connection:open_channel(Connection),
+					%% Declare exchange
+					amqp_channel:call(Channel, #'exchange.declare'{exchange = StreamExchange, type = <<"fanout">>}),
+					%% Send
+					amqp_channel:cast(Channel, #'basic.publish'{exchange = StreamExchange}, #amqp_msg{payload = Msg}),
+
+					{true, ReqData, State}
 			end
 	end.
 
