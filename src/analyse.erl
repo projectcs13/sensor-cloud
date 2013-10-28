@@ -24,9 +24,9 @@ stop() ->
 %% @end
 
 predict(Json) -> 
-	init(),
 	{_Start, _End, Values} = get_time_series(Json),
-	eri:eval("pred <- " ++ get_arima_string(Values)),
+	eri:eval("A <- auto.arima(" ++ Values ++ ")"),
+	eri:eval("pred <- forecast(A)"),
 	Mean = eri:eval("data.frame(c(pred$mean))[[1]]"),
 	Lo80 = eri:eval("data.frame(c(pred[5]))[1]"),
 	Hi80 = eri:eval("data.frame(c(pred[6]))[1]"),
@@ -65,7 +65,7 @@ get_times(List, {End}) -> {binary_to_list(lists:last(List)), binary_to_list(End)
 
 get_values_string([Head | Tail]) -> get_values_string_(Tail, lists:flatten(io_lib:format("~p)", [Head]))).
 
-get_values_string_([], S) -> "c=("++S;
+get_values_string_([], S) -> "c("++S;
 get_values_string_([Head | Tail], S) -> get_values_string_(Tail, lists:flatten(io_lib:format("~p, ", [Head]))++S).
 
 
