@@ -10,7 +10,7 @@
 -ifndef(TO_STRING).
 -define(TO_STRING(Arg), case Arg of
 			    X when is_atom(X)      -> atom_to_list(X);
-			    X when is_binary(X)    -> binary_to_list(X);
+			    X when is_binary(X)    -> binary:bin_to_list(X);
 			    X when is_float(X)     -> float_to_list(X);			   
 			    X when is_integer(X)   -> integer_to_list(X);
 			    X when is_list(X)      -> X;

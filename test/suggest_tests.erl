@@ -11,6 +11,7 @@
 
 -module(suggest_tests).
 -include_lib("eunit/include/eunit.hrl").
+-include_lib("misc.hrl").
 
 
 %% ====================================================================
@@ -60,7 +61,7 @@ post_test() ->
 	Response2 = get_request(?SUGGEST_URL++"testsmartphone2"),     
 	check_returned_code(Response2, 200),
 	{ok, {_, _ ,Body}} = Response2,
-	?assertEqual("testtag",lib_json:get_field(Body, "testsuggest[0].options[0].payload.tags")).
+	?assertEqual(<<"testtag">>,lib_json:get_field(Body, "testsuggest[0].options[0].payload.tags")).
 
 
 post_and_stream_test() ->
@@ -73,16 +74,16 @@ post_and_stream_test() ->
 	{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} = Response1,
 	Id = lib_json:get_field(Body, "_id"),
 	timer:sleep(800),
-	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"search\",\"resource_id\" : \""++Id++"\", \"private\" : \"false\", \"tags\":\"test_tag\"}"}, [], []),
+	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"search\",\"resource_id\" : \""++?TO_STRING(Id)++"\", \"private\" : \"false\", \"tags\":\"test_tag\"}"}, [], []),
 	erlang:display(Body1),
 	erlang:display("******************************************"),
-	{ok, {{_Version11, 200, _ReasonPhrase11}, _Headers11, Body11}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"search2\",\"resource_id\" : \""++Id++"\", \"private\" : \"false\", \"tags\":\"test_tag\"}"}, [], []),
+	{ok, {{_Version11, 200, _ReasonPhrase11}, _Headers11, Body11}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"search2\",\"resource_id\" : \""++?TO_STRING(Id)++"\", \"private\" : \"false\", \"tags\":\"test_tag\"}"}, [], []),
 	Response2 = get_request(?SUGGEST_URL++"testresource"),     
 	check_returned_code(Response2, 200),
 	{ok, {_, _ ,Body2}} = Response2,
 	erlang:display("_______________________________"),
 	erlang:display(Body2),
-	?assertEqual("testtag",lib_json:get_field(Body2, "testsuggest[0].options[0].payload.tags")).
+	?assertEqual(<<"testtag">>,lib_json:get_field(Body2, "testsuggest[0].options[0].payload.tags")).
 
 
 %% @doc
@@ -103,7 +104,7 @@ get_suggestion_test() ->
 	Response2 = get_request(?SUGGEST_URL ++ "testanother"),
 	check_returned_code(Response2, 200),
 	{ok, {_, _ ,Body}} = Response2,
-	?assertEqual("ericsson",lib_json:get_field(Body, "testsuggest[0].options[0].payload.manufacturer")).
+	?assertEqual(<<"ericsson">>,lib_json:get_field(Body, "testsuggest[0].options[0].payload.manufacturer")).
 
 
 %% @doc

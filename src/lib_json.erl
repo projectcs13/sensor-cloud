@@ -162,10 +162,7 @@ field_value_exists(Json, Query, Value) ->
 %% @end
 -spec get_field(Json::json(), Query::string()) -> json_output_value().
 get_field(Json, Query) ->
-    erlang:display("11##################################"),
-    erlang:display(Json),
     NewJson  = parse_json(Json),
-    erlang:display("22##################################"),
     Attrs    = parse_attr(Query),
     format_output(get_field_internal(NewJson, Attrs)).
 
@@ -213,7 +210,7 @@ get_field_value(Json, Query, Value) ->
     try field_recursion(Json, QueryParts, Value) of
 	Value ->
 	    Value;
-	_ ->
+	R ->
 	    undefined
     catch
 	%% I could use only a catch all clause, but I left these here to show how 
@@ -324,7 +321,7 @@ get_and_add_id(JsonStruct) ->
     SourceJson  = get_field(JsonStruct, "_source"),
     %% erlang:display(SourceJson),
     %% erlang:display("+++++++++++++++++++444+++++++++++++++++++++"),
-    P = add_value(SourceJson, "id", binary:list_to_bin(Id)),
+    P = add_value(SourceJson, "id", Id),
     %% erlang:display(P),
     %% erlang:display("+++++++++++++++++++333+++++++++++++++++++++"),
     P
@@ -404,9 +401,7 @@ field_recursion(Json, [{no_wildcard, Field}], Value, Query) ->
     NewQuery = lists:concat([Query, Field]),
     case get_field(Json, NewQuery) of
 	R when is_list(R) ->
-	    case lists:member(Value, lists:map(fun(X) when is_binary(X) -> binary:bin_to_list(X);
-						  (X) -> X
-					       end, R)) of
+	    case lists:member(Value, R) of
 		true ->
 		    Value;
 		false ->
@@ -440,41 +435,53 @@ find_wildcard_fields(Query) ->
 %% Function: format_output/2
 %% @end
 format_output(Value) when is_binary(Value) ->
-    ?TO_STRING(Value);
+    Value;
 format_output([]) ->
     [];
 format_output(Value) when is_list(Value) ->
     %% erlang:display("0000"),
+    %% case erlson:is_json_string(Value) of
+    %% 	true ->
+    %% 	    to_string(erlson:to_json(Value));
+    %% 	false ->
+    %% 	    case lists:all(fun erlson:is_json_string/1, Value) of
+    %% 		true ->
+    %% 		    lists:map(fun(X) -> to_string(erlson:to_json(X)) end, Value);
+    %% 		false ->
+    %% 		    Value
+    %% 	    end
+    %% end;
+		
     try to_string(erlson:to_json(Value)) of
-	NewValue ->
-	    %% erlang:display("1***1"),
-	    %% erlang:display(NewValue),
-	    %% erlang:display("1***2"),
-	    NewValue
+    	NewValue ->
+    	    %% erlang:display("1***1"),
+    	    %% erlang:display(NewValue),
+    	    %% erlang:display("1***2"),
+    	    NewValue
     catch
-	_:_ ->
-	    try lists:map(fun(X) -> to_string(erlson:to_json(X)) end, Value) of
-		NewValue ->
-		    %% erlang:display("2***1"),
-		    %% erlang:display(NewValue),
-		    %% erlang:display("2***2"),
-		    NewValue
-	    catch
-		_:_ ->
-		    case lists:all(fun is_integer/1, Value) of
-			true ->
-			    %% erlang:display("3***1"),
-			    %% erlang:display(Value),
-			    %% erlang:display("3***2"),
-			    Value;
-			false ->
-			    %% erlang:display("4***1"),
-			    P = lists:map(fun(A) -> ?TO_STRING(A) end, Value),
-			    %% erlang:display(P),
-			    %% erlang:display("4***2"),
-			    P
-		    end
-	    end
+    	_:_ ->
+    	    try lists:map(fun(X) -> to_string(erlson:to_json(X)) end, Value) of
+    		NewValue ->
+    		    %% erlang:display("2***1"),
+    		    %% erlang:display(NewValue),
+    		    %% erlang:display("2***2"),
+    		    NewValue
+    	    catch
+    		_:_ ->
+    		    case lists:all(fun is_integer/1, Value) of
+    			true ->
+    			    %% erlang:display("3***1"),
+    			    %% erlang:display(Value),
+    			    %% erlang:display("3***2"),
+    			    Value;
+    			false ->
+    			    %% erlang:display("4***1"),
+    			    P = lists:map(fun(A) -> A end, Value),
+    			    %% erlang:display(P),
+    			    %% erlang:display("4***2"),
+    			    P
+    		    end
+    	    end
     end;
 format_output(Value) ->
     Value.
@@ -593,10 +600,10 @@ parse_value(Value) when is_tuple(Value)->
 parse_value(Value) when is_list(Value) ->
     case {hd(Value), lists:last(Value)} of
 	{${,$}} -> %% Check if Value is a proper json object
-	    %% erlang:display("poff1"),
+	    erlang:display("poff1"),
 	    erlson:from_json(Value);
 	{$[,$]} -> %% Check if Value is a json list
-	    %% erlang:display("poff2"),
+	    erlang:display("poff2"),
 	    erlson:list_from_json_array(Value);
 	{_ ,_ } -> %% Value is a list of values for an attribute
 	    %% erlang:display("poff3***1"),

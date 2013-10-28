@@ -12,6 +12,7 @@
 -module(users_tests).
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("stdlib/include/qlc.hrl").
+-include_lib("misc.hrl").
 
 
 %% ====================================================================
@@ -66,7 +67,7 @@ post_test() ->
 get_existing_user_test() ->
 	Id = get_index_id(?TEST_NAME),
 	?assertNotMatch({error, "no match"}, Id),
-	Response1 = get_request(?USERS_URL ++ Id),
+	Response1 = get_request(?USERS_URL ++ ?TO_STRING(Id)),
 	check_returned_code(Response1, 200).
 
 
@@ -94,7 +95,7 @@ get_user_search_test() ->
 	check_returned_code(Response1, 200),
 	{ok, Rest} = Response1,
 	{_,_,A} = Rest,
-	?assertEqual(true, lib_json:field_value_exists(A, "hits.hits[*]._source.user_name", ?TEST_NAME)).
+	?assertEqual(true, lib_json:field_value_exists(A, "hits.hits[*]._source.user_name", <<?TEST_NAME>>)).
 
 
 %% @doc
@@ -110,7 +111,7 @@ post_user_search_test() ->
 	check_returned_code(Response1, 200),
 	{ok, Rest} = Response1,
 	{_,_,A} = Rest,
-	?assertEqual(true, lib_json:field_value_exists(A, "hits.hits[*]._source.user_name", ?TEST_NAME)).
+	?assertEqual(true, lib_json:field_value_exists(A, "hits.hits[*]._source.user_name", <<?TEST_NAME>>)).
 
 
 %% @doc
@@ -121,7 +122,7 @@ post_user_search_test() ->
 %% @end
 -spec put_user_search_test() -> ok | {error, term()}.
 put_user_search_test() ->	
-	Id = get_index_id(?TEST_NAME),
+	Id = ?TO_STRING(get_index_id(?TEST_NAME)),
 	?assertNotMatch({error, "no match"}, Id),
 	Response1 = put_request(?USERS_URL++Id, "application/json", "{\"user_name\":\""++?TEST_NAME++"\","++
 						"\"email\":\""++ ?TEST_EMAIL++"\"}"),
@@ -129,7 +130,7 @@ put_user_search_test() ->
 	Response2 = get_request(?USERS_URL ++ Id),
 	{ok, Rest} = Response2,
 	{_,_,A} = Rest,
-	?assertEqual(true, lib_json:field_value_exists(A, "email", ?TEST_EMAIL)).
+	?assertEqual(true, lib_json:field_value_exists(A, "email", <<?TEST_EMAIL>>)).
 
 
 %% @doc
@@ -142,10 +143,10 @@ put_user_search_test() ->
 delete_user_test() ->	
 	Id = get_index_id(?TEST_NAME),
 	?assertNotMatch({error, "no match"}, Id),
-	Response1 = delete_request(?USERS_URL++Id),
+	Response1 = delete_request(?USERS_URL++?TO_STRING(Id)),
 	check_returned_code(Response1, 200),
 	
-	Response2 = get_request(?USERS_URL ++ Id),
+	Response2 = get_request(?USERS_URL ++ ?TO_STRING(Id)),
 	check_returned_code(Response2, 500).
 
 

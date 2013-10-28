@@ -141,13 +141,13 @@ add_value_test() ->
 %% Purpose: Tests lib_json:get_field/2
 %% @end
 get_field_test() ->
-    ?assertEqual("Name1", lib_json:get_field(?JSON1, "name")),
+    ?assertEqual(<<"Name1">>, lib_json:get_field(?JSON1, "name")),
     ?assertEqual(?JSON_RESULT5, lib_json:get_field(?JSON1, "friend")),
     ?assertEqual(?JSON_RESULT6, lib_json:get_field(?JSON1, "friend[0]")),
-    ?assertEqual("FriendName1", lib_json:get_field(?JSON1, "friend[0].name")),
-    ?assertEqual("NickName1", lib_json:get_field(?JSON1, "friend[0].nickname")),
-    ?assertEqual(["NickName2", "NickName3"], lib_json:get_field(?JSON1, "friend[1].nickname")),
-    ?assertEqual("NickName2", lib_json:get_field(?JSON1, "friend[1].nickname[0]")),
+    ?assertEqual(<<"FriendName1">>, lib_json:get_field(?JSON1, "friend[0].name")),
+    ?assertEqual(<<"NickName1">>, lib_json:get_field(?JSON1, "friend[0].nickname")),
+    ?assertEqual([<<"NickName2">>, <<"NickName3">>], lib_json:get_field(?JSON1, "friend[1].nickname")),
+    ?assertEqual(<<"NickName2">>, lib_json:get_field(?JSON1, "friend[1].nickname[0]")),
     ?assertEqual(undefined, lib_json:get_field(?JSON1, "friend[0].nick")),
     ?assertEqual("{\"name\":\"FriendName2\",\"nickname\":[\"NickName2\",\"NickName3\"]}",
 		 lib_json:get_field(?JSON2, "friend")),
@@ -155,21 +155,20 @@ get_field_test() ->
     AddedField1 = lib_json:add_value(?JSON1, "friend[0].height", [1,2]),
     ?assertEqual([1,2], lib_json:get_field(AddedField1, "friend[0].height")),
     AddedField2 = lib_json:add_value(?JSON1, "friend[0].height", ["value1","value2"]),
-    ?assertEqual(["value1","value2"], lib_json:get_field(AddedField2, "friend[0].height")).
+    ?assertEqual([<<"value1">>,<<"value2">>], lib_json:get_field(AddedField2, "friend[0].height")).
 
 %% @doc
 %% Purpose: Tests json_lib:get_field_value/2 
 %% @end
 get_field_value_test() ->
-    ?assertEqual("FriendName2", lib_json:get_field_value(?JSON1, "friend[1].name", "FriendName2")),
-    ?assertEqual(undefined, lib_json:get_field_value(?JSON1, "friend[0].name", "FriendName2")),
-    ?assertEqual("NickName1", lib_json:get_field_value(?JSON1, "friend[*].nickname", "NickName1")),
-    ?assertEqual("NickName3", lib_json:get_field_value(?JSON1, "friend[*].nickname", "NickName3")),
-    ?assertEqual(undefined, lib_json:get_field_value(?JSON1, "friend[*].name", "NickName3")),
-    ?assertEqual(undefined, lib_json:get_field_value(?JSON2, "friend[*].name", "NickName3")),
-    ?assertEqual("NickName3", lib_json:get_field_value(?JSON2, "friend.nickname", "NickName3")),
-    ?assertEqual(?JSON_RESULT6, 
-		 lib_json:get_field_value(?JSON1, "friend[0]", ?JSON_RESULT6)),
+    ?assertEqual(<<"FriendName2">>, lib_json:get_field_value(?JSON1, "friend[1].name", <<"FriendName2">>)),
+    ?assertEqual(undefined, lib_json:get_field_value(?JSON1, "friend[0].name", <<"FriendName2">>)),
+    ?assertEqual(<<"NickName1">>, lib_json:get_field_value(?JSON1, "friend[*].nickname", <<"NickName1">>)),
+    ?assertEqual(<<"NickName3">>, lib_json:get_field_value(?JSON1, "friend[*].nickname", <<"NickName3">>)),
+    ?assertEqual(undefined, lib_json:get_field_value(?JSON1, "friend[*].name", <<"NickName3">>)),
+    ?assertEqual(undefined, lib_json:get_field_value(?JSON2, "friend[*].name", <<"NickName3">>)),
+    ?assertEqual(<<"NickName3">>, lib_json:get_field_value(?JSON2, "friend.nickname", <<"NickName3">>)),
+    ?assertEqual(?JSON_RESULT6, lib_json:get_field_value(?JSON1, "friend[0]", ?JSON_RESULT6)),
     ?assertEqual(?JSON_RESULT5, lib_json:get_field_value(?JSON1, "friend", ?JSON_RESULT5)),
     ?assertEqual(null, lib_json:get_field_value(?JSON3, "hits.max_score", null)),
 
@@ -188,13 +187,13 @@ get_field_value_test() ->
 %% Purpose: Test the json_lib:field_value_exists/3
 %% @end
 field_value_exists_test() ->
-    ?assertEqual(true, lib_json:field_value_exists(?JSON1, "friend[1].name", "FriendName2")),
-    ?assertEqual(false, lib_json:field_value_exists(?JSON1, "friend[0].name", "FriendName2")),
-    ?assertEqual(true, lib_json:field_value_exists(?JSON1, "friend[*].nickname", "NickName1")),
-    ?assertEqual(true, lib_json:field_value_exists(?JSON1, "friend[*].nickname", "NickName3")),
-    ?assertEqual(false, lib_json:field_value_exists(?JSON1, "friend[*].name", "NickName3")),
-    ?assertEqual(false, lib_json:field_value_exists(?JSON2, "friend[*].name", "NickName3")),
-    ?assertEqual(true, lib_json:field_value_exists(?JSON2, "friend.nickname", "NickName3")),
+    ?assertEqual(true, lib_json:field_value_exists(?JSON1, "friend[1].name", <<"FriendName2">>)),
+    ?assertEqual(false, lib_json:field_value_exists(?JSON1, "friend[0].name", <<"FriendName2">>)),
+    ?assertEqual(true, lib_json:field_value_exists(?JSON1, "friend[*].nickname", <<"NickName1">>)),
+    ?assertEqual(true, lib_json:field_value_exists(?JSON1, "friend[*].nickname", <<"NickName3">>)),
+    ?assertEqual(false, lib_json:field_value_exists(?JSON1, "friend[*].name", <<"NickName3">>)),
+    ?assertEqual(false, lib_json:field_value_exists(?JSON2, "friend[*].name", <<"NickName3">>)),
+    ?assertEqual(true, lib_json:field_value_exists(?JSON2, "friend.nickname", <<"NickName3">>)),
     ?assertEqual(true, lib_json:field_value_exists(?JSON1, "friend[0]", ?JSON_RESULT6)),
     ?assertEqual(true, lib_json:field_value_exists(?JSON1, "friend", ?JSON_RESULT5)).
 

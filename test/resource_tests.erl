@@ -9,6 +9,7 @@
 
 -module(resource_tests).
 -include_lib("eunit/include/eunit.hrl").
+-include_lib("misc.hrl").
 
 %% @doc
 %% Function: inti_test/0
@@ -91,13 +92,13 @@ put_resource_test() ->
 	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/resources/", [],"application/json", "{\"test\" : \"put1\",\"user_id\" : \"0\",\"streams\" : \"1\"}"}, [], []),
 	refresh(),
 	DocId = lib_json:get_field(Body1,"_id"),
-	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(put, {"http://localhost:8000/resources/" ++ DocId , [],"application/json", "{\"test\" : \"put2\"}"}, [], []),
-	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(get, {"http://localhost:8000/resources/" ++ DocId, []}, [], []),
+	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(put, {"http://localhost:8000/resources/" ++ ?TO_STRING(DocId) , [],"application/json", "{\"test\" : \"put2\"}"}, [], []),
+	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(get, {"http://localhost:8000/resources/" ++ ?TO_STRING(DocId), []}, [], []),
 	%Try to put to a resource that doesn't exist
 	{ok, {{_Version4, 500, _ReasonPhrase4}, _Headers4, _Body4}} = httpc:request(put, {"http://localhost:8000/resources/1", [],"application/json", "{\"test\" : \"put2\"}"}, [], []),
 	?assertEqual(true,lib_json:get_field(Body1,"ok")),
 	?assertEqual(true,lib_json:get_field(Body2,"ok")),
-	?assertEqual("put2",lib_json:get_field(Body3,"test")).
+	?assertEqual(<<"put2">>,lib_json:get_field(Body3,"test")).
 
 	
 %% @doc
@@ -116,9 +117,9 @@ get_resource_test() ->
 	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(get, {"http://localhost:8000/users/0/resources/_search?test=get", []}, [], []),
 	%Get resource that doesn't exist
 	{ok, {{_Version5, 500, _ReasonPhrase5}, _Headers5, _Body5}} = httpc:request(get, {"http://localhost:8000/resources/1" ++ DocId, []}, [], []),
-	?assertEqual("get",lib_json:get_field(Body2,"test")),
-	?assertEqual("get",lib_json:get_field(Body3,"test")),
-	?assertEqual(true,lib_json:field_value_exists(Body4,"hits.hits[*]._source.test","get")).
+	?assertEqual(<<"get">>,lib_json:get_field(Body2,"test")),
+	?assertEqual(<<"get">>,lib_json:get_field(Body3,"test")),
+	?assertEqual(true,lib_json:field_value_exists(Body4,"hits.hits[*]._source.test",<<"get">>)).
 
 
 %% @doc

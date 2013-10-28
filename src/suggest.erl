@@ -20,6 +20,7 @@
 
 -include_lib("erlastic_search.hrl").
 -include("webmachine.hrl").
+-include("misc.hrl").
 
 
 -define(INDEX, "sensorcloud").
@@ -160,7 +161,7 @@ update_suggestion(Stream) ->
 	erlang:display("*******Starting Update********"),
 	ResourceId = lib_json:get_field(Stream, "resource_id"),
 	erlang:display(ResourceId),
-	case erlastic_search:search(?INDEX, "suggestion", "resource_id:"++ResourceId) of
+	case erlastic_search:search(?INDEX, "suggestion", "resource_id:"++?TO_STRING(ResourceId)) of
 		{error, _} -> erlang:display("ERROR");
 		{ok, Response} ->
 			erlang:display("HEEEREEEEE"),
@@ -191,10 +192,10 @@ update_suggestion(Stream) ->
 							%erlang:display(NewSugg);
 							erlang:display(ResourceId),
 							NewSugg = "{
-				\"resource_id\" : \"" ++ ResourceId ++ "\",
+				\"resource_id\" : \"" ++ ?TO_STRING(ResourceId) ++ "\",
 				\"suggest\" : {
 					\"input\" : [ \"" ++ lib_json:to_string(Input) ++ "\" ], 
-					\"output\" : \"" ++ Output ++ "\",
+					\"output\" : \"" ++ lib_json:to_string(Output) ++ "\",
 					\"payload\" : " ++ NewPayload ++ ",
 					\"weight\" : " ++ integer_to_list(NewWeight) ++ "
 				}				
@@ -218,7 +219,7 @@ update_suggestion(Stream) ->
 					%		erlang:display(binary_to_list(S));
 					%	{ok, _} -> erlang:display("Stream suggestion added")
 					%end;
-					{ok, {{_Version11, 200, _ReasonPhrase11}, _Headers11, Body11}} = httpc:request(post, {"http://localhost:9200/sensorcloud/suggestion/"++Id++"/_update", [],"application/json", "{\"doc\":"++NewSugg++"}"}, [], []);
+					{ok, {{_Version11, 200, _ReasonPhrase11}, _Headers11, Body11}} = httpc:request(post, {"http://localhost:9200/sensorcloud/suggestion/"++lib_json:to_string(Id)++"/_update", [],"application/json", "{\"doc\":"++NewSugg++"}"}, [], []);
 				_ -> 
 					erlang:display("error-2")
 			end
@@ -258,7 +259,7 @@ undefined_to_string(Text) ->
 		undefined ->
 			"";
 		_ ->
-			Text
+			?TO_STRING(Text)
 	end.
 
 
