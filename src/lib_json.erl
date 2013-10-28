@@ -57,6 +57,8 @@
 %% means that it can not add nested fields, but it can add a field either to the root or
 %% inside another attribute.
 %%
+%% Note: Either "{}", [] or "" is okay to use for an empty json object, both for 'Json' and 'Value'.
+%% Note: To make an attribute with no value, supply it with an empty list binary
 %% Example:
 %% ```
 %% > Json = "{\"attr1\":\"value1\"}".
@@ -87,7 +89,8 @@ add_value(Json, Field, Value)  ->
 %% means that it can not add nested fields, but it can add a field either to the root or
 %% inside another attribute. Already existing (non-empty) fields are not overwritten
 %%
-%% Note: Either "{}" or [] is okay to use for an empty json object, both for 'Json' and 'Value'.
+%% Note: Either "{}", [] or "" is okay to use for an empty json object, both for 'Json' and 'Value'.
+%% Note: To make an attribute with no value, supply it with an empty list binary
 %% Example
 %% ```
 %% > Json = "{}".
@@ -263,6 +266,7 @@ get_field_value(Json, Query, Value) ->
 %% @doc
 %% Replaces the value of a field 'Query' with 'Value' in a JSON object
 %%
+%% Note: To make an attribute with no value, supply it with an empty list binary
 %% Example:
 %% ```
 %% > Json = "{\"attr1\":\"value1\"}".
@@ -304,6 +308,7 @@ rm_field(Json, Query)  ->
 %%
 %% For replaceing a value see: <a href="#replace_field-3">replace_value/3</a>
 %%
+%% Note: To make an attribute with no value, supply it with an empty list binary
 %% Example:
 %% ```
 %% > Json = "{\"attr1\":\"value1\"}".
@@ -320,7 +325,8 @@ set_attr(Attr, Value) ->
 %% @doc
 %% Sets a lsit of json attributes. This function is only for creating 
 %% a proper JSON object with a list of attributes of {'Attr', Value}. 
-
+%%
+%% Note: To make an attribute with no value, supply it with an empty list binary
 %% This function uses <a href="#add_values-2">add_values/2</a> and gives it an 
 %% empty json object. See <a href="#add_values-2">add_values/2</a> for examples 
 %% on how to use this function.

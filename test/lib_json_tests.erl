@@ -137,6 +137,43 @@ add_value_test() ->
     ?assertEqual(?JSON1, lib_json:add_value(?JSON1, "name.poff", <<"poff">>)),
     ?assertEqual(?JSON_RESULT7, lib_json:add_value(lib_json:rm_field(?JSON_RESULT6, name), "name", {s,"poff"})).
 
+
+add_values_test() ->
+    true.
+
+%% @doc
+%% Purpose: Test the json_lib:decode/1
+%% @end
+decode_test() ->
+    ?assertEqual(?DECODE_RESULT1, lib_json:decode(?JSON1)).
+
+%% @doc
+%% Purpose: Test the json_lib:encode/1
+%% @end
+encode_test() ->
+    ?assertEqual(?ENCODE_RESULT1, lib_json:encode(?JSON1)).
+
+%% @doc
+%% Purpose: Test the json_lib:encode/1 and lib_json:decode/1 in combination
+%% @end
+encode_decode_test() ->
+    ?assertEqual(?DECODE_RESULT1, lib_json:decode(lib_json:encode(?JSON1))),
+    ?assertEqual(?ENCODE_RESULT1, lib_json:encode(lib_json:decode(lib_json:encode(?JSON1)))).
+
+%% @doc
+%% Purpose: Test the json_lib:field_value_exists/3
+%% @end
+field_value_exists_test() ->
+    ?assertEqual(true, lib_json:field_value_exists(?JSON1, "friend[1].name", <<"FriendName2">>)),
+    ?assertEqual(false, lib_json:field_value_exists(?JSON1, "friend[0].name", <<"FriendName2">>)),
+    ?assertEqual(true, lib_json:field_value_exists(?JSON1, "friend[*].nickname", <<"NickName1">>)),
+    ?assertEqual(true, lib_json:field_value_exists(?JSON1, "friend[*].nickname", <<"NickName3">>)),
+    ?assertEqual(false, lib_json:field_value_exists(?JSON1, "friend[*].name", <<"NickName3">>)),
+    ?assertEqual(false, lib_json:field_value_exists(?JSON2, "friend[*].name", <<"NickName3">>)),
+    ?assertEqual(true, lib_json:field_value_exists(?JSON2, "friend.nickname", <<"NickName3">>)),
+    ?assertEqual(true, lib_json:field_value_exists(?JSON1, "friend[0]", ?JSON_RESULT6)),
+    ?assertEqual(true, lib_json:field_value_exists(?JSON1, "friend", ?JSON_RESULT5)).
+
 %% @doc
 %% Purpose: Tests lib_json:get_field/2
 %% @end
@@ -183,35 +220,17 @@ get_field_value_test() ->
 	  end,    
     ?assertEqual(error, Try).
 
-%% @doc
-%% Purpose: Test the json_lib:field_value_exists/3
-%% @end
-field_value_exists_test() ->
-    ?assertEqual(true, lib_json:field_value_exists(?JSON1, "friend[1].name", <<"FriendName2">>)),
-    ?assertEqual(false, lib_json:field_value_exists(?JSON1, "friend[0].name", <<"FriendName2">>)),
-    ?assertEqual(true, lib_json:field_value_exists(?JSON1, "friend[*].nickname", <<"NickName1">>)),
-    ?assertEqual(true, lib_json:field_value_exists(?JSON1, "friend[*].nickname", <<"NickName3">>)),
-    ?assertEqual(false, lib_json:field_value_exists(?JSON1, "friend[*].name", <<"NickName3">>)),
-    ?assertEqual(false, lib_json:field_value_exists(?JSON2, "friend[*].name", <<"NickName3">>)),
-    ?assertEqual(true, lib_json:field_value_exists(?JSON2, "friend.nickname", <<"NickName3">>)),
-    ?assertEqual(true, lib_json:field_value_exists(?JSON1, "friend[0]", ?JSON_RESULT6)),
-    ?assertEqual(true, lib_json:field_value_exists(?JSON1, "friend", ?JSON_RESULT5)).
+replace_field_test() ->
+    true.
 
-%% @doc
-%% Purpose: Test the json_lib:encode/1
-%% @end
-encode_test() ->
-    ?assertEqual(?ENCODE_RESULT1, lib_json:encode(?JSON1)).
+rm_field_test() ->
+    true.
 
-%% @doc
-%% Purpose: Test the json_lib:decode/1
-%% @end
-decode_test() ->
-    ?assertEqual(?DECODE_RESULT1, lib_json:decode(?JSON1)).
+set_attr_test() ->
+    true.
 
-%% @doc
-%% Purpose: Test the json_lib:encode/1 and lib_json:decode/1 in combination
-%% @end
-encode_decode_test() ->
-    ?assertEqual(?DECODE_RESULT1, lib_json:decode(lib_json:encode(?JSON1))),
-    ?assertEqual(?ENCODE_RESULT1, lib_json:encode(lib_json:decode(lib_json:encode(?JSON1)))).
+set_attrs_test() ->
+    true.
+
+to_string_test() ->
+    true.
