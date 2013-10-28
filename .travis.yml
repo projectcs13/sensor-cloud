@@ -2,9 +2,7 @@ language: erlang
 before_install:
   - sudo apt-get install -qq xsltproc 
 script: "make install && make test"
-#services:
-#  - elasticsearce
-before_script: "curl https://raw.github.com/projectcs13/sensor-cloud/sp4.sc2.model-auto-complete/travis-elasticsearch.sh  | ELASTICSEARCH_VERSION=0.90.5 bash"
+before_script: "./travis-elasticsearch.sh"
 otp_release:
 #  - R16B02
 #  - R16B01
