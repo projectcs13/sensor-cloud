@@ -132,7 +132,7 @@ process_search_post(ReqData, State) ->
                         {{halt,Reason2}, ReqData, State};
                 {ok,List2} -> UserSearch = lib_json:encode(List2) % May need to convert
          end,
-        SearchResults = "{streams:"++ StreamSearch ++", users:"++ UserSearch ++"}",
+        SearchResults = "{\"streams\":"++ StreamSearch ++", \"users\":"++ UserSearch ++"}",
         {true,wrq:set_resp_body(SearchResults,ReqData),State}.
 %% GROUPS ARE NOT IMPLEMENTED
 %%         case erlastic_search:search_json(#erls_params{},?INDEX, "group", FilteredJson) of % Maybe wanna take more
