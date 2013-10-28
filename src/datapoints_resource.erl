@@ -137,7 +137,7 @@ get_datapoint(ReqData, State) ->
 -spec is_search(string()) -> boolean().
 is_search(ReqData) ->
 		URIList = string:tokens(wrq:path(ReqData), "/"),
-		A = string:sub_string(lists:nth(length(URIList),URIList),1,7) == "_search".
+		string:sub_string(lists:nth(length(URIList),URIList),1,7) == "_search".
 
 
 %% @doc
@@ -161,7 +161,6 @@ is_search(ReqData) ->
 		{list(), tuple(), string()}.
 process_search(ReqData, State, post) ->
 		{Json,_,_} = json_handler(ReqData,State),
-		Id = id_from_path(ReqData),	
 		case erlastic_search:search_json(#erls_params{},?INDEX, "datapoint", Json) of
 			{error,Reason} -> {{error,Reason}, ReqData, State};
 			{ok,List} -> {true, wrq:set_resp_body(json_encode(List),ReqData),State}
