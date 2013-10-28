@@ -3,13 +3,13 @@
 %% @version 1.0
 %% @copyright [Copyright information]
 %%
-%% @doc == users_resource_tests ==
+%% @doc == users_tests ==
 %% This module contains several tests to test the functionallity
-%% in the restful API in users_resource.
+%% in the restful API in users.
 %%
 %% @end
 
--module(users_resource_tests).
+-module(users_tests).
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("stdlib/include/qlc.hrl").
 
@@ -28,6 +28,17 @@
 -define(TEST_EMAIL, "weird_test_email").
 
 
+%% @doc
+%% Function: init_test/0
+%% Purpose: Used to start the inets to be able to do HTTP requests
+%% Returns: ok | {error, term()}
+%%
+%% Side effects: Start inets
+%% @end
+-spec init_test() -> ok | {error, term()}.
+
+init_test() ->
+	inets:start().
 
 
 %% @doc
@@ -40,8 +51,8 @@
 post_test() ->
 	Response1 = post_request(?USERS_URL, "application/json", 
 					 "{\"user_name\":\""++?TEST_NAME++"\"}"),
-	check_returned_code(Response1, 204),
-	timer:sleep(2000),
+	check_returned_code(Response1, 200),
+	refresh(),
 	?assertNotMatch({error, "no match"}, get_index_id(?TEST_NAME)).
 
 
@@ -68,7 +79,7 @@ get_existing_user_test() ->
 -spec get_non_existing_user_test() -> ok | {error, term()}.
 get_non_existing_user_test() ->
 	Response1 = get_request(?USERS_URL ++ "non-existing-key"),
-	check_returned_code(Response1, 404).
+	check_returned_code(Response1, 500).
 
 
 %% @doc
@@ -83,7 +94,7 @@ get_user_search_test() ->
 	check_returned_code(Response1, 200),
 	{ok, Rest} = Response1,
 	{_,_,A} = Rest,
-	?assertMatch({match, _}, re:run(A, "\"user_name\":\""++?TEST_NAME++"\"", [{capture, first, list}])).
+	?assertEqual(true, lib_json:field_value_exists(A, "hits.hits[*]._source.user_name", ?TEST_NAME)).
 
 
 %% @doc
@@ -99,7 +110,7 @@ post_user_search_test() ->
 	check_returned_code(Response1, 200),
 	{ok, Rest} = Response1,
 	{_,_,A} = Rest,
-	?assertMatch({match, _}, re:run(A, "\"user_name\":\""++?TEST_NAME++"\"", [{capture, first, list}])).
+	?assertEqual(true, lib_json:field_value_exists(A, "hits.hits[*]._source.user_name", ?TEST_NAME)).
 
 
 %% @doc
@@ -114,11 +125,11 @@ put_user_search_test() ->
 	?assertNotMatch({error, "no match"}, Id),
 	Response1 = put_request(?USERS_URL++Id, "application/json", "{\"user_name\":\""++?TEST_NAME++"\","++
 						"\"email\":\""++ ?TEST_EMAIL++"\"}"),
-	check_returned_code(Response1, 204),
+	check_returned_code(Response1, 200),
 	Response2 = get_request(?USERS_URL ++ Id),
 	{ok, Rest} = Response2,
 	{_,_,A} = Rest,
-	?assertMatch({match, _}, re:run(A, "\"email\":\""++?TEST_EMAIL++"\"", [{capture, first, list}])).
+	?assertEqual(true, lib_json:field_value_exists(A, "email", ?TEST_EMAIL)).
 
 
 %% @doc
@@ -132,10 +143,10 @@ delete_user_test() ->
 	Id = get_index_id(?TEST_NAME),
 	?assertNotMatch({error, "no match"}, Id),
 	Response1 = delete_request(?USERS_URL++Id),
-	check_returned_code(Response1, 204),
+	check_returned_code(Response1, 200),
 	
 	Response2 = get_request(?USERS_URL ++ Id),
-	check_returned_code(Response2, 404).
+	check_returned_code(Response2, 500).
 
 
 %% @doc
@@ -147,7 +158,7 @@ delete_user_test() ->
 -spec delete_non_existing_user_test() -> ok | {error, term()}.
 delete_non_existing_user_test() ->	
 	Response1 = delete_request(?USERS_URL++"non-existing-key"),
-	check_returned_code(Response1, 404).
+	check_returned_code(Response1, 500).
 
 
 %% @doc
@@ -160,12 +171,15 @@ delete_non_existing_user_test() ->
 get_index_id(Uname) ->
 	Response1 = get_request(?USERS_URL ++ "_search?user_name="++Uname),
 	check_returned_code(Response1, 200),
-	{ok, Rest} = Response1,
-	{_,_,A} = Rest,
-	case re:run(A, "id\":\"[^\"]*", [{capture, first, list}]) of
-		{match, ["id\":\"" ++ Id]} -> Id;
-		nomatch -> {error, "no match"}
+	{ok, {_,_,A}} = Response1,
+	Response = lib_json:get_field(A, "hits.hits[0]._id"),
+	case Response of
+		undefined ->
+			{error, "no match"};
+		_ ->
+			Response
 	end.
+
 		
 
 %% @doc
@@ -180,6 +194,7 @@ check_returned_code(Response, Code) ->
 	?assertMatch({_, Code, _}, Header).
 
 
+
 post_request(URL, ContentType, Body) -> request(post, {URL, [], ContentType, Body}).
 put_request(URL, ContentType, Body) -> request(put, {URL, [], ContentType, Body}).
 get_request(URL)                     -> request(get,  {URL, []}).
@@ -187,3 +202,11 @@ delete_request(URL)                     -> request(delete,  {URL, []}).
 
 request(Method, Request) ->
     httpc:request(Method, Request, [], []).
+
+%% @doc
+%% Function: refresh/0
+%% Purpose: Help function to find refresh the sensorcloud index
+%% Returns: {ok/error, {{Version, Code, Reason}, Headers, Body}}
+%% @end
+refresh() ->
+	httpc:request(post, {"http://localhost:9200/sensorcloud/_refresh", [],"", ""}, [], []).

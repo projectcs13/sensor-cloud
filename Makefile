@@ -23,6 +23,8 @@ compile:
 get_libs:
 	@./rebar get-deps
 	@./rebar compile
+	$(MAKE) -C lib/rabbitmq-server
+	$(MAKE) -C lib/rabbitmq-erlang-client
 
 clean_emacs_vsn_files:
 	rm -rf *~
@@ -52,18 +54,43 @@ install: get_libs
 ### Command: make run
 ### Downloads all depenedencies, bulds entire project and runs the project.
 run: compile
-	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname database -setcookie database -mnesia dir '"/home/database/Mnesia.Database"' -s database init
+	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname engine 
 
 ### Command: make run_es
 ### Runs elastic search
 run_es:
-	lib/elastic_search/bin/elasticsearch -f
+	lib/elasticsearch/bin/elasticsearch -f
+	
+### Command: make run_rabbit
+### Runs rabbitMQ server
+run_rabbit:
+	sudo lib/rabbitmq-server/scripts/rabbitmq-server
 
 ### Command: make test
 ### Compile project resources (not libraries) and runs all eunit tests.
 test: compile
 	-@mkdir test-results
-	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname database -setcookie database -mnesia dir '"/home/database/Mnesia.Database"' -s database init -s test run
+	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname test -s test run
+
+test_json: compile
+	-@mkdir test-results
+	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname test -eval 'test:run(json)'
+
+test_resource: compile
+	-@mkdir test-results
+	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname test -eval 'test:run(resource)'
+
+test_streams: compile
+	-@mkdir test-results
+	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname test -eval 'test:run(streams)'
+
+test_suggest: compile
+	-@mkdir test-results
+	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname test -eval 'test:run(suggest)'
+
+test_users: compile
+	-@mkdir test-results
+	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname test -eval 'test:run(users)'
 
 ### Command: make docs
 ### Genereats all of the documentation files
@@ -110,6 +137,9 @@ help:
 	@echo ""
 	@echo "'make run_es'"
 	@echo "Runs the elastic search server"
+	@echo ""
+	@echo "make run_rabbit"
+	@echo "Runs the rabbitMQ server"
 	@echo ""
 	@echo "'make docs'"
 	@echo "Generates documentation for the project"
