@@ -162,7 +162,10 @@ field_value_exists(Json, Query, Value) ->
 %% @end
 -spec get_field(Json::json(), Query::string()) -> json_output_value().
 get_field(Json, Query) ->
+    erlang:display("11##################################"),
+    erlang:display(Json),
     NewJson  = parse_json(Json),
+    erlang:display("22##################################"),
     Attrs    = parse_attr(Query),
     format_output(get_field_internal(NewJson, Attrs)).
 
@@ -438,6 +441,8 @@ find_wildcard_fields(Query) ->
 %% @end
 format_output(Value) when is_binary(Value) ->
     ?TO_STRING(Value);
+format_output([]) ->
+    [];
 format_output(Value) when is_list(Value) ->
     %% erlang:display("0000"),
     try to_string(erlson:to_json(Value)) of
@@ -487,6 +492,8 @@ format_output(Value) ->
 -spec get_field_internal(Json::string() | tuple(), Query::string()) -> string() | atom().
 get_field_internal(Json, Attrs) ->
     try erlson:get_value(Attrs, Json) of
+	"{}" ->
+	    [];
 	Result ->
 	    Result
     catch
@@ -576,6 +583,8 @@ parse_json(Json) when is_list(Json)->
 %% @hidden
 %% Function: parse_value/1
 %% @end
+parse_value([]) ->
+    [];
 parse_value({s, Value}) ->
      binary:list_to_bin(Value);
 parse_value(Value) when is_tuple(Value)->

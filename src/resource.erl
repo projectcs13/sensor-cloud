@@ -106,6 +106,8 @@ delete_streams_with_resource_id(Id) ->
 			case get_streams(List) of
 				[] -> {ok};
 				Streams ->
+				erlang:display("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$"),
+				erlang:display(Streams),
 					case delete_streams(Streams) of
 						{error,Reason} -> {error, Reason};
 						{ok} -> {ok}
