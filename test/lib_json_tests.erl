@@ -90,6 +90,10 @@
 	"{\"name\":\"FriendName1\",\"nickname\":\"NickName1\"}"
        ).
 
+-define(JSON_RESULT7, 
+	"{\"name\":\"poff\",\"nickname\":\"NickName1\"}"
+       ).
+
 -define(ENCODE_RESULT1, 
 	[$\{,[$\",<<"friend">>,$\"],$:,[$[,
 [${,[$\",<<"name">>,$\"],$:,[$\",<<"FriendName1">>,$\"],$,,[$\",<<"nickname">>,$\"],$:,[$\",<<"NickName1">>,$\"],$}],$,,
@@ -120,7 +124,7 @@ add_value_test() ->
 
     %% For a regular string value the function does not recognize it, so 
     %% it needs to be defined as a binary like above
-    ?assertNotEqual("{\"attr1\":\"value1\"}", lib_json:add_value("{}", attr1, "value1")),
+    ?assertEqual("{\"attr1\":\"value1\"}", lib_json:add_value("{}", attr1, <<"value1">>)),
     ?assertEqual(?JSON_RESULT1, lib_json:add_value(?JSON1, friend, "{\"name\":\"FriendName0\", \"nickname\":\"NickName0\"}")),
     ?assertEqual(?JSON_RESULT2, lib_json:add_value(?JSON1, "friend[1].nickname", <<"NickName6">>)),
     ?assertEqual(?JSON_RESULT3, lib_json:add_value(?JSON1, "friend[0].height", 180)),
@@ -130,7 +134,8 @@ add_value_test() ->
     %% If the field already exist and is not a list then no action is taken
     ?assertEqual(?JSON1, lib_json:add_value(?JSON1, name, <<"poff">>)),
 
-    ?assertEqual(?JSON1, lib_json:add_value(?JSON1, "name.poff", <<"poff">>)).
+    ?assertEqual(?JSON1, lib_json:add_value(?JSON1, "name.poff", <<"poff">>)),
+    ?assertEqual(?JSON_RESULT7, lib_json:add_value(lib_json:rm_field(?JSON_RESULT6, name), "name", {s,"poff"})).
 
 %% @doc
 %% Purpose: Tests lib_json:get_field/2

@@ -576,6 +576,8 @@ parse_json(Json) when is_list(Json)->
 %% @hidden
 %% Function: parse_value/1
 %% @end
+parse_value({s, Value}) ->
+     binary:list_to_bin(Value);
 parse_value(Value) when is_tuple(Value)->
     %% erlang:display("poff0"),
     erlson:from_json_term(Value);
