@@ -10,7 +10,7 @@
 %% API functions - Exports
 %% ====================================================================
 -export([add_value/3,
-	 add_value_in_list/2,
+	 add_values/2,
 	 decode/1, 
 	 encode/1, 
 	 field_value_exists/3, 
@@ -20,6 +20,7 @@
 	 replace_field/3,
 	 rm_field/2,
 	 set_attr/2,
+	 set_attrs/1,
 	 to_string/1]).
 %% ====================================================================
 %% Specialized functions - Exports
@@ -40,9 +41,9 @@
 %% @type json_string() = string()
 -type json_string() :: string().
 %% @type json_input_value() = atom() | binary() | integer() | string() | json() | [json()]
--type json_input_value() :: atom() | binary() | integer() | string() | json() | [json()].
+-type json_input_value() :: atom() | binary() | integer() | json() | [json()].
 %% @type json_output_value() = integer() | string() | json_string() | [json_output_value()]
--type json_output_value() :: integer() | string() | json_string() | [json_output_value()].
+-type json_output_value() :: integer() | json_string() | [json_output_value()].
 %% @type mochijson() = tuple() 
 -type mochijson() :: tuple(). 
 
@@ -50,14 +51,6 @@
 %% ====================================================================
 %% API functions
 %% ====================================================================
-%% @doc
-%% TODO Should be removed because add_value/3 provides the proper functionality
-%% @end
-add_value_in_list(List, Value) when is_list(List) ->
-	V = decode(Value),
-	A= {struct,[{<<"streams">>, [V | List]}]},
-	A.
-
 %% @doc 
 %% Adds a new value to a field with the name 'Field' and the value 'Value' to a JSON object.
 %% If the field doesn't exist then it is added, but only if the Field path is valid. This 
@@ -68,7 +61,7 @@ add_value_in_list(List, Value) when is_list(List) ->
 %% ```
 %% > Json = "{\"attr1\":\"value1\"}".
 %% > Field = "attr2".
-%% > Value = "value2".
+%% > Value = <<"value2">>.
 %% > lib_json:add_value(Json, Field, Value).
 %% "{\"attr1\":\"value1\", \"attr2\":\"value2\"}"
 %% '''
@@ -81,12 +74,58 @@ add_value_in_list(List, Value) when is_list(List) ->
 %% "{\"attr1\":\"value1\"}"
 %% '''
 %% @end
--spec add_value(Json::json(), Field::field(),Value::json_input_value()) -> json_string().
+-spec add_value(Json::json(), Field::field(),Value::json_input_value()) -> json_output_value().
 add_value(Json, Field, Value)  ->
     NewJson  = parse_json(Json),
     Attrs    = parse_attr(Field),
     NewValue = parse_value(Value),
     format_output(add_value_internal(NewJson, Attrs, NewValue)).
+
+%% @doc 
+%% Adds a list of attributes and values to a JSON object.
+%% If a field in the list exist then it is added, but only if the Field path is valid. This 
+%% means that it can not add nested fields, but it can add a field either to the root or
+%% inside another attribute. Already existing (non-empty) fields are not overwritten
+%%
+%% Note: Either "{}" or [] is okay to use for an empty json object, both for 'Json' and 'Value'.
+%% Example
+%% ```
+%% > Json = "{}".
+%% > FieldValue1 = {attr1, <<"value1">>}.
+%% > FieldValue2 = {attr2, <<"value2">>}.
+%% > FieldValue3 = {"attr2.attr3", <<"value3">>}.
+%% > FieldValues = [FieldValue1, FieldValue2, FieldValue3].
+%% > lib_json:add_values(Json, FieldValues).
+%% "{\"attr1\":\"value1\", \"attr2\":\"value2\"}"
+%% '''
+%%
+%% Example
+%% ```
+%% > Json = "{}".
+%% > FieldValue1 = {attr1, <<"value1">>}.
+%% > FieldValue2 = {attr2, "{}"}.
+%% > FieldValue3 = {"attr2.attr3", <<"value3">>}.
+%% > FieldValue4 = {"attr2.attr4", <<"value4">>}.
+%% > FieldValues = [FieldValue1, FieldValue2, FieldValue3, FieldValue4].
+%% > lib_json:add_values(Json, FieldValues).
+%% "{\"attr1\":\"value1\",\"attr2\":{\"attr3\":\"value3\",\"attr4\":\"value4\"}}"
+%% '''
+%%
+%% Example
+%% ```
+%% > Json = "{\"attr2\":[]}".
+%% > FieldValue1 = {attr1, <<"value1">>}.
+%% > FieldValue3 = {"attr2", 1}.
+%% > FieldValue4 = {"attr2", 2}.
+%% > FieldValues = [FieldValue1, FieldValue3, FieldValue4].
+%% > lib_json:add_values(Json, FieldValues).
+%% "{\"attr1\":\"value1\",\"attr2\": [1, 2]}"
+%% '''
+%% @end
+-spec add_values(Json::json(), [{Field::field(),Value::json_input_value()}]) -> json_output_value().
+add_values(Json, FieldsAndValues) ->
+    Fun = fun({Attr, Value}, Acc) -> add_value(Acc, Attr, Value) end,
+    lists:foldl(Fun, Json, FieldsAndValues).
 
 %% @doc 
 %% Decodes a json object into mochijson format.
@@ -210,7 +249,7 @@ get_field_value(Json, Query, Value) ->
     try field_recursion(Json, QueryParts, Value) of
 	Value ->
 	    Value;
-	R ->
+	_ ->
 	    undefined
     catch
 	%% I could use only a catch all clause, but I left these here to show how 
@@ -278,6 +317,19 @@ rm_field(Json, Query)  ->
 set_attr(Attr, Value) ->
     add_value("{}", Attr, Value).
 
+%% @doc
+%% Sets a lsit of json attributes. This function is only for creating 
+%% a proper JSON object with a list of attributes of {'Attr', Value}. 
+
+%% This function uses <a href="#add_values-2">add_values/2</a> and gives it an 
+%% empty json object. See <a href="#add_values-2">add_values/2</a> for examples 
+%% on how to use this function.
+%%
+%% @end
+-spec set_attrs([{Attr::attr(), Value::json_input_value()}]) -> json_output_value().
+set_attrs(AttrsAndValuesList) ->
+    add_values("{}", AttrsAndValuesList).
+
 
 
 %% @doc
@@ -313,19 +365,9 @@ to_string(Json) ->
 %% @end 
 -spec get_and_add_id(JsonStruct::mochijson()) -> json_output_value().
 get_and_add_id(JsonStruct) ->
-    %% erlang:display("+++++++++++++++++++111+++++++++++++++++++++"),
-    %% erlang:display(to_string(JsonStruct)),
     Id  = get_field(JsonStruct, "_id"),
-    %% erlang:display(Id),
-    %% erlang:display("+++++++++++++++++++222+++++++++++++++++++++"),
     SourceJson  = get_field(JsonStruct, "_source"),
-    %% erlang:display(SourceJson),
-    %% erlang:display("+++++++++++++++++++444+++++++++++++++++++++"),
-    P = add_value(SourceJson, "id", Id),
-    %% erlang:display(P),
-    %% erlang:display("+++++++++++++++++++333+++++++++++++++++++++"),
-    P
-    .
+    add_value(SourceJson, "id", Id).
 
 %% @doc 
 %% Get the search results and performs get_and_add_id/1 on each
@@ -335,15 +377,9 @@ get_and_add_id(JsonStruct) ->
 %% @end 
 -spec get_list_and_add_id(JsonStruct::mochijson()) -> json_string().
 get_list_and_add_id(JsonStruct) ->
-    %% erlang:display("+++++++++++++++++++444+++++++++++++++++++++"),
-    %% erlang:display(to_string(JsonStruct)),
     HitsList = get_field(JsonStruct, "hits.hits"),
     AddedId = lists:map(fun(X) -> get_and_add_id(X) end, HitsList),
-    %% erlang:display("+++++++++++++++++++555+++++++++++++++++++++"),
-    P = set_attr(hits, AddedId),
-    %% erlang:display(P),
-    %% erlang:display("+++++++++++++++++++666+++++++++++++++++++++"),
-    P.
+    set_attr(hits, AddedId).
 
 
 %% ====================================================================
@@ -356,14 +392,11 @@ get_list_and_add_id(JsonStruct) ->
 add_value_internal(Json, Attrs, Value) ->
     try erlson:get_value(Attrs, Json) of
 	undefined ->
-	    %% erlang:display("undefined Json"),
 	    ?erlson_default(erlson:store(Attrs, Value, Json), Json);
 	List when is_list(List) ->
-	    %% erlang:display("List Json"),
 	    NewList = lists:sort([Value | List]),
 	    erlson:store(Attrs, NewList, Json);
 	_ -> 
-	    %% erlang:display("non-list Json"),
 	    Json
     catch
 	_:_ ->
@@ -439,46 +472,21 @@ format_output(Value) when is_binary(Value) ->
 format_output([]) ->
     [];
 format_output(Value) when is_list(Value) ->
-    %% erlang:display("0000"),
-    %% case erlson:is_json_string(Value) of
-    %% 	true ->
-    %% 	    to_string(erlson:to_json(Value));
-    %% 	false ->
-    %% 	    case lists:all(fun erlson:is_json_string/1, Value) of
-    %% 		true ->
-    %% 		    lists:map(fun(X) -> to_string(erlson:to_json(X)) end, Value);
-    %% 		false ->
-    %% 		    Value
-    %% 	    end
-    %% end;
-		
     try to_string(erlson:to_json(Value)) of
     	NewValue ->
-    	    %% erlang:display("1***1"),
-    	    %% erlang:display(NewValue),
-    	    %% erlang:display("1***2"),
     	    NewValue
     catch
     	_:_ ->
     	    try lists:map(fun(X) -> to_string(erlson:to_json(X)) end, Value) of
     		NewValue ->
-    		    %% erlang:display("2***1"),
-    		    %% erlang:display(NewValue),
-    		    %% erlang:display("2***2"),
     		    NewValue
     	    catch
     		_:_ ->
     		    case lists:all(fun is_integer/1, Value) of
     			true ->
-    			    %% erlang:display("3***1"),
-    			    %% erlang:display(Value),
-    			    %% erlang:display("3***2"),
     			    Value;
     			false ->
-    			    %% erlang:display("4***1"),
     			    P = lists:map(fun(A) -> A end, Value),
-    			    %% erlang:display(P),
-    			    %% erlang:display("4***2"),
     			    P
     		    end
     	    end
@@ -593,32 +601,24 @@ parse_json(Json) when is_list(Json)->
 parse_value([]) ->
     [];
 parse_value({s, Value}) ->
-     binary:list_to_bin(Value);
+    binary:list_to_bin(Value);
 parse_value(Value) when is_tuple(Value)->
-    %% erlang:display("poff0"),
     erlson:from_json_term(Value);
 parse_value(Value) when is_list(Value) ->
     case {hd(Value), lists:last(Value)} of
 	{${,$}} -> %% Check if Value is a proper json object
-	    erlang:display("poff1"),
 	    erlson:from_json(Value);
 	{$[,$]} -> %% Check if Value is a json list
-	    erlang:display("poff2"),
 	    erlson:list_from_json_array(Value);
-	{_ ,_ } -> %% Value is a list of values for an attribute
-	    %% erlang:display("poff3***1"),
-	    %% erlang:display(Value),	    
+	{_ ,_ } -> %% Value is a list of values for an attribute 
 	    case lists:all(fun(X) -> erlson:is_json_string(X) end, Value) of
 		true ->
-		    %% erlang:display("poff3***2"),
 		    lists:map(fun erlson:from_json/1, Value);
 		false ->
-		    %% erlang:display("poff3***3"),
 		    lists:map(fun(X) -> ?JSON_VALUE(X) end, Value)
 	    end		
     end;
 parse_value(Value) ->
-    %% erlang:display("poff4"),
     Value.
 
 %% @doc
