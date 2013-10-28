@@ -10,6 +10,7 @@
 				process_post/2, get_datapoint/2]).
 
 -include("webmachine.hrl").
+-include_lib("erlastic_search.hrl").
 -include_lib("amqp_client.hrl").
 -include_lib("pubsub.hrl").
 
