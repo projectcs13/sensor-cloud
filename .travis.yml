@@ -4,7 +4,7 @@ before_install:
 script: "make install && make test"
 #services:
 #  - elasticsearce
-before_script: "curl https://raw.github.com/projectcs13/sensor-cloud/sp4.sc2.model-auto-complete/travis-elasticsearch.sh  | ELASTICSEARCH_VERSION=0.20.2 bash"
+before_script: "curl https://raw.github.com/projectcs13/sensor-cloud/sp4.sc2.model-auto-complete/travis-elasticsearch.sh  | ELASTICSEARCH_VERSION=0.90.5 bash"
 otp_release:
 #  - R16B02
 #  - R16B01
