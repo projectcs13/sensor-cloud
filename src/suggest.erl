@@ -31,7 +31,7 @@
 %% @end
 -spec init([]) -> {ok, undefined}.
 init([]) -> 
-    {ok, undefined}.
+	{ok, undefined}.
 
 %% @doc
 %% Function: allowed_methods/2
@@ -47,7 +47,7 @@ allowed_methods(ReqData, State) ->
 		[{"suggest"}] ->
 			{['POST'], ReqData, State}; 
 		[error] ->
-		    {[], ReqData, State} 
+			{[], ReqData, State} 
 	end.
 
 
@@ -96,14 +96,14 @@ get_suggestion(ReqData, State) ->
 		Term ->
 			%forms the query
 			Query = "{                   
-    					\"testsuggest\" : {     
-        					\"text\" : \""++Term++"\",
-        					\"completion\" : {                    
-            					\"field\" : \"suggest\",
+					\"testsuggest\" : {     
+						\"text\" : \""++Term++"\",
+						\"completion\" : {                    
+						\"field\" : \"suggest\",
 								\"size\" : 1            
-        					}                                                   
-    					}                                      
-					}",
+						}                                                   
+					}                                      
+				}",
 			case erlastic_search:suggest(?INDEX, Query) of	
 				{error, Reason} -> {json_encode(Reason),ReqData, State};
 				{ok,List} -> 
@@ -148,7 +148,7 @@ add_suggestion(Resource, Json) ->
 					},
 					\"weight\" : " ++ integer_to_list(Weight) ++ "
 				}				
-			}",
+				}",
 			case erlastic_search:index_doc(?INDEX, "suggestion", Suggestion) of 
 				{error, S} -> erlang:display("Suggestion not saved ");
 				{ok, _} -> 	ok
@@ -159,75 +159,43 @@ add_suggestion(Resource, Json) ->
 update_suggestion(Stream) ->
 	erlang:display("*******Starting Update********"),
 	ResourceId = lib_json:get_field(Stream, "resource_id"),
-	erlang:display(ResourceId),
 	case erlastic_search:search(?INDEX, "suggestion", "resource_id:"++ResourceId) of
 		{error, _} -> erlang:display("ERROR");
 		{ok, Response} ->
-			erlang:display("HEEEREEEEE"),
-			erlang:display(lib_json:to_string(Response)),	
 			case lib_json:get_field(Response, "hits.hits[0]._source.resource_id") of
 				ResourceId ->
-					erlang:display("Getting from response"),
 					Weight = lib_json:get_field(Response, "hits.hits[0]._source.suggest.weight"),
 					Id = lib_json:get_field(Response, "hits.hits[0]._id"),
-					erlang:display("suggest id  "++Id),
 					Output = lib_json:get_field(Response, "hits.hits[0]._source.suggest.output"),
 					Input = lib_json:get_field(Response, "hits.hits[0]._source.suggest.input"),
 					Payload = lib_json:get_field(Response, "hits.hits[0]._source.suggest.payload"),
 					{AddWeight, StreamInfo} = get_stream_info(Stream),
 					NewWeight = Weight + AddWeight,
 					Sugg = lib_json:get_field(Response, "hits.hits[0]._source"),
-					erlang:display("---------"),
 					case lib_json:get_field(Response, "hits.hits[0]._source.suggest.payload.streams") of
 						undefined ->
-							erlang:display("000000000"),
 							NewPayload = lib_json:add_value(Payload, "streams", "["++StreamInfo++"]"),
-							erlang:display(NewPayload),
-							erlang:display("111111111"),
-							%TempSugg = lib_json:replace_field(Sugg, "suggest.payload", lib_json:to_string(NewPayload)),
-							%erlang:display(lib_json:to_string(TempSugg)),
-							%erlang:display("222222222"),
-							%NewSugg = lib_json:replace_field(TempSugg, "suggest.weight", NewWeight),
-							%erlang:display(NewSugg);
-							erlang:display(ResourceId),
-							NewSugg = "{
-				\"resource_id\" : \"" ++ ResourceId ++ "\",
-				\"suggest\" : {
-					\"input\" : [ \"" ++ lib_json:to_string(Input) ++ "\" ], 
-					\"output\" : \"" ++ Output ++ "\",
-					\"payload\" : " ++ NewPayload ++ ",
-					\"weight\" : " ++ integer_to_list(NewWeight) ++ "
-				}				
-								}",
+							TempSugg = lib_json:replace_field(Sugg, "suggest.payload", lib_json:to_string(NewPayload)),
+							erlang:display(lib_json:to_string(TempSugg)),
+							NewSugg = lib_json:replace_field(TempSugg, "suggest.weight", NewWeight),
 							erlang:display("FINAL"),
 							erlang:display(NewSugg);
 						OldStream ->
-							erlang:display("333333333"),
-							erlang:display("oldstream"),
-							erlang:display(lib_json:to_string(OldStream)),
 
-							NewStreamList = lib_json:add_value_in_list(OldStream, StreamInfo),
-							erlang:display("444444444"),
-							TempSugg = lib_json:replace_field(Sugg, "suggest.payload.streams", NewStreamList),
-							erlang:display(lib_json:to_string(TempSugg)),
-							erlang:display("555555555"),
-							NewSugg = lib_json:replace_field(TempSugg, "suggest.weight", NewWeight)
+							NewStreamList = lib_json:add_value(Sugg,"suggest.payload.streams" , StreamInfo),
+							NewSugg = lib_json:replace_field(NewStreamList, "suggest.weight", NewWeight),
+							erlang:display("FINAL"),
+							erlang:display(NewSugg)
 					end,
-					%case erlastic_search:update_doc(?INDEX, "suggestion", Id, lib_json:decode(NewSugg)) of 
-					%	{error, {_,S}} -> erlang:display("Suggestion not saved "),
-					%		erlang:display(binary_to_list(S));
-					%	{ok, _} -> erlang:display("Stream suggestion added")
-					%end;
-					{ok, {{_Version11, 200, _ReasonPhrase11}, _Headers11, Body11}} = httpc:request(post, {"http://localhost:9200/sensorcloud/suggestion/"++Id++"/_update", [],"application/json", "{\"doc\":"++NewSugg++"}"}, [], []);
+					Final = api_help:create_update(NewSugg),
+					case api_help:update_doc(?INDEX, "suggestion", Id, Final) of 
+						{error,Reason} -> erlang:display("not updated");
+						{ok,List} -> erlang:display("updated")
+					end;
 				_ -> 
 					erlang:display("error-2")
 			end
 	end.
-post_request(URL, ContentType, Body) -> request(post, {URL, [], ContentType, Body}).
-
-request(Method, Request) ->
-	httpc:request(Method, Request, [], []).
-
 
 
 
@@ -298,7 +266,7 @@ add_field(Stream,FieldName,FieldValue) ->
 		false ->
 			string:substr(Stream,1,length(Stream)-1) ++ ",\n\"" ++ FieldName ++ "\" : \"" ++ FieldValue ++ "\"\n}"
 	end.
-			
+
 
 %% @doc
 %% Function: parse_path/1
@@ -334,7 +302,7 @@ pair([A,B|T]) ->
 
 % Taken from erlasticsearch
 json_encode(Data) ->
-    (mochijson2:encoder([{utf8, true}]))(Data).
+	(mochijson2:encoder([{utf8, true}]))(Data).
 
 %% @doc
 %% Function: update_doc/4
@@ -344,7 +312,7 @@ json_encode(Data) ->
 
 % Taken from erlasticsearch and modified to not encode
 update_doc(Index, Type, Id, Mochijson) ->
-    update_doc(Index, Type, Id, Mochijson, []).
+	update_doc(Index, Type, Id, Mochijson, []).
 
 %% @doc
 %% Function: update_doc/5
@@ -354,9 +322,9 @@ update_doc(Index, Type, Id, Mochijson) ->
 
 % Taken from erlasticsearch and modified to not encode
 update_doc(Index, Type, Id, Json, Qs) ->
-    Id1 = mochiweb_util:quote_plus(Id),
-    ReqPath = Index ++ [$/ | Type] ++ [$/ | Id1] ++ "/_update",
-    erls_resource:post(#erls_params{}, ReqPath, [], Qs, Json, []).
+	Id1 = mochiweb_util:quote_plus(Id),
+	ReqPath = Index ++ [$/ | Type] ++ [$/ | Id1] ++ "/_update",
+	erls_resource:post(#erls_params{}, ReqPath, [], Qs, Json, []).
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -364,10 +332,10 @@ update_doc(Index, Type, Id, Json, Qs) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 get_timestamp() ->
-    TS = {MSec,Sec,Micro} = os:timestamp(),
+	TS = {MSec,Sec,Micro} = os:timestamp(),
 	{{Year,Month,Day},{Hour,Minute,Second}} = calendar:now_to_universal_time(TS),
-    Mstr = element(Month,{"Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"}),
-    io_lib:format("~2w ~s ~4w ~2w:~2..0w:~2..0w.~6..0w", [Day,Mstr,Year,Hour,Minute,Second,Micro]).
+	Mstr = element(Month,{"Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"}),
+	io_lib:format("~2w ~s ~4w ~2w:~2..0w:~2..0w.~6..0w", [Day,Mstr,Year,Hour,Minute,Second,Micro]).
 
 
 

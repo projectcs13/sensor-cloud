@@ -66,23 +66,34 @@ post_test() ->
 post_and_stream_test() ->
 	Response1 = post_request(?RESOURCE_URL, "application/json", 
 							"{
-								\"model\" : \"testresource\",
+								\"model\" : \"test2resource\",
 								\"tags\" : \"testtag\"
 			}"),
 	check_returned_code(Response1, 200),
 	{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} = Response1,
 	Id = lib_json:get_field(Body, "_id"),
 	timer:sleep(800),
+	erlang:display("_______________________________"),
 	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"search\",\"resource_id\" : \""++Id++"\", \"private\" : \"false\", \"tags\":\"test_tag\"}"}, [], []),
 	erlang:display(Body1),
-	erlang:display("******************************************"),
-	{ok, {{_Version11, 200, _ReasonPhrase11}, _Headers11, Body11}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"search2\",\"resource_id\" : \""++Id++"\", \"private\" : \"false\", \"tags\":\"test_tag\"}"}, [], []),
-	Response2 = get_request(?SUGGEST_URL++"testresource"),     
+	erlang:display("_______________________________"),
+	timer:sleep(1000),
+	Response21 = get_request(?SUGGEST_URL++"test2resource"),     
+	check_returned_code(Response21, 200),
+	{ok, {_, _ ,Body21}} = Response21,
+	erlang:display(Body21),
+	erlang:display("GOT THE ABOVE"),
+	{ok, {{_Version11, 200, _ReasonPhrase11}, _Headers11, Body11}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"search2\",\"resource_id\" : \""++Id++"\", \"private\" : \"false\", \"tags\":\"test2\"}"}, [], []),
+	erlang:display(Body11),
+	erlang:display("_______________________________"),
+	timer:sleep(1000),
+	Response2 = get_request(?SUGGEST_URL++"test2resource"),     
 	check_returned_code(Response2, 200),
 	{ok, {_, _ ,Body2}} = Response2,
-	erlang:display("_______________________________"),
 	erlang:display(Body2),
-	?assertEqual("testtag",lib_json:get_field(Body2, "testsuggest[0].options[0].payload.tags")).
+	?assertEqual("testtag",lib_json:get_field(Body2, "testsuggest[0].options[0].payload.tags")),
+	?assertEqual(true, lib_json:field_value_exists(Body2, "testsuggest[0].options[0].payload.streams[*].tags","test_tag")),
+	?assertEqual(true, lib_json:field_value_exists(Body2, "testsuggest[0].options[0].payload.streams[*].tags","test2")).
 
 
 %% @doc

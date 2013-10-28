@@ -162,10 +162,7 @@ field_value_exists(Json, Query, Value) ->
 %% @end
 -spec get_field(Json::json(), Query::string()) -> json_output_value().
 get_field(Json, Query) ->
-    erlang:display("11##################################"),
-    erlang:display(Json),
     NewJson  = parse_json(Json),
-    erlang:display("22##################################"),
     Attrs    = parse_attr(Query),
     format_output(get_field_internal(NewJson, Attrs)).
 
