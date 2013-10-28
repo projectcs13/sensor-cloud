@@ -26,23 +26,6 @@
 -define(SUGGEST_URL, "http://localhost:8000/suggest/").
 -define(RESOURCE_URL, "http://localhost:8000/resources/").
 
-
-init_test() ->
-	Response1 = post_request(?RESOURCE_URL, "application/json", 
-							"{
-								\"suggestion\" : {           
-									\"properties\" : {      
-										\"resource_id\" : { \"type\" : \"string\" },
-										\"suggest\" : { \"type\" : \"completion\",
-											\"index_analyzer\" : \"simple\",      
-											\"search_analyzer\" : \"simple\",
-											\"payloads\" : true
-										}
-									}
-							    }
-			}").
-
-
 %% @doc
 %% Function: post_test/0
 %% Purpose: Test a post request
@@ -61,6 +44,7 @@ post_test() ->
 	Response2 = get_request(?SUGGEST_URL++"testsmartphone2"),     
 	check_returned_code(Response2, 200),
 	{ok, {_, _ ,Body}} = Response2,
+	erlang:display(Response2),
 	?assertEqual(<<"testtag">>,lib_json:get_field(Body, "testsuggest[0].options[0].payload.tags")).
 
 
