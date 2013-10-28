@@ -10,7 +10,7 @@
 				process_post/2, get_datapoint/2]).
 
 -include("webmachine.hrl").
-
+-include_lib("erlastic_search.hrl").
 -include_lib("amqp_client.hrl").
 -include_lib("pubsub.hrl").
 
@@ -54,11 +54,10 @@ content_types_provided(ReqData, State) ->
 		{[{"application/json", get_datapoint}], ReqData, State}.
 
 
-
 %% @doc
 %% Function: process_post/2
 %% Purpose: decodes a JSON object and either adds the new datapoint in the DB or
-%% performs search in the Datapoint database.
+%% performs _search in the Datapoint database.
 %% It is run automatically for POST requests
 %% Returns: {true, ReqData, State} || {{error, Reason}, ReqData, State}
 %%
@@ -66,16 +65,21 @@ content_types_provided(ReqData, State) ->
 %% @end
 -spec process_post(ReqData::tuple(), State::string()) -> {true, tuple(), string()}.
 process_post(ReqData, State) ->
-	{DatapointJson,_,_} = json_handler(ReqData, State),
-	Id = id_from_path(ReqData),
-	case Id of
-		undefined -> {{halt, 404}, ReqData, State};
-		_ ->
-			FinalJson = add_field(DatapointJson, "streamid", Id),
-			case erlastic_search:index_doc(?INDEX, "datapoint", FinalJson) of
-				{error, Reason} -> {{error, Reason}, ReqData, State};
-				{ok,_} -> {true, ReqData, State}
-			end
+	case is_search(ReqData) of
+			false ->
+				{DatapointJson,_,_} = json_handler(ReqData, State),
+				Id = id_from_path(ReqData),
+				case Id of
+					undefined -> {{halt, 404}, ReqData, State};
+					_ ->
+						FinalJson = add_field(DatapointJson, "streamid", Id),
+						case erlastic_search:index_doc(?INDEX, "datapoint", FinalJson) of
+							{error, Reason} -> {{error, Reason}, ReqData, State};
+							{ok,_} -> {true, ReqData, State}
+						end
+				end;
+			true ->
+				process_search(ReqData,State, post)	
 	end.
 
 
@@ -110,9 +114,8 @@ json_handler(ReqData, State) ->
 get_datapoint(ReqData, State) ->
 		case is_search(ReqData) of
 			false ->
-				Id = id_from_path(ReqData),
-				% Get specific datapoint				
-				case A=erlastic_search:search(?INDEX, "datapoint", "streamid:"++Id) of
+				Id = id_from_path(ReqData),			
+				case erlastic_search:search(?INDEX, "datapoint", "streamid:" ++ Id) of
 					{ok, Result} ->
 						EncodedResult = json_encode(Result),
 						case re:run(EncodedResult, "\"max_score\":null", [{capture, first, list}]) of
@@ -121,8 +124,8 @@ get_datapoint(ReqData, State) ->
 						end;
 					_ -> {{halt, 404}, ReqData, State}
 
-				end;
-			true ->	
+				end; 
+			true ->
 				process_search(ReqData,State, get)	
 		end.
 
@@ -142,23 +145,42 @@ is_search(ReqData) ->
 %% Function: process_search/3
 %% Purpose: Does search for Datapoints for either search done with POST or GET
 %% Returns: {true, ReqData, State} || {{error, Reason}, ReqData, State}
+
+%the POST range query should be structed as follows:
+%	curl -XPOST http://localhost:8000/streams/1/data/_search -d '{
+%		query:{
+% 		   "filtered" : {
+% 		       "query" : {
+%  		          "term" : { "streamid" : Id }
+%  		      }, "filter" : {  "range" : {    "label" : {"gte" : timestampFromValue,"lte" : timestampToValue}}}}}}'
+%the GET range query should be structed as follows:
+%	curl -XGET http://localhost:8000/streams/Id/data/_search    --   to return all the datapoints of the current stream
+%or	curl -XGET http://localhost:8000/streams/Id/data/_search\?timestampFrom\=timestampFromValue\&timestampTo\=timestampToValue    --   for range query
+%or 	curl -XGET http://localhost:8000/streams/Id/data/_search\?timestampFrom\=timestampFromValue   --   for lower bounded only range qquery
 %% @end
 -spec process_search(ReqData::tuple(), State::string(), term()) ->
 		{list(), tuple(), string()}.
 process_search(ReqData, State, post) ->
 		{Json,_,_} = json_handler(ReqData,State),
-		{struct, JsonData} = mochijson2:decode(Json),
-		Query = transform(JsonData),
-		case erlastic_search:search_limit(?INDEX, "datapoint", Query, 10) of
+		case erlastic_search:search_json(#erls_params{},?INDEX, "datapoint", Json) of
 			{error,Reason} -> {{error,Reason}, ReqData, State};
 			{ok,List} -> {true, wrq:set_resp_body(json_encode(List),ReqData),State}
 		end;
 process_search(ReqData, State, get) ->
 		TempQuery = wrq:req_qs(ReqData),
-		TransformedQuery = transform(TempQuery),
-		case erlastic_search:search_limit(?INDEX, "datapoint", TransformedQuery, 10) of
-			{error,Reason} -> {{error,Reason}, ReqData, State};
-			{ok,List} -> {json_encode(List),ReqData,State} % May need to convert
+		Id = id_from_path(ReqData),
+		case TempQuery of
+			[] ->   
+				case erlastic_search:search_limit(?INDEX, "datapoint","streamid:" ++ Id, 10) of
+					{error,Reason} -> {{error,Reason}, ReqData, State};
+					{ok,List} -> {json_encode(List),ReqData,State}
+			 	end;
+			_ ->
+				TransformedQuery="streamid:" ++ Id ++ transform(TempQuery),
+						case erlastic_search:search_limit(?INDEX, "datapoint",TransformedQuery, 10) of
+					{error,Reason} -> {{error,Reason}, ReqData, State};
+					{ok,List} -> {json_encode(List),ReqData,State}
+				end
 		end.
 
 
@@ -170,17 +192,20 @@ process_search(ReqData, State, get) ->
 -spec transform(tuple()) -> {string()}.
 transform([]) -> "";
 transform([{Field,Value}|Rest]) when is_binary(Field) andalso is_binary(Value)->
-		case Rest of
-			[] -> binary_to_list(Field) ++ ":" ++ binary_to_list(Value) ++
-					transform(Rest);
-			_ -> binary_to_list(Field) ++ ":" ++ binary_to_list(Value) ++ "&" ++
-					transform(Rest)
-		end;
+	transform([{binary_to_list(Field), binary_to_list(Value)}]) ++ transform(Rest);
 transform([{Field,Value}|Rest]) ->
-		case Rest of
-			[] -> Field ++ ":" ++ Value ++ transform(Rest);
-			_ -> Field ++ ":" ++ Value ++ "&" ++ transform(Rest)
-		end.
+	case Field of 
+		"timestampFrom" ->
+				case Rest of
+					[{"timestampTo",ValueTo}] -> "%20AND%20" ++ "timestamp:[" ++ Value ++ "+TO+" ++ ValueTo ++ "]";
+					[] -> "%20AND%20" ++ "timestamp:[" ++ Value ++ "+TO+*" ++ "]"
+				end;
+		_ ->	
+				case Rest of
+					[] -> "%20AND%20" ++ Field ++ ":" ++ Value;
+					_ -> "%20AND%20" ++ Field ++ ":" ++ Value ++ transform(Rest)
+				end
+	end.
 
 
 %% @doc

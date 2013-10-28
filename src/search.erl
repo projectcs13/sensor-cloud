@@ -124,15 +124,15 @@ process_search_post(ReqData, State) ->
                         StreamSearch = "error",
                         {{halt,Reason1}, ReqData, State};
                 {ok,List1} ->
-                        StreamSearch = api_help:json_encode(List1) % May need to convert
+                        StreamSearch = lib_json:encode(List1) % May need to convert
         end,
         case erlastic_search:search_json(#erls_params{},?INDEX, "user", FilteredJson) of % Maybe wanna take more
                 {error,Reason2} ->
                         UserSearch = "error",
                         {{halt,Reason2}, ReqData, State};
-                {ok,List2} -> UserSearch = api_help:json_encode(List2) % May need to convert
+                {ok,List2} -> UserSearch = lib_json:encode(List2) % May need to convert
          end,
-        SearchResults = "{streams:"++ StreamSearch ++", users:"++ UserSearch ++"}",
+        SearchResults = "{\"streams\":"++ StreamSearch ++", \"users\":"++ UserSearch ++"}",
         {true,wrq:set_resp_body(SearchResults,ReqData),State}.
 %% GROUPS ARE NOT IMPLEMENTED
 %%         case erlastic_search:search_json(#erls_params{},?INDEX, "group", FilteredJson) of % Maybe wanna take more
