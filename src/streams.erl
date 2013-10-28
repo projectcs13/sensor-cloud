@@ -99,7 +99,7 @@ delete_resource(ReqData, State) ->
 	case erlastic_search:delete_doc(?INDEX,"stream", Id) of
 			{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
 			{ok,List} -> httpc:request(delete, {"http://localhost:9200/sensorcloud/datapoint/_query?q=streamid:" 
-                  		 ++ Id , []}, [], []),
+                  		 ++ Id, []}, [], []),
 				 	{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
 	end.
 
