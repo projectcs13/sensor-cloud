@@ -125,7 +125,7 @@ get_datapoint(ReqData, State) ->
 					_ -> {{halt, 404}, ReqData, State}
 
 				end;
-			true ->	
+			true ->
 				process_search(ReqData,State, get)	
 		end.
 
