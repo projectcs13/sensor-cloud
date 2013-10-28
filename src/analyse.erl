@@ -1,5 +1,5 @@
 -module(analyse).
--export([get_time_series/1, get_arima_string/1, predict/1, init/0, stop/0, test/0]).
+-export([get_time_series/1, get_arima_string/1, predict/1, predict/2, init/0, stop/0, this/0]).
 
 -include("webmachine.hrl").
 
@@ -16,8 +16,8 @@ init() ->
 stop() ->
 	eri:stop().
 
-test() ->
-	init(),
+this() ->
+	%init(),
 	predict("[ { \"value\": 3347, \"date\": \"1995-06-09\" }, { \"value\": 1833, \"date\": \"1995-07-26\" }, { \"value\": 2470, \"date\": \"1996-11-19\" }, { \"value\": 2849, \"date\": \"1997-11-15\" }, { \"value\": 3295, \"date\": \"1998-10-01\" }, { \"value\": 2853, \"date\": \"1998-12-26\" }, { \"value\": 3924, \"date\": \"1999-11-23\" }, { \"value\": 1392, \"date\": \"2000-10-19\" }, { \"value\": 2127, \"date\": \"2001-03-09\" }, { \"value\": 2121, \"date\": \"2001-05-27\" }, { \"value\": 2817, \"date\": \"2002-05-03\" }, { \"value\": 1713, \"date\": \"2003-02-13\" }, { \"value\": 3699, \"date\": \"2003-05-25\" }, { \"value\": 2387, \"date\": \"2003-07-13\" }, { \"value\": 2409, \"date\": \"2004-01-11\" }, { \"value\": 3163, \"date\": \"2004-12-06\" }, { \"value\": 2168, \"date\": \"2005-10-05\" }, { \"value\": 1276, \"date\": \"2008-02-12\" }, { \"value\": 2597, \"date\": \"2009-12-29\" }, { \"value\": 2851, \"date\": \"2010-10-23\"}]").
 	
 
@@ -29,16 +29,43 @@ test() ->
 %% @end
 
 predict(Json) -> 
+	predict(Json, 10).
+
+%% @doc
+%% Function: predict/2
+%% Purpose: Used to do a prediction with R given a json object, and
+%% Returns: List
+%% @end	
+predict(Json, Nr) -> 
 	{_Start, _End, Values} = get_time_series(Json),
 	eri:eval("A <- auto.arima(" ++ Values ++ ")"),
-	eri:eval("pred <- forecast(A)"),
+	eri:eval("pred <- forecast(A, "++ io_lib:format("~i", [Nr]) ++ ")"),
 	Mean = eri:eval("data.frame(c(pred$mean))[[1]]"),
-	Lo80 = eri:eval("data.frame(c(pred[5]))[1]"),
-	Hi80 = eri:eval("data.frame(c(pred[6]))[1]"),
-	Lo95 = eri:eval("data.frame(c(pred[5]))[2]"),
-	Hi95 = eri:eval("data.frame(c(pred[6]))[2]"),
-	{Mean, Lo80, Hi80, Lo95, Hi95}.
-	
+	{ok, _, Lo80} = eri:eval("data.frame(c(pred[5]))[[1]]"),
+	{ok, _, Hi80} = eri:eval("data.frame(c(pred[6]))[[1]]"),
+	{ok, _, Lo95} = eri:eval("data.frame(c(pred[5]))[[2]]"),
+	{ok, _, Hi95} = eri:eval("data.frame(c(pred[6]))[[2]]"),
+	start_format_result({Mean, Lo80, Hi80, Lo95, Hi95}).
+
+start_format_result({Mean, Lo80, Hi80, Lo95, Hi95}) ->
+	"{ \"predictions\": [" ++ format_result({Mean, Lo80, Hi80, Lo95, Hi95}).
+
+
+format_result({[HeadMean|[]], [HeadLo80|[]], [HeadHi80|[]],[HeadLo95|[]], [HeadHi95|[]]}) ->
+	"{ \"value\":" ++ io_lib:format("~p", [HeadMean]) ++ ",
+	 \"lo80\":" ++ io_lib:format("~p", [HeadLo80]) ++ ",
+	 \"hi80\":" ++ io_lib:format("~p", [HeadHi80]) ++ ",
+	 \"lo95\":" ++ io_lib:format("~p", [HeadLo95]) ++ ",
+	 \"hi95\":" ++ io_lib:format("~p", [HeadHi95]) ++ "}]}";
+format_result({[HeadMean|Mean], [HeadLo80|Lo80], [HeadHi80|Hi80],[HeadLo95|Lo95], [HeadHi95|Hi95]}) ->
+	"{ \"value\":" ++ io_lib:format("~p", [HeadMean]) ++ ",
+	 \"lo80\":" ++ io_lib:format("~p", [HeadLo80]) ++ ",
+	 \"hi80\":" ++ io_lib:format("~p", [HeadHi80]) ++ ",
+	 \"lo95\":" ++ io_lib:format("~p", [HeadLo95]) ++ ",
+	 \"hi95\":" ++ io_lib:format("~p", [HeadHi95]) ++ "},"
+	 ++  format_result({[Mean], [Lo80], [Hi80],[Lo95], [Hi95]}).
+
+
 
 get_arima_string(Values) -> 
 	"forecast(auto.arima("++Values++"))".
