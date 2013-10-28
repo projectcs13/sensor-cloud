@@ -25,6 +25,7 @@ get_libs:
 	@./rebar compile
 	$(MAKE) -C lib/rabbitmq-server
 	$(MAKE) -C lib/rabbitmq-erlang-client
+	$(MAKE) -C lib/rErlang
 
 clean_emacs_vsn_files:
 	rm -rf *~
@@ -54,7 +55,8 @@ install: get_libs
 ### Command: make run
 ### Downloads all depenedencies, bulds entire project and runs the project.
 run: compile
-	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname engine 
+	-export R_HOME="/usr/lib/R"
+	erl -pa ebin/ lib/*/ebin/ lib/*/bin/ -boot start_sasl -s reloader -s engine -sname engine 
 
 ### Command: make run_es
 ### Runs elastic search
