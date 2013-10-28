@@ -1,7 +1,7 @@
 language: erlang
 before_install:
   - sudo apt-get install -qq xsltproc 
-script: "make install && make test"
+script: "make install && make run_rabbit && make test"
 services:
   - elasticsearch
 otp_release:
