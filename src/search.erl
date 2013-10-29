@@ -148,5 +148,5 @@ process_search_post(ReqData, State) ->
 %% @end
 filter_json(Json) ->
         NewJson = string:sub_string(Json,1,string:len(Json)-1),
-        "{\"query\":{\"filtered\":"++NewJson++",\"filter\":{\"bool\":{\"must\":{\"term\":{\"private\":0}}}}}}}".
+        "{\"query\":{\"filtered\":"++NewJson++",\"filter\":{\"bool\":{\"must\":{\"term\":{\"private\":\"false\"}}}}}}}".
 
