@@ -140,8 +140,6 @@ delete_stream_test() ->
 	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/users/0/resources/asdascvsr213sda/streams", [], "application/json", "{\n\"test\" : \"get\"\n}"}, [], []),
 	DocId1 = lib_json:get_field(Body1,"_id"),
 	DocId2 = lib_json:get_field(Body2,"_id"),
-        erlang:display("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^"),
-        erlang:display(DocId2),
 	refresh(),
 	% Test delete
 	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ ?TO_STRING(DocId1), []}, [], []),

@@ -32,7 +32,7 @@ init_test() ->
 %% Side effects: creates documents in elasticsearch
 %% @end
 process_search_post_test() ->
-        {ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/resources", [],"application/json", "{\"test\" : \"post\",\"owner\" : 7,\"streams\" : 1}"}, [], []),
+        {ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/resources", [],"application/json", "{\"test\" : \"post\",\"user_id\" : 7,\"streams\" : 1}"}, [], []),
         timer:sleep(100),
         DocId1 = get_id_value(Body1,"_id"),
         ?assertEqual(true,lib_json:get_field(Body1,"ok")),        

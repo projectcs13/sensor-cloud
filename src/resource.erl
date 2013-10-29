@@ -106,8 +106,6 @@ delete_streams_with_resource_id(Id) ->
 			case get_streams(List) of
 				[] -> {ok};
 				Streams ->
-				erlang:display("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$"),
-				erlang:display(Streams),
 					case delete_streams(Streams) of
 						{error,Reason} -> {error, Reason};
 						{ok} -> {ok}
@@ -186,15 +184,13 @@ process_post(ReqData, State) ->
 -spec process_search_post(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 
 process_search_post(ReqData, State) ->
-	erlang:display("search with json request"),
 	{Json,_,_} = api_help:json_handler(ReqData,State),
 	case proplists:get_value('userid', wrq:path_info(ReqData)) of
 		undefined ->
 			{{halt,405}, ReqData, State};
 		UserId ->
-			UserQuery = "\"owner\":" ++ UserId,
+			UserQuery = "\"user_id\":" ++ UserId,
 			FilteredJson = filter_json(Json, UserQuery),
-			erlang:display(FilteredJson),
 			case erlastic_search:search_json(#erls_params{},?INDEX, "resource", FilteredJson) of % Maybe wanna take more
 				{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
 				{ok,List} -> {true,wrq:set_resp_body(lib_json:encode(List),ReqData),State} % May need to convert
