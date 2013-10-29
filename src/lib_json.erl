@@ -1,11 +1,13 @@
 %% @author Tommy Mattsson, Georgios Koutsoumpakis [www.csproj13.student.it.uu.se]
 %% @copyright [Copyright information]
 %% @version 1.0
+%% @headerfile "json.hrl"
 %% @doc == Library for creating, reading, updating, and deleting fields in JSON objects ==
 %% @end
 -module(lib_json).
 -include("erlson.hrl").
 -include("json.hrl").
+-include("misc.hrl").
 %% ====================================================================
 %% API functions - Exports
 %% ====================================================================
@@ -28,25 +30,6 @@
 -export([get_and_add_id/1, 
 	 get_list_and_add_id/1
 	]).
--include("misc.hrl").
-%% ====================================================================
-%% Type definitions
-%% ====================================================================
-%% @type attr() = atom() | string()
--type attr() :: atom() | string().
-%% @type field() = json_string() | mochijson()
--type field() :: atom() | string() | [atom()].
-%% @type json() = json_string() | mochijson()
--type json() :: json_string() | mochijson().
-%% @type json_string() = string()
--type json_string() :: string().
-%% @type json_input_value() = atom() | binary() | integer() | string() | json() | [json()]
--type json_input_value() :: atom() | binary() | integer() | json() | [json()].
-%% @type json_output_value() = integer() | string() | json_string() | [json_output_value()]
--type json_output_value() :: integer() | json_string() | [json_output_value()].
-%% @type mochijson() = tuple() 
--type mochijson() :: tuple(). 
-
 
 %% ====================================================================
 %% API functions
@@ -621,7 +604,9 @@ parse_value(Value) when is_list(Value) ->
 		true ->
 		    lists:map(fun erlson:from_json/1, Value);
 		false ->
-		    lists:map(fun(X) -> ?JSON_VALUE(X) end, Value)
+		    lists:map(fun(X) when is_list(X) -> list_to_binary(X);
+				 (X) -> X 
+			      end, Value)
 	    end		
     end;
 parse_value(Value) ->
