@@ -51,7 +51,6 @@ post_test() ->
 -spec get_existing_datapoint_test() -> ok | {error, term()}.
 get_existing_datapoint_test() ->
         Id = get_index_id(?TEST_VALUE, ?TEST_TIMESTAMP),
-		erlang:display("##$################# Id:" ++ Id),
         ?assertNotMatch({error, "no match"}, Id),
         Response1 = get_request(?DATAPOINTS_URL ++ "_search?_id=" ++ Id),
         check_returned_code(Response1, 200).
