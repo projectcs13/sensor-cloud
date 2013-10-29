@@ -99,17 +99,6 @@ get_non_existent_datapoint_test() ->
 		{_,_,Result} = Rest,
 	    ?assertNotEqual(0, string:str(Result, "max_score\":null")).
 
-
-%% @doc
-%% Function: json_encode/2
-%% Purpose: To encode utf8-json WITHOUT converting multi-byte utf8-chars into ASCII '\uXXXX'.
-%% Returns: A string with fields and values formatted in a correct way
-%% @end
--spec json_encode(string()) -> string().
-json_encode(Data) ->
-    (mochijson2:encoder([{utf8, true}]))(Data).
-
-
 post_request(URL, ContentType, Body) -> request(post, {URL, [], ContentType, Body}).
 get_request(URL) -> request(get, {URL, []}).
 request(Method, Request) ->

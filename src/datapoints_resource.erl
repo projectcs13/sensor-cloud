@@ -114,6 +114,7 @@ json_handler(ReqData, State) ->
 get_datapoint(ReqData, State) ->
 		case is_search(ReqData) of
 			false ->
+
 				Id = id_from_path(ReqData),			
 				case erlastic_search:search(?INDEX, "datapoint", "streamid:" ++ Id) of
 					{ok, Result} ->

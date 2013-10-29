@@ -159,18 +159,21 @@ delete_streams([StreamId|Rest]) ->
 process_post(ReqData, State) ->
         URIList = string:tokens(wrq:path(ReqData), "/"),
         IsSearch = (string:sub_string(lists:nth(length(URIList),URIList),1,7) == "_search"),
-        case IsSearch of 
-                false ->
-                        % Create
-                        {Resource,_,_} = api_help:json_handler(ReqData,State),
-						case erlastic_search:index_doc(?INDEX,"resource",Resource) of 
-							{error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
-							{ok,List} -> {true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
-						end;
-                true ->
-                        % Search
-                		 process_search_post(ReqData,State)
-        end.
+	case IsSearch of 
+		false ->
+			% Create
+			{Resource,_,_} = api_help:json_handler(ReqData,State),
+			case erlastic_search:index_doc(?INDEX,"resource",Resource) of 
+				{error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
+				{ok, Json} -> 
+					ResourceId = lib_json:get_field(Json, "_id"),
+					suggest:add_suggestion(Resource, ResourceId),
+					{true, wrq:set_resp_body(lib_json:encode(Json), ReqData), State}
+			end;
+		true ->
+			% Search
+			process_search_post(ReqData,State)
+	end.
 
 %% @doc
 %% Function: process_search_post/2
@@ -181,20 +184,18 @@ process_post(ReqData, State) ->
 -spec process_search_post(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 
 process_search_post(ReqData, State) ->
-        erlang:display("search with json request"),
-        {Json,_,_} = api_help:json_handler(ReqData,State),
-        case proplists:get_value('userid', wrq:path_info(ReqData)) of
-                undefined ->
-                        {{halt,405}, ReqData, State};
-                UserId ->
-                        UserQuery = "\"owner\":" ++ UserId,
-                        FilteredJson = filter_json(Json, UserQuery),
-                        erlang:display(FilteredJson),
-                        case erlastic_search:search_json(#erls_params{},?INDEX, "resource", FilteredJson) of % Maybe wanna take more
-                                {error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
-                                {ok,List} -> {true,wrq:set_resp_body(lib_json:encode(List),ReqData),State} % May need to convert
-                        end
-        end.
+	{Json,_,_} = api_help:json_handler(ReqData,State),
+	case proplists:get_value('userid', wrq:path_info(ReqData)) of
+		undefined ->
+			{{halt,405}, ReqData, State};
+		UserId ->
+			UserQuery = "\"user_id\":" ++ UserId,
+			FilteredJson = filter_json(Json, UserQuery),
+			case erlastic_search:search_json(#erls_params{},?INDEX, "resource", FilteredJson) of % Maybe wanna take more
+				{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
+				{ok,List} -> {true,wrq:set_resp_body(lib_json:encode(List),ReqData),State} % May need to convert
+			end
+	end.
 
 
 %% @doc

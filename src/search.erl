@@ -67,20 +67,6 @@ content_types_provided(ReqData, State) ->
 content_types_accepted(ReqData, State) ->
         {[{"application/json", process_post}], ReqData, State}.
 
-
-%% @doc
-%% Function: delete_resource/2
-%% Purpose: Works but need to fix transformation of the return value
-%% Returns:  {JSON-object(string), ReqData, State}
-%%
-%% Side effects: Deletes the User for the database
-%% @end
--spec delete_resource(ReqData::tuple(), State::string()) -> {string(), tuple(), string()}.
-delete_resource(ReqData, State) ->
-                        {{halt,405}, ReqData, State}.
-
-
-
 %% @doc
 %% Function: process_post/2
 %% Purpose: decodes a JSON object and either adds the new User in the DB or
@@ -93,18 +79,6 @@ delete_resource(ReqData, State) ->
 -spec process_post(ReqData::tuple(), State::string()) -> {true, tuple(), string()}.
 process_post(ReqData, State) ->
         process_search_post(ReqData,State).
-
-
-%% @doc
-%% Function: get_search/2
-%% Purpose: Returns the JSON representation of a json-object or multiple json-objects. 
-%% Returns: {true, ReqData, State} | {false, ReqData, State}
-%% @end
--spec get_search(ReqData::tuple(), State::string()) -> {list(), tuple(), string()}.
-get_search(ReqData, State) ->
-        % URI Search
-        {{halt, 200}, ReqData, State}.
-
 
 %% @doc
 %% Function: process_search_post/2
