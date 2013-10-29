@@ -1,34 +1,19 @@
-Project Skeleton for the engine app.
+#Sensor Cloud Engine
+[![Build Status](https://travis-ci.org/projectcs13/sensor-cloud.png)](https://travis-ci.org/projectcs13/sensor-cloud)
+Welcome to the "Project CS 2013" project
 
-You should find in this directory:
+Running the project:
 
-README : this file
-Makefile : simple make commands
-rebar : the Rebar build tool for Erlang applications
-rebar.config : configuration for Rebar
-start.sh : simple startup script for running engine
-/ebin
-  /engine.app : the Erlang app specification
-/src
-  /engine_app.erl : base module for the Erlang application
-  /engine_sup.erl : OTP supervisor for the application
-/priv
-  /dispatch.conf : the Webmachine URL-dispatching table
-  /www : a convenient place to put your static web content
+0. Download and compile the dependencies, and compile the project sources
+   $ make install
 
-You probably want to do one of a couple of things at this point:
+1. Run the application
+   $ make run
 
-0. Build the skeleton application:
-   $ make
-   - or -
-   $ ./rebar compile
+Running tests:
 
-1. Start up the skeleton application:
-   $ ./start.sh
+0. Download and compile the dependencies, and compile the project sources
+   $ make install
 
-2. Change the basic application:
-   edit src/engine_resource.erl
-
-3. Add some new resources:
-   edit src/YOUR_NEW_RESOURCE.erl
-   edit priv/dispatch.conf
+1. Run the tests
+   $ make test
