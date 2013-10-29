@@ -1,15 +1,29 @@
-%% @author Tommy Mattsson <toma10293@student.uu.se>
+%% Author: Tommy Mattsson <toma10293@student.uu.se>
 %% [www.csproj13.student.it.uu.se]
-%% @version 1.0
-%% @copyright [Copyright information]
-%%
-%% @doc == json include file ==
+%% == json include file ==
 %% Provides definitions for creating JSON string objects
 %%
 %% @end
--include("misc.hrl").
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Type definitions
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% @type attr() = atom() | string()
+-type attr() :: atom() | string().
+%% @type field() = json_string() | mochijson()
+-type field() :: atom() | string() | [atom()].
+%% @type json() = json_string() | mochijson()
+-type json() :: json_string() | mochijson().
+%% @type json_string() = string()
+-type json_string() :: string().
+%% @type json_input_value() = atom() | binary() | integer() | string() | json() | [json()]
+-type json_input_value() :: atom() | binary() | integer() | json() | [json_input_value()].
+%% @type json_output_value() = integer() | string() | json_string() | [json_output_value()]
+-type json_output_value() :: boolean() | binary() | integer() | json_string() | [json_output_value()].
+%% @type mochijson() = tuple() 
+-type mochijson() :: tuple(). 
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Convenience Macros
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -ifndef(QUOTE).
 -define(QUOTE(ARG), "\"" ++ ARG ++ "\"").
@@ -25,33 +39,4 @@
 
 -ifndef(COLON).
 -define(COLON, ":").
--endif.
-
-
-
-
-%% -ifndef(JSON_STRUCT).
-%% -define(JSON_STRUCT(ARG), ?TUPLE(string:join(lists:map(fun({Attr, Val}) -> ?JSON_ATTR(Attr, Val) end, ARG), ","))).
-%% -endif.
-
-
-
-%% -ifndef(JSON_ATTR).
-%% -define(JSON_ATTR(Attr, Val), 
-%% 	lists:concat([?QUOTE(?TO_STRING(Attr)), ?COLON,  
-		      
-%% 		      %% indicates that Z is to be treated as a string value
-%% 		      fun({s, Z}) -> ?QUOTE(Z);
-			 
-%% 			 %%indicates that Z will be treated as a list of values
-%% 			 ({l, Z}) -> Fun = fun(Y) -> ?QUOTE(?TO_STRING(Y)) end,
-%% 				     ?LIST(string:join(lists:map(Fun, Z), ","))
-%% 		      end(Val)])).
-%% -endif.
-
--ifndef(JSON_VALUE).
--define(JSON_VALUE(Arg), case Arg of
-			     X when is_list(X) -> list_to_binary(X);
-			     X -> X
-			 end).
 -endif.
