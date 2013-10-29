@@ -39,8 +39,8 @@ process_search_post_test() ->
         DocId2 = lib_json:get_field(Body2,"_id"),
         timer:sleep(1000),
         {ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(post, {"http://localhost:8000/_search", [],"application/json", "{\"query\":{\"match_all\":{}}}"}, [], []),
-        {ok, {{_Version8, 200, _ReasonPhrase8}, _Headers8, Body8}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ DocId1, []}, [], []),
-        {ok, {{_Version9, 200, _ReasonPhrase9}, _Headers9, Body9}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ DocId2, []}, [], []),
+        {ok, {{_Version8, 200, _ReasonPhrase8}, _Headers8, Body8}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId1), []}, [], []),
+        {ok, {{_Version9, 200, _ReasonPhrase9}, _Headers9, Body9}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId2), []}, [], []),
         ?assertEqual(true,lib_json:get_field(Body3,"streams.hits.total") >= 1).
 
 
