@@ -11,8 +11,6 @@
 
 -module(suggest_tests).
 -include_lib("eunit/include/eunit.hrl").
--include_lib("misc.hrl").
-
 
 %% ====================================================================
 %% API functions
@@ -57,9 +55,9 @@ post_and_stream_test() ->
 	{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} = Response1,
 	Id = lib_json:get_field(Body, "_id"),
 	timer:sleep(800),
-	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"search\",\"resource_id\" : \""++?TO_STRING(Id)++"\", \"private\" : \"false\", \"tags\":\"test_tag\"}"}, [], []),
+	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, _Body1}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"search\",\"resource_id\" : \""++lib_json:to_string(Id)++"\", \"private\" : \"false\", \"tags\":\"test_tag\"}"}, [], []),
 	timer:sleep(1000),
-	{ok, {{_Version11, 200, _ReasonPhrase11}, _Headers11, Body11}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"search2\",\"resource_id\" : \""++?TO_STRING(Id)++"\", \"private\" : \"false\", \"tags\":\"test2\"}"}, [], []),
+	{ok, {{_Version11, 200, _ReasonPhrase11}, _Headers11, _Body11}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"search2\",\"resource_id\" : \""++lib_json:to_string(Id)++"\", \"private\" : \"false\", \"tags\":\"test2\"}"}, [], []),
 	timer:sleep(1000),
 	Response2 = get_request(?SUGGEST_URL++"test3resource"),
 	check_returned_code(Response2, 200),
@@ -117,9 +115,8 @@ check_returned_code(Response, Code) ->
 
 
 post_request(URL, ContentType, Body) -> request(post, {URL, [], ContentType, Body}).
-put_request(URL, ContentType, Body) -> request(put, {URL, [], ContentType, Body}).
+
 get_request(URL)                     -> request(get,  {URL, []}).
-delete_request(URL)                     -> request(delete,  {URL, []}).
 
 request(Method, Request) ->
 	httpc:request(Method, Request, [], []).

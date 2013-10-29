@@ -112,7 +112,7 @@ get_datapoint(ReqData, State) ->
 			false ->
 				Id = id_from_path(ReqData),
 				% Get specific datapoint				
-				case A=erlastic_search:search(?INDEX, "datapoint", "streamid:"++Id) of
+				case erlastic_search:search(?INDEX, "datapoint", "streamid:"++Id) of
 					{ok, Result} ->
 						EncodedResult = json_encode(Result),
 						case re:run(EncodedResult, "\"max_score\":null", [{capture, first, list}]) of

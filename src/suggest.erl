@@ -16,7 +16,6 @@
 
 -include_lib("erlastic_search.hrl").
 -include("webmachine.hrl").
--include("misc.hrl").
 -include("json.hrl").
 
 -define(INDEX, "sensorcloud").
@@ -129,7 +128,7 @@ add_suggestion(Resource, ResourceId) ->
 				}				
 				}",
 			case erlastic_search:index_doc(?INDEX, "suggestion", Suggestion) of 
-				{error, S} -> erlang:display("Suggestion not saved ");
+				{error, _Reason} -> erlang:display("Suggestion not saved ");
 				{ok, _} -> 	ok
 			end
 	end.
@@ -143,15 +142,13 @@ add_suggestion(Resource, ResourceId) ->
 -spec update_suggestion(Stream::json()) -> ok.
 update_suggestion(Stream) ->
 	ResourceId = lib_json:get_field(Stream, "resource_id"),
-	case erlastic_search:search(?INDEX, "suggestion", "resource_id:"++?TO_STRING(ResourceId)) of
+	case erlastic_search:search(?INDEX, "suggestion", "resource_id:"++ lib_json:to_string(ResourceId)) of
 		{error, _} -> erlang:display("ERROR");
 		{ok, Response} ->
 			case lib_json:get_field(Response, "hits.hits[0]._source.resource_id") of
 				ResourceId ->
 					Weight = lib_json:get_field(Response, "hits.hits[0]._source.suggest.weight"),
 					Id = lib_json:get_field(Response, "hits.hits[0]._id"),
-					Output = lib_json:get_field(Response, "hits.hits[0]._source.suggest.output"),
-					Input = lib_json:get_field(Response, "hits.hits[0]._source.suggest.input"),
 					Payload = lib_json:get_field(Response, "hits.hits[0]._source.suggest.payload"),
 					{AddWeight, StreamInfo} = get_stream_info(Stream),
 					NewWeight = Weight + AddWeight,
@@ -162,15 +159,15 @@ update_suggestion(Stream) ->
 
 							TempSugg = lib_json:replace_field(Sugg, "suggest.payload", lib_json:to_string(NewPayload)),
 							NewSugg = lib_json:replace_field(TempSugg, "suggest.weight", NewWeight);
-						OldStream ->
+						_OldStream ->
 
 							NewStreamList = lib_json:add_value(Sugg,"suggest.payload.streams" , StreamInfo),
 							NewSugg = lib_json:replace_field(NewStreamList, "suggest.weight", NewWeight)
 					end,
 					Final = api_help:create_update(NewSugg),
 					case api_help:update_doc(?INDEX, "suggestion", Id, Final) of 
-						{error,Reason} -> erlang:display("not updated");
-						{ok,List} -> ok 
+						{error, _Reason} -> erlang:display("not updated");
+						{ok, _Json} -> ok 
 					end;
 				_ -> 
 					erlang:display("No suggestion exists for that resource")
@@ -211,7 +208,7 @@ undefined_to_string(Text) ->
 		undefined ->
 			"";
 		_ ->
-			?TO_STRING(Text)
+			lib_json:to_string(Text)
 	end.
 
 
@@ -223,7 +220,7 @@ undefined_to_string(Text) ->
 %% Returns the current timestamp.
 %% @end
 get_timestamp() ->
-	TS = {MSec,Sec,Micro} = os:timestamp(),
+	TS = {_MSec,_Sec,Micro} = os:timestamp(),
 	{{Year,Month,Day},{Hour,Minute,Second}} = calendar:now_to_universal_time(TS),
 	Mstr = element(Month,{"Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"}),
 	io_lib:format("~2w ~s ~4w ~2w:~2..0w:~2..0w.~6..0w", [Day,Mstr,Year,Hour,Minute,Second,Micro]).

@@ -7,7 +7,6 @@
 -module(lib_json).
 -include("erlson.hrl").
 -include("json.hrl").
--include("misc.hrl").
 %% ====================================================================
 %% API functions - Exports
 %% ====================================================================
@@ -331,16 +330,25 @@ set_attrs(AttrsAndValuesList) ->
 %% "{\"attr1\":\"value\"}"
 %% '''
 %% @end
--spec to_string(Json::mochijson() | iolist()) -> json_string().
+-spec to_string(Json::mochijson() | any()) -> json_string() | string().
 to_string(Json) when is_tuple(Json) ->
     to_string(encode(Json));
-to_string(Json) when is_binary(Json) ->
-    binary:bin_to_list(Json);
-to_string(Json) ->
+to_string(Json) when is_list(Json) ->
     %% Flattens a list and converts the entire thing into a binary.
     BinaryJson = binary:list_to_bin(Json),
     %% Converts the binary into a string.
-    binary:bin_to_list(BinaryJson).
+    binary:bin_to_list(BinaryJson);
+to_string(Json) when is_atom(Json) -> 
+    atom_to_list(Json);
+to_string(Json) when is_binary(Json) -> 
+    binary:bin_to_list(Json);
+to_string(Json) when is_float(Json) -> 
+    float_to_list(Json);         
+to_string(Json) when is_integer(Json) -> 
+    integer_to_list(Json);
+to_string(Json) when is_bitstring(Json) -> 
+    bitstring_to_list(Json).
+
 
 
 %% ====================================================================

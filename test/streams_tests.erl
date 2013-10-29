@@ -11,7 +11,6 @@
 
 -module(streams_tests).
 -include_lib("eunit/include/eunit.hrl").
--include_lib("misc.hrl").
 -export([]).
 
 %% @doc
@@ -36,12 +35,12 @@ inets:start().
 process_search_post_test() ->
         {ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"search\",\"resource_id\" : \"0\", \"private\" : \"false\"}"}, [], []),
         {ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"search\",\"resource_id\" : \"0\", \"private\" : \"true\"}"}, [], []),
-        DocId1 = ?TO_STRING(lib_json:get_field(Body1,"_id")),
-        DocId2 = lib_json:to_string(lib_json:get_field(Body2,"_id")),
+        DocId1 = lib_json:get_field(Body1,"_id"),
+        DocId2 = lib_json:get_field(Body2,"_id"),
         timer:sleep(1000),
         {ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(post, {"http://localhost:8000/streams/_search", [],"application/json", "{\"query\":{\"match_all\":{}}}"}, [], []),
-        {ok, {{_Version8, 200, _ReasonPhrase8}, _Headers8, Body8}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ DocId1, []}, [], []),
-        {ok, {{_Version9, 200, _ReasonPhrase9}, _Headers9, Body9}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ DocId2, []}, [], []),
+        {ok, {{_Version8, 200, _ReasonPhrase8}, _Headers8, _Body8}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId1), []}, [], []),
+        {ok, {{_Version9, 200, _ReasonPhrase9}, _Headers9, _Body9}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId2), []}, [], []),
         ?assertEqual(true,lib_json:get_field(Body3,"hits.total") >= 1).
 
 %% @doc
@@ -102,7 +101,7 @@ put_stream_test() ->
 	DocId2 = lib_json:get_field(Body2,"_id"),
 	refresh(),
 	% Test update
-	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, _Body3}} = httpc:request(put, {"http://localhost:8000/streams/" ++ ?TO_STRING(DocId1), [], "application/json", "{\n\"test\" : \"put\",\n\"private\" : \"false\"\n}"}, [], []),
+	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, _Body3}} = httpc:request(put, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId1), [], "application/json", "{\n\"test\" : \"put\",\n\"private\" : \"false\"\n}"}, [], []),
 	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, _Body4}} = httpc:request(put, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId2), [], "application/json", "{\n\"test\" : \"put\"\n}"}, [], []),
 	% Test get
 
@@ -144,7 +143,7 @@ delete_stream_test() ->
         erlang:display(DocId2),
 	refresh(),
 	% Test delete
-	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ ?TO_STRING(DocId1), []}, [], []),
+	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId1), []}, [], []),
 	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId2), []}, [], []),
 	% Test delete on missing index
 	{ok, {{_Version5, 500, _ReasonPhrase5}, _Headers5, Body5}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId1), []}, [], []),
@@ -167,28 +166,8 @@ create_doc_without_resource_test() ->
  	{ok, {{_Version2, 500, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/users/0/streams", [], "application/json", "{\n\"test\" : \"get\"\n}"}, [], []),
 	?assertEqual(true,string:str(Body1,"resource_id_missing") =/= 0),
 	?assertEqual(true,string:str(Body2,"resource_id_missing") =/= 0).
-		
+
 %% @doc
-%% Function: get_id_value/2
-%% Purpose: Help function to find value of a field in the string
-%% Returns: String with value of the field
-%% @end
--spec get_id_value(String::string(),Field::string()) -> string().
-
-get_id_value(String,Field) ->
-	Location = string:str(String,Field),
-	Start = Location + 3 + length(Field),
-	RestOfString = string:substr(String, Start),
-	NextComma = string:str(RestOfString,","),
-	NextBracket = string:str(RestOfString,"}"),
-	case (NextComma < NextBracket) and (NextComma =/= 0) of
-		true ->
-			string:substr(RestOfString, 1,NextComma-2);
-		false ->
-			string:substr(RestOfString, 1,NextBracket-2)
-	end.
-
-	%% @doc
 %% Function: refresh/0
 %% Purpose: Help function to find refresh the sensorcloud index
 %% Returns: {ok/error, {{Version, Code, Reason}, Headers, Body}}
