@@ -23,9 +23,9 @@
 %% Internal functions
 %% ====================================================================
 
--define(DATAPOINTS_URL, "http://localhost:8000/streams/1/data/").
--define(TEST_VALUE, "test_value").
--define(TEST_TIMESTAMP, "test_timestamp").
+-define(DATAPOINTS_URL, "http://localhost:8000/streams/4/data/").
+-define(TEST_VALUE, "3").
+-define(TEST_TIMESTAMP, "2").
 
 %% @doc
 %% Function: post_test/0
@@ -36,9 +36,9 @@
 -spec post_test() -> ok | {error, term()}.
 post_test() ->
         Response1 = post_request(?DATAPOINTS_URL, "application/json",
-                                         "{\"datapoint_value\":\""++?TEST_VALUE++"\"}"),
+                                         "{\"value\":\"" ++ ?TEST_VALUE ++ "\", \"timestamp\": \"" ++ ?TEST_TIMESTAMP ++ "\"}"),
         check_returned_code(Response1, 204),
-        timer:sleep(2000),
+        timer:sleep(3000),
         ?assertNotMatch({error, "no match"}, get_index_id(?TEST_VALUE)).
 
 
@@ -52,7 +52,7 @@ post_test() ->
 get_existing_datapoint_test() ->
         Id = get_index_id(?TEST_VALUE),
         ?assertNotMatch({error, "no match"}, Id),
-        Response1 = get_request(?DATAPOINTS_URL ++ "_search?_id="++ Id),
+        Response1 = get_request(?DATAPOINTS_URL ++ "_search?_id=" ++ Id),
         check_returned_code(Response1, 200).
 
 
@@ -64,7 +64,7 @@ get_existing_datapoint_test() ->
 %% @end
 -spec get_index_id(string()) -> string() | {error, string()}.
 get_index_id(Uvalue) ->
-        Response1 = get_request(?DATAPOINTS_URL ++ "_search?datapoint_value="++Uvalue),
+        Response1 = get_request(?DATAPOINTS_URL ++ "_search?value=" ++ Uvalue ++ "&timestamp=" ++ ?TEST_TIMESTAMP),
         check_returned_code(Response1, 200),
         {ok, Rest} = Response1,
         {_,_,A} = Rest,
@@ -88,7 +88,7 @@ check_returned_code(Response, Code) ->
 
 %% @doc
 %% Function: get_non_existent_user_datapoint/0
-%% Purpose: Test a get request for a datapoint that doesn't exist
+%% Purpose: Tests a get request for a datapoint that doesn't exist
 %% Returns: ok | {error, term()}
 %%
 %% @end
@@ -97,9 +97,7 @@ get_non_existent_datapoint_test() ->
         Response1 = get_request(?DATAPOINTS_URL ++ "_search?_id=" ++ "nonexistent"),
 		{ok, Rest} = Response1,
 		{_,_,Result} = Rest,
-		%JSONString=json_encode(Result),
 	    ?assertNotEqual(0, string:str(Result, "max_score\":null")).
-
 
 post_request(URL, ContentType, Body) -> request(post, {URL, [], ContentType, Body}).
 get_request(URL) -> request(get, {URL, []}).
