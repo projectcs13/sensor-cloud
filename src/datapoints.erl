@@ -92,6 +92,7 @@ process_post(ReqData, State) ->
 get_datapoint(ReqData, State) ->
 		case api_help:is_search(ReqData) of
 			false ->
+
 				Id = id_from_path(ReqData),			
 				case erlastic_search:search(?INDEX, "datapoint", "streamid:" ++ Id) of
 					{ok, Result} ->

@@ -3,10 +3,9 @@
 ################################################################################
 ### Variable assignment
 ################################################################################
-ERL ?= erl
-APP := engine
-REBAR=./rebar
-REBAR_URL=http://cloud.github.com/downloads/basho/rebar/rebar
+ERL := erl
+REBAR := ./rebar
+# DIALYZE_INCLUDE = -I lib/erlastic_search/include/ -I lib/webmachine/include/ -I lib/rabbitmq-erlang-client/include -I lib/erlson/include/
 ################################################################################
 
 
@@ -17,14 +16,20 @@ REBAR_URL=http://cloud.github.com/downloads/basho/rebar/rebar
 ### if there is need for it
 ################################################################################
 compile:
-	@./rebar compile skip_deps=true
+	@$(REBAR) compile skip_deps=true
 
 ### get_libs will download and install all project libraries
 get_libs:
-	@./rebar get-deps
-	@./rebar compile
+	@@$(REBAR) get-deps
+	@$(REBAR) compile
 	$(MAKE) -C lib/rabbitmq-server
 	$(MAKE) -C lib/rabbitmq-erlang-client
+
+# prep_dialyzer:
+# 	dialyzer --build_plt --apps kernel stdlib erts mnesia eunit
+
+# dialyze: 
+# 	dialyzer -pa ebin/ $(DIALYZE_INCLUDE) src/*.erl lib/erlson/ebin/
 
 clean_emacs_vsn_files:
 	rm -rf *~
@@ -45,22 +50,22 @@ clean_emacs_vsn_files:
 
 ### Command: make
 ### Builds the entire project, excluding the dependencies.
-all: compile
+all: compile #dialyze
 
 ### Command: make install
 ### Downloads all dependencies and builds the entire project
-install: get_libs
+install: get_libs #prep_dialyzer
 
 ### Command: make run
 ### Downloads all depenedencies, bulds entire project and runs the project.
 run: compile
-	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname engine 
+	$(ERL) -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname engine 
 
 ### Command: make run_es
 ### Runs elastic search
 run_es:
 	lib/elasticsearch/bin/elasticsearch -f
-	
+
 ### Command: make run_rabbit
 ### Runs rabbitMQ server
 run_rabbit:
@@ -70,31 +75,31 @@ run_rabbit:
 ### Compile project resources (not libraries) and runs all eunit tests.
 test: compile
 	-@mkdir test-results
-	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname test -s test run
+	$(ERL) -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname engine -s test run
 
 test_json: compile
 	-@mkdir test-results
-	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname test -eval 'test:run(json)'
+	$(ERL) -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname engine -eval 'test:run(lib_json)'
 
 test_resource: compile
 	-@mkdir test-results
-	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname test -eval 'test:run(resource)'
+	$(ERL) -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname engine -eval 'test:run(resource)'
 
 test_streams: compile
 	-@mkdir test-results
-	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname test -eval 'test:run(streams)'
+	$(ERL) -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname engine -eval 'test:run(streams)'
 
 test_suggest: compile
 	-@mkdir test-results
-	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname test -eval 'test:run(suggest)'
+	$(ERL) -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname engine -eval 'test:run(suggest)'
 
 test_users: compile
 	-@mkdir test-results
-	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname test -eval 'test:run(users)'
+	$(ERL) -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname engine -eval 'test:run(users)'
 
 ### Command: make docs
 ### Genereats all of the documentation files
-docs:
+docs: all
 	./rebar skip_deps=true doc
 
 ### Command: make clean
