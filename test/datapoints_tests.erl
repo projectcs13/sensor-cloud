@@ -37,9 +37,9 @@
 post_test() ->
         Response1 = post_request(?DATAPOINTS_URL, "application/json",
                                          "{\"value\":\"" ++ ?TEST_VALUE ++ "\", \"timestamp\": \"" ++ ?TEST_TIMESTAMP ++ "\"}"),
-        check_returned_code(Response1, 204),
-        timer:sleep(3000),
-        ?assertNotMatch({error, "no match"}, get_index_id(?TEST_VALUE)).
+        check_returned_code(Response1, 200),
+        timer:sleep(2000),
+        ?assertNotMatch({error, "no match"}, get_index_id(?TEST_VALUE, ?TEST_TIMESTAMP)).
 
 
 %% @doc
@@ -50,7 +50,8 @@ post_test() ->
 %% @end
 -spec get_existing_datapoint_test() -> ok | {error, term()}.
 get_existing_datapoint_test() ->
-        Id = get_index_id(?TEST_VALUE),
+        Id = get_index_id(?TEST_VALUE, ?TEST_TIMESTAMP),
+		erlang:display("##$################# Id:" ++ Id),
         ?assertNotMatch({error, "no match"}, Id),
         Response1 = get_request(?DATAPOINTS_URL ++ "_search?_id=" ++ Id),
         check_returned_code(Response1, 200).
@@ -62,12 +63,11 @@ get_existing_datapoint_test() ->
 %% Returns: string() | {error, string()}
 %%
 %% @end
--spec get_index_id(string()) -> string() | {error, string()}.
-get_index_id(Uvalue) ->
-        Response1 = get_request(?DATAPOINTS_URL ++ "_search?value=" ++ Uvalue ++ "&timestamp=" ++ ?TEST_TIMESTAMP),
+-spec get_index_id(string(), string()) -> string() | {error, string()}.
+get_index_id(Uvalue, Uvalue2) ->
+        Response1 = get_request(?DATAPOINTS_URL ++ "_search?value=" ++ Uvalue ++ "&timestamp=" ++ Uvalue2),
         check_returned_code(Response1, 200),
-        {ok, Rest} = Response1,
-        {_,_,A} = Rest,
+        {ok, {_,_,A}} = Response1,
         case re:run(A, "id\":\"[^\"]*", [{capture, first, list}]) of
                 {match, ["id\":\"" ++ Id]} -> Id;
                 nomatch -> {error, "no match"}

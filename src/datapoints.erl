@@ -75,7 +75,7 @@ process_post(ReqData, State) ->
 						FinalJson = api_help:add_field(DatapointJson, "streamid", Id),
 						case erlastic_search:index_doc(?INDEX, "datapoint", FinalJson) of
 							{error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
-						{ok,List} -> {true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
+							{ok,List} -> {true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
 						end
 				end;
 			true ->
@@ -101,7 +101,6 @@ get_datapoint(ReqData, State) ->
 							nomatch -> {lib_json:encode(Result), ReqData, State}
 						end;
 					_ -> {{halt, 404}, ReqData, State}
-
 				end; 
 			true ->
 				process_search(ReqData,State, get)	
@@ -146,7 +145,7 @@ process_search(ReqData, State, get) ->
 				TransformedQuery="streamid:" ++ Id ++ transform(TempQuery),
 				case erlastic_search:search_limit(?INDEX, "datapoint",TransformedQuery, 10) of
 					{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
-                	{ok,List} -> {true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
+                	{ok,List} -> {lib_json:encode(List),ReqData,State}
 				end
 		end.
 
