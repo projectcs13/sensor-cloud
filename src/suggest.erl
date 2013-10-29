@@ -1,12 +1,9 @@
 %% @author Tommy Mattsson, Georgios Koutsoumpakis
 %%   [www.csproj13.student.it.uu.se]
 %% @version 1.0
+%% @headerfile "json.hrl"
 %% @copyright [Copyright information]
-%%
-%% @doc == suggest ==
-%% 
-%%  
-%%
+%% @doc == Module for creating, updating and retrieving suggestions ==
 %% @end
 -module(suggest).
 -export([init/1, 
@@ -20,22 +17,10 @@
 -include_lib("erlastic_search.hrl").
 -include("webmachine.hrl").
 -include("misc.hrl").
-
+-include("json.hrl").
 
 -define(INDEX, "sensorcloud").
 
-
-%% ====================================================================
-%% Type definitions
-%% ====================================================================
-%% @type attr() = atom() | string()
--type attr() :: atom() | string().
-%% @type json_string() = string()
--type json_string() :: string().
-%% @type mochijson() = tuple() 
--type mochijson() :: tuple(). 
-%% @type json() = json_string() | mochijson()
--type json() :: json_string() | mochijson().
 
 
 %% @doc
