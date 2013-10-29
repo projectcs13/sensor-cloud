@@ -44,7 +44,6 @@ post_test() ->
 	Response2 = get_request(?SUGGEST_URL++"testsmartphone2"),     
 	check_returned_code(Response2, 200),
 	{ok, {_, _ ,Body}} = Response2,
-	erlang:display(Response2),
 	?assertEqual(<<"testtag">>,lib_json:get_field(Body, "testsuggest[0].options[0].payload.tags")).
 
 
@@ -65,7 +64,6 @@ post_and_stream_test() ->
 	Response2 = get_request(?SUGGEST_URL++"test3resource"),
 	check_returned_code(Response2, 200),
 	{ok, {_, _ ,Body2}} = Response2,
-        erlang:display(Body2),
 	?assertEqual(<<"testtag">>,lib_json:get_field(Body2, "testsuggest[0].options[0].payload.tags")),
 	?assertEqual(true, lib_json:field_value_exists(Body2, "testsuggest[0].options[0].payload.streams[*].tags",<<"test_tag">>)),
 	?assertEqual(<<"test2">>, lib_json:get_field_value(Body2, "testsuggest[0].options[0].payload.streams[*].tags",<<"test2">>)).

@@ -11,7 +11,6 @@
 -module(suggest).
 -export([init/1, 
 	allowed_methods/2, 
-	process_post/2, 
 	content_types_provided/2, 
 	get_suggestion/2, 
 	add_suggestion/2,
@@ -24,6 +23,20 @@
 
 
 -define(INDEX, "sensorcloud").
+
+
+%% ====================================================================
+%% Type definitions
+%% ====================================================================
+%% @type attr() = atom() | string()
+-type attr() :: atom() | string().
+%% @type json_string() = string()
+-type json_string() :: string().
+%% @type mochijson() = tuple() 
+-type mochijson() :: tuple(). 
+%% @type json() = json_string() | mochijson()
+-type json() :: json_string() | mochijson().
+
 
 %% @doc
 %% Function: init/1
@@ -42,11 +55,9 @@ init([]) ->
 -spec allowed_methods(ReqData::term(),State::term()) -> {list(), term(), term()}.
 
 allowed_methods(ReqData, State) ->
-	case parse_path(wrq:path(ReqData)) of
+	case api_help:parse_path(wrq:path(ReqData)) of
 		[{"suggest", _Term}] ->
 			{['GET'], ReqData, State}; 
-		[{"suggest"}] ->
-			{['POST'], ReqData, State}; 
 		[error] ->
 			{[], ReqData, State} 
 	end.
@@ -60,36 +71,18 @@ allowed_methods(ReqData, State) ->
 %% Returns: {[{Mediatype, Handler}], ReqData, State}
 %% @end
 -spec content_types_provided(ReqData::term(),State::term()) -> {list(), term(), term()}.
-
 content_types_provided(ReqData, State) ->
 	{[{"application/json", get_suggestion}], ReqData, State}.
 
 
-%% @doc
-%% Function: process_post/2
-%% Purpose: Used to handle POST requests by creating streams, or search for streams in elastic search
-%% Returns: {Success, ReqData, State}, where Success is true if the post request is
-%% successful and false otherwise.
-%% @end
--spec process_post(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
-
-process_post(ReqData, State) ->
-	{Query,_,_} = json_handler(ReqData, State),	
-	case erlastic_search:suggest(?INDEX, Query) of	
-		{error, Reason} -> {false, wrq:set_resp_body(json_encode(Reason),ReqData), State};
-		{ok,List} -> {true, wrq:set_resp_body(json_encode(List),ReqData), State}
-	end.
-
-
 
 %% @doc
-%% Function: get_suggestion/2
-%% Purpose: Used to handle GET requests for suggestions by giving the term 
-%% (model)
-%% Returns: {String, ReqData, State}
+%% Handles GET requests for suggestions by giving the term.(model). It returns only one suggestion,
+%% the one with the highest score.
+%%
+%% Example URL: localhost:8000/suggest/my_model 
 %% @end
 -spec get_suggestion(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
-
 get_suggestion(ReqData, State) ->
 	case proplists:get_value('term', wrq:path_info(ReqData)) of
 		undefined ->
@@ -106,14 +99,14 @@ get_suggestion(ReqData, State) ->
 					}                                      
 				}",
 			case erlastic_search:suggest(?INDEX, Query) of	
-				{error, Reason} -> {json_encode(Reason),ReqData, State};
+				{error, Reason} -> {lib_json:encode(Reason),ReqData, State};
 				{ok,List} -> 
-					EncodedList = json_encode(List),
+					EncodedList = lib_json:encode(List),
 					case re:run(EncodedList, "\"options\":\\[\\]", [{capture, first, list}]) of
 						{match, _} -> 
 							{{halt,404},ReqData, State};
 						_->
-							{json_encode(List),ReqData, State}
+							{lib_json:encode(List),ReqData, State}
 					end
 			end
 	end.
@@ -122,12 +115,12 @@ get_suggestion(ReqData, State) ->
 
 
 %% @doc
-%% Function: add_suggestion/2aaaaaaaaa
-%% Purpose: Used to get the json object from the request
-%% Returns: {Json,ReqData,State}
+%% Creates a suggestion using a resource. This new suggestion contains only the metadata from the resource
+%% like manufacturer, tags, polling_frequency. It is expected to be updated with information about the
+%% streams when new streams are created for that resource. 
 %% @end
-add_suggestion(Resource, Json) ->
-	ResourceId = binary_to_list(proplists:get_value(<<"_id">>, Json)),
+-spec add_suggestion(Resource::json(), RsourceId::binary()) -> ok | {error, no_model}. 
+add_suggestion(Resource, ResourceId) ->
 	Manufacturer = lib_json:get_field(Resource, "manufacturer"),
 	Model = lib_json:get_field(Resource, "model"),
 	Tags = lib_json:get_field(Resource, "tags"),
@@ -135,7 +128,7 @@ add_suggestion(Resource, Json) ->
 	Weight = scoring:calc(Resource, resource),
 	case Model of 
 		undefined ->
-			{error, "no model"};
+			{error, no_model};
 		_ ->
 			Suggestion = "{
 				\"resource_id\" : \"" ++ undefined_to_string(ResourceId) ++ "\",
@@ -157,10 +150,14 @@ add_suggestion(Resource, Json) ->
 	end.
 
 
+%% @doc
+%% Updates the suggestion to include information from the new stream. This way we can later
+%% on autocomplete the number of streams for that resource, along with some more information 
+%% about each stream. 
+%% @end
+-spec update_suggestion(Stream::json()) -> ok.
 update_suggestion(Stream) ->
-	erlang:display("*******Starting Update********"),
 	ResourceId = lib_json:get_field(Stream, "resource_id"),
-	erlang:display(ResourceId),
 	case erlastic_search:search(?INDEX, "suggestion", "resource_id:"++?TO_STRING(ResourceId)) of
 		{error, _} -> erlang:display("ERROR");
 		{ok, Response} ->
@@ -179,28 +176,28 @@ update_suggestion(Stream) ->
 							NewPayload = lib_json:add_value(Payload, "streams", "["++StreamInfo++"]"),
 
 							TempSugg = lib_json:replace_field(Sugg, "suggest.payload", lib_json:to_string(NewPayload)),
-							NewSugg = lib_json:replace_field(TempSugg, "suggest.weight", NewWeight),
-							erlang:display("FINAL"),
-							erlang:display(NewSugg);
+							NewSugg = lib_json:replace_field(TempSugg, "suggest.weight", NewWeight);
 						OldStream ->
 
 							NewStreamList = lib_json:add_value(Sugg,"suggest.payload.streams" , StreamInfo),
-							NewSugg = lib_json:replace_field(NewStreamList, "suggest.weight", NewWeight),
-							erlang:display("FINAL"),
-							erlang:display(NewSugg)
+							NewSugg = lib_json:replace_field(NewStreamList, "suggest.weight", NewWeight)
 					end,
 					Final = api_help:create_update(NewSugg),
 					case api_help:update_doc(?INDEX, "suggestion", Id, Final) of 
 						{error,Reason} -> erlang:display("not updated");
-						{ok,List} -> erlang:display("updated")
+						{ok,List} -> ok 
 					end;
 				_ -> 
-					erlang:display("error-2")
+					erlang:display("No suggestion exists for that resource")
 			end
 	end.
 
 
-
+%% @doc
+%% It keeps usefull information for the given stream. It forms a new json object using only these 
+%% information and also returns the difference on the scoring of the suggestion
+%% @end
+-spec get_stream_info(Stream::json()) -> {Weight::integer(), Result::json_string()}.
 get_stream_info(Stream) ->
 	Name = lib_json:get_field(Stream, "name"),
 	Description = lib_json:get_field(Stream, "description"),
@@ -217,12 +214,13 @@ get_stream_info(Stream) ->
 		\"tags\":\"" ++ undefined_to_string(Tags)++"\",
 		\"type\":\"" ++ undefined_to_string(Type)++"\"
 		}",
-	erlang:display(Result),
 	{Weight, Result}.
 
 
-
-
+%% @doc
+%% Returns an empty string if it was "undefined", else it returns the string itself.
+%% @end
+-spec undefined_to_string(Text::attr()) -> string().
 undefined_to_string(Text) ->
 	case Text of
 		undefined ->
@@ -232,107 +230,13 @@ undefined_to_string(Text) ->
 	end.
 
 
-%% @doc
-%% Function: json_handler/2
-%% Purpose: Used to get the json object from the request
-%% Returns: {Json,ReqData,State}
-%% @end
--spec json_handler(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
-
-json_handler(ReqData, State) ->
-	[{Value,_ }] = mochiweb_util:parse_qs(wrq:req_body(ReqData)), 
-	{Value, ReqData, State}.
-
-%% @doc
-%% Function: create_update/1
-%% Purpose: Used to create the update document sent to erlastic search
-%% Returns: The update document to send to erlasticsearch
-%% @end
--spec create_update(Stream::string()) -> string().
-
-create_update(Stream) ->
-	"{\n\"doc\" : " ++ Stream ++ "\n}".
-
-%% @doc
-%% Function: add_field/3
-%% Purpose: Used to add a new field to the given string representation of
-%%          of a JSON object, the field will be FieldName : FieldValue
-%% Returns: The string representation of the JSON object with the new field
-%% @end
--spec add_field(Stream::string(),FieldName::string(),FieldValue::term()) -> string().
-
-add_field(Stream,FieldName,FieldValue) ->
-	case is_integer(FieldValue) of
-		true ->
-			string:substr(Stream,1,length(Stream)-1) ++ ",\n\"" ++ FieldName ++ "\" : " ++ FieldValue ++ "\n}";
-		false ->
-			string:substr(Stream,1,length(Stream)-1) ++ ",\n\"" ++ FieldName ++ "\" : \"" ++ FieldValue ++ "\"\n}"
-	end.
-
-
-%% @doc
-%% Function: parse_path/1
-%% Purpose: Used to parse the URI path
-%% Returns: The parsed URI path as a list
-%% @end
--spec parse_path(Path::file:name_all()) -> list().
-
-parse_path(Path) -> 
-	[_|T] = filename:split(Path),
-	pair(T).
-
-%% @doc
-%% Function: pair/1
-%% Purpose: Used to create a new list of tuples where each 
-%%          2 elements are paired
-%% Returns: The paired list
-%% @end
--spec pair(PathList::list()) -> list().
-
-pair([]) -> [];
-pair([A]) -> [{A}];
-pair([A,B|T]) ->
-	[{A,B}|pair(T)].
-
-
-
-%% @doc
-%% Function: json_encode/1
-%% Purpose: Used to transform the given data to json
-%% Returns: JSON that is created
-%% @end
-
-% Taken from erlasticsearch
-json_encode(Data) ->
-	(mochijson2:encoder([{utf8, true}]))(Data).
-
-%% @doc
-%% Function: update_doc/4
-%% Purpose: Used to update document in elastic search
-%% Returns: JSON response from elastic search server
-%% @end
-
-% Taken from erlasticsearch and modified to not encode
-update_doc(Index, Type, Id, Mochijson) ->
-	update_doc(Index, Type, Id, Mochijson, []).
-
-%% @doc
-%% Function: update_doc/5
-%% Purpose: Used to update document in elastic search
-%% Returns: JSON response from elastic search server
-%% @end
-
-% Taken from erlasticsearch and modified to not encode
-update_doc(Index, Type, Id, Json, Qs) ->
-	Id1 = mochiweb_util:quote_plus(Id),
-	ReqPath = Index ++ [$/ | Type] ++ [$/ | Id1] ++ "/_update",
-	erls_resource:post(#erls_params{}, ReqPath, [], Qs, Json, []).
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Should be moved to own module later
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
+%% @doc
+%% Returns the current timestamp.
+%% @end
 get_timestamp() ->
 	TS = {MSec,Sec,Micro} = os:timestamp(),
 	{{Year,Month,Day},{Hour,Minute,Second}} = calendar:now_to_universal_time(TS),
