@@ -5,9 +5,9 @@
 
 %% @doc Webmachine_resource for /datapoints
 
--module(datapoints_resource).
+-module(datapoints).
 -export([init/1, allowed_methods/2, content_types_provided/2,
-				process_post/2, get_datapoint/2]).
+		 process_post/2, get_datapoint/2]).
 
 -include("webmachine.hrl").
 -include_lib("erlastic_search.hrl").
@@ -33,13 +33,13 @@ init([]) ->
 %% @end
 -spec allowed_methods(ReqData::tuple(), State::string()) -> {list(), tuple(), string()}.
 allowed_methods(ReqData, State) ->
-	case parse_path(wrq:path(ReqData)) of	
+	case api_help:parse_path(wrq:path(ReqData)) of	
 		[{"streams", _Id}, {"data", "_search"}] ->
 			{['POST','GET'], ReqData, State};
 		[{"streams", _Id}, {"data"}] ->
 			{['GET', 'POST', 'DELETE'], ReqData, State};
 		[error] ->
-			{['POST','GET'], ReqData, State}
+				{[], ReqData, State}
 	end.
 
 
@@ -57,7 +57,7 @@ content_types_provided(ReqData, State) ->
 %% @doc
 %% Function: process_post/2
 %% Purpose: decodes a JSON object and either adds the new datapoint in the DB or
-%% performs _search in the Datapoint database.
+%% performs search in the Datapoint database.
 %% It is run automatically for POST requests
 %% Returns: {true, ReqData, State} || {{error, Reason}, ReqData, State}
 %%
@@ -65,44 +65,22 @@ content_types_provided(ReqData, State) ->
 %% @end
 -spec process_post(ReqData::tuple(), State::string()) -> {true, tuple(), string()}.
 process_post(ReqData, State) ->
-	case is_search(ReqData) of
+	case api_help:is_search(ReqData) of
 			false ->
-				{DatapointJson,_,_} = json_handler(ReqData, State),
+				{DatapointJson,_,_} = api_help:json_handler(ReqData, State),
 				Id = id_from_path(ReqData),
 				case Id of
 					undefined -> {{halt, 404}, ReqData, State};
 					_ ->
-						FinalJson = add_field(DatapointJson, "streamid", Id),
+						FinalJson = api_help:add_field(DatapointJson, "streamid", Id),
 						case erlastic_search:index_doc(?INDEX, "datapoint", FinalJson) of
-							{error, Reason} -> {{error, Reason}, ReqData, State};
-							{ok,_} -> {true, ReqData, State}
+							{error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
+						{ok,List} -> {true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
 						end
 				end;
 			true ->
 				process_search(ReqData,State, post)	
 	end.
-
-
-%% @doc
-%% Function: add_field/3
-%% Purpose: Used to add a new field to the given string representation of
-%%          of a JSON object, the field will be FieldName : FieldValue
-%% Returns: The string representation of the JSON object with the new field
-%% @end
--spec add_field(Stream::string(),FieldName::string(),FieldValue::string()) -> string().
-add_field(Stream,FieldName,FieldValue) ->
-	string:substr(Stream,1,length(Stream)-1) ++ ",\n\"" ++ FieldName ++ "\" : \"" ++ FieldValue ++ "\"\n}".
-
-
-%% @doc
-%% Function: json_handler/2
-%% Purpose: Handles JSON 
-%% Returns: A string with fields and values formatted in a correct way
-%% @end
--spec json_handler(tuple(), string()) -> {string(), tuple(), string()}.
-json_handler(ReqData, State) ->
-		[{Value,_ }] = mochiweb_util:parse_qs(wrq:req_body(ReqData)),
-		{Value, ReqData, State}.
 
 
 %% @doc
@@ -112,15 +90,15 @@ json_handler(ReqData, State) ->
 %% @end
 -spec get_datapoint(ReqData::tuple(), State::string()) -> {list(), tuple(), string()}.
 get_datapoint(ReqData, State) ->
-		case is_search(ReqData) of
+		case api_help:is_search(ReqData) of
 			false ->
 				Id = id_from_path(ReqData),			
 				case erlastic_search:search(?INDEX, "datapoint", "streamid:" ++ Id) of
 					{ok, Result} ->
-						EncodedResult = json_encode(Result),
+						EncodedResult = lib_json:encode(Result),
 						case re:run(EncodedResult, "\"max_score\":null", [{capture, first, list}]) of
 							{match, _} -> {{halt, 404}, ReqData, State};
-							nomatch -> {json_encode(Result), ReqData, State}
+							nomatch -> {lib_json:encode(Result), ReqData, State}
 						end;
 					_ -> {{halt, 404}, ReqData, State}
 
@@ -128,17 +106,6 @@ get_datapoint(ReqData, State) ->
 			true ->
 				process_search(ReqData,State, get)	
 		end.
-
-
-%% @doc
-%% Function: is_search/2
-%% Purpose: Returns true if it is a search POST/GET request.
-%% Returns: {true | false}
-%% @end
--spec is_search(string()) -> boolean().
-is_search(ReqData) ->
-		URIList = string:tokens(wrq:path(ReqData), "/"),
-		string:sub_string(lists:nth(length(URIList),URIList),1,7) == "_search".
 
 
 %% @doc
@@ -161,10 +128,10 @@ is_search(ReqData) ->
 -spec process_search(ReqData::tuple(), State::string(), term()) ->
 		{list(), tuple(), string()}.
 process_search(ReqData, State, post) ->
-		{Json,_,_} = json_handler(ReqData,State),
+		{Json,_,_} = api_help:json_handler(ReqData,State),
 		case erlastic_search:search_json(#erls_params{},?INDEX, "datapoint", Json) of
-			{error,Reason} -> {{error,Reason}, ReqData, State};
-			{ok,List} -> {true, wrq:set_resp_body(json_encode(List),ReqData),State}
+				{error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
+				{ok,List} -> {true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
 		end;
 process_search(ReqData, State, get) ->
 		TempQuery = wrq:req_qs(ReqData),
@@ -172,14 +139,14 @@ process_search(ReqData, State, get) ->
 		case TempQuery of
 			[] ->   
 				case erlastic_search:search_limit(?INDEX, "datapoint","streamid:" ++ Id, 10) of
-					{error,Reason} -> {{error,Reason}, ReqData, State};
-					{ok,List} -> {json_encode(List),ReqData,State}
+					{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
+                	{ok,List} -> {true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
 			 	end;
 			_ ->
 				TransformedQuery="streamid:" ++ Id ++ transform(TempQuery),
-						case erlastic_search:search_limit(?INDEX, "datapoint",TransformedQuery, 10) of
-					{error,Reason} -> {{error,Reason}, ReqData, State};
-					{ok,List} -> {json_encode(List),ReqData,State}
+				case erlastic_search:search_limit(?INDEX, "datapoint",TransformedQuery, 10) of
+					{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
+                	{ok,List} -> {true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
 				end
 		end.
 
@@ -223,37 +190,3 @@ id_from_path(RD) ->
 			end;
 		Id -> Id
 	end.
-
-
-%% @doc
-%% Function: parse_path/1
-%% Purpose: Given a string representation of a search path, the path is split
-%% by the '/' token and the return value is a list of tuples [{dir, id}].
-%% Returns: [{"directory_name", "id_value"}] | [{Error, Err}] | []
-%% @end
--spec parse_path(string()) -> string().
-parse_path(Path) ->
-		[_|T] = filename:split(Path),
-		pair(T).
-
-
-%% @doc
-%% Function: pair/1
-%% Purpose: Pairs the values of the input list
-%% Returns: A list with paired values
-%% @end
--spec pair(list()) -> list().
-pair([]) -> [];
-pair([A]) -> [{A}];
-pair([A,B|T]) ->
-	[{A,B}|pair(T)].
-
-
-%% @doc
-%% Function: json_encode/2
-%% Purpose: To encode utf8-json WITHOUT converting multi-byte utf8-chars into ASCII '\uXXXX'.
-%% Returns: A string with fields and values formatted in a correct way
-%% @end
--spec json_encode(string()) -> string().
-json_encode(Data) ->
-	(mochijson2:encoder([{utf8, true}]))(Data).
