@@ -95,14 +95,14 @@ process_search_post(ReqData, State) ->
         erlang:display(FilteredJson),
         case erlastic_search:search_json(#erls_params{},?INDEX, "stream", FilteredJson) of % Maybe wanna take more
                 {error,Reason1} ->
-                        StreamSearch = "error",
+                        StreamSearch = "\"error\"",
                         {{halt,Reason1}, ReqData, State};
                 {ok,List1} ->
                         StreamSearch = lib_json:encode(List1) % May need to convert
         end,
         case erlastic_search:search_json(#erls_params{},?INDEX, "user", FilteredJson) of % Maybe wanna take more
                 {error,Reason2} ->
-                        UserSearch = "error",
+                        UserSearch = "\"error\"",
                         {{halt,Reason2}, ReqData, State};
                 {ok,List2} -> UserSearch = lib_json:encode(List2) % May need to convert
          end,
