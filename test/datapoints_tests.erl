@@ -37,9 +37,9 @@
 post_test() ->
         Response1 = post_request(?DATAPOINTS_URL, "application/json",
                                          "{\"value\":\"" ++ ?TEST_VALUE ++ "\", \"timestamp\": \"" ++ ?TEST_TIMESTAMP ++ "\"}"),
-        check_returned_code(Response1, 204),
-        timer:sleep(3000),
-        ?assertNotMatch({error, "no match"}, get_index_id(?TEST_VALUE)).
+        check_returned_code(Response1, 200),
+        timer:sleep(1000),
+        ?assertNotMatch({error, "no match"}, get_index_id(?TEST_VALUE, ?TEST_TIMESTAMP)).
 
 
 %% @doc
@@ -50,7 +50,7 @@ post_test() ->
 %% @end
 -spec get_existing_datapoint_test() -> ok | {error, term()}.
 get_existing_datapoint_test() ->
-        Id = get_index_id(?TEST_VALUE),
+        Id = get_index_id(?TEST_VALUE, ?TEST_TIMESTAMP),
         ?assertNotMatch({error, "no match"}, Id),
         Response1 = get_request(?DATAPOINTS_URL ++ "_search?_id=" ++ Id),
         check_returned_code(Response1, 200).
@@ -62,12 +62,11 @@ get_existing_datapoint_test() ->
 %% Returns: string() | {error, string()}
 %%
 %% @end
--spec get_index_id(string()) -> string() | {error, string()}.
-get_index_id(Uvalue) ->
-        Response1 = get_request(?DATAPOINTS_URL ++ "_search?value=" ++ Uvalue ++ "&timestamp=" ++ ?TEST_TIMESTAMP),
+-spec get_index_id(string(), string()) -> string() | {error, string()}.
+get_index_id(Uvalue, Uvalue2) ->
+        Response1 = get_request(?DATAPOINTS_URL ++ "_search?value=" ++ Uvalue ++ "&timestamp=" ++ Uvalue2),
         check_returned_code(Response1, 200),
-        {ok, Rest} = Response1,
-        {_,_,A} = Rest,
+        {ok, {_,_,A}} = Response1,
         case re:run(A, "id\":\"[^\"]*", [{capture, first, list}]) of
                 {match, ["id\":\"" ++ Id]} -> Id;
                 nomatch -> {error, "no match"}
@@ -97,18 +96,7 @@ get_non_existent_datapoint_test() ->
         Response1 = get_request(?DATAPOINTS_URL ++ "_search?_id=" ++ "nonexistent"),
 		{ok, Rest} = Response1,
 		{_,_,Result} = Rest,
-	    ?assertNotEqual(0, string:str(Result, "max_score\":null")).
-
-
-%% @doc
-%% Function: json_encode/2
-%% Purpose: To encode utf8-json WITHOUT converting multi-byte utf8-chars into ASCII '\uXXXX'.
-%% Returns: A string with fields and values formatted in a correct way
-%% @end
--spec json_encode(string()) -> string().
-json_encode(Data) ->
-    (mochijson2:encoder([{utf8, true}]))(Data).
-
+	    ?assertNotEqual(0, string:str(Result, "hits\":[]")).
 
 post_request(URL, ContentType, Body) -> request(post, {URL, [], ContentType, Body}).
 get_request(URL) -> request(get, {URL, []}).
