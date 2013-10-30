@@ -13,31 +13,53 @@
 -export([add_data/0]).
 
 %% @doc
-%% Function: random_data/4
-%% Purpose: Used to add a given amount of datapoints with random 
-%%          values to the history of the given stream
+%% Function: sinus_random_data/3
+%% Purpose: Used to add a given amount of datapoints with values
+%%          following the sinus curve with some random noise
 %% Returns: ok 
 %%
 %% Side effects: creates datapoints in elastich search
 %% @end
--spec random_data(Amount::integer(),Min::float(),Max::float(),StreamId::string()) -> ok.
+-spec sinus_random_data(Amount::integer(),StreamId::string(),Delay::integer()) -> ok.
 
-random_data(0,_Min,_Max,_StreamId) ->
+sinus_random_data(0,_StreamId,_Delay) ->
 	ok;
-random_data(Amount,Min,Max,StreamId) ->
+sinus_random_data(Amount,StreamId,Delay) ->
 	{A1,A2,A3} = now(),
 	random:seed(A1, A2, A3),
-	Value = random:uniform(),
-	UsedValue = float_to_list(Min+(Value*(Max-Min)),[{decimals,1}]),
-	case Amount < 10 of
-		true -> Time = "0" ++ integer_to_list(Amount);
-		false -> Time = integer_to_list(Amount)
-	end,
+	{{Year,Month,Day},{Hour,Minute,Second}} = calendar:local_time(),
+	TimeStamp = generate_timestamp([Year,Month,Day,Hour,Minute,Second],0),
+	Value = math:sin(Amount/10.0) + (random:uniform()/10.0),
+	UsedValue = float_to_list(Value,[{decimals,3}]),
 	%% Unsure if this is how the datapoints should look
-	JSON = "{\"stream_id\":\""++ StreamId++"\",\"timstap\":\"2013-10-05T0105" ++ Time ++ ".0000\",\"value\":"++ UsedValue ++"}",
+	JSON = "{\"stream_id\":\""++ StreamId++"\",\"timestamp\":\"" ++ TimeStamp ++ "\",\"value\":"++ UsedValue ++"}",
 	{ok, {{_Version, _Code, _ReasonPhrase}, _Headers, _Body}} = httpc:request(post, {"http://localhost:8000/streams/" ++ StreamId ++ "/data", [],"application/json", JSON}, [], []),
-	random_data(Amount-1,Min,Max,StreamId).
+	timer:sleep(Delay),
+	sinus_random_data(Amount-1,StreamId,Delay).
 
+
+%% @doc
+%% Function: random_data/2
+%% Purpose: Used to create a timestamp vaild in es
+%%          from the input which should be the list
+%%          [Year,Mount,Day,Hour,Minute,Day]
+%% Returns: The generated timestamp
+%%
+%% @end
+-spec generate_timestamp(DateList::list(),Count::integer()) -> string().
+
+generate_timestamp([],_) ->
+	[];
+generate_timestamp([First|Rest],3) ->
+	case First < 10 of
+		true -> "T0" ++ integer_to_list(First) ++ generate_timestamp(Rest,4);
+		false -> "T" ++ integer_to_list(First) ++ generate_timestamp(Rest,4)
+	end;
+generate_timestamp([First|Rest],Count) ->
+	case First < 10 of
+		true -> "0" ++ integer_to_list(First) ++ generate_timestamp(Rest,Count+1);
+		false -> "" ++ integer_to_list(First) ++ generate_timestamp(Rest,Count+1)
+	end.
 
 %% @doc
 %% Function: add_data/0
@@ -78,8 +100,8 @@ add_data() ->
 	U1R1Stream2 = lib_json:get_field(Body10,"_id"),
 	
 	%% Add random data between min and max for the streams
-	random_data(15,-50.0,50.0,U1R1Stream1),
-	random_data(15,150.0,350.0,U1R1Stream2),
+	sinus_random_data(15,U1R1Stream1,1000),
+	sinus_random_data(15,U1R1Stream2,1000),
 	
 	%% Create streams for resource2 for user1
 	{ok, {{_Version11, 200, _ReasonPhrase11}, _Headers11, Body11}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"resource_id\":\""++ U1Resource2 ++"\",\"name\":\"Stream1\",\"tags\":\"[temperature,celsius,Norrtalje]\",\"description\":\"Temperature in Celsius in Norrtalje\",\"private\":\"false\",\"type\":\"Temperature\",\"unit\":\"celsius\",\"accuracy\":0.95,\"min_val\":-50.0,\"max_val\":50.0,\"active\":\"true\",\"user_ranking\":10.0,\"subscribers\":6,\"last_updated\":\"2013-10-05T010502.0000\", \"creation_date\":\"2013-10-01\",\"history_size\": 5000,\"location\":\"59.7667,18.7000\"}"}, [], []),
@@ -88,8 +110,8 @@ add_data() ->
 	U1R2Stream2 = lib_json:get_field(Body12,"_id"),
 	
 	%% Add random data between min and max for the streams
-	random_data(15,-50.0,50.0,U1R2Stream1),
-	random_data(15,150.0,350.0,U1R2Stream2),
+	sinus_random_data(15,U1R2Stream1,1000),
+	sinus_random_data(15,U1R2Stream2,1000),
 	
 	%% Create streams for resource3 for user1
 	{ok, {{_Version13, 200, _ReasonPhrase13}, _Headers13, Body13}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"resource_id\":\""++ U1Resource3 ++"\",\"name\":\"Stream1\",\"tags\":\"[temperature,celsius,Sala]\",\"description\":\"Temperature in Celsius in Sala\",\"private\":\"false\",\"type\":\"Temperature\",\"unit\":\"celsius\",\"accuracy\":0.95,\"min_val\":-50.0,\"max_val\":50.0,\"active\":\"true\",\"user_ranking\":10.0,\"subscribers\":16,\"last_updated\":\"2013-10-05T010502.0000\", \"creation_date\":\"2013-10-01\",\"history_size\": 5000,\"location\":\"59.9167,16.6000\"}"}, [], []),
@@ -98,8 +120,8 @@ add_data() ->
 	U1R3Stream2 = lib_json:get_field(Body14,"_id"),
 	
 	%% Add random data between min and max for the streams
-	random_data(15,-50.0,50.0,U1R3Stream1),
-	random_data(15,150.0,350.0,U1R3Stream2),
+	sinus_random_data(15,U1R3Stream1,1000),
+	sinus_random_data(15,U1R3Stream2,1000),
 	
 	
 	
@@ -120,16 +142,16 @@ add_data() ->
 	U2R1Stream3 = lib_json:get_field(Body19,"_id"),
 	
 	%% Add random data between min and max for the streams
-	random_data(15,0.0,15.0,U2R1Stream1),
-	random_data(15,0.0,15.0,U2R1Stream2),
-	random_data(15,0.0,15.0,U2R1Stream3),
+	sinus_random_data(15,U2R1Stream1,1000),
+	sinus_random_data(15,U2R1Stream2,1000),
+	sinus_random_data(15,U2R1Stream3,1000),
 		
 	%% Create stream for resource2 for user2
 	{ok, {{_Version20, 200, _ReasonPhrase20}, _Headers20, Body20}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"resource_id\":\""++ U2Resource2 ++"\",\"name\":\"Stream1\",\"tags\":\"[water-level,Uppsala]\",\"description\":\"Water-level in Fyrisan in Uppsala\",\"private\":\"true\",\"type\":\"Water-level\",\"unit\":\"meter\",\"accuracy\":0.95,\"min_val\":0.0,\"max_val\":15.0,\"active\":\"true\",\"user_ranking\":10.0,\"subscribers\":169,\"last_updated\":\"2013-10-05T010502.0000\", \"creation_date\":\"2013-10-01\",\"history_size\": 5000,\"location\":\"59.8581,17.6447\"}"}, [], []),
 	U2R2Stream1 = lib_json:get_field(Body20,"_id"),
 	
 	%% Add random data between min and max for the streams
-	random_data(15,0.0,15.0,U2R2Stream1),
+	sinus_random_data(15,U2R2Stream1,1000),
 
 	
 
@@ -142,7 +164,7 @@ add_data() ->
 	U3R1Stream1 = lib_json:get_field(Body22,"_id"),
 	
 	%% Add random data between min and max for the streams
-	random_data(15,0.0,15.0,U3R1Stream1),
+	sinus_random_data(15,U3R1Stream1,1000),
 
 	%% Create resources for user4
 	{ok, {{_Version23, 200, _ReasonPhrase23}, _Headers23, Body23}} = httpc:request(post, {"http://localhost:8000/resources", [],"application/json", "{\"user_id\":\""++ User4 ++"\",\"name\":\"Resource1\",\"tags\":\"[water-level,Uppsala]\",\"description\":\"Water-level in Uppsala\",\"type\":\"Water-level\",\"manufacturer\":\"Ericsson\",\"model\":\"WLA099\",\"make\":\"\",\"serial\":\"AACV223\",\"location\":\"59.8581,17.6447\",\"active\":\"true\",\"uri\":\"http://uppsala.com\",\"polling_freq\":\"60\",\"creation_date\":\"2013-10-05\"}"}, [], []),
@@ -159,28 +181,28 @@ add_data() ->
 	U4R1Stream1 = lib_json:get_field(Body27,"_id"),
 	
 	%% Add random data between min and max for the streams
-	random_data(15,0.0,19.0,U4R1Stream1),
+	sinus_random_data(15,U4R1Stream1,1000),
 	
 	%% Create stream for resource2 for user4
 	{ok, {{_Version28, 200, _ReasonPhrase28}, _Headers28, Body28}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"resource_id\":\""++ U4Resource2 ++"\",\"name\":\"Stream1\",\"tags\":\"[water-level,Norrtalje]\",\"description\":\"Water-level in Nortaljean in Uppsala\",\"private\":\"false\",\"type\":\"Water-level\",\"unit\":\"meter\",\"accuracy\":0.95,\"min_val\":0.0,\"max_val\":10.0,\"active\":\"true\",\"user_ranking\":17.0,\"subscribers\":19,\"last_updated\":\"2013-10-08T070502.0000\", \"creation_date\":\"2013-10-01\",\"history_size\": 700,\"location\":\"59.7667,18.7000\"}"}, [], []),
 	U4R2Stream1 = lib_json:get_field(Body28,"_id"),
 	
 	%% Add random data between min and max for the streams
-	random_data(15,0.0,10.0,U4R2Stream1),
+	sinus_random_data(15,U4R2Stream1,1000),
 
 	%% Create stream for resource3 for user4
 	{ok, {{_Version29, 200, _ReasonPhrase29}, _Headers29, Body29}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"resource_id\":\""++ U4Resource3 ++"\",\"name\":\"Stream1\",\"tags\":\"[water-level,Sala]\",\"description\":\"Water-level in the spring in Sala\",\"private\":\"false\",\"type\":\"Water-level\",\"unit\":\"meter\",\"accuracy\":0.75,\"min_val\":0.0,\"max_val\":9.0,\"active\":\"true\",\"user_ranking\":5.0,\"subscribers\":9,\"last_updated\":\"2013-10-09T060502.0000\", \"creation_date\":\"2013-10-01\",\"history_size\": 8900,\"location\":\"59.9167,16.6000\"}"}, [], []),
 	U4R3Stream1 = lib_json:get_field(Body29,"_id"),
 	
 	%% Add random data between min and max for the streams
-	random_data(15,0.0,9.0,U4R3Stream1),
+	sinus_random_data(15,U4R3Stream1,1000),
 
 	%% Create stream for resource4 for user4
 	{ok, {{_Version30, 200, _ReasonPhrase30}, _Headers30, Body30}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"resource_id\":\""++ U4Resource4 ++"\",\"name\":\"Stream1\",\"tags\":\"[water-level,Stockholm]\",\"description\":\"Water-level in the spring in Stockholm\",\"private\":\"false\",\"type\":\"Water-level\",\"unit\":\"meter\",\"accuracy\":0.97,\"min_val\":0.0,\"max_val\":22.0,\"active\":\"true\",\"user_ranking\":18.0,\"subscribers\":1798,\"last_updated\":\"2013-10-15T010502.0000\", \"creation_date\":\"2013-09-01\",\"history_size\": 50000,\"location\":\"59.3294,18.0686\"}"}, [], []),
 	U4R4Stream1 = lib_json:get_field(Body30,"_id"),
 	
 	%% Add random data between min and max for the streams
-	random_data(15,0.0,22.0,U4R4Stream1),
+	sinus_random_data(15,U4R4Stream1,1000),
 	ok.
 
 	
