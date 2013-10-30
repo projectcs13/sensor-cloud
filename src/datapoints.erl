@@ -92,14 +92,14 @@ process_post(ReqData, State) ->
 get_datapoint(ReqData, State) ->
 		case api_help:is_search(ReqData) of
 			false ->
-
 				Id = id_from_path(ReqData),			
 				case erlastic_search:search(?INDEX, "datapoint", "streamid:" ++ Id) of
 					{ok, Result} ->
 						EncodedResult = lib_json:encode(Result),
 						case re:run(EncodedResult, "\"max_score\":null", [{capture, first, list}]) of
 							{match, _} -> {{halt, 404}, ReqData, State};
-							nomatch -> {lib_json:encode(Result), ReqData, State}
+							nomatch -> FinalJson = lib_json:get_list_and_add_id(Result),
+						       {FinalJson, ReqData, State}
 						end;
 					_ -> {{halt, 404}, ReqData, State}
 				end; 
@@ -119,7 +119,7 @@ get_datapoint(ReqData, State) ->
 % 		   "filtered" : {
 % 		       "query" : {
 %  		          "term" : { "streamid" : Id }
-%  		      }, "filter" : {  "range" : {    "label" : {"gte" : timestampFromValue,"lte" : timestampToValue}}}}}}'
+%  		      }, "filter" : {  "range" : {    "timestamp" : {"gte" : timestampFromValue,"lte" : timestampToValue}}}}}}'
 %the GET range query should be structed as follows:
 %	curl -XGET http://localhost:8000/streams/Id/data/_search    --   to return all the datapoints of the current stream
 %or	curl -XGET http://localhost:8000/streams/Id/data/_search\?timestampFrom\=timestampFromValue\&timestampTo\=timestampToValue    --   for range query
@@ -131,7 +131,9 @@ process_search(ReqData, State, post) ->
 		{Json,_,_} = api_help:json_handler(ReqData,State),
 		case erlastic_search:search_json(#erls_params{},?INDEX, "datapoint", Json) of
 				{error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
-				{ok,List} -> {true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
+				{ok,JsonStruct} ->
+						       FinalJson = lib_json:get_list_and_add_id(JsonStruct),
+						       {true,wrq:set_resp_body(lib_json:encode(FinalJson),ReqData),State}
 		end;
 process_search(ReqData, State, get) ->
 		TempQuery = wrq:req_qs(ReqData),
@@ -140,13 +142,17 @@ process_search(ReqData, State, get) ->
 			[] ->   
 				case erlastic_search:search_limit(?INDEX, "datapoint","streamid:" ++ Id, 10) of
 					{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
-                	{ok,List} -> {true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
+                	{ok,JsonStruct} ->
+						       FinalJson = lib_json:get_list_and_add_id(JsonStruct),
+						       {FinalJson, ReqData, State}
 			 	end;
 			_ ->
 				TransformedQuery="streamid:" ++ Id ++ transform(TempQuery),
 				case erlastic_search:search_limit(?INDEX, "datapoint",TransformedQuery, 10) of
 					{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
-                	{ok,List} -> {lib_json:encode(List),ReqData,State}
+                	{ok,JsonStruct} ->
+						       FinalJson = lib_json:get_list_and_add_id(JsonStruct),
+						       {FinalJson, ReqData, State}
 				end
 		end.
 

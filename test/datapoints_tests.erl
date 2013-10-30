@@ -96,7 +96,7 @@ get_non_existent_datapoint_test() ->
         Response1 = get_request(?DATAPOINTS_URL ++ "_search?_id=" ++ "nonexistent"),
 		{ok, Rest} = Response1,
 		{_,_,Result} = Rest,
-	    ?assertNotEqual(0, string:str(Result, "max_score\":null")).
+	    ?assertNotEqual(0, string:str(Result, "hits\":[]")).
 
 post_request(URL, ContentType, Body) -> request(post, {URL, [], ContentType, Body}).
 get_request(URL) -> request(get, {URL, []}).
