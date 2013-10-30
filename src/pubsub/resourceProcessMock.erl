@@ -1,3 +1,13 @@
+%% @author 
+%%   [www.csproj13.student.it.uu.se]
+%% @version 1.0
+%% @copyright [Copyright information]
+%%
+%% @doc == resourceProcessMock ==
+%% 
+%%
+%% @end
+
 %%#!/usr/bin/env escript
 %%! -pz ./amqp_client ./rabbit_common ./amqp_client/ebin ./rabbit_common/ebin
 -module(resourceProcessMock).
@@ -24,6 +34,8 @@ create(ResourceId) ->
     %% Start Loop
     loop(ResourceId, Channel, ResourceExchange).
 
+
+
 loop(ResourceId, Channel, Exchange) ->
     {S1,S2,S3} = erlang:now(),
     %% Seed random generator
@@ -31,18 +43,12 @@ loop(ResourceId, Channel, Exchange) ->
     %% Random a value
     Data = random:uniform(5),
     %% get Timestamp
-    {{Year,Month,Day},{Hour,Min,Sec}} = erlang:localtime(),
+    Date = uniform_time(erlang:localtime()),
     %% Create Message
-    Msg = term_to_binary(#'datapoint'{timestamp = string:join([integer_to_list(Year),
-                                                               integer_to_list(Month),
-                                                               integer_to_list(Day)], "-")++
-                                                  " "++
-                                                  string:join([integer_to_list(Hour),
-                                                               integer_to_list(Min),
-                                                               integer_to_list(Sec)], ":"),
-                                      value = Data,
+    Msg = term_to_binary(#'datapoint'{timestamp = Date,
+                                      value = integer_to_list(Data),
                                       id = ResourceId}),
-
+	
     %% Send Msg to exchange
     io:format("~p -> ~p~n", [binary_to_term(Msg) ,binary_to_list(Exchange)]),
     amqp_channel:cast(Channel, #'basic.publish'{exchange = Exchange}, #amqp_msg{payload = Msg}),
@@ -52,3 +58,51 @@ loop(ResourceId, Channel, Exchange) ->
 
     %% Recurse
     loop(ResourceId, Channel, Exchange).
+
+
+
+
+%% @doc
+%% Function: uniform_time/1
+%% Purpose: Transform a timestamp to have the form YYYY:MM:DD HH:MM:SS
+%% Returns: String of the timestamp in the form "YYYY:MM:DD HH:MM:SS"
+%% @end
+-spec uniform_time(calendar:datetime()) -> string().
+uniform_time({{Year, Month, Day},{Hour, Min, Sec}}) ->
+	string:join([integer_to_list(Year),
+				 check_format(Month),
+				 check_format(Day)], ":") ++
+		" " ++
+		string:join([check_format(Hour),
+					 check_format(Min),
+					 check_format(Sec)], ":").
+
+
+
+%% @doc
+%% Function: check_format/1
+%% Purpose: Transform a integer X < 10 to be a string "0X" otherwise "X"
+%% Returns: If X < 10 then "0X" else "X"
+%% @end
+-spec check_format(integer()) -> string().
+check_format(Integer) when is_integer(Integer) ->
+	case Integer < 10 of
+		true -> "0" ++ integer_to_list(Integer);
+		_ -> "" ++ integer_to_list(Integer)
+	end.
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		

@@ -1,3 +1,13 @@
+%% @author 
+%%   [www.csproj13.student.it.uu.se]
+%% @version 1.0
+%% @copyright [Copyright information]
+%%
+%% @doc == streamProcess ==
+%% 
+%%
+%% @end
+
 -module(streamProcess).
 
 -include_lib("amqp_client.hrl").

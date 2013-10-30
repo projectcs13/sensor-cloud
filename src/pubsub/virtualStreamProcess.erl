@@ -64,13 +64,14 @@ loop(VStreamId, ChannelIn, {ChannelOut, VStreamExchange}, Function) ->
 					%% Store value
 
 					%% Apply function
-					Data = Function(Value),
+					{Val, _} = string:to_integer(Value),
+					Data = Function(Val),
 
 					%% Create Message
 					Msg = term_to_binary(#'datapoint'{
 							id = VStreamId,
 							timestamp = TimeStamp,
-							value = Data}),
+							value = integer_to_list(Data)}),
 
 					%% Propagete
 					send(ChannelOut, VStreamExchange, Msg),
