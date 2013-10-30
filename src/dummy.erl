@@ -40,7 +40,7 @@ sinus_random_data(Amount,StreamId,Delay) ->
 
 %% @doc
 %% Function: random_data/2
-%% Purpose: Used to create a timestamp vaild in es
+%% Purpose: Used to create a timestamp valid in ES
 %%          from the input which should be the list
 %%          [Year,Mount,Day,Hour,Minute,Day]
 %% Returns: The generated timestamp
