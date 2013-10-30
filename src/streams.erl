@@ -133,7 +133,9 @@ process_post(ReqData, State) ->
 				false ->
 					case erlastic_search:index_doc(?INDEX, "stream", ResAdded) of	
 						{error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
-						{ok,List} -> {true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
+						{ok,List} -> 
+							suggest:update_suggestion(ResAdded),
+							{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
 					end
 			end;
 		true ->
