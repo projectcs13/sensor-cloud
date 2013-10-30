@@ -98,7 +98,8 @@ get_datapoint(ReqData, State) ->
 						EncodedResult = lib_json:encode(Result),
 						case re:run(EncodedResult, "\"max_score\":null", [{capture, first, list}]) of
 							{match, _} -> {{halt, 404}, ReqData, State};
-							nomatch -> {lib_json:encode(Result), ReqData, State}
+							nomatch -> FinalJson = lib_json:get_list_and_add_id(Result),
+						       {FinalJson, ReqData, State}
 						end;
 					_ -> {{halt, 404}, ReqData, State}
 				end; 
