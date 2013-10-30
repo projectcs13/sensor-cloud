@@ -33,9 +33,9 @@ create(StreamId, ResourceId) ->
 	io:format("Listening to ~p~n", [binary_to_list(ResourceExchange)]),
 	amqp_channel:call(ChannelOut, #'exchange.declare'{exchange = StreamExchange, type = <<"fanout">>}),
 	
-	loop(ChannelIn, {ChannelOut, StreamExchange}).
+	loop(StreamId, ChannelIn, {ChannelOut, StreamExchange}).
 
-loop(ChannelIn, {ChannelOut, StreamExchange}) ->
+loop(StreamId, ChannelIn, {ChannelOut, StreamExchange}) ->
 	%% Receive from the subscribeTopic!
 	receive
 		{#'basic.deliver'{}, #amqp_msg{payload = Body}} ->
@@ -59,17 +59,23 @@ loop(ChannelIn, {ChannelOut, StreamExchange}) ->
 					io:format("DELETE~n");
 
 				%% New value from the source
-				#'datapoint'{timestamp = TimeStamp, value = Value} ->
+				#'datapoint'{timestamp = TimeStamp, value = Value, streamid = ResourceId} ->
 					%% Store value
 
+					%% Create Message
+					Msg = term_to_binary(#'datapoint'{
+							timestamp = TimeStamp,
+							value = Value,
+							streamid = StreamId}),
+					
 					%% Propagete
-					send(ChannelOut, StreamExchange, Body),
+					send(ChannelOut, StreamExchange, Msg),
 					io:format("DATAPOINT: {\"timestamp\" : ~p, \"value\" : ~p} -> ~p~n", [TimeStamp, Value, StreamExchange]);
 				_ ->
 					io:format("CRAP! We are getting CRAP!~n")
 			end,
 			%% Recurse
-			loop(ChannelIn, {ChannelOut, StreamExchange})
+			loop(StreamId, ChannelIn, {ChannelOut, StreamExchange})
 	end.
 
 send(Channel, Exchange, Message) ->

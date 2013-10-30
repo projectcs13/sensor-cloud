@@ -22,25 +22,22 @@ create(ResourceId) ->
     amqp_channel:call(Channel, #'exchange.declare'{exchange = ResourceExchange, type = <<"fanout">>}),
     
     %% Start Loop
-    loop(Channel, ResourceExchange).
+    loop(ResourceId, Channel, ResourceExchange).
 
-loop(Channel, Exchange) ->
+loop(ResourceId, Channel, Exchange) ->
     {S1,S2,S3} = erlang:now(),
     %% Seed random generator
     random:seed(S1,S2,S3),
     %% Random a value
     Data = random:uniform(5),
     %% get Timestamp
-    {{Year,Month,Day},{Hour,Min,Sec}} = erlang:localtime(),
+    {Year, Month, Day, Hour, Min, Sec} = create_uniform_time(erlang:localtime()),
+	Date = string:join([Year, Month, Day], "-") ++ " " ++ string:join([Hour, Min, Sec], ":"),
+	
     %% Create Message
-    Msg = term_to_binary(#'datapoint'{timestamp = string:join([integer_to_list(Year),
-                                                               integer_to_list(Month),
-                                                               integer_to_list(Day)], "-")++
-                                                  " "++
-                                                  string:join([integer_to_list(Hour),
-                                                               integer_to_list(Min),
-                                                               integer_to_list(Sec)], ":"),
-                                      value = Data}),
+    Msg = term_to_binary(#'datapoint'{timestamp = Date,
+                                      value = integer_to_list(Data),
+									  streamid = ResourceId}),
 
     %% Send Msg to exchange
     io:format("~p -> ~p~n", [binary_to_term(Msg) ,binary_to_list(Exchange)]),
@@ -50,4 +47,22 @@ loop(Channel, Exchange) ->
     timer:sleep(1000),
 
     %% Recurse
-    loop(Channel, Exchange).
+    loop(ResourceId, Channel, Exchange).
+
+
+
+%% ====================================================================
+%% Internal functions
+%% ====================================================================
+
+
+create_uniform_time({{Year, Month, Day}, {Hour, Min, Sec}}) ->
+	{integer_to_list(Year), check_format(Month), check_format(Day),
+	 check_format(Hour), check_format(Min), check_format(Sec)}.
+
+
+check_format(Value) when is_integer(Value) ->
+	case Value < 10 of
+		true -> "0" ++ integer_to_list(Value);
+		false -> integer_to_list(Value)
+	end.
