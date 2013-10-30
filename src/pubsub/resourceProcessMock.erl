@@ -35,7 +35,6 @@ create(ResourceId) ->
     loop(ResourceId, Channel, ResourceExchange).
 
 
-
 loop(ResourceId, Channel, Exchange) ->
     {S1,S2,S3} = erlang:now(),
     %% Seed random generator
@@ -48,7 +47,7 @@ loop(ResourceId, Channel, Exchange) ->
     Msg = term_to_binary(#'datapoint'{timestamp = Date,
                                       value = integer_to_list(Data),
                                       id = ResourceId}),
-	
+
     %% Send Msg to exchange
     io:format("~p -> ~p~n", [binary_to_term(Msg) ,binary_to_list(Exchange)]),
     amqp_channel:cast(Channel, #'basic.publish'{exchange = Exchange}, #amqp_msg{payload = Msg}),
@@ -58,7 +57,6 @@ loop(ResourceId, Channel, Exchange) ->
 
     %% Recurse
     loop(ResourceId, Channel, Exchange).
-
 
 
 
@@ -90,19 +88,3 @@ check_format(Integer) when is_integer(Integer) ->
 		true -> "0" ++ integer_to_list(Integer);
 		_ -> "" ++ integer_to_list(Integer)
 	end.
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		

@@ -72,10 +72,10 @@ loop(StreamId, ChannelIn, {ChannelOut, StreamExchange}) ->
 				#'datapoint'{id = Id, timestamp = TimeStamp, value = Value} ->
 					%% Store value
 
-					
+					%% Create Message
 					Msg = term_to_binary(#'datapoint'{id = StreamId,
-													  timestamp = TimeStamp,
-                                      				  value = Value}),
+												  		timestamp = TimeStamp,
+                                      			  		value = Value}),
 					%% Propagete
 					send(ChannelOut, StreamExchange, Msg),
 					io:format("DATAPOINT: {\"timestamp\" : ~p, \"value\" : ~p} -> ~p~n", [TimeStamp, Value, StreamExchange]);

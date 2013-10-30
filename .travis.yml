@@ -2,9 +2,13 @@ language: erlang
 before_install:
   - sudo apt-get install -qq xsltproc 
 script: "make install && make test"
+<<<<<<< HEAD
 services:
   - elasticsearch
   - rabbitmq
+=======
+before_script: "curl https://raw.github.com/projectcs13/sensor-cloud/develop/scripts/travis-elasticsearch.sh  | bash"
+>>>>>>> refs/remotes/origin/demo
 otp_release:
 #  - R16B02
 #  - R16B01
