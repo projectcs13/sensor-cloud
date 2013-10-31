@@ -1,3 +1,13 @@
+%% @author 
+%%   [www.csproj13.student.it.uu.se]
+%% @version 1.0
+%% @copyright [Copyright information]
+%%
+%% @doc == streamProcess ==
+%% 
+%%
+%% @end
+
 -module(streamProcess).
 
 -include_lib("amqp_client.hrl").
@@ -18,7 +28,7 @@ create(StreamId, ResourceId) ->
 	{ok, ChannelIn} = amqp_connection:open_channel(Connection),
 	{ok, ChannelOut} = amqp_connection:open_channel(Connection),
 
-	%% Declare INPUT queue
+	%% Declare INPUT exchange and queue
 	amqp_channel:call(ChannelIn, #'exchange.declare'{exchange = ResourceExchange, type = <<"fanout">>}),
 	#'queue.declare_ok'{queue = QueueIn} = amqp_channel:call(ChannelIn, #'queue.declare'{exclusive = true}),
 	amqp_channel:call(ChannelIn, #'queue.bind'{exchange = ResourceExchange, queue = QueueIn}),
@@ -59,15 +69,13 @@ loop(StreamId, ChannelIn, {ChannelOut, StreamExchange}) ->
 					io:format("DELETE~n");
 
 				%% New value from the source
-				#'datapoint'{timestamp = TimeStamp, value = Value, streamid = ResourceId} ->
+				#'datapoint'{id = Id, timestamp = TimeStamp, value = Value} ->
 					%% Store value
 
 					%% Create Message
-					Msg = term_to_binary(#'datapoint'{
-							timestamp = TimeStamp,
-							value = Value,
-							streamid = StreamId}),
-					
+					Msg = term_to_binary(#'datapoint'{id = StreamId,
+												  		timestamp = TimeStamp,
+                                      			  		value = Value}),
 					%% Propagete
 					send(ChannelOut, StreamExchange, Msg),
 					io:format("DATAPOINT: {\"timestamp\" : ~p, \"value\" : ~p} -> ~p~n", [TimeStamp, Value, StreamExchange]);
