@@ -94,7 +94,7 @@ get_analysis(ReqData, State) ->
 			% Get specific stream
 			% @TODO: Make sure data is sorted by timestamp!!!!! 
 				
-			case erlastic_search:search_limit(?INDEX, "datapoint","streamid:" ++ StreamId ++ "&sort=timestamp:asc", 20) of
+			case erlastic_search:search_limit(?INDEX, "datapoint","streamid:" ++ StreamId ++ "&sort=timestamp:asc", 50) of
 			%case erlastic_search:search_json(#erls_params{}, ?INDEX, "datapoint", create_json(StreamId), []) of
 				{error,Reason} ->
 					io:format("Error on line 62 for " ++ StreamId),
@@ -175,13 +175,15 @@ forecast(Json, Nr) ->
 	{_Start, _End, Values} = get_time_series(Json),
 	erlang:display(Values),
 	Number = lists:flatten(io_lib:format("~p", [Nr])),
-	eri:eval("A <- auto.arima(" ++ Values ++ ")"),
-	eri:eval("pred <- forecast(A, "++ Number ++ ")"),
+	erlang:display(eri:eval("V <- " ++ Values)),
+	erlang:display(eri:eval("A <- auto.arima(V)")),
+	erlang:display(eri:eval("pred <- forecast(A, "++ Number ++ ")")),
 	{ok, _, Mean} = eri:eval("data.frame(c(pred$mean))[[1]]"),
 	{ok, _, Lo80} = eri:eval("head(data.frame(c(pred$lower))[[1]], " ++ Number ++")"),
 	{ok, _, Hi80} = eri:eval("head(data.frame(c(pred$upper))[[1]], " ++ Number ++")"),
 	{ok, _, Lo95} = eri:eval("tail(data.frame(c(pred$lower))[[1]], " ++ Number ++")"),
 	{ok, _, Hi95} = eri:eval("tail(data.frame(c(pred$upper))[[1]], " ++ Number ++")"),
+	eri:eval("rm(list = ls())"),
 	erlang:display("In forecast just before format!"),
 	start_format_result({Mean, Lo80, Hi80, Lo95, Hi95}).
 
@@ -248,9 +250,8 @@ get_time_series(Json) ->
 -spec parse_json_list(Datapoint::list(), Values::list(), Times::list()) -> {Values::list(), Times::list()}.
 parse_json_list([], Values, Times) -> {Values, Times};
 parse_json_list([Head|Rest], Values, Times) ->
-	Struct = proplists:get_value(<<"_source">>, Head#struct.lst),
-	Val = proplists:get_value(<<"value">>, Struct#struct.lst),
-	Time = proplists:get_value(<<"timestamp">>, Head#struct.lst),
+	Val = lib_json:get_field(Head, "_source.value"),
+	Time = lib_json:get_field(Head, "_source.timestamp"),
 	parse_json_list(Rest, [Val|Values], [Time|Times]).
 
 
