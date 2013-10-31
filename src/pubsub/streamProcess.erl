@@ -49,39 +49,11 @@ loop(StreamId, ChannelIn, {ChannelOut, StreamExchange}) ->
 	%% Receive from the subscribeTopic!
 	receive
 		{#'basic.deliver'{}, #amqp_msg{payload = Body}} ->
-			case binary_to_term(Body) of
-				%% Get request
-				{get, GetVar} ->
-					io:format("GET: ~p~n", [GetVar]);
 
-				%% Post request
-				{post, JSON} ->
-					io:format("POST: ~p~n", [JSON]);
-					%% Parse JSON
+			%% Propagete
+			send(ChannelOut, StreamExchange, Body),
+			%io:format("DATAPOINT: {\"timestamp\" : ~p, \"value\" : ~p} -> ~p~n", [TimeStamp, Value, StreamExchange]);
 
-					%% Store value
-
-					%% Propagete
-%					send(ChannelOut, StreamExchange, Body),
-
-				%% Delete request
-				{delete} ->
-					io:format("DELETE~n");
-
-				%% New value from the source
-				#'datapoint'{id = Id, timestamp = TimeStamp, value = Value} ->
-					%% Store value
-
-					%% Create Message
-					Msg = term_to_binary(#'datapoint'{id = StreamId,
-												  		timestamp = TimeStamp,
-                                      			  		value = Value}),
-					%% Propagete
-					send(ChannelOut, StreamExchange, Msg),
-					io:format("DATAPOINT: {\"timestamp\" : ~p, \"value\" : ~p} -> ~p~n", [TimeStamp, Value, StreamExchange]);
-				_ ->
-					io:format("CRAP! We are getting CRAP!~n")
-			end,
 			%% Recurse
 			loop(StreamId, ChannelIn, {ChannelOut, StreamExchange})
 	end.

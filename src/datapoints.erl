@@ -75,7 +75,24 @@ process_post(ReqData, State) ->
 						FinalJson = api_help:add_field(DatapointJson, "streamid", Id),
 						case erlastic_search:index_doc(?INDEX, "datapoint", FinalJson) of
 							{error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
-							{ok,List} -> {true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
+							{ok,List} -> 
+								io:format("RESPONSE: ~p",[FinalJson]),
+								%% Create Message
+								%Msg = term_to_binary(#'datapoint'{id = Id, timestamp = lib_json:get_field(FinalJson,"timestamp"), value = lib_json:get_field(FinalJson,"value")}),
+								Msg = list_to_binary(FinalJson),
+
+								StreamExchange = list_to_binary("streams."++Id),
+								%% Connect
+                                        			{ok, Connection} =
+                                                		amqp_connection:start(#amqp_params_network{host = "localhost"}),
+                                        			%% Open channel
+                                        			{ok, Channel} = amqp_connection:open_channel(Connection),
+                                        			%% Declare exchange
+                                        			amqp_channel:call(Channel, #'exchange.declare'{exchange = StreamExchange, type = <<"fanout">>}),	
+                                        			%% Send
+                                        			amqp_channel:cast(Channel, #'basic.publish'{exchange = StreamExchange}, #amqp_msg{payload = Msg}),
+								
+								{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
 						end
 				end;
 			true ->

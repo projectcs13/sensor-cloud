@@ -44,9 +44,10 @@ loop(ResourceId, Channel, Exchange) ->
     %% get Timestamp
     Date = uniform_time(erlang:localtime()),
     %% Create Message
-    Msg = term_to_binary(#'datapoint'{timestamp = Date,
-                                      value = integer_to_list(Data),
-                                      id = ResourceId}),
+    %Msg = term_to_binary(#'datapoint'{timestamp = Date,
+    %                                  value = integer_to_list(Data),
+    %									  streamid = ResourceId}),
+    Msg = list_to_binary("{\"id\" : \""++ResourceId++"\", \"timestamp\" : \""++Date++"\", \"value\" : \""++Data++"\"}"),
 
     %% Send Msg to exchange
     io:format("~p -> ~p~n", [binary_to_term(Msg) ,binary_to_list(Exchange)]),
@@ -58,7 +59,9 @@ loop(ResourceId, Channel, Exchange) ->
     %% Recurse
     loop(ResourceId, Channel, Exchange).
 
-
+%% ====================================================================
+%% Internal functions
+%% ====================================================================
 
 %% @doc
 %% Function: uniform_time/1
