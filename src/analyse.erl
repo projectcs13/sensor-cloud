@@ -162,7 +162,7 @@ this() ->
 -spec forecast(JSON::string()) -> JSON::string().
 forecast(Json) -> 
 	erlang:display("In forecast!"),
-	forecast(Json, 10).
+	forecast(Json, 25).
 
 %% @doc
 %% Function: forecast/2
@@ -183,7 +183,7 @@ forecast(Json, Nr) ->
 	{ok, _, Hi80} = eri:eval("head(data.frame(c(pred$upper))[[1]], " ++ Number ++")"),
 	{ok, _, Lo95} = eri:eval("tail(data.frame(c(pred$lower))[[1]], " ++ Number ++")"),
 	{ok, _, Hi95} = eri:eval("tail(data.frame(c(pred$upper))[[1]], " ++ Number ++")"),
-	eri:eval("rm(list = ls())"),
+	%eri:eval("rm(list = ls())"),
 	erlang:display("In forecast just before format!"),
 	start_format_result({Mean, Lo80, Hi80, Lo95, Hi95}).
 
