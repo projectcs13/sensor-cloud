@@ -186,15 +186,17 @@ get_stream_info(Stream) ->
 	Min_val  = lib_json:get_field(Stream, "min_val"),
 	Max_val  = lib_json:get_field(Stream, "max_val"),
 	Tags  = lib_json:get_field(Stream, "tags"),
-	Type  = lib_json:get_field(Stream, "Type"),
-	Weight = scoring:calc([Name, Description, Min_val, Max_val, Tags, Type]),
+	Type  = lib_json:get_field(Stream, "type"),
+	Accuracy  = lib_json:get_field(Stream, "accuracy"),
+	Weight = scoring:calc([Name, Description, Min_val, Max_val, Tags, Type, Accuracy]),
 	Result ="{
 		\"name\":\"" ++ undefined_to_string(Name)++"\",
 		\"description\":\"" ++ undefined_to_string(Description)++"\",
 		\"min_value\":\"" ++ undefined_to_string(Min_val)++"\",
 		\"max_value\":\"" ++ undefined_to_string(Max_val)++"\",
 		\"tags\":\"" ++ undefined_to_string(Tags)++"\",
-		\"type\":\"" ++ undefined_to_string(Type)++"\"
+		\"type\":\"" ++ undefined_to_string(Type)++"\",
+		\"accuracy\":\"" ++ undefined_to_string(Accuracy)++"\"
 		}",
 	{Weight, Result}.
 
