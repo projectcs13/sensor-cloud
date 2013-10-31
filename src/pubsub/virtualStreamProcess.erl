@@ -60,17 +60,18 @@ loop(VStreamId, ChannelIn, {ChannelOut, VStreamExchange}, Function) ->
 					io:format("DELETE~n");
 
 				%% New value from the source
-				#'datapoint'{timestamp = TimeStamp, value = Value, streamid = StreamId} ->
+				#'datapoint'{id = Id, timestamp = TimeStamp, value = Value} ->
 					%% Store value
 
 					%% Apply function
-					Data = Function(Value),
+					{Val, _} = string:to_integer(Value),
+					Data = Function(Val),
 
 					%% Create Message
 					Msg = term_to_binary(#'datapoint'{
+							id = VStreamId,
 							timestamp = TimeStamp,
-							value = Data,
-							streamid = VStreamId}),
+							value = integer_to_list(Data)}),
 
 					%% Propagete
 					send(ChannelOut, VStreamExchange, Msg),
