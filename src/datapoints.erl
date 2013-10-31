@@ -65,36 +65,39 @@ content_types_provided(ReqData, State) ->
 %% @end
 -spec process_post(ReqData::tuple(), State::string()) -> {true, tuple(), string()}.
 process_post(ReqData, State) ->
-        {DatapointJson,_,_} = json_handler(ReqData, State),
-        Id = id_from_path(ReqData),
-        case Id of
-                undefined -> {{halt, 404}, ReqData, State};
-                _ ->
-                        FinalJson = add_field(DatapointJson, "streamid", Id),
-                        case erlastic_search:index_doc(?INDEX, "datapoint", FinalJson) of
-                                {error, Reason} -> {{error, Reason}, ReqData, State};
-                                {ok,_} ->
-                                        io:format("RESPONSE: ~p",[FinalJson]),
-                                 %% Create Message
-                                 %Msg = term_to_binary(#'datapoint'{id = Id,
-                                 %                                                                timestamp = lib_json:get_field(FinalJson,"timestamp"),
-				Msg = list_to_binary(FinalJson),
-                                 value = lib_json:get_field(FinalJson,"value")}),
+	case api_help:is_search(ReqData) of
+			false ->
+				{DatapointJson,_,_} = api_help:json_handler(ReqData, State),
+				Id = id_from_path(ReqData),
+				case Id of
+					undefined -> {{halt, 404}, ReqData, State};
+					_ ->
+						FinalJson = api_help:add_field(DatapointJson, "streamid", Id),
+						case erlastic_search:index_doc(?INDEX, "datapoint", FinalJson) of
+							{error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
+							{ok,List} -> 
+								io:format("RESPONSE: ~p",[FinalJson]),
+								%% Create Message
+								%Msg = term_to_binary(#'datapoint'{id = Id, timestamp = lib_json:get_field(FinalJson,"timestamp"), value = lib_json:get_field(FinalJson,"value")}),
+								Msg = list_to_binary(FinalJson),
 
-                                 StreamExchange = list_to_binary("streams."++Id),
-                                 %% Connect
-                                        {ok, Connection} =
-                                                amqp_connection:start(#amqp_params_network{host = "localhost"}),
-                                        %% Open channel
-                                        {ok, Channel} = amqp_connection:open_channel(Connection),
-                                        %% Declare exchange
-                                        amqp_channel:call(Channel, #'exchange.declare'{exchange = StreamExchange, type = <<"fanout">>}),
-                                        %% Send
-                                        amqp_channel:cast(Channel, #'basic.publish'{exchange = StreamExchange}, #amqp_msg{payload = Msg}),
-
-                                        {true, ReqData, State}
-                        end
-        end.
+								StreamExchange = list_to_binary("streams."++Id),
+								%% Connect
+                                        			{ok, Connection} =
+                                                		amqp_connection:start(#amqp_params_network{host = "localhost"}),
+                                        			%% Open channel
+                                        			{ok, Channel} = amqp_connection:open_channel(Connection),
+                                        			%% Declare exchange
+                                        			amqp_channel:call(Channel, #'exchange.declare'{exchange = StreamExchange, type = <<"fanout">>}),	
+                                        			%% Send
+                                        			amqp_channel:cast(Channel, #'basic.publish'{exchange = StreamExchange}, #amqp_msg{payload = Msg}),
+								
+								{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
+						end
+				end;
+			true ->
+				process_search(ReqData,State, post)	
+	end.
 
 
 %% @doc

@@ -47,7 +47,7 @@ loop(ResourceId, Channel, Exchange) ->
     %Msg = term_to_binary(#'datapoint'{timestamp = Date,
     %                                  value = integer_to_list(Data),
     %									  streamid = ResourceId}),
-    Msg = list_to_binary("{\"id\" : \""++ResourceId++"\", \"timestamp\" : \""++Date++"\", \"value\" : \""++Data++"\"}")
+    Msg = list_to_binary("{\"id\" : \""++ResourceId++"\", \"timestamp\" : \""++Date++"\", \"value\" : \""++Data++"\"}"),
 
     %% Send Msg to exchange
     io:format("~p -> ~p~n", [binary_to_term(Msg) ,binary_to_list(Exchange)]),
@@ -59,24 +59,10 @@ loop(ResourceId, Channel, Exchange) ->
     %% Recurse
     loop(ResourceId, Channel, Exchange).
 
-
-
-<<<<<<< HEAD
 %% ====================================================================
 %% Internal functions
 %% ====================================================================
 
-
-create_uniform_time({{Year, Month, Day}, {Hour, Min, Sec}}) ->
-	{integer_to_list(Year), check_format(Month), check_format(Day),
-	 check_format(Hour), check_format(Min), check_format(Sec)}.
-
-
-check_format(Value) when is_integer(Value) ->
-	case Value < 10 of
-		true -> "0" ++ integer_to_list(Value);
-		false -> integer_to_list(Value)
-=======
 %% @doc
 %% Function: uniform_time/1
 %% Purpose: Transform a timestamp to have the form YYYY:MM:DD HH:MM:SS
@@ -104,5 +90,4 @@ check_format(Integer) when is_integer(Integer) ->
 	case Integer < 10 of
 		true -> "0" ++ integer_to_list(Integer);
 		_ -> "" ++ integer_to_list(Integer)
->>>>>>> b27493433a2293d398dcadc54bbf8e6f32ff0f3b
 	end.
