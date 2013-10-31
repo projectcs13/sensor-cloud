@@ -35,9 +35,10 @@ loop(ResourceId, Channel, Exchange) ->
 	Date = string:join([Year, Month, Day], "-") ++ " " ++ string:join([Hour, Min, Sec], ":"),
 	
     %% Create Message
-    Msg = term_to_binary(#'datapoint'{timestamp = Date,
-                                      value = integer_to_list(Data),
-									  streamid = ResourceId}),
+    %Msg = term_to_binary(#'datapoint'{timestamp = Date,
+    %                                  value = integer_to_list(Data),
+    %									  streamid = ResourceId}),
+    Msg = list_to_binary("{\"id\" : \""++ResourceId++"\", \"timestamp\" : \""++Date++"\", \"value\" : \""++Data++"\"}")
 
     %% Send Msg to exchange
     io:format("~p -> ~p~n", [binary_to_term(Msg) ,binary_to_list(Exchange)]),
