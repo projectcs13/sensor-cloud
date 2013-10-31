@@ -37,11 +37,11 @@ main(Argv) ->
 					  
 					  term_to_binary(#datapoint{timestamp = Date,
 												value = integer_to_list(random:uniform(100)),
-												streamid = "034e32-42f3769"});
+												id = "034e32-42f3769"});
 				  [Value] ->
 					  term_to_binary(#datapoint{timestamp = Date,
 												value = integer_to_list(Value),
-												streamid = "034e32-42f376b"})
+												id = "034e32-42f376b"})
 			  end,
     amqp_channel:cast(Channel,
                       #'basic.publish'{
