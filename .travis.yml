@@ -1,13 +1,7 @@
 language: erlang
 before_install:
   - sudo apt-get install -qq xsltproc
-  - curl -OL http://raw.github.com/craigcitro/r-travis/master/scripts/travis-tool.sh
-  - chmod 755 ./travis-tool.sh
-  - ./travis-tool.sh bootstrap
-script: "./travis-tool.sh run_tests && make install && make test"
-install:
-  - ./travis-tool.sh install_deps
-  - ./travis-tool.sh github_package assertthat
+script: "make install && make test"
 services:
   - elasticsearch
   - rabbitmq
