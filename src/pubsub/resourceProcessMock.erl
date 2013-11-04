@@ -47,7 +47,7 @@ loop(ResourceId, Channel, Exchange) ->
     %Msg = term_to_binary(#'datapoint'{timestamp = Date,
     %                                  value = integer_to_list(Data),
     %									  streamid = ResourceId}),
-    Msg = list_to_binary("{\"id\" : \""++ResourceId++"\", \"timestamp\" : \""++Date++"\", \"value\" : \""++Data++"\"}"),
+    Msg = list_to_binary("{\"id\" : \""++ResourceId++"\", \"timestamp\" : \""++Date++"\", \"value\" : "++Data++"}"),
 
     %% Send Msg to exchange
     io:format("~p -> ~p~n", [binary_to_term(Msg) ,binary_to_list(Exchange)]),

@@ -8,7 +8,7 @@ var port = 8080,
     url = require('url');
     var streams = new Object();
     // Limits debug messages that are printed by socket.io
-    io.set('log level', 1); 
+    //io.set('log level', 1); 
 
 // A websocket is connected (eg: browser).
 io.sockets.on('connection', function(socket) {
@@ -27,13 +27,8 @@ io.sockets.on('connection', function(socket) {
 
     io.of('/'+namespace).on('connection', function(sock) {
         sub.on('data', function(data) {
-            var type = data.substring(6, 15),
-            time = data.substring(18, 37),
-            rest = data.substring(40).split("k\0"),
-    	    id = rest[0],
-    	    value = rest[1].substring(1);
-            sock.send(id+" :: "+time + " :: " + value);
-            //console.log(io.sockets.clients().length);
+		sock.send(data);        
+	    //console.log(io.sockets.clients().length);
         });
     });
     socket.on('disconnect', function() {

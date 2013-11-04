@@ -68,6 +68,7 @@ content_types_provided(ReqData, State) ->
 %% @end
 -spec get_suggestion(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 get_suggestion(ReqData, State) ->
+	erlang:display("Here!"),
 	case proplists:get_value('term', wrq:path_info(ReqData)) of
 		undefined ->
 			{{halt, 400}, ReqData, State};
@@ -86,10 +87,13 @@ get_suggestion(ReqData, State) ->
 				{error, Reason} -> {lib_json:encode(Reason),ReqData, State};
 				{ok,List} -> 
 					EncodedList = lib_json:encode(List),
+					erlang:display(List),
 					case re:run(EncodedList, "\"options\":\\[\\]", [{capture, first, list}]) of
 						{match, _} -> 
+							erlang:display("Match"),
 							{{halt,404},ReqData, State};
 						_->
+							erlang:display("No Match"),
 							{lib_json:encode(List),ReqData, State}
 					end
 			end

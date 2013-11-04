@@ -10,7 +10,7 @@
 %% @end
 -module(dummy).
 
--export([add_data/0]).
+-export([add_data/0,sinus_random_data/3]).
 
 %% @doc
 %% Function: sinus_random_data/3
