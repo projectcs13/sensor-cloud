@@ -2,7 +2,7 @@ language: erlang
 before_install:
   - sudo apt-get install -qq xsltproc 
   - sudo add-apt-repository "deb http://ftp.sunet.se/pub/lang/CRAN/bin/linux/ubuntu precise/" 
-script: "./install_R.sh"
+  - sudo "./install_R.sh"
 script: "make install && make test"
 before_script: "curl https://raw.github.com/projectcs13/sensor-cloud/develop/scripts/travis-elasticsearch.sh  | bash"
 otp_release:
