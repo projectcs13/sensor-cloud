@@ -12,7 +12,7 @@
 	get_suggestion/2, 
 	add_suggestion/2,
 	update_suggestion/1,
-	update_resource/1]).
+	update_resource/2]).
 
 
 -include_lib("erlastic_search.hrl").
@@ -176,6 +176,10 @@ update_suggestion(Stream) ->
 	end.
 
 update_resource(Resource, ResourceId) ->
+	Manufacturer = undefined_to_string(lib_json:get_field(Resource, "manufacturer")),
+	Model = undefined_to_string(lib_json:get_field(Resource, "model")),
+	Tags = undefined_to_string(lib_json:get_field(Resource, "tags")),
+	Polling_freq = undefined_to_string(lib_json:get_field(Resource, "polling_freq")),
 	%fetch old suggestion
 	case erlastic_search:search(?INDEX, "suggestion", "resource_id:"++ lib_json:to_string(ResourceId)) of
 		{error, _} -> erlang:display("ERROR");
@@ -185,25 +189,14 @@ update_resource(Resource, ResourceId) ->
 					%If suggestion found
 					SuggId = lib_json:get_field(Response, "hits.hits[0]._id"),
 					Json = lib_json:get_field(Response, "hits.hits[0]._source"), 
-					Payload = lib_json:get_field(Response, "hits.hits[0]._source.suggest.payload"),
-					Sugg = lib_json:get_field(Response, "hits.hits[0]._source"),
-					%case lib_json:get_field(Response, "hits.hits[0]._source.suggest.payload.streams") of
-					%	undefined ->
-							%If there are no streams
-							%NewPayload = lib_json:add_value(Payload, "streams", "["++StreamInfo++"]"),
-
-							%TempSugg = lib_json:replace_field(Sugg, "suggest.payload", lib_json:to_string(NewPayload)),
-							%NewSugg = lib_json:replace_field(TempSugg, "suggest.weight", NewWeight);
-					%	_OldStream ->
-							%If there are streams
-					%		NewStreamList = lib_json:add_value(Sugg,"suggest.payload.streams" , StreamInfo),
-					%		NewSugg = lib_json:replace_field(NewStreamList, "suggest.weight", NewWeight)
-					%
-					%keep streams
+					%Payload = lib_json:get_field(Response, "hits.hits[0]._source.suggest.payload"),
+					NewJson = lib_json:replace_fields(Json, [{"suggest.payload.manufacturer",Manufacturer},{"suggest.payload.model",Model},{"suggest.payload.tags",Tags},{"suggest.payload.pollng_feq",Polling_freq}]),
 
 					%Delete old suggestion
 					erlastic_search:delete_doc("sensorcloud", "suggestion", SuggId),
-					%calc weight
+					%update weight
+
+					%change input (in case model changed)
 
 					%case erlastic_search:index_doc(?INDEX, "suggestion", Suggestion) of 
 					%	{error, _Reason} -> erlang:display("Suggestion not saved ");
