@@ -1,2 +1,0 @@
-USER       PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
-caca7037  2374  0.0  0.0  13592   928 pts/2    S+   10:47   0:00 grep --color=auto CPU
