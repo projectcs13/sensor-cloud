@@ -213,8 +213,8 @@ put_resource(ReqData, State) ->
 			{{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
 		{ok, _} ->
 			{UserJson,_,_} = api_help:json_handler(ReqData, State),
-			UpdatedJson = api_help:create_update(UserJson),
-			case api_help:update_doc(?INDEX,"resource", Id, UpdatedJson, []) of 
+			Update = api_help:create_update(UserJson),
+       		case api_help:update_doc(?INDEX,"resource", Id, Update) of 
 				{error, Reason} -> 
 					{{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
 				{ok,List} ->
