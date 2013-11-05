@@ -192,29 +192,43 @@ update_resource(Resource, ResourceId) ->
 					SuggId = lib_json:get_field(Response, "hits.hits[0]._id"),
 					Json = lib_json:get_field(Response, "hits.hits[0]._source"), 
 					%Payload = lib_json:get_field(Response, "hits.hits[0]._source.suggest.payload"),
-					NewJson = lib_json:replace_fields(Json, [{"suggest.payload.manufacturer",Manufacturer},{"suggest.payload.model",Model},{"suggest.payload.tags",Tags},{"suggest.payload.pollng_feq",Polling_freq}]),
+					UpdatedJson = lib_json:replace_fields(Json, [{"suggest.payload.manufacturer",Manufacturer},{"suggest.payload.model",Model},{"suggest.payload.tags",Tags},{"suggest.payload.pollng_feq",Polling_freq}]),
 
 					%Delete old suggestion
 					erlastic_search:delete_doc("sensorcloud", "suggestion", SuggId),
 					%update weight
-
+					WeightJson = update_score(UpdatedJson),
 					%change input (in case model changed)
-
-					%case erlastic_search:index_doc(?INDEX, "suggestion", Suggestion) of 
-					%	{error, _Reason} -> erlang:display("Suggestion not saved ");
-					%	{ok, _} -> 	ok
-					%end,
+					FinalJson = lib_json:replace_field(WeightJson, "suggest.input",Model),
+					case erlastic_search:index_doc_with_id(?INDEX, "suggestion", SuggId, FinalJson) of 
+						{error, _Reason} -> erlang:display("Suggestion not saved ");
+						{ok, _} -> 	ok
+					end;
 					%Final = api_help:create_update(Sugg),
 					%case api_help:update_doc(?INDEX, "suggestion", SuggId, Final) of 
 					%	{error, _Reason} -> erlang:display("not updated");
 					%	{ok, _Json} -> ok 
 					%end;
-					ok;
 				_ -> 
 					erlang:display("No suggestion exists for that resource")
 			end
 	end,
 	ok.
+
+
+
+update_score(Suggestion) ->
+	Payload = lib_json:get_field(Suggestion, "suggest.payload"),
+	ResourceWeight = scoring:calc(Suggestion),
+	Streams = lib_json:get_field(Payload, "streams"),
+	Fun = fun(Stream, Acc) -> 
+			scoring:calc(Stream,stream)+Acc
+	end,
+	StreamWeight = list:foldr(Fun, 0, Streams),
+	Sum = ResourceWeight + StreamWeight,
+	lib_json:replace_field(Suggestion, "suggest.weight", Sum).
+
+
 
 
 %% @doc

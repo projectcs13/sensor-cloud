@@ -10,8 +10,7 @@
 -include("json.hrl").
 
 -export([calc/1, 
-	 calc/2, 
-	 update/1
+	 calc/2 
 	]).
 
 %% ====================================================================
@@ -51,12 +50,6 @@ calc(Stream, stream) ->
 	Type  = lib_json:get_field(Stream, "type"),
 	Accuracy  = lib_json:get_field(Stream, "accuracy"),
 	calc([Name, Description, Min_val, Max_val, Tags, Type, Accuracy]).
-
-
-
-update(Json) ->
-    Weight = calc(Json),
-    lib_json:replace_field(Json, "suggest.weight", Weight).
 
 
 
