@@ -41,10 +41,17 @@ calc(Resource, resource) ->
 	Tags = lib_json:get_field(Resource, "tags"),
 	Polling_freq = lib_json:get_field(Resource, "polling_freq"),
 	List = [Manufacturer, Tags, Polling_freq],
-	Fun = fun(undefined, Acc) -> Acc;
-		(_,  Acc) -> Acc+1
-	end, 
-	lists:foldr(Fun, 0, List).
+	calc(List);
+calc(Stream, stream) ->
+	Name = lib_json:get_field(Stream, "name"),
+	Description = lib_json:get_field(Stream, "description"),
+	Min_val  = lib_json:get_field(Stream, "min_val"),
+	Max_val  = lib_json:get_field(Stream, "max_val"),
+	Tags  = lib_json:get_field(Stream, "tags"),
+	Type  = lib_json:get_field(Stream, "type"),
+	Accuracy  = lib_json:get_field(Stream, "accuracy"),
+	calc([Name, Description, Min_val, Max_val, Tags, Type, Accuracy]).
+
 
 
 update(Json) ->
