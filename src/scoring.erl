@@ -9,7 +9,10 @@
 -module(scoring).
 -include("json.hrl").
 
--export([calc/2, calc/1]).
+-export([calc/1, 
+	 calc/2, 
+	 update/1
+	]).
 
 %% ====================================================================
 %% API functions
@@ -42,6 +45,13 @@ calc(Resource, resource) ->
 		(_,  Acc) -> Acc+1
 	end, 
 	lists:foldr(Fun, 0, List).
+
+
+update(Json) ->
+    Weight = calc(Json),
+    lib_json:field_replace(Json, "suggest.weight", Weight).
+
+
 
 
 %% ====================================================================
