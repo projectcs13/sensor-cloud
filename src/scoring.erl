@@ -49,7 +49,7 @@ calc(Resource, resource) ->
 
 update(Json) ->
     Weight = calc(Json),
-    lib_json:field_replace(Json, "suggest.weight", Weight).
+    lib_json:replace_field(Json, "suggest.weight", Weight).
 
 
 
