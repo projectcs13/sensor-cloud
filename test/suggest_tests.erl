@@ -101,6 +101,33 @@ get_non_existing_term_test() ->
 
 
 
+update_resource_test() ->
+	Response1 = post_request(?RESOURCE_URL, "application/json", 
+							"{
+								\"model\" : \"test4resource\",
+								\"tags\" : \"testtag\",
+								\"manufacturer\" : \"testmanu\"
+			}"),
+	check_returned_code(Response1, 200),
+	{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} = Response1,
+	Id = lib_json:get_field(Body, "_id"),
+	timer:sleep(800),
+	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, _Body1}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"search\",\"resource_id\" : \""++lib_json:to_string(Id)++"\", \"private\" : \"false\", \"tags\":\"test_tag\"}"}, [], []),
+	timer:sleep(1000),
+	{ok, {{_Version11, 200, _ReasonPhrase11}, _Headers11, _Body11}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"search2\",\"resource_id\" : \""++lib_json:to_string(Id)++"\", \"private\" : \"false\", \"tags\":\"test2\"}"}, [], []),
+	timer:sleep(1000),
+	Response2 = get_request(?SUGGEST_URL++"test4resource"),
+	check_returned_code(Response2, 200),
+	{ok, {_, _ ,Body2}} = Response2,
+	?assertEqual(<<"testtag">>,lib_json:get_field(Body2, "testsuggest[0].options[0].payload.tags")),
+	?assertEqual(true, lib_json:field_value_exists(Body2, "testsuggest[0].options[0].payload.streams[*].tags",<<"test_tag">>)),
+	?assertEqual(<<"test2">>, lib_json:get_field_value(Body2, "testsuggest[0].options[0].payload.streams[*].tags",<<"test2">>)),
+	{ok, {{_Version21, 201, _ReasonPhrase21}, _Headers21, _Body21}} = httpc:request(put, {"http://localhost:8000/resource/"++lib_json:to_string(Id), [],"application/json", "{\"model\" : \"test4resource\",\"tags\" : \"newtag\", \"manufacturer\" : \"testmanu\"}"}, [], []),
+	{ok, {_, _ ,Body3}} = get_request(?SUGGEST_URL++"test4resource"),
+	?assertEqual(<<"newtag">>,lib_json:get_field(Body3, "testsuggest[0].options[0].payload.tags")),
+	?assertEqual(true, lib_json:field_value_exists(Body3, "testsuggest[0].options[0].payload.streams[*].tags",<<"test_tag">>)),
+	?assertEqual(<<"test2">>, lib_json:get_field_value(Body3, "testsuggest[0].options[0].payload.streams[*].tags",<<"test2">>)).
+
 
 %% @doc
 %% Function: check_returned_code/0
@@ -116,6 +143,7 @@ check_returned_code(Response, Code) ->
 
 post_request(URL, ContentType, Body) -> request(post, {URL, [], ContentType, Body}).
 
+put_request(URL, ContentType, Body) -> request(put, {URL, [], ContentType, Body}).
 get_request(URL)                     -> request(get,  {URL, []}).
 
 request(Method, Request) ->
