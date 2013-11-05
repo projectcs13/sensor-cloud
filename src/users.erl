@@ -85,11 +85,11 @@ content_types_accepted(ReqData, State) ->
 delete_resource(ReqData, State) ->
         Id = id_from_path(ReqData),
         case delete_resources_with_user_id(Id) of
-        {error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ api_help:json_encode(Reason) ++ "\"}", ReqData), State};
+        {error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
         {ok} ->
             case erlastic_search:delete_doc(?INDEX,"user", Id) of
-                    {error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ api_help:json_encode(Reason) ++ "\"}", ReqData), State};
-                    {ok,List} -> {true,wrq:set_resp_body(api_help:json_encode(List),ReqData),State}
+                    {error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
+                    {ok,List} -> {true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
             end
     end.
 
@@ -107,9 +107,7 @@ delete_resources_with_user_id(Id) ->
         {error,Reason} -> 
             {error,Reason};
         {ok,List} -> 
-            SearchRemoved = api_help:remove_search_part(api_help:make_to_string(api_help:json_encode(List)),false,0),
-            ExtraRemoved = "[" ++ api_help:remove_extra_and_add_id(SearchRemoved) ++ "]",
-            case get_resources(ExtraRemoved) of
+            case get_resources(List) of
                 [] -> {ok};
                 Streams ->
                     case delete_resources(Streams) of
@@ -126,12 +124,18 @@ delete_resources_with_user_id(Id) ->
 %% @end
 -spec get_resources(JSON::string()) -> list().
 
-get_resources(JSON) ->
-    case api_help:get_value_field(JSON, "id") of
-        [] -> [];
-        Id -> [Id] ++ get_resources(api_help:remove_object(JSON,0))
+get_resources(JSON) when is_tuple(JSON)->
+    Result = lib_json:get_field(JSON, "hits.hits"),
+    get_resources(Result);
+get_resources(undefined) ->
+    [];
+get_resources([]) ->
+    [];
+get_resources([JSON | Tl]) ->
+    case lib_json:get_field(JSON, "_id") of
+        undefined -> [];
+        Id -> [Id] ++ get_resources(Tl)
     end.
-
 
 %% @doc
 %% Function: delete_resources/1
