@@ -178,16 +178,23 @@ update_suggestion(Stream) ->
 	end.
 
 update_resource(Resource, ResourceId) ->
+	erlang:display("-2-2-2-2-2-2-2"),
+	erlang:display(ResourceId),
 	Manufacturer = undefined_to_string(lib_json:get_field(Resource, "manufacturer")),
 	Model = undefined_to_string(lib_json:get_field(Resource, "model")),
 	Tags = undefined_to_string(lib_json:get_field(Resource, "tags")),
 	Polling_freq = undefined_to_string(lib_json:get_field(Resource, "polling_freq")),
+	RId = list_to_binary(ResourceId),
+	erlang:display("-1-1-1-1-1-1-1"),
 	%fetch old suggestion
 	case erlastic_search:search(?INDEX, "suggestion", "resource_id:"++ lib_json:to_string(ResourceId)) of
 		{error, _} -> erlang:display("ERROR");
 		{ok, Response} ->
+			erlang:display("000000"),
+			erlang:display(lib_json:to_string(Response)),
 			case lib_json:get_field(Response, "hits.hits[0]._source.resource_id") of
-				ResourceId ->
+				RId ->
+					erlang:display("111111111"),
 					%If suggestion found
 					SuggId = lib_json:get_field(Response, "hits.hits[0]._id"),
 					Json = lib_json:get_field(Response, "hits.hits[0]._source"), 
@@ -195,11 +202,14 @@ update_resource(Resource, ResourceId) ->
 					UpdatedJson = lib_json:replace_fields(Json, [{"suggest.payload.manufacturer",Manufacturer},{"suggest.payload.model",Model},{"suggest.payload.tags",Tags},{"suggest.payload.pollng_feq",Polling_freq}]),
 
 					%Delete old suggestion
-					erlastic_search:delete_doc("sensorcloud", "suggestion", SuggId),
+					%erlastic_search:delete_doc("sensorcloud", "suggestion", SuggId),
 					%update weight
+					erlang:display("333333333"),
 					WeightJson = update_score(UpdatedJson),
+					erlang:display("444444444"),
 					%change input (in case model changed)
 					FinalJson = lib_json:replace_field(WeightJson, "suggest.input",Model),
+					erlang:display(FinalJson),
 					case erlastic_search:index_doc_with_id(?INDEX, "suggestion", SuggId, FinalJson) of 
 						{error, _Reason} -> erlang:display("Suggestion not saved ");
 						{ok, _} -> 	ok
@@ -209,7 +219,8 @@ update_resource(Resource, ResourceId) ->
 					%	{error, _Reason} -> erlang:display("not updated");
 					%	{ok, _Json} -> ok 
 					%end;
-				_ -> 
+				A -> 
+					erlang:display(A),
 					erlang:display("No suggestion exists for that resource")
 			end
 	end,

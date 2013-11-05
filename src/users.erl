@@ -111,8 +111,12 @@ put_user(ReqData, State) ->
                                         {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
                                 {ok, List} ->
                                         {UserJson,_,_} = api_help:json_handler(ReqData, State),
-                                        erlastic_search:index_doc_with_id(?INDEX, "user", Id, UserJson),
-                                        {true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
+					case erlastic_search:index_doc_with_id(?INDEX, "user", Id, UserJson) of
+						{error, Reason} ->
+							{{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
+						{ok, Json} ->
+							{true, wrq:set_resp_body(lib_json:encode(Json), ReqData), State}
+					end
                         end
         end.
 
