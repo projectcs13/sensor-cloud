@@ -19,7 +19,9 @@
 	 get_fields/2,
 	 get_field_value/3, 
 	 replace_field/3,
+	 replace_fields/2,
 	 rm_field/2,
+	 rm_fields/2,
 	 set_attr/2,
 	 set_attrs/1,
 	 to_string/1]).
@@ -265,6 +267,12 @@ replace_field(Json, Query, Value) ->
     NewValue = parse_value(Value),
     format_output(replace_field_internal(NewJson, Attrs, NewValue)).
 
+
+-spec replace_fields(Json::json(), [{Field::field(),Value::json_input_value()}]) -> json_output_value().
+replace_fields(Json, FieldsAndValues) ->
+    Fun = fun({Attr, Value}, Acc) -> replace_field(Acc, Attr, Value) end,
+    lists:foldl(Fun, Json, FieldsAndValues).
+
 %% @doc
 %% Removes the field 'Query' from a JSON object
 %%
@@ -281,6 +289,12 @@ rm_field(Json, Query)  ->
     NewJson  = parse_json(Json),
     Attrs    = parse_attr(Query),
     format_output(rm_field_internal(NewJson, Attrs)).
+
+
+-spec rm_fields(Json::json(), [Field::field()]) -> json_output_value().
+rm_fields(Json, Fields) ->
+    Fun = fun(Attr, Acc) -> rm_field(Acc, Attr) end,
+    lists:foldl(Fun, Json, Fields).
 
 %% @doc
 %% Sets a json attribute 'Attr' to 'Value'. This function is only for creating 

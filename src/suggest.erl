@@ -12,7 +12,8 @@
 	get_suggestion/2, 
 	add_suggestion/2,
 	update_suggestion/1,
-	update_resource/1]).
+	update_resource/2
+	]).
 
 
 -include_lib("erlastic_search.hrl").
