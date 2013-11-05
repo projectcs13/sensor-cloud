@@ -175,7 +175,7 @@ update_suggestion(Stream) ->
 			end
 	end.
 
-update_resource(Resource, Id) ->
+update_resource(Resource, ResourceId) ->
 	%fetch old suggestion
 	case erlastic_search:search(?INDEX, "suggestion", "resource_id:"++ lib_json:to_string(ResourceId)) of
 		{error, _} -> erlang:display("ERROR");
@@ -184,41 +184,41 @@ update_resource(Resource, Id) ->
 				ResourceId ->
 					%If suggestion found
 					SuggId = lib_json:get_field(Response, "hits.hits[0]._id"),
-					Json = lib_json:get_field(Response, 
+					Json = lib_json:get_field(Response, "hits.hits[0]._source"), 
 					Payload = lib_json:get_field(Response, "hits.hits[0]._source.suggest.payload"),
 					Sugg = lib_json:get_field(Response, "hits.hits[0]._source"),
-					case lib_json:get_field(Response, "hits.hits[0]._source.suggest.payload.streams") of
-						undefined ->
+					%case lib_json:get_field(Response, "hits.hits[0]._source.suggest.payload.streams") of
+					%	undefined ->
 							%If there are no streams
-							NewPayload = lib_json:add_value(Payload, "streams", "["++StreamInfo++"]"),
+							%NewPayload = lib_json:add_value(Payload, "streams", "["++StreamInfo++"]"),
 
-							TempSugg = lib_json:replace_field(Sugg, "suggest.payload", lib_json:to_string(NewPayload)),
-							NewSugg = lib_json:replace_field(TempSugg, "suggest.weight", NewWeight);
-						_OldStream ->
+							%TempSugg = lib_json:replace_field(Sugg, "suggest.payload", lib_json:to_string(NewPayload)),
+							%NewSugg = lib_json:replace_field(TempSugg, "suggest.weight", NewWeight);
+					%	_OldStream ->
 							%If there are streams
-							NewStreamList = lib_json:add_value(Sugg,"suggest.payload.streams" , StreamInfo),
-							NewSugg = lib_json:replace_field(NewStreamList, "suggest.weight", NewWeight)
-					end,
-					Final = api_help:create_update(NewSugg),
-					case api_help:update_doc(?INDEX, "suggestion", Id, Final) of 
-						{error, _Reason} -> erlang:display("not updated");
-						{ok, _Json} -> ok 
-					end;
+					%		NewStreamList = lib_json:add_value(Sugg,"suggest.payload.streams" , StreamInfo),
+					%		NewSugg = lib_json:replace_field(NewStreamList, "suggest.weight", NewWeight)
+					%
+					%keep streams
+
+					%Delete old suggestion
+					erlastic_search:delete_doc("sensorcloud", "suggestion", SuggId),
+					%calc weight
+
+					%case erlastic_search:index_doc(?INDEX, "suggestion", Suggestion) of 
+					%	{error, _Reason} -> erlang:display("Suggestion not saved ");
+					%	{ok, _} -> 	ok
+					%end,
+					%Final = api_help:create_update(Sugg),
+					%case api_help:update_doc(?INDEX, "suggestion", SuggId, Final) of 
+					%	{error, _Reason} -> erlang:display("not updated");
+					%	{ok, _Json} -> ok 
+					%end;
+					ok;
 				_ -> 
 					erlang:display("No suggestion exists for that resource")
 			end
 	end,
-	%keep streams
-
-	%Delete old suggestion
-	erlastic_search:delete_doc("sensorcloud", "suggestion", SuggId),
-	%calc weight
-
-	%insert new
-	case erlastic_search:index_doc(?INDEX, "suggestion", Suggestion) of 
-		{error, _Reason} -> erlang:display("Suggestion not saved ");
-		{ok, _} -> 	ok
-	end
 	ok.
 
 
