@@ -180,10 +180,10 @@ update_suggestion(Stream) ->
 update_resource(Resource, ResourceId) ->
 	erlang:display("-2-2-2-2-2-2-2"),
 	erlang:display(ResourceId),
-	Manufacturer = undefined_to_string(lib_json:get_field(Resource, "manufacturer")),
-	Model = undefined_to_string(lib_json:get_field(Resource, "model")),
-	Tags = undefined_to_string(lib_json:get_field(Resource, "tags")),
-	Polling_freq = undefined_to_string(lib_json:get_field(Resource, "polling_freq")),
+	Manufacturer = binary_undefined_to_string(lib_json:get_field(Resource, "manufacturer")),
+	Model = binary_undefined_to_string(lib_json:get_field(Resource, "model")),
+	Tags = binary_undefined_to_string(lib_json:get_field(Resource, "tags")),
+	Polling_freq = binary_undefined_to_string(lib_json:get_field(Resource, "polling_freq")),
 	RId = list_to_binary(ResourceId),
 	erlang:display("-1-1-1-1-1-1-1"),
 	%fetch old suggestion
@@ -205,6 +205,7 @@ update_resource(Resource, ResourceId) ->
 					%erlastic_search:delete_doc("sensorcloud", "suggestion", SuggId),
 					%update weight
 					erlang:display("333333333"),
+					erlang:display(UpdatedJson),
 					WeightJson = update_score(UpdatedJson),
 					erlang:display("444444444"),
 					%change input (in case model changed)
@@ -281,6 +282,17 @@ undefined_to_string(Text) ->
 	end.
 
 
+%% @doc
+%% Returns an empty string if it was "undefined", else it returns the string itself. Concerted to binary
+%% @end
+-spec binary_undefined_to_string(Text::attr()) -> string().
+binary_undefined_to_string(Text) ->
+	case Text of
+		undefined ->
+			<<"">>;
+		_ ->
+			Text
+	end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Should be moved to own module later
