@@ -187,7 +187,7 @@ update_resource(Resource, ResourceId) ->
 	RId = list_to_binary(ResourceId),
 	erlang:display("-1-1-1-1-1-1-1"),
 	%fetch old suggestion
-	case erlastic_search:search(?INDEX, "suggestion", "resource_id:"++ lib_json:to_string(ResourceId)) of
+	case erlastic_search:search(?INDEX, "suggestion", "resource_id:"++ ResourceId) of
 		{error, _} -> erlang:display("ERROR");
 		{ok, Response} ->
 			erlang:display("000000"),
@@ -232,12 +232,18 @@ update_resource(Resource, ResourceId) ->
 update_score(Suggestion) ->
 	Payload = lib_json:get_field(Suggestion, "suggest.payload"),
 	ResourceWeight = scoring:calc(Suggestion),
+	erlang:display(ResourceWeight),
 	Streams = lib_json:get_field(Payload, "streams"),
+	erlang:display("----1----"),
 	Fun = fun(Stream, Acc) -> 
 			scoring:calc(Stream,stream)+Acc
 	end,
-	StreamWeight = list:foldr(Fun, 0, Streams),
+	erlang:display("----2----"),
+	StreamWeight = lists:foldr(Fun, 0, Streams),
+	erlang:display(StreamWeight),
+	erlang:display("----3----"),
 	Sum = ResourceWeight + StreamWeight,
+	erlang:display("----4----"),
 	lib_json:replace_field(Suggestion, "suggest.weight", Sum).
 
 
