@@ -1,7 +1,7 @@
 #Sensor Cloud Engine
 [![Build Status](https://travis-ci.org/projectcs13/sensor-cloud.png)](https://travis-ci.org/projectcs13/sensor-cloud)
 
-Welcome to the "Project CS 2013" project
+##Welcome to the "Project CS 2013" project
 
 For more information concerning setup, please see the wiki.
 
