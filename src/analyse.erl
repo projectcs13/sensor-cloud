@@ -118,7 +118,6 @@ create_json(StreamId) ->
 start() ->
 	Pid = eri:start(),
 	eri:connect(),
-	eri:eval("library(forecast)"),
 	ok.
 
 %% @doc
@@ -162,6 +161,7 @@ this() ->
 -spec forecast(JSON::string()) -> JSON::string().
 forecast(Json) -> 
 	erlang:display("In forecast!"),
+	eri:eval("library(forecast)"),
 	forecast(Json, 10).
 
 %% @doc
