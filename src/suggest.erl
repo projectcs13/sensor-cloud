@@ -11,7 +11,8 @@
 	content_types_provided/2, 
 	get_suggestion/2, 
 	add_suggestion/2,
-	update_suggestion/1]).
+	update_suggestion/1,
+	update_resource/1]).
 
 
 -include_lib("erlastic_search.hrl").
@@ -173,6 +174,52 @@ update_suggestion(Stream) ->
 					erlang:display("No suggestion exists for that resource")
 			end
 	end.
+
+update_resource(Resource, Id) ->
+	%fetch old suggestion
+	case erlastic_search:search(?INDEX, "suggestion", "resource_id:"++ lib_json:to_string(ResourceId)) of
+		{error, _} -> erlang:display("ERROR");
+		{ok, Response} ->
+			case lib_json:get_field(Response, "hits.hits[0]._source.resource_id") of
+				ResourceId ->
+					%If suggestion found
+					SuggId = lib_json:get_field(Response, "hits.hits[0]._id"),
+					Json = lib_json:get_field(Response, 
+					Payload = lib_json:get_field(Response, "hits.hits[0]._source.suggest.payload"),
+					Sugg = lib_json:get_field(Response, "hits.hits[0]._source"),
+					case lib_json:get_field(Response, "hits.hits[0]._source.suggest.payload.streams") of
+						undefined ->
+							%If there are no streams
+							NewPayload = lib_json:add_value(Payload, "streams", "["++StreamInfo++"]"),
+
+							TempSugg = lib_json:replace_field(Sugg, "suggest.payload", lib_json:to_string(NewPayload)),
+							NewSugg = lib_json:replace_field(TempSugg, "suggest.weight", NewWeight);
+						_OldStream ->
+							%If there are streams
+							NewStreamList = lib_json:add_value(Sugg,"suggest.payload.streams" , StreamInfo),
+							NewSugg = lib_json:replace_field(NewStreamList, "suggest.weight", NewWeight)
+					end,
+					Final = api_help:create_update(NewSugg),
+					case api_help:update_doc(?INDEX, "suggestion", Id, Final) of 
+						{error, _Reason} -> erlang:display("not updated");
+						{ok, _Json} -> ok 
+					end;
+				_ -> 
+					erlang:display("No suggestion exists for that resource")
+			end
+	end,
+	%keep streams
+
+	%Delete old suggestion
+	erlastic_search:delete_doc("sensorcloud", "suggestion", SuggId),
+	%calc weight
+
+	%insert new
+	case erlastic_search:index_doc(?INDEX, "suggestion", Suggestion) of 
+		{error, _Reason} -> erlang:display("Suggestion not saved ");
+		{ok, _} -> 	ok
+	end
+	ok.
 
 
 %% @doc

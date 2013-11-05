@@ -22,6 +22,7 @@
 -spec calc(List::list()) -> integer().
 calc(List) when is_list(List)->
 	Fun = fun(undefined, Acc) -> Acc;
+		("", Acc) -> Acc;
 		(_,  Acc) -> Acc+1
 	end, 
 	lists:foldr(Fun, 0, List).

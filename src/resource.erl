@@ -218,6 +218,7 @@ put_resource(ReqData, State) ->
 				{error, Reason} -> 
 					{{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
 				{ok,List} ->
+					suggest:update_resource(UserJson, Id),
 					{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
 			end
 	end.
