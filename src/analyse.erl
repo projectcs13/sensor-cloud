@@ -18,7 +18,6 @@
 %% @end
 -spec allowed_methods(ReqData::tuple(), State::string()) -> {list(), tuple(), string()}.
 allowed_methods(ReqData, State) ->
-	erlang:display("Checking allowed methods!"),
 	case api_help:parse_path(wrq:path(ReqData)) of
 		[{"streams", _StreamID}, {"_analyse"}] ->
 		  	{['GET'], ReqData, State};
@@ -62,7 +61,7 @@ content_types_accepted(ReqData, State) ->
 %% @end
 -spec delete_resource(ReqData::tuple(), State::string()) -> {string(), tuple(), string()}.
 delete_resource(ReqData, State) ->
-	erlang:display("delete resources!"),
+	erlang:display("No deletions here!"),
 	ok.
 
 %% @doc
@@ -72,7 +71,7 @@ delete_resource(ReqData, State) ->
 %% @end
 -spec process_post(ReqData::tuple(), State::string()) -> {atom(), tuple(), string()}.
 process_post(ReqData, State) ->
-	erlang:display("Process post!"),
+	erlang:display("No posts!"),
     ok.
 
 
@@ -86,7 +85,6 @@ process_post(ReqData, State) ->
 %% @end
 -spec get_analysis(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 get_analysis(ReqData, State) ->
-	erlang:display("Attempting to get analysis!"),
 	case proplists:get_value('streamid', wrq:path_info(ReqData)) of
 		undefined ->
 			{{error,405}, wrq:set_resp_body("{\"error\":\"missing streamid\"}", ReqData), State};
@@ -94,12 +92,13 @@ get_analysis(ReqData, State) ->
 			% Get specific stream
 			% @TODO: Make sure data is sorted by timestamp!!!!! 
 				
-			case erlastic_search:search_limit(?INDEX, "datapoint","streamid:" ++ StreamId ++ "&sort=timestamp:asc", 20) of
+			case erlastic_search:search_limit(?INDEX, "datapoint","streamid:" ++ StreamId ++ "&sort=timestamp:desc", 50) of
 			%case erlastic_search:search_json(#erls_params{}, ?INDEX, "datapoint", create_json(StreamId), []) of
 				{error,Reason} ->
-					io:format("Error on line 62 for " ++ StreamId),
+					io:format("Error for stream " ++ StreamId),
 					{{error,Reason}, ReqData, State};
-				{ok,JsonStruct} -> {true,wrq:set_resp_body(forecast(lib_json:get_field(JsonStruct, "hits.hits")),ReqData),State}
+				{ok,JsonStruct} -> 
+					{true,wrq:set_resp_body(forecast(lib_json:get_field(JsonStruct, "hits.hits")),ReqData),State}
 			end
 	end.
 
@@ -127,7 +126,6 @@ start() ->
 %% @end
 -spec init([]) -> {ok, undefined}.
 init([]) -> 
-	%erlastic_search_app:start(), %% start this in the make file somehow
     {ok, undefined}.
 
 
@@ -160,9 +158,8 @@ this() ->
 %% @end
 -spec forecast(JSON::string()) -> JSON::string().
 forecast(Json) -> 
-	erlang:display("In forecast!"),
 	eri:eval("library(forecast)"),
-	forecast(Json, 10).
+	forecast(Json, 25).
 
 %% @doc
 %% Function: forecast/2
@@ -171,18 +168,17 @@ forecast(Json) ->
 %% @end	
 -spec forecast(JSON::string(), Nr::integer()) -> JSON::string().
 forecast(Json, Nr) -> 
-	erlang:display("Actually attempting to run forecast!"),
-	{_Start, _End, Values} = get_time_series(Json),
-	erlang:display(Values),
+	Values = get_time_series(Json),
 	Number = lists:flatten(io_lib:format("~p", [Nr])),
-	eri:eval("A <- auto.arima(" ++ Values ++ ")"),
+	eri:eval("V <- " ++ Values),
+	eri:eval("A <- auto.arima(V)"),
 	eri:eval("pred <- forecast(A, "++ Number ++ ")"),
 	{ok, _, Mean} = eri:eval("data.frame(c(pred$mean))[[1]]"),
 	{ok, _, Lo80} = eri:eval("head(data.frame(c(pred$lower))[[1]], " ++ Number ++")"),
 	{ok, _, Hi80} = eri:eval("head(data.frame(c(pred$upper))[[1]], " ++ Number ++")"),
 	{ok, _, Lo95} = eri:eval("tail(data.frame(c(pred$lower))[[1]], " ++ Number ++")"),
 	{ok, _, Hi95} = eri:eval("tail(data.frame(c(pred$upper))[[1]], " ++ Number ++")"),
-	erlang:display("In forecast just before format!"),
+	%eri:eval("rm(list = ls())"),
 	start_format_result({Mean, Lo80, Hi80, Lo95, Hi95}).
 
 
@@ -231,33 +227,33 @@ get_forecast_string(Values) ->
 %% Purpose: Gets information as strings from a Json object (first time, last time and a list with all values)
 %% Returns: Data from JSON object as strings
 %% @end
--spec get_time_series(JSON::string()) -> {Start::string(), End::string(), Values::string()}.
+-spec get_time_series(JSON::string()) -> Values::string().
 get_time_series(Json) ->
-	%erlang:display(Json),
-    %Data = mochijson2:decode(Json),
-	{Values, Times} = parse_json_list(Json, [], []),
-	{Start, End} = get_times(Times, {}),
-	{Start, End, get_values_string(Values)}.
+	{Values, _} = parse_json_list(Json, [], []),
+	%{Start, End} = get_times(Times, {}),
+	get_values_string(Values).
 
 
 %% @doc
 %% Function: parse_json_list/3
 %% Purpose: Get a list of times and values from a Json object
 %% Returns: Lists with data from list of Json objects lists
+%% @TODO Avoid reverse by merging this function with get_values_string
 %% @end
+
 -spec parse_json_list(Datapoint::list(), Values::list(), Times::list()) -> {Values::list(), Times::list()}.
-parse_json_list([], Values, Times) -> {Values, Times};
+parse_json_list([], Values, Times) -> {lists:reverse(Values), lists:reverse(Times)};
 parse_json_list([Head|Rest], Values, Times) ->
-	Struct = proplists:get_value(<<"_source">>, Head#struct.lst),
-	Val = proplists:get_value(<<"value">>, Struct#struct.lst),
-	Time = proplists:get_value(<<"timestamp">>, Head#struct.lst),
-	parse_json_list(Rest, [Val|Values], [Time|Times]).
+	Val = lib_json:get_field(Head, "_source.value"),
+	parse_json_list(Rest, [Val|Values], []).
+
 
 
 %% @doc
 %% Function: get_times/1
 %% Purpose: Get the first and last time from a list (no longer interesting)
 %% Returns: A tuple with the first and last times in the list.
+%% @TODO No longer necessary. Remove calls to it.
 %% @end	
 -spec get_times(Values::string(), tuple()) -> {list(), list()}.
 get_times([], {}) -> {"321", "123"};
