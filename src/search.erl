@@ -90,9 +90,20 @@ process_post(ReqData, State) ->
 
 process_search_post(ReqData, State) ->
         erlang:display("search with json request"),
+        case wrq:get_qs_value("size",ReqData) of 
+            undefined ->
+                Size = "10";
+            SizeParam ->
+                Size = SizeParam
+        end,
+        case wrq:get_qs_value("from",ReqData) of
+            undefined ->
+                From = "0";
+            FromParam ->
+                From = FromParam
+        end,
         {Json,_,_} = api_help:json_handler(ReqData,State),
-        FilteredJson = filter_json(Json),
-        erlang:display(FilteredJson),
+        FilteredJson = filter_json(Json, From, Size),
         case erlastic_search:search_json(#erls_params{},?INDEX, "stream", FilteredJson) of % Maybe wanna take more
                 {error,Reason1} ->
                         StreamSearch = "\"error\"",
@@ -123,4 +134,14 @@ process_search_post(ReqData, State) ->
 filter_json(Json) ->
         NewJson = string:sub_string(Json,1,string:len(Json)-1),
         "{\"query\":{\"filtered\":"++NewJson++",\"filter\":{\"bool\":{\"must\":{\"term\":{\"private\":\"false\"}}}}}}}".
+
+
+%% @doc
+%% Function: filter_json/3
+%% Purpose: Used to add private filters to the json query with pagination
+%% Returns: JSON string that is updated with filter and the from size parameters
+%% @end
+filter_json(Json, From, Size) ->
+        NewJson = string:sub_string(Json,1,string:len(Json)-1),
+        "{\"from\" : "++From++", \"size\" : "++Size++", \"query\":{\"filtered\":"++NewJson++",\"filter\":{\"bool\":{\"must\":{\"term\":{\"private\":\"false\"}}}}}}}".
 
