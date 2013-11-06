@@ -120,7 +120,7 @@ get_resource_test() ->
 	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(get, {"http://localhost:8000/users/0/resources/" ++ lib_json:to_string(DocId), []}, [], []),
 	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(get, {"http://localhost:8000/users/0/resources/_search?test=get", []}, [], []),
 	%Get resource that doesn't exist
-	{ok, {{_Version5, 500, _ReasonPhrase5}, _Headers5, _Body5}} = httpc:request(get, {"http://localhost:8000/resources/1" ++ lib_json:to_string(DocId), []}, [], []),
+	{ok, {{_Version5, 500, _ReasonPhrase5}, _Headers5, Body5}} = httpc:request(get, {"http://localhost:8000/resources/1" ++ lib_json:to_string(DocId), []}, [], []),
 	{{Year,Month,Day},_} = calendar:local_time(),
     Date = generate_date([Year,Month,Day]),
     % Tests to make sure the correct creation date is added
@@ -129,8 +129,10 @@ get_resource_test() ->
 	?assertEqual(<<"get">>,lib_json:get_field(Body2,"test")),
 	?assertEqual(<<"get">>,lib_json:get_field(Body3,"test")),
 	?assertEqual(true,lib_json:field_value_exists(Body4,"hits.hits[*]._source.test",<<"get">>)),
+	?assertEqual(<<"not_found">>,lib_json:get_field(Body5,"error")),
 	%Clean up
 	httpc:request(delete, {"http://localhost:8000/resources/" ++ lib_json:to_string(DocId), []}, [], []).
+
 
 
 %% @doc
