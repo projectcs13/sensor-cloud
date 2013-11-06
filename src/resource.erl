@@ -81,7 +81,6 @@ delete_resource(ReqData, State) ->
 	erlang:display("DELETE request - check permission here"),
 	%% TODO Authentication
  	case delete_streams_with_resource_id(Id) of
- 		{error,{Status,Body}} -> {{error,Status}, wrq:set_resp_body(Body, ReqData), State};
    		{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
    		{ok} ->
 			case erlastic_search:delete_doc(?INDEX,"resource", Id) of
