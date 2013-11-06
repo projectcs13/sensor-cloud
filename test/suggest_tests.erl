@@ -48,7 +48,7 @@ post_test() ->
 post_and_stream_test() ->
 	Response1 = post_request(?RESOURCE_URL, "application/json", 
 							"{
-								\"model\" : \"test3resource\",
+								\"model\" : \"testwithstream\",
 								\"tags\" : \"testtag\"
 			}"),
 	check_returned_code(Response1, 200),
@@ -59,7 +59,7 @@ post_and_stream_test() ->
 	timer:sleep(1000),
 	{ok, {{_Version11, 200, _ReasonPhrase11}, _Headers11, _Body11}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"search2\",\"resource_id\" : \""++lib_json:to_string(Id)++"\", \"private\" : \"false\", \"tags\":\"test2\"}"}, [], []),
 	timer:sleep(1000),
-	Response2 = get_request(?SUGGEST_URL++"test3resource"),
+	Response2 = get_request(?SUGGEST_URL++"testwithstream"),
 	check_returned_code(Response2, 200),
 	{ok, {_, _ ,Body2}} = Response2,
 	?assertEqual(<<"testtag">>,lib_json:get_field(Body2, "testsuggest[0].options[0].payload.tags")),
@@ -77,12 +77,12 @@ post_and_stream_test() ->
 get_suggestion_test() ->
 	Response1 = post_request(?RESOURCE_URL, "application/json", 
 							"{
-								\"model\" : \"testanother\",
+								\"model\" : \"testgetsuggestion\",
 								\"manufacturer\" : \"ericsson\"
 			}"),
 	check_returned_code(Response1, 200),
 	timer:sleep(800),
-	Response2 = get_request(?SUGGEST_URL ++ "testanother"),
+	Response2 = get_request(?SUGGEST_URL ++ "testgetsuggestion"),
 	check_returned_code(Response2, 200),
 	{ok, {_, _ ,Body}} = Response2,
 	?assertEqual(<<"ericsson">>,lib_json:get_field(Body, "testsuggest[0].options[0].payload.manufacturer")).
@@ -104,7 +104,7 @@ get_non_existing_term_test() ->
 update_resource_test() ->
 	Response1 = post_request(?RESOURCE_URL, "application/json", 
 							"{
-								\"model\" : \"test4resource\",
+								\"model\" : \"testupdate\",
 								\"tags\" : \"testtag\",
 								\"manufacturer\" : \"testmanu\"
 			}"),
@@ -116,15 +116,15 @@ update_resource_test() ->
 	timer:sleep(1000),
 	{ok, {{_Version11, 200, _ReasonPhrase11}, _Headers11, _Body11}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"search2\",\"resource_id\" : \""++lib_json:to_string(Id)++"\", \"private\" : \"false\", \"tags\":\"test2\"}"}, [], []),
 	timer:sleep(1000),
-	Response2 = get_request(?SUGGEST_URL++"test4resource"),
+	Response2 = get_request(?SUGGEST_URL++"testupdate"),
 	check_returned_code(Response2, 200),
 	{ok, {_, _ ,Body2}} = Response2,
 	?assertEqual(<<"testtag">>,lib_json:get_field(Body2, "testsuggest[0].options[0].payload.tags")),
 	?assertEqual(true, lib_json:field_value_exists(Body2, "testsuggest[0].options[0].payload.streams[*].tags",<<"test_tag">>)),
 	?assertEqual(<<"test2">>, lib_json:get_field_value(Body2, "testsuggest[0].options[0].payload.streams[*].tags",<<"test2">>)),
-	{ok, {{_Version21, 200, _ReasonPhrase21}, _Headers21, _Body21}} = httpc:request(put, {"http://localhost:8000/resources/"++lib_json:to_string(Id), [],"application/json", "{\"model\" : \"test4resource\",\"tags\" : \"newtag\", \"manufacturer\" : \"testmanu\"}"}, [], []),
+	{ok, {{_Version21, 200, _ReasonPhrase21}, _Headers21, _Body21}} = httpc:request(put, {"http://localhost:8000/resources/"++lib_json:to_string(Id), [],"application/json", "{\"model\" : \"testupdate\",\"tags\" : \"newtag\", \"manufacturer\" : \"testmanu\"}"}, [], []),
 	timer:sleep(1000),
-	{ok, {_, _ ,Body3}} = get_request(?SUGGEST_URL++"test4resource"),
+	{ok, {_, _ ,Body3}} = get_request(?SUGGEST_URL++"testupdate"),
 	?assertEqual(<<"newtag">>,lib_json:get_field(Body3, "testsuggest[0].options[0].payload.tags")),
 	?assertEqual(true, lib_json:field_value_exists(Body3, "testsuggest[0].options[0].payload.streams[*].tags",<<"test_tag">>)),
 	?assertEqual(<<"test2">>, lib_json:get_field_value(Body3, "testsuggest[0].options[0].payload.streams[*].tags",<<"test2">>)).
