@@ -41,7 +41,7 @@
 %%               with id 'VStreamId'.
 %%
 %% @end
--spec create(string(), string()) -> ok.
+-spec create(string(), string(), string(), fun()) -> ok.
 create(VStreamId, InputType, InputId, Function) ->
 	io:format("VStream: f = ~p~n",[Function]),
 	%% Exchange name binarys
@@ -122,7 +122,7 @@ loop(VStreamId, ChannelIn, {ChannelOut, VStreamExchange}, Function) ->
 					io:format("DELETE~n");
 				
 				%% New value from the source
-				#'datapoint'{id = Id, timestamp = TimeStamp, value = Value} ->
+				#'datapoint'{timestamp = TimeStamp, value = Value} ->
 					%% Store value
 					
 					%% Apply function
