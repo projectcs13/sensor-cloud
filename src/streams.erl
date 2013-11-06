@@ -131,7 +131,10 @@ process_post(ReqData, State) ->
 			case lib_json:get_field(ResAdded,"resource_id") == undefined of
 				true -> {false, wrq:set_resp_body("\"resource_id_missing\"",ReqData), State};
 				false ->
-					case erlastic_search:index_doc(?INDEX, "stream", ResAdded) of	
+					{{Year,Month,Day},_} = calendar:local_time(),
+					Date = generate_date([Year,Month,Day]),
+					DateAdded = api_help:add_field(ResAdded,"creation_date",Date),
+					case erlastic_search:index_doc(?INDEX, "stream", DateAdded) of	
 						{error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
 						{ok,List} -> 
 							suggest:update_suggestion(ResAdded),
@@ -307,3 +310,23 @@ filter_json(Json,ResourceQuery) ->
         NewJson = string:sub_string(Json,1,string:len(Json)-1),
         "{\"query\":{\"filtered\":"++NewJson++",\"filter\":{\"bool\":{\"must\":[{\"term\":{\"private\":\"false\"}},{\"term\":{"++ResourceQuery++"}}]}}}}}".
 
+%% @doc
+%% Function: generate_date/2
+%% Purpose: Used to create a date valid in ES
+%%          from the input which should be the list
+%%          [Year,Mounth,Day]
+%% Returns: The generated timestamp
+%%
+%% @end
+-spec generate_date(DateList::list()) -> string().
+
+generate_date([First]) ->
+	case First < 10 of
+		true -> "0" ++ integer_to_list(First);
+		false -> "" ++ integer_to_list(First)
+	end;
+generate_date([First|Rest]) ->
+	case First < 10 of
+		true -> "0" ++ integer_to_list(First) ++ "-" ++ generate_date(Rest);
+		false -> "" ++ integer_to_list(First) ++ "-" ++ generate_date(Rest)
+	end.
