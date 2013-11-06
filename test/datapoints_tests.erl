@@ -109,4 +109,5 @@ request(Method, Request) ->
 %% Returns: {ok/error, {{Version, Code, Reason}, Headers, Body}}
 %% @end
 refresh() ->
-	httpc:request(post, {"http://localhost:9200/sensorcloud/_refresh", [],"", ""}, [], []).
+    httpc:request(post, {"http://localhost:9200/sensorcloud/_refresh", [],"", ""}, [], []).
+

@@ -54,7 +54,10 @@ process_post_test() ->
 	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/users/0/resources/", [],"application/json", "{\"test\" : \"post\",\"user_id\" : \"0\",\"streams\" : \"1\"}"}, [], []),
 	refresh(),
 	?assertEqual(true,lib_json:get_field(Body1,"ok")),	
-	?assertEqual(true,lib_json:get_field(Body2,"ok")).
+	?assertEqual(true,lib_json:get_field(Body2,"ok")),
+	%Clean up after the test
+	httpc:request(delete, {"http://localhost:8000/resources/" ++ lib_json:to_string(lib_json:get_field(Body1,"_id")), []}, [], []),
+	httpc:request(delete, {"http://localhost:8000/resources/" ++ lib_json:to_string(lib_json:get_field(Body2,"_id")), []}, [], []).
 
 %% @doc
 %% Function: delete_resource_test/0
@@ -78,7 +81,7 @@ delete_resource_test() ->
 	{ok, {{_Version5, 500, _ReasonPhrase5}, _Headers5, _Body5}} = httpc:request(delete, {"http://localhost:8000/resources/1", []}, [], []),
 	?assertEqual(true, lib_json:get_field(Body2,"ok")),
 	?assertEqual(true, lib_json:get_field(Body3,"ok")),
-        ?assertEqual([], lib_json:get_field(Body4, "hits")).
+    ?assertEqual([], lib_json:get_field(Body4, "hits")).
 	
 %% @doc
 %% Function: put_resource_test/0
@@ -97,7 +100,9 @@ put_resource_test() ->
 	{ok, {{_Version4, 500, _ReasonPhrase4}, _Headers4, _Body4}} = httpc:request(put, {"http://localhost:8000/resources/1", [],"application/json", "{\"test\" : \"put2\"}"}, [], []),
 	?assertEqual(true,lib_json:get_field(Body1,"ok")),
 	?assertEqual(true,lib_json:get_field(Body2,"ok")),
-	?assertEqual(<<"put2">>,lib_json:get_field(Body3,"test")).
+	?assertEqual(<<"put2">>,lib_json:get_field(Body3,"test")),
+	%Clean up
+	httpc:request(delete, {"http://localhost:8000/resources/" ++ lib_json:to_string(DocId), []}, [], []).
 
 	
 %% @doc
@@ -124,7 +129,11 @@ get_resource_test() ->
 	?assertEqual(<<"get">>,lib_json:get_field(Body2,"test")),
 	?assertEqual(<<"get">>,lib_json:get_field(Body3,"test")),
 	?assertEqual(true,lib_json:field_value_exists(Body4,"hits.hits[*]._source.test",<<"get">>)),
-	?assertEqual(<<"not_found">>,lib_json:get_field(Body5,"error")).
+	?assertEqual(<<"not_found">>,lib_json:get_field(Body5,"error")),
+	%Clean up
+	httpc:request(delete, {"http://localhost:8000/resources/" ++ lib_json:to_string(DocId), []}, [], []).
+
+
 
 %% @doc
 %% Function: generate_date/2

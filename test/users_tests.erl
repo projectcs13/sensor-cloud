@@ -112,6 +112,7 @@ post_user_search_test() ->
 	?assertEqual(true, lib_json:field_value_exists(A, "hits.hits[*]._source.user_name", <<?TEST_NAME>>)).
 
 
+
 %% @doc
 %% Function: put_user_search_test/0
 %% Purpose: Checks if PUT requests work
@@ -131,21 +132,43 @@ put_user_search_test() ->
 	?assertEqual(true, lib_json:field_value_exists(A, "email", <<?TEST_EMAIL>>)).
 
 
+
+
 %% @doc
 %% Function: delete_user_test/0
-%% Purpose: Checks user deletion
+%% Purpose: Test the delete_resource function by doing some HTTP requests
 %% Returns: ok | {error, term()}
 %%
+%% Side effects: creates and deletes documents in elasticsearch
 %% @end
 -spec delete_user_test() -> ok | {error, term()}.
-delete_user_test() ->	
-	Id = get_index_id(?TEST_NAME),
-	?assertNotMatch({error, "no match"}, Id),
-	Response1 = delete_request(?USERS_URL++lib_json:to_string(Id)),
-	check_returned_code(Response1, 200),
+delete_user_test() ->
+	% Create a resource and two streams, then delete the resource and check if streams are automatically deleted
+	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/users", [],"application/json", "{\"name\" : \"test\"}"}, [], []),
+	DocId = lib_json:get_field(Body2,"_id"),
+	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(post, {"http://localhost:8000/resources", [],"application/json", "{\"test\" : \"delete\",\"user_id\" : \"" ++ lib_json:to_string(DocId) ++ "\"}"}, [], []),
+	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(post, {"http://localhost:8000/resources", [],"application/json", "{\"test\" : \"delete\",\"user_id\" : \"" ++ lib_json:to_string(DocId) ++ "\"}"}, [], []),
+	DocId2 = lib_json:get_field(Body3,"_id"),
+	{ok, {{_Version5, 200, _ReasonPhrase5}, _Headers5, Body5}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"delete\",\"resource_id\" : \"" ++ lib_json:to_string(DocId2) ++ "\"}"}, [], []),
+	{ok, {{_Version6, 200, _ReasonPhrase6}, _Headers6, Body6}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"delete\",\"resource_id\" : \"" ++ lib_json:to_string(DocId2) ++ "\"}"}, [], []),
+	DocId3 = lib_json:get_field(Body4,"_id"),
+	{ok, {{_Version7, 200, _ReasonPhrase7}, _Headers7, Body7}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"delete\",\"resource_id\" : \"" ++ lib_json:to_string(DocId3) ++ "\"}"}, [], []),
+	{ok, {{_Version8, 200, _ReasonPhrase8}, _Headers8, Body8}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"delete\",\"resource_id\" : \"" ++ lib_json:to_string(DocId3) ++ "\"}"}, [], []),
+	refresh(),
+	{ok, {{_Version9, 200, _ReasonPhrase9}, _Headers9, Body9}} = httpc:request(delete, {"http://localhost:8000/users/" ++ lib_json:to_string(DocId), []}, [], []),
+	refresh(),
+	{ok, {{_Version10, 200, _ReasonPhrase10}, _Headers10, Body10}} = httpc:request(get, {"http://localhost:8000/users/"++ lib_json:to_string(DocId) ++"/resources", []}, [], []),
+	{ok, {{_Version11, 200, _ReasonPhrase11}, _Headers11, Body11}} = httpc:request(get, {"http://localhost:8000/users/"++ lib_json:to_string(DocId) ++"/resources/"++ lib_json:to_string(DocId2) ++ "/streams", []}, [], []),
+	{ok, {{_Version12, 200, _ReasonPhrase12}, _Headers12, Body12}} = httpc:request(get, {"http://localhost:8000/users/"++ lib_json:to_string(DocId) ++"/resources/"++ lib_json:to_string(DocId3) ++ "/streams", []}, [], []),
+	% Delete a resource that doesn't exist
+	{ok, {{_Version13, 500, _ReasonPhrase13}, _Headers13, Body13}} = httpc:request(delete, {"http://localhost:8000/users/idthatdoesntexist", []}, [], []),
+	?assertEqual("{\"hits\":[]}",Body10),
+	?assertEqual("{\"hits\":[]}",Body11),
+	?assertEqual("{\"hits\":[]}",Body12),
+	?assertEqual("{\"error\":\"not_found\"}",Body13).
+
 	
-	Response2 = get_request(?USERS_URL ++ lib_json:to_string(Id)),
-	check_returned_code(Response2, 500).
+
 
 
 %% @doc
@@ -178,8 +201,6 @@ get_index_id(Uname) ->
 		_ ->
 			Response
 	end.
-
-		
 
 %% @doc
 %% Function: check_returned_code/0

@@ -55,7 +55,6 @@ process_search_post_test() ->
 
 get_stream_test() ->
 	% Test create
-
 	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"get\",\"user_id\" : \"0\", \"resource_id\" : \"asdascvsr213sda\", \"private\" : \"false\"}"}, [], []),
 	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"get\",\"user_id\" : \"0\", \"resource_id\" : \"asdascvsr213sda\", \"private\" : \"false\"}"}, [], []),
 	DocId1 = lib_json:get_field(Body1,"_id"),
@@ -66,8 +65,6 @@ get_stream_test() ->
 	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(get, {"http://localhost:8000/users/0/resources/asdascvsr213sda/streams", []}, [], []),
 	{ok, {{_Version5, 200, _ReasonPhrase5}, _Headers5, Body5}} = httpc:request(get, {"http://localhost:8000/streams/_search?user_id=0", []}, [], []),
 	{ok, {{_Version6, 200, _ReasonPhrase6}, _Headers6, Body6}} = httpc:request(post, {"http://localhost:8000/streams/_search",[],"application/json", "{\"query\":{\"term\" : { \"test\" : \"get\" }}}"}, [], []),
-
-
 	% Test get for missing index
 	{ok, {{_Version7, 500, _ReasonPhrase7}, _Headers7, Body7}} = httpc:request(get, {"http://localhost:8000/streams/1", []}, [], []),
 	% Test delete
@@ -109,7 +106,6 @@ put_stream_test() ->
 	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, _Body3}} = httpc:request(put, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId1), [], "application/json", "{\n\"test\" : \"put\",\n\"private\" : \"false\"\n}"}, [], []),
 	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, _Body4}} = httpc:request(put, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId2), [], "application/json", "{\n\"test\" : \"put\"\n}"}, [], []),
 	% Test get
-
 	{ok, {{_Version5, 200, _ReasonPhrase5}, _Headers5, Body5}} = httpc:request(get, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId1), []}, [], []),
 	{ok, {{_Version6, 200, _ReasonPhrase6}, _Headers6, Body6}} = httpc:request(get, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId2), []}, [], []),
 	% Test delete
