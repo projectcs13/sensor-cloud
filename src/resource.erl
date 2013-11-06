@@ -242,7 +242,7 @@ get_resource(ReqData, State) ->
 							Query = "user_id:" ++ UserId
 					end,
 					case erlastic_search:search_limit(?INDEX, "resource", Query, 100) of % Maybe wanna take more
-						{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ api_help:json_encode(Reason) ++ "\"}", ReqData), State};
+						{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
 					        {ok,JsonStruct} ->
 						       FinalJson = lib_json:get_list_and_add_id(JsonStruct),
 						       {FinalJson, ReqData, State} 
