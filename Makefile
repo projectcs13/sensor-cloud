@@ -3,8 +3,9 @@
 ################################################################################
 ### Variable assignment
 ################################################################################
-ERL ?= erl
-APP := website
+ERL := erl
+REBAR := ./rebar
+# DIALYZE_INCLUDE = -I lib/erlastic_search/include/ -I lib/webmachine/include/ -I lib/rabbitmq-erlang-client/include -I lib/erlson/include/
 ################################################################################
 
 
@@ -15,15 +16,20 @@ APP := website
 ### if there is need for it
 ################################################################################
 compile:
-	@./rebar compile skip_deps=true
+	@$(REBAR) compile skip_deps=true
 
+### get_libs will download and install all project libraries
 get_libs:
-	@./rebar get-deps
-	@./rebar compile
+	@@$(REBAR) get-deps
+	@$(REBAR) compile
+	$(MAKE) -C lib/rabbitmq-server
+	$(MAKE) -C lib/rabbitmq-erlang-client
 
-clean_libs:
-	@./rebar delete-deps
-	rm -rf lib/
+# prep_dialyzer:
+# 	dialyzer --build_plt --apps kernel stdlib erts mnesia eunit
+
+# dialyze: 
+# 	dialyzer -pa ebin/ $(DIALYZE_INCLUDE) src/*.erl lib/erlson/ebin/
 
 clean_emacs_vsn_files:
 	rm -rf *~
@@ -43,30 +49,75 @@ clean_emacs_vsn_files:
 ################################################################################
 
 ### Command: make
-### Downloads all dependencies and builds the entire project
-all: compile
+### Builds the entire project, excluding the dependencies.
+all: compile #dialyze
 
-install: get_libs
+### Command: make install
+### Downloads all dependencies and builds the entire project
+install: get_libs #prep_dialyzer
 
 ### Command: make run
 ### Downloads all depenedencies, bulds entire project and runs the project.
 run: compile
-	erl -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname database -setcookie database -mnesia dir '"/home/database/Mnesia.Database"' -s database init
+	$(ERL) -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname engine 
+
+### Command: make run_es
+### Runs elastic search
+run_es:
+	lib/elasticsearch/bin/elasticsearch -f
+
+### Command: make run_rabbit
+### Runs rabbitMQ server
+run_rabbit:
+	sudo lib/rabbitmq-server/scripts/rabbitmq-server
+
+### Command: make test
+### Compile project resources (not libraries) and runs all eunit tests.
+test: compile
+	-@mkdir test-results
+	$(ERL) -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname engine -s test run
+
+test_json: compile
+	-@mkdir test-results
+	$(ERL) -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname engine -eval 'test:run(lib_json)'
+
+test_resource: compile
+	-@mkdir test-results
+	$(ERL) -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname engine -eval 'test:run(resource)'
+
+test_streams: compile
+	-@mkdir test-results
+	$(ERL) -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname engine -eval 'test:run(streams)'
+
+test_suggest: compile
+	-@mkdir test-results
+	$(ERL) -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname engine -eval 'test:run(suggest)'
+
+test_users: compile
+	-@mkdir test-results
+	$(ERL) -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname engine -eval 'test:run(users)'
 
 ### Command: make docs
 ### Genereats all of the documentation files
-docs:
-	@$(ERL) -noshell -run edoc_run application '$(APP)' '"."' '[{packages, false},{private, true}]'
+docs: all
+	./rebar skip_deps=true doc
 
 ### Command: make clean
 ### Cleans the directory of the following things:
-### * Libraries, including 'lib' folder.
 ### * Emacs versioning files.
 ### * All erlang .beam files, including 'ebin' folder
-clean: clean_libs clean_emacs_vsn_files
-	@./rebar clean
+clean: clean_emacs_vsn_files
+	@./rebar clean skip_deps=true
 	rm -f erl_crash.dump
 	rm -rf ebin/
+	rm -rf test-results/
+
+### Command: make clean_libs
+### Cleans the directory of the following things:
+### * All the downloaded libraries
+clean_libs:
+	@./rebar delete-deps
+	rm -rf lib/
 
 ### Command: make clean_docs
 ### Cleans the directory of the following things:
@@ -89,11 +140,20 @@ help:
 	@echo "'make run'"
 	@echo "Compiles and runs the project. Does NOT compile libraries"
 	@echo ""
+	@echo "'make run_es'"
+	@echo "Runs the elastic search server"
+	@echo ""
+	@echo "make run_rabbit"
+	@echo "Runs the rabbitMQ server"
+	@echo ""
 	@echo "'make docs'"
 	@echo "Generates documentation for the project"
 	@echo ""
 	@echo "'make clean'"
 	@echo "Cleans all the project, including dependencies"
+	@echo ""
+	@echo "'make clean_libs'"
+	@echo "Cleans all of the libraries"
 	@echo ""
 	@echo "'make clean_docs'"
 	@echo "Cleans all of the documentation files, except for 'overview.edoc'"
