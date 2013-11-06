@@ -57,6 +57,22 @@ get_existing_datapoint_test() ->
 
 
 %% @doc
+%% Function: no_timestamp_test/0
+%% Purpose: Test a post request without a timestamp
+%% Returns: ok | {error, term()}
+%%
+%% @end
+-spec no_timestamp_test() -> ok | {error, term()}.
+no_timestamp_test() ->
+        Response1 = post_request("http://localhost:8000/streams/5/data/", "application/json",
+                                         "{\"value\":\"55\"}"),
+        check_returned_code(Response1, 200),
+		refresh(),
+		{ok,{_,_,Body}} = httpc:request(get, {"http://localhost:8000/streams/5/data/", []}, [], []),
+		ObjectList = lib_json:get_field(Body,"hits"),
+        ?assertEqual(true, lib_json:get_field(lists:nth(1,ObjectList),"timestamp") =/= undefined).
+
+%% @doc
 %% Function: get_index_id/0
 %% Purpose: Searches the ES and returns the _id of a datapoint
 %% Returns: string() | {error, string()}

@@ -72,7 +72,15 @@ process_post(ReqData, State) ->
 				case Id of
 					undefined -> {{halt, 404}, ReqData, State};
 					_ ->
-						FinalJson = api_help:add_field(DatapointJson, "streamid", Id),
+						case lib_json:get_field(DatapointJson,"timestamp") of
+							undefined ->
+								{{Year,Month,Day},{Hour,Minute,Second}} = calendar:local_time(),
+								TimeStamp = generate_timestamp([Year,Month,Day,Hour,Minute,Second],0) ++ ".000",
+								TimeStampAdded = api_help:add_field(DatapointJson, "timestamp", TimeStamp);
+							_ ->
+								TimeStampAdded = DatapointJson
+						end,
+						FinalJson = api_help:add_field(TimeStampAdded, "streamid", Id),
 						case erlastic_search:index_doc(?INDEX, "datapoint", FinalJson) of
 							{error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
 							{ok,List} -> {true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
@@ -197,4 +205,27 @@ id_from_path(RD) ->
 					_ -> undefined
 			end;
 		Id -> Id
+	end.
+
+%% @doc
+%% Function: generate_timpestamp/2
+%% Purpose: Used to create a timestamp valid in ES
+%%          from the input which should be the list
+%%          [Year,Mounth,Day,Hour,Minute,Day]
+%% Returns: The generated timestamp
+%%
+%% @end
+-spec generate_timestamp(DateList::list(),Count::integer()) -> string().
+
+generate_timestamp([],_) ->
+	[];
+generate_timestamp([First|Rest],3) ->
+	case First < 10 of
+		true -> "T0" ++ integer_to_list(First) ++ generate_timestamp(Rest,4);
+		false -> "T" ++ integer_to_list(First) ++ generate_timestamp(Rest,4)
+	end;
+generate_timestamp([First|Rest],Count) ->
+	case First < 10 of
+		true -> "0" ++ integer_to_list(First) ++ generate_timestamp(Rest,Count+1);
+		false -> "" ++ integer_to_list(First) ++ generate_timestamp(Rest,Count+1)
 	end.
