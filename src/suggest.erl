@@ -231,7 +231,7 @@ update_resource(Resource, ResourceId) ->
 
 update_score(Suggestion) ->
 	Payload = lib_json:get_field(Suggestion, "suggest.payload"),
-	ResourceWeight = scoring:calc(Suggestion),
+	ResourceWeight = scoring:calc(Payload, resource),
 	erlang:display(ResourceWeight),
 	Streams = lib_json:get_field(Payload, "streams"),
 	erlang:display("----1----"),
