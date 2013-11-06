@@ -218,7 +218,7 @@ put_resource(ReqData, State) ->
 		{ok, _} ->
 			{UserJson,_,_} = api_help:json_handler(ReqData, State),
 			Update = api_help:create_update(UserJson),
-			case api_help:update_doc(?INDEX,"resource", Id, Update) of 
+       		case api_help:update_doc(?INDEX,"resource", Id, Update) of 
 				{error, Reason} -> 
 					{{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
 				{ok,List} -> {true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
