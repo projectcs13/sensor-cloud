@@ -38,7 +38,7 @@ post_test() ->
         Response1 = post_request(?DATAPOINTS_URL, "application/json",
                                          "{\"value\":\"" ++ ?TEST_VALUE ++ "\", \"timestamp\": \"" ++ ?TEST_TIMESTAMP ++ "\"}"),
         check_returned_code(Response1, 200),
-        timer:sleep(1000),
+        refresh(),
         ?assertNotMatch({error, "no match"}, get_index_id(?TEST_VALUE, ?TEST_TIMESTAMP)).
 
 
@@ -102,3 +102,11 @@ post_request(URL, ContentType, Body) -> request(post, {URL, [], ContentType, Bod
 get_request(URL) -> request(get, {URL, []}).
 request(Method, Request) ->
     httpc:request(Method, Request, [], []).
+
+%% @doc
+%% Function: refresh/0
+%% Purpose: Help function to find refresh the sensorcloud index
+%% Returns: {ok/error, {{Version, Code, Reason}, Headers, Body}}
+%% @end
+refresh() ->
+	httpc:request(post, {"http://localhost:9200/sensorcloud/_refresh", [],"", ""}, [], []).
