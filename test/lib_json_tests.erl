@@ -134,8 +134,7 @@ add_value_test() ->
     %% If the field already exist and is not a list then no action is taken
     ?assertEqual(?JSON1, lib_json:add_value(?JSON1, name, <<"poff">>)),
 
-    ?assertEqual(?JSON1, lib_json:add_value(?JSON1, "name.poff", <<"poff">>)),
-    ?assertEqual(?JSON_RESULT7, lib_json:add_value(lib_json:rm_field(?JSON_RESULT6, name), "name", {s,"poff"})).
+    ?assertEqual(?JSON1, lib_json:add_value(?JSON1, "name.poff", <<"poff">>)).
 
 
 add_values_test() ->

@@ -117,19 +117,19 @@ add_suggestion(Resource, ResourceId) ->
 		undefined ->
 			{error, no_model};
 		_ ->
-			Suggestion = "{
-				\"resource_id\" : \"" ++ undefined_to_string(ResourceId) ++ "\",
-				\"suggest\" : {
-					\"input\" : [ \"" ++ undefined_to_string(Model) ++ "\" ], 
-					\"output\" : \"" ++ get_timestamp() ++ "\",
-					\"payload\" : { 
-						\"manufacturer\" : \"" ++ undefined_to_string(Manufacturer) ++ "\",
-						\"tags\" : \"" ++ undefined_to_string(Tags) ++ "\",
-						\"polling_freq\" : \"" ++ undefined_to_string(Polling_freq) ++ "\"
-					},
-					\"weight\" : " ++ integer_to_list(Weight) ++ "
-				}				
-				}",
+		           Suggestion = lib_json:set_attrs(
+					  [
+					   {resource_id, ResourceId},
+					   {suggest, "{}"},
+					   {"suggest.input", Model},
+					   {"suggest.output", get_timestamp()},
+					   {"suggest.payload", "{}"},
+					   {"suggest.payload.manufacturer", Manufacturer},
+					   {"suggest.payload.tags", Tags},
+					   {"suggest.payload.polling_freq", Polling_freq},
+					   {"suggest.weight", Weight}
+					  ]
+					 ),
 			case erlastic_search:index_doc(?INDEX, "suggestion", Suggestion) of 
 				{error, _Reason} -> erlang:display("Suggestion not saved ");
 				{ok, _} -> 	ok
@@ -180,10 +180,10 @@ update_suggestion(Stream) ->
 update_resource(Resource, ResourceId) ->
 	erlang:display("-2-2-2-2-2-2-2"),
 	erlang:display(ResourceId),
-	Manufacturer = binary_undefined_to_string(lib_json:get_field(Resource, "manufacturer")),
-	Model = binary_undefined_to_string(lib_json:get_field(Resource, "model")),
-	Tags = binary_undefined_to_string(lib_json:get_field(Resource, "tags")),
-	Polling_freq = binary_undefined_to_string(lib_json:get_field(Resource, "polling_freq")),
+	Manufacturer = lib_json:get_field(Resource, "manufacturer"),
+	Model = lib_json:get_field(Resource, "model"),
+	Tags = lib_json:get_field(Resource, "tags"),
+	Polling_freq = lib_json:get_field(Resource, "polling_freq"),
 	RId = list_to_binary(ResourceId),
 	erlang:display("-1-1-1-1-1-1-1"),
 	%fetch old suggestion
@@ -263,42 +263,15 @@ get_stream_info(Stream) ->
 	Type  = lib_json:get_field(Stream, "type"),
 	Accuracy  = lib_json:get_field(Stream, "accuracy"),
 	Weight = scoring:calc([Name, Description, Min_val, Max_val, Tags, Type, Accuracy]),
-	Result ="{
-		\"name\":\"" ++ undefined_to_string(Name)++"\",
-		\"description\":\"" ++ undefined_to_string(Description)++"\",
-		\"min_value\":\"" ++ undefined_to_string(Min_val)++"\",
-		\"max_value\":\"" ++ undefined_to_string(Max_val)++"\",
-		\"tags\":\"" ++ undefined_to_string(Tags)++"\",
-		\"type\":\"" ++ undefined_to_string(Type)++"\",
-		\"accuracy\":\"" ++ undefined_to_string(Accuracy)++"\"
-		}",
+        Result = lib_json:set_attrs([{name, Name},
+				     {description, Description},
+				     {min_value, Min_val},
+				     {max_value, Max_val},
+				     {tags, Tags},
+				     {type, Type},
+				     {accuracy, Accuracy}
+				    ]),
 	{Weight, Result}.
-
-
-%% @doc
-%% Returns an empty string if it was "undefined", else it returns the string itself.
-%% @end
--spec undefined_to_string(Text::attr()) -> string().
-undefined_to_string(Text) ->
-	case Text of
-		undefined ->
-			"";
-		_ ->
-			lib_json:to_string(Text)
-	end.
-
-
-%% @doc
-%% Returns an empty string if it was "undefined", else it returns the string itself. Concerted to binary
-%% @end
--spec binary_undefined_to_string(Text::attr()) -> string().
-binary_undefined_to_string(Text) ->
-	case Text of
-		undefined ->
-			<<"">>;
-		_ ->
-			Text
-	end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Should be moved to own module later
@@ -310,7 +283,7 @@ get_timestamp() ->
 	TS = {_MSec,_Sec,Micro} = os:timestamp(),
 	{{Year,Month,Day},{Hour,Minute,Second}} = calendar:now_to_universal_time(TS),
 	Mstr = element(Month,{"Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"}),
-	io_lib:format("~2w ~s ~4w ~2w:~2..0w:~2..0w.~6..0w", [Day,Mstr,Year,Hour,Minute,Second,Micro]).
+	binary:list_to_bin(io_lib:format("~2w ~s ~4w ~2w:~2..0w:~2..0w.~6..0w", [Day,Mstr,Year,Hour,Minute,Second,Micro])).
 
 
 
