@@ -9,63 +9,128 @@
 %% @end
 
 -module(pollingSystem).
+-behaviour(gen_server).
 -include("poller.hrl").
+-include("state.hrl").
 
 %% ====================================================================
 %% API functions
 %% ====================================================================
--export([start/0, rebuild_poller/1, create_poller/1]).
+-export([start_link/0, init/1, handle_info/2, handle_cast/2, handle_call/2, terminate/2]).
 
 %% @doc
-%% Function: start/0
-%% Purpose: init function used to generate the supervisor process and create all pollers.
+%% Function: start_link/0
+%% Purpose: init function used to generate the supervisor process, polling_monitor, and create all pollers.
 %% Returns: ok | {error, ErrMsg}
-%% Side effects: spawn supervisor process and register it by name supervisor
+%% Side effects: spawn supervisor process and register it by name supervisor. spawn pollingBoss supervisor and register it by its name.
 %% @end
--spec start() -> ok | {error, term()}.
-start()->
-	case whereis(supervisor) of
+start_link()->
+	case whereis(polling_supervisor) of
 		undefined->
-			register(supervisor, spawn(server_loop, [[]])),
-			create_pollers();
-		_ -> 
+			gen_server:start_link({local, polling_supervisor}, ?MODULE, [], []),
+			supervisor:start_link({local, polling_monitor}, polling_monitor, []),
+			gen_server:call(polling_supervisor, create_pollers);
+		_ ->
+			%%gen_event could be used here to handle the error conditions!
 			{error, "the supervisor has already been started"}
 	end.
 
 %% @doc
-%% Function: create_poller/1
-%% Purpose: create one poller according the poller`s information provided.
-%% Returns: {ok, TRef} | {error, ErrMsg}
-%% Side effects: make a timer for scheduling, the TRef is the reference to this timer.
+%% Function: init/1
+%% Purpose: init function called by gen_server:start_link() method, used to initialize the state of gen_server
+%% Returns: {ok, State}
 %% @end
--spec create_poller(record()) -> {ok, term()} | {error, term()}.
-create_poller(#pollerInfo{resourceid = ResourceId, name = ResourceName, url = Url, frequency = Frequency})->
-	%% TODO create erlastic function to get all parsers for a specific resource
-	Parsers = parser:get_parsers_by_id(ResourceId), %% Non-Existing
-	Pid = spawn(poller, poller_loop, [ResourceId, Url, Parsers]),
-	Record = #pollerInfo{resourceid=ResourceId, name=ResourceName, url=Url, frequency=Frequency, pid=Pid},
-	%%add this poller into the pollers infor storage of the server_loop
-	supervisor!{addNewPoller, Record},
-	%%use timer library to create scheduler for this poller
-	timer:start(),
-	timer:send_interval(Frequency, Pid, {probe}).
-
+init(_)->
+	{ok, []}.
 
 %% @doc
-%% Function: rebuild_poller/1
-%% Purpose: the function used to notify the supervisor to rebuild the poller, acccording to the resource`s id.
-%% Returns: ok.
-%% Side effects: the poller which is specified by resource id will be rebuilt
+%% Function: handle_info/2
+%% Purpose: handle the messages` processing of the gen_server, accepts two parameters: message and the old state of gen_server.
+%%			could be called by: polling_supervisor!{message}
+%% Returns: {noreply, NewState}
+%% Side effects: send message to specific poller and update the state of gen_server.
 %% @end
--spec rebuild_poller(string()) -> ok.
-rebuild_poller(ResourceId)->
-	supervisor!{rebuild, ResourceId},
-	ok.
+handle_info({addNewPoller, Poller}, PollersInfo)->
+	{noreply, [Poller|PollersInfo]};
+handle_info({update, ResourceId, NewUrl}, PollersInfo)->
+	{noreply, updateInfo(PollersInfo, ResourceId, NewUrl)};
+handle_info({rebuild, ResourceId}, PollersInfo)->
+	%%find pid from the records list according to resource id
+	Poller = find_poller_by_id(ResourceId, PollersInfo),
+	%%and sends rebuild function to the poller
+	case Poller of
+		{error, ErrMessage} -> 
+			erlang:display(ErrMessage);
+		_ ->
+			Poller#pollerInfo.pid ! {rebuild}
+	end,
+	{noreply, PollersInfo}.
+
+%% @doc
+%% Function: handle_cast/2
+%% Purpose: handle asynchronous call of gen_server, accepts two parameters: message of the call and the old state of gen_server.
+%%			can be called via: gen_server:cast(polling_supervisor, {rebuild_poller, (resource_id)}).
+%% Returns: {noreply, NewState}
+%% Side effects: create new poller and send message to specific poller.
+%% @end
+handle_cast({create_poller, #pollerInfo{resourceid = ResourceId, name = ResourceName, url = Url, frequency = Frequency}}, State)->
+	%% TODO create erlastic function to get all parsers for a specific resource
+	Parsers = parser:get_parsers_by_id(ResourceId), %% Non-Existing
+	%%generate a new poller to the pollingBoss
+	{ok, Pid}=supervisor:start_child(polling_monitor, [#state{resourceid=ResourceId, url=Url, parserslist=Parsers}]),
+	%%Pid = spawn(poller, poller_loop, [ResourceId, Url, Parsers]),
+	Record = #pollerInfo{resourceid=ResourceId, name=ResourceName, url=Url, frequency=Frequency, pid=Pid},
+	%%add this poller into the pollers infor storage of the server_loop
+	polling_supervisor!{addNewPoller, Record},
+	%%use timer library to create scheduler for this poller
+	timer:start(),
+	timer:send_interval(Frequency, Pid, {probe}),
+	{noreply, State};
+handle_cast({rebuild_poller, ResourceId}, State)->
+	polling_supervisor!{rebuild, ResourceId},
+	{noreply, State}.
+	
+%% @doc
+%% Function: handle_call/2
+%% Purpose: init function used to generate the supervisor process, pollingBoss supervisor, and create all pollers.
+%% Returns: {reply, (reply_message), (new_state_of_gen_server)}
+%% Side effects: creates pollers for specific resource
+%% @end
+handle_call(create_pollers, State)->
+	%%extract all the resources data from the database
+	%%and store the information into specific data structure
+	
+	%%create pollers for each resource and add them into the server_loop.\
+				%% [{#pollerInfo{...}}, {#pollerInfo{...}}]
+	%% TODO create erlastic function for getting all resources using polling.
+	PollerList = streams:get_all_pollers(),
+	lists:foreach(create_poller, PollerList),
+	create_poller_for_each(PollerList)
+	%%return the list of pollers` information list
+	.
+
+%% @doc
+%% Function: terminate/2
+%% Purpose: controls what happen when this pulling supervisor stops working!.
+%% Returns: ok
+%% @end
+terminate(_T, State)->
+	erlang:display("polling supervisor stops working!").
 
 
 %% ====================================================================
 %% Internal functions
 %% ====================================================================
+
+%% @doc
+%% Function: create_poller_for_each/1
+%% Purpose: make asynchronous call to polling_supervisor to create poller for each item in polling information list.
+%% Returns: ok
+%% @end
+create_poller_for_each([])->ok;
+create_poller_for_each([PollerInfo|PollerInfoList])->
+	supervisor:cast(polling_supervisor, {create_poller, PollerInfo}),
+	create_poller_for_each(PollerInfoList).
 
 %% @doc
 %% Function: find_poller_by_id/2
@@ -85,18 +150,18 @@ find_poller_by_id(ResourceId, [Poller|Tail]) ->
 %% Purpose: function used to extract all pollers from the datastore and create every poller for each of them.
 %% Returns: ok
 %% @end
--spec create_pollers() -> ok.
-create_pollers()->
+%%-spec create_pollers() -> ok.
+%%create_pollers()->
 	%%extract all the resources data from the database
 	%%and store the information into specific data structure
 	
 	%%create pollers for each resource and add them into the server_loop.\
 				%% [{#pollerInfo{...}}, {#pollerInfo{...}}]
 	%% TODO create erlastic function for getting all resources using polling.
-	PollerList = streams:get_all_pollers(),
-	lists:foreach(create_poller, PollerList)
+%%	PollerList = streams:get_all_pollers(),
+%%	lists:foreach(create_poller, PollerList)
 	%%return the list of pollers` information list
-	.
+%%	.
 
 
 %% @doc
@@ -119,23 +184,23 @@ updateInfo([Poller|Tail], ResourceId, NewUrl) ->
 %% Function: server_loop/1
 %% Purpose: the main loop of supervisor to process the coming messages
 %% @end
--spec server_loop(list()) -> none().
-server_loop(PollersInfo)->
-	receive
-		{addNewPoller, Poller}->
-			server_loop([Poller|PollersInfo]);
-		{update, ResourceId, NewUrl}->
-			server_loop( updateInfo(PollersInfo, ResourceId, NewUrl) );
-		{rebuild, ResourceId}->
-			%%find pid from the records list according to resource id
-			Poller = find_poller_by_id(ResourceId, PollersInfo),
-			%%and sends rebuild function to the poller
-			case Poller of
-				{error, ErrMessage} -> 
-					erlang:display(ErrMessage);
-				_ ->
-					Poller#pollerInfo.pid ! {rebuild}
-			end,
-			server_loop(PollersInfo)
-	end.
+%%-spec server_loop(list()) -> none().
+%%server_loop(PollersInfo)->
+%%	receive
+%%		{addNewPoller, Poller}->
+%%			server_loop([Poller|PollersInfo]);
+%%		{update, ResourceId, NewUrl}->
+%%			server_loop( updateInfo(PollersInfo, ResourceId, NewUrl) );
+%%		{rebuild, ResourceId}->
+%%			%%find pid from the records list according to resource id
+%%			Poller = find_poller_by_id(ResourceId, PollersInfo),
+%%			%%and sends rebuild function to the poller
+%%			case Poller of
+%%				{error, ErrMessage} -> 
+%%					erlang:display(ErrMessage);
+%%				_ ->
+%%					Poller#pollerInfo.pid ! {rebuild}
+%%			end,
+%%			server_loop(PollersInfo)
+%%	end.
 
