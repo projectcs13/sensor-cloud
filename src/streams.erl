@@ -97,7 +97,7 @@ content_types_accepted(ReqData, State) ->
 delete_resource(ReqData, State) ->
 	Id = proplists:get_value('stream', wrq:path_info(ReqData)),
 	case erlastic_search:delete_doc(?INDEX,"stream", Id) of
-			{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
+			{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
 			{ok,List} -> httpc:request(delete, {"http://localhost:9200/sensorcloud/datapoint/_query?q=streamid:" 
                   		 ++ Id, []}, [], []),
 				 	{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
@@ -135,7 +135,7 @@ process_post(ReqData, State) ->
 					Date = generate_date([Year,Month,Day]),
 					DateAdded = api_help:add_field(ResAdded,"creation_date",Date),
 					case erlastic_search:index_doc(?INDEX, "stream", DateAdded) of	
-						{error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
+						{error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
 						{ok,List} -> 
 							suggest:update_suggestion(ResAdded),
 							{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
@@ -167,7 +167,7 @@ process_search_post(ReqData, State) ->
         end,
         erlang:display(FilteredJson),
         case erlastic_search:search_json(#erls_params{},?INDEX, "stream", FilteredJson) of % Maybe wanna take more
-                {error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
+                {error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
                 {ok,List} -> {true,wrq:set_resp_body(lib_json:encode(List),ReqData),State} % May need to convert
         end.
 
@@ -207,7 +207,7 @@ process_search_get(ReqData, State) ->
 	end,
 	FullQuery = lists:append(api_help:transform(URIQuery,ResDef or UserDef),Query),
 	case erlastic_search:search_limit(?INDEX, "stream", FullQuery,200) of % Maybe wanna take more
-		{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
+		{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
 		{ok,List} -> {lib_json:encode(List),ReqData,State} 
 	end.
 
@@ -225,7 +225,7 @@ put_stream(ReqData, State) ->
 	{Stream,_,_} = api_help:json_handler(ReqData,State),
 	Update = api_help:create_update(Stream),
 	case api_help:update_doc(?INDEX, "stream", StreamId, Update) of 
-		{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
+		{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
 		{ok,List} -> {true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
 	end.
 
@@ -275,7 +275,7 @@ get_stream(ReqData, State) ->
 					end,
 					case erlastic_search:search_limit(?INDEX, "stream", Query,200) of % Maybe wanna take more
 						{error,Reason} -> 
-						      {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
+						      {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
 					        {ok,JsonStruct} ->
 						       FinalJson = lib_json:get_list_and_add_id(JsonStruct),
 						       {FinalJson, ReqData, State} 
@@ -284,7 +284,7 @@ get_stream(ReqData, State) ->
 				% Get specific stream
 					case erlastic_search:get_doc(?INDEX, "stream", StreamId) of 
 						{error, Reason} -> 
-							{{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
+							{{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
 						{ok,JsonStruct} -> 	 
 						        FinalJson = lib_json:get_and_add_id(JsonStruct),
 						        {FinalJson, ReqData, State}

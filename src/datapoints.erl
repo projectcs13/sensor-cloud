@@ -74,7 +74,7 @@ process_post(ReqData, State) ->
 					_ ->
 						FinalJson = api_help:add_field(DatapointJson, "streamid", Id),
 						case erlastic_search:index_doc(?INDEX, "datapoint", FinalJson) of
-							{error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
+							{error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
 							{ok,List} -> {true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
 						end
 				end;
@@ -132,7 +132,7 @@ get_datapoint(ReqData, State) ->
 process_search(ReqData, State, post) ->
 		{Json,_,_} = api_help:json_handler(ReqData,State),
 		case erlastic_search:search_json(#erls_params{},?INDEX, "datapoint", Json) of
-				{error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
+				{error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
 				{ok,JsonStruct} ->
 						       FinalJson = lib_json:get_list_and_add_id(JsonStruct),
 						       {true,wrq:set_resp_body(lib_json:encode(FinalJson),ReqData),State}
@@ -143,7 +143,7 @@ process_search(ReqData, State, get) ->
 		case TempQuery of
 			[] ->   
 				case erlastic_search:search_limit(?INDEX, "datapoint","streamid:" ++ Id ++ "&sort=timestamp:asc", 100) of
-					{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
+					{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
                 	{ok,JsonStruct} ->
 						       FinalJson = lib_json:get_list_and_add_id(JsonStruct),
 						       {FinalJson, ReqData, State}
@@ -151,7 +151,7 @@ process_search(ReqData, State, get) ->
 			_ ->
 				TransformedQuery="streamid:" ++ Id ++ transform(TempQuery) ++ "&sort=timestamp:asc",
 				case erlastic_search:search_limit(?INDEX, "datapoint",TransformedQuery, 100) of
-					{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
+					{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
                 	{ok,JsonStruct} ->
 						       FinalJson = lib_json:get_list_and_add_id(JsonStruct),
 						       {FinalJson, ReqData, State}
