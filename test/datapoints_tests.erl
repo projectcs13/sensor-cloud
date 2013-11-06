@@ -110,3 +110,4 @@ request(Method, Request) ->
 %% @end
 refresh() ->
     httpc:request(post, {"http://localhost:9200/sensorcloud/_refresh", [],"", ""}, [], []).
+

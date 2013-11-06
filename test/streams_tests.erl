@@ -37,10 +37,11 @@ process_search_post_test() ->
         {ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"search\",\"resource_id\" : \"0\", \"private\" : \"true\"}"}, [], []),
         DocId1 = lib_json:get_field(Body1,"_id"),
         DocId2 = lib_json:get_field(Body2,"_id"),
-        timer:sleep(1000),
+        refresh(),
         {ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(post, {"http://localhost:8000/streams/_search", [],"application/json", "{\"query\":{\"match_all\":{}}}"}, [], []),
         {ok, {{_Version8, 200, _ReasonPhrase8}, _Headers8, _Body8}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId1), []}, [], []),
         {ok, {{_Version9, 200, _ReasonPhrase9}, _Headers9, _Body9}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId2), []}, [], []),
+		% Test for the search
         ?assertEqual(true,lib_json:get_field(Body3,"hits.total") >= 1).
 
 %% @doc
@@ -69,6 +70,11 @@ get_stream_test() ->
 	% Test delete
 	{ok, {{_Version8, 200, _ReasonPhrase8}, _Headers8, Body8}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId1), []}, [], []),
 	{ok, {{_Version9, 200, _ReasonPhrase9}, _Headers9, Body9}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId2), []}, [], []),
+	
+	{{Year,Month,Day},_} = calendar:local_time(),
+	Date = generate_date([Year,Month,Day]),
+	% Tests to make sure the correct creation date is added
+	?assertEqual(true,lib_json:get_field(Body3,"creation_date") == list_to_binary(Date)),
 	?assertEqual(<<"get">>,lib_json:get_field(Body3,"test")),
 	?assertEqual(true,lib_json:get_field(Body3,"private") == <<"false">>),
 	?assertEqual(true,lib_json:field_value_exists(Body4,"hits[*].test", <<"get">>)),
@@ -167,3 +173,24 @@ create_doc_without_resource_test() ->
 %% @end
 refresh() ->
 	httpc:request(post, {"http://localhost:9200/sensorcloud/_refresh", [],"", ""}, [], []).
+
+%% @doc
+%% Function: generate_date/2
+%% Purpose: Used to create a date valid in ES
+%%          from the input which should be the list
+%%          [Year,Mounth,Day]
+%% Returns: The generated timestamp
+%%
+%% @end
+-spec generate_date(DateList::list()) -> string().
+
+generate_date([First]) ->
+	case First < 10 of
+		true -> "0" ++ integer_to_list(First);
+		false -> "" ++ integer_to_list(First)
+	end;
+generate_date([First|Rest]) ->
+	case First < 10 of
+		true -> "0" ++ integer_to_list(First) ++ "-" ++ generate_date(Rest);
+		false -> "" ++ integer_to_list(First) ++ "-" ++ generate_date(Rest)
+	end.
