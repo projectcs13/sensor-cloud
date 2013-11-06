@@ -34,9 +34,9 @@ create(VStreamId, InputType, InputId, Function) ->
 	io:format("Listening to ~p~n", [binary_to_list(InputExchange)]),
 	amqp_channel:call(ChannelOut, #'exchange.declare'{exchange = VStreamExchange, type = <<"fanout">>}),
 	
-	loop(ChannelIn, {ChannelOut, VStreamExchange}, Function).
+	loop(VStreamId, ChannelIn, {ChannelOut, VStreamExchange}, Function).
 
-loop(ChannelIn, {ChannelOut, VStreamExchange}, Function) ->
+loop(VStreamId, ChannelIn, {ChannelOut, VStreamExchange}, Function) ->
 	%% Receive from the subscribeTopic!
 	receive
 		{#'basic.deliver'{}, #amqp_msg{payload = Body}} ->
@@ -60,16 +60,18 @@ loop(ChannelIn, {ChannelOut, VStreamExchange}, Function) ->
 					io:format("DELETE~n");
 
 				%% New value from the source
-				#'datapoint'{timestamp = TimeStamp, value = Value} ->
+				#'datapoint'{id = Id, timestamp = TimeStamp, value = Value} ->
 					%% Store value
 
 					%% Apply function
-					Data = Function(Value),
+					{Val, _} = string:to_integer(Value),
+					Data = Function(Val),
 
 					%% Create Message
 					Msg = term_to_binary(#'datapoint'{
+							id = VStreamId,
 							timestamp = TimeStamp,
-							value = Data}),
+							value = integer_to_list(Data)}),
 
 					%% Propagete
 					send(ChannelOut, VStreamExchange, Msg),
@@ -78,7 +80,7 @@ loop(ChannelIn, {ChannelOut, VStreamExchange}, Function) ->
 					io:format("CRAP! We are getting CRAP!~n")
 			end,
 			%% Recurse
-			loop(ChannelIn, {ChannelOut, VStreamExchange}, Function)
+			loop(VStreamId, ChannelIn, {ChannelOut, VStreamExchange}, Function)
 	end.
 
 send(Channel, Exchange, Message) ->

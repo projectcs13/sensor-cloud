@@ -37,6 +37,7 @@ start() ->
     application:set_env(webmachine, webmachine_logger_module, 
                         webmachine_logger),
     ensure_started(webmachine),
+    analyse:start(),    % possibly temporary solution for ericsson demo
     application:start(engine).
 
 %% @spec stop() -> ok
