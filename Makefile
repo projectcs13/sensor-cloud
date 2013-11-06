@@ -75,9 +75,9 @@ run_rabbit:
 ### Compile project resources (not libraries) and runs all eunit tests.
 test: compile
 	-@mkdir test-results
+	curl -XDELETE localhost:9200/sensorcloud
 	curl -XPUT localhost:9200/sensorcloud
 	$(ERL) -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname engine -s test run
-	curl -XDELETE localhost:9200/sensorcloud
 
 test_json: compile
 	-@mkdir test-results
