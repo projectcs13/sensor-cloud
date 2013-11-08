@@ -178,50 +178,28 @@ update_suggestion(Stream) ->
 	end.
 
 update_resource(Resource, ResourceId) ->
-	erlang:display("-2-2-2-2-2-2-2"),
-	erlang:display(ResourceId),
 	Manufacturer = lib_json:get_field(Resource, "manufacturer"),
 	Model = lib_json:get_field(Resource, "model"),
 	Tags = lib_json:get_field(Resource, "tags"),
 	Polling_freq = lib_json:get_field(Resource, "polling_freq"),
 	RId = list_to_binary(ResourceId),
-	erlang:display("-1-1-1-1-1-1-1"),
 	%fetch old suggestion
 	case erlastic_search:search(?INDEX, "suggestion", "resource_id:"++ ResourceId) of
 		{error, _} -> erlang:display("ERROR");
 		{ok, Response} ->
-			erlang:display("000000"),
-			erlang:display(lib_json:to_string(Response)),
 			case lib_json:get_field(Response, "hits.hits[0]._source.resource_id") of
 				RId ->
-					erlang:display("111111111"),
-					%If suggestion found
 					SuggId = lib_json:get_field(Response, "hits.hits[0]._id"),
 					Json = lib_json:get_field(Response, "hits.hits[0]._source"), 
-					%Payload = lib_json:get_field(Response, "hits.hits[0]._source.suggest.payload"),
 					UpdatedJson = lib_json:replace_fields(Json, [{"suggest.payload.manufacturer",Manufacturer},{"suggest.payload.model",Model},{"suggest.payload.tags",Tags},{"suggest.payload.pollng_feq",Polling_freq}]),
-
-					%Delete old suggestion
-					%erlastic_search:delete_doc("sensorcloud", "suggestion", SuggId),
-					%update weight
-					erlang:display("333333333"),
-					erlang:display(UpdatedJson),
 					WeightJson = update_score(UpdatedJson),
-					erlang:display("444444444"),
 					%change input (in case model changed)
 					FinalJson = lib_json:replace_field(WeightJson, "suggest.input",Model),
-					erlang:display(FinalJson),
 					case erlastic_search:index_doc_with_id(?INDEX, "suggestion", SuggId, FinalJson) of 
 						{error, _Reason} -> erlang:display("Suggestion not saved ");
 						{ok, _} -> 	ok
 					end;
-					%Final = api_help:create_update(Sugg),
-					%case api_help:update_doc(?INDEX, "suggestion", SuggId, Final) of 
-					%	{error, _Reason} -> erlang:display("not updated");
-					%	{ok, _Json} -> ok 
-					%end;
-				A -> 
-					erlang:display(A),
+				_ -> 
 					erlang:display("No suggestion exists for that resource")
 			end
 	end,
@@ -232,18 +210,12 @@ update_resource(Resource, ResourceId) ->
 update_score(Suggestion) ->
 	Payload = lib_json:get_field(Suggestion, "suggest.payload"),
 	ResourceWeight = scoring:calc(Payload, resource),
-	erlang:display(ResourceWeight),
 	Streams = lib_json:get_field(Payload, "streams"),
-	erlang:display("----1----"),
 	Fun = fun(Stream, Acc) -> 
 			scoring:calc(Stream,stream)+Acc
 	end,
-	erlang:display("----2----"),
 	StreamWeight = lists:foldr(Fun, 0, Streams),
-	erlang:display(StreamWeight),
-	erlang:display("----3----"),
 	Sum = ResourceWeight + StreamWeight,
-	erlang:display("----4----"),
 	lib_json:replace_field(Suggestion, "suggest.weight", Sum).
 
 
