@@ -1,4 +1,4 @@
-%% @author Tomas Sävström <tosa7943@student.uu.se>
+%% @author Tomas SÃ¤vstrÃ¶m <tosa7943@student.uu.se>
 %%   [www.csproj13.student.it.uu.se]
 %% @version 1.0
 %% @copyright [Copyright information]
@@ -13,6 +13,8 @@
 		 delete_resource/2, process_post/2, put_stream/2, get_stream/2]).
 
 
+
+-include_lib("erlastic_search.hrl").
 -include("webmachine.hrl").
 
 -define(INDEX, "sensorcloud").
@@ -95,8 +97,10 @@ content_types_accepted(ReqData, State) ->
 delete_resource(ReqData, State) ->
 	Id = proplists:get_value('stream', wrq:path_info(ReqData)),
 	case erlastic_search:delete_doc(?INDEX,"stream", Id) of
-			{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
-			{ok,List} -> {true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
+			{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
+			{ok,List} -> httpc:request(delete, {"http://localhost:9200/sensorcloud/datapoint/_query?q=streamid:" 
+                  		 ++ Id, []}, [], []),
+				 	{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
 	end.
 
 
@@ -127,9 +131,14 @@ process_post(ReqData, State) ->
 			case lib_json:get_field(ResAdded,"resource_id") == undefined of
 				true -> {false, wrq:set_resp_body("\"resource_id_missing\"",ReqData), State};
 				false ->
-					case erlastic_search:index_doc(?INDEX, "stream", ResAdded) of	
-						{error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
-						{ok,List} -> {true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
+					{{Year,Month,Day},_} = calendar:local_time(),
+					Date = generate_date([Year,Month,Day]),
+					DateAdded = api_help:add_field(ResAdded,"creation_date",Date),
+					case erlastic_search:index_doc(?INDEX, "stream", DateAdded) of	
+						{error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
+						{ok,List} -> 
+							suggest:update_suggestion(ResAdded),
+							{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
 					end
 			end;
 		true ->
@@ -146,35 +155,21 @@ process_post(ReqData, State) ->
 -spec process_search_post(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 
 process_search_post(ReqData, State) ->
-	URIQuery = wrq:req_qs(ReqData),
-	case proplists:get_value('user', wrq:path_info(ReqData)) of
-		undefined ->
-			UserQuery = [],
-			UserDef = false;
-		UserId ->
-			UserQuery = "user_id:" ++ UserId,
-			UserDef = true
-		end,
-	case proplists:get_value('res', wrq:path_info(ReqData)) of
-		undefined ->
-			ResQuery = [],
-			ResDef = false;
-		ResId ->
-			ResQuery = "resource_id:" ++ ResId,
-			ResDef = true
-	end,
-	case ResDef and UserDef of
-		true -> Query = UserQuery ++ "&" ++ ResQuery; 
-		false -> case ResDef or UserDef of
-					 true -> Query = UserQuery ++ ResQuery;
-					 false -> Query = ""
-				 end
-	end,
-	FullQuery = lists:append(api_help:transform(URIQuery,ResDef or UserDef),Query),
-	case erlastic_search:search_limit(?INDEX, "stream", FullQuery,200) of % Maybe wanna take more
-		{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
-		{ok,List} -> {true,wrq:set_resp_body(lib_json:encode(List),ReqData),State} 
-	end.
+
+        erlang:display("search with json request"),
+        {Json,_,_} = api_help:json_handler(ReqData,State),
+        case proplists:get_value('res', wrq:path_info(ReqData)) of
+                undefined ->
+                        FilteredJson = filter_json(Json);
+                ResId ->
+                        ResQuery = "\"resource\":" ++ ResId,
+                        FilteredJson = filter_json(Json, ResQuery)
+        end,
+        erlang:display(FilteredJson),
+        case erlastic_search:search_json(#erls_params{},?INDEX, "stream", FilteredJson) of % Maybe wanna take more
+                {error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
+                {ok,List} -> {true,wrq:set_resp_body(lib_json:encode(List),ReqData),State} % May need to convert
+        end.
 
 
 %% @doc
@@ -212,7 +207,7 @@ process_search_get(ReqData, State) ->
 	end,
 	FullQuery = lists:append(api_help:transform(URIQuery,ResDef or UserDef),Query),
 	case erlastic_search:search_limit(?INDEX, "stream", FullQuery,200) of % Maybe wanna take more
-		{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
+		{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
 		{ok,List} -> {lib_json:encode(List),ReqData,State} 
 	end.
 
@@ -230,7 +225,7 @@ put_stream(ReqData, State) ->
 	{Stream,_,_} = api_help:json_handler(ReqData,State),
 	Update = api_help:create_update(Stream),
 	case api_help:update_doc(?INDEX, "stream", StreamId, Update) of 
-		{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
+		{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
 		{ok,List} -> {true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
 	end.
 
@@ -280,25 +275,58 @@ get_stream(ReqData, State) ->
 					end,
 					case erlastic_search:search_limit(?INDEX, "stream", Query,200) of % Maybe wanna take more
 						{error,Reason} -> 
-						      {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ api_help:json_encode(Reason) ++ "\"}", ReqData), State};
+						      {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
 					        {ok,JsonStruct} ->
-                                                       HitsList = lib_json:get_field(JsonStruct, "hits.hits"),
-						       HitsAttr = lib_json:set_attr(hits, HitsList), 
-						       FinalJson = lib_json:to_string(HitsAttr),
+						       FinalJson = lib_json:get_list_and_add_id(JsonStruct),
 						       {FinalJson, ReqData, State} 
 					end;
 				StreamId ->
 				% Get specific stream
 					case erlastic_search:get_doc(?INDEX, "stream", StreamId) of 
 						{error, Reason} -> 
-							{{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
-						{ok,JsonStruct} -> 
-	  					        JsonStr = lib_json:to_string(JsonStruct),
-						        StreamId  = lib_json:get_field(JsonStruct, "_id"),
-						        SourceJson  = lib_json:get_field(JsonStruct, "_source"),
-						        FinalJson = lib_json:add_field(SourceJson, "id", StreamId),
+							{{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
+						{ok,JsonStruct} -> 	 
+						        FinalJson = lib_json:get_and_add_id(JsonStruct),
 						        {FinalJson, ReqData, State}
 					end
 				end
 	end.
 
+%% @doc
+%% Function: filter_json/1
+%% Purpose: Used to add private filters to the json query
+%% Returns: JSON string that is updated with filter
+%% @end
+filter_json(Json) ->
+        NewJson = string:sub_string(Json,1,string:len(Json)-1),
+        "{\"query\":{\"filtered\":"++NewJson++",\"filter\":{\"bool\":{\"must\":{\"term\":{\"private\":\"false\"}}}}}}}".
+
+%% @doc
+%% Function: filter_json/2
+%% Purpose: Used to add private and resource filters to the json query
+%% Returns: JSON string that is updated with filter
+%% @end
+filter_json(Json,ResourceQuery) ->
+        NewJson = string:sub_string(Json,1,string:len(Json)-1),
+        "{\"query\":{\"filtered\":"++NewJson++",\"filter\":{\"bool\":{\"must\":[{\"term\":{\"private\":\"false\"}},{\"term\":{"++ResourceQuery++"}}]}}}}}".
+
+%% @doc
+%% Function: generate_date/2
+%% Purpose: Used to create a date valid in ES
+%%          from the input which should be the list
+%%          [Year,Mounth,Day]
+%% Returns: The generated timestamp
+%%
+%% @end
+-spec generate_date(DateList::list()) -> string().
+
+generate_date([First]) ->
+	case First < 10 of
+		true -> "0" ++ integer_to_list(First);
+		false -> "" ++ integer_to_list(First)
+	end;
+generate_date([First|Rest]) ->
+	case First < 10 of
+		true -> "0" ++ integer_to_list(First) ++ "-" ++ generate_date(Rest);
+		false -> "" ++ integer_to_list(First) ++ "-" ++ generate_date(Rest)
+	end.
