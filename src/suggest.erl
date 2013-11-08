@@ -11,7 +11,10 @@
 	content_types_provided/2, 
 	get_suggestion/2, 
 	add_suggestion/2,
-	update_suggestion/1]).
+	update_suggestion/1,
+
+	update_resource/2
+	]).
 
 
 -include_lib("erlastic_search.hrl").
@@ -114,19 +117,19 @@ add_suggestion(Resource, ResourceId) ->
 		undefined ->
 			{error, no_model};
 		_ ->
-			Suggestion = "{
-				\"resource_id\" : \"" ++ undefined_to_string(ResourceId) ++ "\",
-				\"suggest\" : {
-					\"input\" : [ \"" ++ undefined_to_string(Model) ++ "\" ], 
-					\"output\" : \"" ++ get_timestamp() ++ "\",
-					\"payload\" : { 
-						\"manufacturer\" : \"" ++ undefined_to_string(Manufacturer) ++ "\",
-						\"tags\" : \"" ++ undefined_to_string(Tags) ++ "\",
-						\"polling_freq\" : \"" ++ undefined_to_string(Polling_freq) ++ "\"
-					},
-					\"weight\" : " ++ integer_to_list(Weight) ++ "
-				}				
-				}",
+		           Suggestion = lib_json:set_attrs(
+					  [
+					   {resource_id, ResourceId},
+					   {suggest, "{}"},
+					   {"suggest.input", Model},
+					   {"suggest.output", get_timestamp()},
+					   {"suggest.payload", "{}"},
+					   {"suggest.payload.manufacturer", Manufacturer},
+					   {"suggest.payload.tags", Tags},
+					   {"suggest.payload.polling_freq", Polling_freq},
+					   {"suggest.weight", Weight}
+					  ]
+					 ),
 			case erlastic_search:index_doc(?INDEX, "suggestion", Suggestion) of 
 				{error, _Reason} -> erlang:display("Suggestion not saved ");
 				{ok, _} -> 	ok
@@ -174,6 +177,57 @@ update_suggestion(Stream) ->
 			end
 	end.
 
+%% @doc
+%% Updates the suggestion to reflect the changes that has been done in a resource.
+%% @end
+-spec update_resource(Resource::json(), ResourceId::string()) -> ok.
+update_resource(Resource, ResourceId) ->
+	Manufacturer = lib_json:get_field(Resource, "manufacturer"),
+	Model = lib_json:get_field(Resource, "model"),
+	Tags = lib_json:get_field(Resource, "tags"),
+	Polling_freq = lib_json:get_field(Resource, "polling_freq"),
+	RId = list_to_binary(ResourceId),
+	%fetch old suggestion
+	case erlastic_search:search(?INDEX, "suggestion", "resource_id:"++ ResourceId) of
+		{error, _} -> erlang:display("ERROR");
+		{ok, Response} ->
+			case lib_json:get_field(Response, "hits.hits[0]._source.resource_id") of
+				RId ->
+					SuggId = lib_json:get_field(Response, "hits.hits[0]._id"),
+					Json = lib_json:get_field(Response, "hits.hits[0]._source"), 
+					UpdatedJson = lib_json:replace_fields(Json, [{"suggest.payload.manufacturer",Manufacturer},{"suggest.payload.model",Model},{"suggest.payload.tags",Tags},{"suggest.payload.pollng_feq",Polling_freq}]),
+					WeightJson = update_score(UpdatedJson),
+					%change input (in case model changed)
+					FinalJson = lib_json:replace_field(WeightJson, "suggest.input",Model),
+					case erlastic_search:index_doc_with_id(?INDEX, "suggestion", SuggId, FinalJson) of 
+						{error, _Reason} -> erlang:display("Suggestion not saved ");
+						{ok, _} -> 	ok
+					end;
+				_ -> 
+					erlang:display("No suggestion exists for that resource")
+			end
+	end,
+	ok.
+
+
+%% @doc
+%% Updates the weight of the suggestion after the new information has been added to it
+%% It takes into account both resource and stream.
+%% @end
+-spec update_score(Suggestion::json()) -> json().
+update_score(Suggestion) ->
+	Payload = lib_json:get_field(Suggestion, "suggest.payload"),
+	ResourceWeight = scoring:calc(Payload, resource),
+	Streams = lib_json:get_field(Payload, "streams"),
+	Fun = fun(Stream, Acc) -> 
+			scoring:calc(Stream,stream)+Acc
+	end,
+	StreamWeight = lists:foldr(Fun, 0, Streams),
+	Sum = ResourceWeight + StreamWeight,
+	lib_json:replace_field(Suggestion, "suggest.weight", Sum).
+
+
+
 
 %% @doc
 %% It keeps usefull information for the given stream. It forms a new json object using only these 
@@ -189,31 +243,15 @@ get_stream_info(Stream) ->
 	Type  = lib_json:get_field(Stream, "type"),
 	Accuracy  = lib_json:get_field(Stream, "accuracy"),
 	Weight = scoring:calc([Name, Description, Min_val, Max_val, Tags, Type, Accuracy]),
-	Result ="{
-		\"name\":\"" ++ undefined_to_string(Name)++"\",
-		\"description\":\"" ++ undefined_to_string(Description)++"\",
-		\"min_value\":\"" ++ undefined_to_string(Min_val)++"\",
-		\"max_value\":\"" ++ undefined_to_string(Max_val)++"\",
-		\"tags\":\"" ++ undefined_to_string(Tags)++"\",
-		\"type\":\"" ++ undefined_to_string(Type)++"\",
-		\"accuracy\":\"" ++ undefined_to_string(Accuracy)++"\"
-		}",
+        Result = lib_json:set_attrs([{name, Name},
+				     {description, Description},
+				     {min_value, Min_val},
+				     {max_value, Max_val},
+				     {tags, Tags},
+				     {type, Type},
+				     {accuracy, Accuracy}
+				    ]),
 	{Weight, Result}.
-
-
-%% @doc
-%% Returns an empty string if it was "undefined", else it returns the string itself.
-%% @end
--spec undefined_to_string(Text::attr()) -> string().
-undefined_to_string(Text) ->
-	case Text of
-		undefined ->
-			"";
-		_ ->
-			lib_json:to_string(Text)
-	end.
-
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Should be moved to own module later
@@ -225,7 +263,7 @@ get_timestamp() ->
 	TS = {_MSec,_Sec,Micro} = os:timestamp(),
 	{{Year,Month,Day},{Hour,Minute,Second}} = calendar:now_to_universal_time(TS),
 	Mstr = element(Month,{"Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"}),
-	io_lib:format("~2w ~s ~4w ~2w:~2..0w:~2..0w.~6..0w", [Day,Mstr,Year,Hour,Minute,Second,Micro]).
+	binary:list_to_bin(io_lib:format("~2w ~s ~4w ~2w:~2..0w:~2..0w.~6..0w", [Day,Mstr,Year,Hour,Minute,Second,Micro])).
 
 
 
