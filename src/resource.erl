@@ -21,7 +21,7 @@
 -spec init([]) -> {ok, undefined}.
 init([]) -> 
 	%erlastic_search_app:start(), %% start this in the make file somehow
-    {ok, undefined}.
+	{ok, undefined}.
 
 %% @doc
 %% Function: allowed_methods/2
@@ -38,12 +38,12 @@ allowed_methods(ReqData, State) ->
 		[{"users", _UserID}, {"resources"}] ->
 			{['GET','POST'], ReqData, State};
 		[{"users", _UserID}, {"resources", "_search" ++ _Query}] ->
-		  	{['GET', 'POST'], ReqData, State};
+			{['GET', 'POST'], ReqData, State};
 		[{"users", _UserID}, {"resources", _ResourceID}] ->
 			{['GET', 'PUT', 'DELETE'], ReqData, State};
 		[error] ->
-		    {[], ReqData, State}
-end.
+			{[], ReqData, State}
+	end.
 
 
 
@@ -80,12 +80,12 @@ delete_resource(ReqData, State) ->
 	Id = proplists:get_value('resourceid', wrq:path_info(ReqData)),
 	erlang:display("DELETE request - check permission here"),
 	%% TODO Authentication
- 	case delete_streams_with_resource_id(Id) of
-   		{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
-   		{ok} ->
+	case delete_streams_with_resource_id(Id) of
+		{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
+		{ok} ->
 			case erlastic_search:delete_doc(?INDEX,"resource", Id) of
-					{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
-					{ok,List} -> {true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
+				{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
+				{ok,List} -> {true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
 			end
 	end.
 
@@ -157,14 +157,17 @@ delete_streams([StreamId|Rest]) ->
 %% @end
 -spec process_post(ReqData::tuple(), State::string()) -> {atom(), tuple(), string()}.
 process_post(ReqData, State) ->
-        URIList = string:tokens(wrq:path(ReqData), "/"),
-        IsSearch = (string:sub_string(lists:nth(length(URIList),URIList),1,7) == "_search"),
+	URIList = string:tokens(wrq:path(ReqData), "/"),
+	IsSearch = (string:sub_string(lists:nth(length(URIList),URIList),1,7) == "_search"),
 	case IsSearch of 
 		false ->
 			% Create
 			{Resource,_,_} = api_help:json_handler(ReqData,State),
-			case erlastic_search:index_doc(?INDEX,"resource",Resource) of 
-				{error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
+			{{Year,Month,Day},_} = calendar:local_time(),
+			Date = generate_date([Year,Month,Day]),
+			DateAdded = api_help:add_field(Resource,"creation_date",Date),
+			case erlastic_search:index_doc(?INDEX,"resource",DateAdded) of 
+				{error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
 				{ok, Json} -> 
 					ResourceId = lib_json:get_field(Json, "_id"),
 					suggest:add_suggestion(Resource, ResourceId),
@@ -192,7 +195,8 @@ process_search_post(ReqData, State) ->
 			UserQuery = "\"user_id\":" ++ UserId,
 			FilteredJson = filter_json(Json, UserQuery),
 			case erlastic_search:search_json(#erls_params{},?INDEX, "resource", FilteredJson) of % Maybe wanna take more
-				{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
+				{error,Reason} -> 
+					{{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
 				{ok,List} -> {true,wrq:set_resp_body(lib_json:encode(List),ReqData),State} % May need to convert
 			end
 	end.
@@ -209,20 +213,20 @@ put_resource(ReqData, State) ->
 	%check if doc already exists
 	Id = id_from_path(ReqData),
 	case erlastic_search:get_doc(?INDEX, "resource", Id) of
-		{error, Reason} ->
-			{{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
+		{error, Reason} -> 
+			{{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
 		{ok, _} ->
 			{UserJson,_,_} = api_help:json_handler(ReqData, State),
 			Update = api_help:create_update(UserJson),
 			case api_help:update_doc(?INDEX,"resource", Id, Update) of 
 				{error, Reason} -> 
-					{{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
-				{ok,List} ->
+					{{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
+				{ok,List} -> 
 					suggest:update_resource(UserJson, Id),
 					{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
 			end
 	end.
-	
+
 
 %% @doc
 %% Function: get_resource/2
@@ -235,7 +239,7 @@ get_resource(ReqData, State) ->
 		false ->
 			case proplists:get_value('resourceid', wrq:path_info(ReqData)) of
 				undefined ->
-				% List resources based on URI
+					% List resources based on URI
 					case proplists:get_value('userid', wrq:path_info(ReqData)) of
 						undefined ->
 							Query = [];
@@ -243,21 +247,22 @@ get_resource(ReqData, State) ->
 							Query = "user_id:" ++ UserId
 					end,
 					case erlastic_search:search_limit(?INDEX, "resource", Query, 100) of % Maybe wanna take more
-						{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ api_help:json_encode(Reason) ++ "\"}", ReqData), State};
-					        {ok,JsonStruct} ->
-						       FinalJson = lib_json:get_list_and_add_id(JsonStruct),
-						       {FinalJson, ReqData, State} 
+						{error,Reason} -> 
+							{{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
+						{ok,JsonStruct} ->
+							FinalJson = lib_json:get_list_and_add_id(JsonStruct),
+							{FinalJson, ReqData, State} 
 					end;
 				ResourceId ->
-				% Get specific resource
+					% Get specific resource
 					case erlastic_search:get_doc(?INDEX, "resource", ResourceId) of 
 						{error,Reason} -> 
-								{{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};			
-					        {ok,JsonStruct} ->
-						        FinalJson = lib_json:get_and_add_id(JsonStruct),
-						        {FinalJson, ReqData, State} 
+							{{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};			
+						{ok,JsonStruct} ->
+							FinalJson = lib_json:get_and_add_id(JsonStruct),
+							{FinalJson, ReqData, State} 
 					end
-		end;
+			end;
 		true ->
 			process_search(ReqData,State, get)
 	end.
@@ -269,23 +274,23 @@ get_resource(ReqData, State) ->
 %% Returns: {true, ReqData, State} || {{error, Reason}, ReqData, State}
 %% @end
 -spec process_search(ReqData::tuple(), State::string(), term()) ->
-		{list(), tuple(), string()}.
+	{list(), tuple(), string()}.
 process_search(ReqData, State, post) ->
-		{Json,_,_} = api_help:json_handler(ReqData,State),
-		{struct, JsonData} = mochijson2:decode(Json),
-		Query = api_help:transform(JsonData),
-		case erlastic_search:search_limit(?INDEX, "resource", Query, 10) of
+	{Json,_,_} = api_help:json_handler(ReqData,State),
+	{struct, JsonData} = mochijson2:decode(Json),
+	Query = api_help:transform(JsonData),
+	case erlastic_search:search_limit(?INDEX, "resource", Query, 10) of
 
-			{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
-			{ok,List} -> {true, wrq:set_resp_body(lib_json:encode(List),ReqData),State}
-		end;
+		{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
+		{ok,List} -> {true, wrq:set_resp_body(lib_json:encode(List),ReqData),State}
+	end;
 process_search(ReqData, State, get) ->
-		TempQuery = wrq:req_qs(ReqData),
-		TransformedQuery = api_help:transform(TempQuery),
-		case erlastic_search:search_limit(?INDEX, "resource", TransformedQuery, 10) of
-			{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ lib_json:encode(Reason) ++ "\"}", ReqData), State};
-			{ok,List} -> {lib_json:encode(List),ReqData,State} % May need to convert
-		end.
+	TempQuery = wrq:req_qs(ReqData),
+	TransformedQuery = api_help:transform(TempQuery),
+	case erlastic_search:search_limit(?INDEX, "resource", TransformedQuery, 10) of
+		{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
+		{ok,List} -> {lib_json:encode(List),ReqData,State} % May need to convert
+	end.
 
 %% @doc
 %% Function: id_from_path/1
@@ -294,12 +299,12 @@ process_search(ReqData, State, get) ->
 %% @end
 -spec id_from_path(tuple()) -> string().
 id_from_path(RD) ->
-    case wrq:path_info(resourceid, RD) of
-        undefined->
-            ["resource", Id] = string:tokens(wrq:disp_path(RD), "/"),
-            Id;
-        Id -> Id
-    end.
+	case wrq:path_info(resourceid, RD) of
+		undefined->
+			["resource", Id] = string:tokens(wrq:disp_path(RD), "/"),
+			Id;
+		Id -> Id
+	end.
 
 %% @doc
 %% Function: filter_json/2
@@ -307,6 +312,27 @@ id_from_path(RD) ->
 %% Returns: JSON string that is updated with filter
 %% @end
 filter_json(Json,UserQuery) ->
-        NewJson = string:sub_string(Json,1,string:len(Json)-1),
-        "{\"query\":{\"filtered\":"++NewJson++",\"filter\":{\"bool\":{\"must\":[{\"term\":{"++UserQuery++"}}]}}}}}".
+	NewJson = string:sub_string(Json,1,string:len(Json)-1),
+	"{\"query\":{\"filtered\":"++NewJson++",\"filter\":{\"bool\":{\"must\":[{\"term\":{"++UserQuery++"}}]}}}}}".
+
+%% @doc
+%% Function: generate_date/2
+%% Purpose: Used to create a date valid in ES
+%% from the input which should be the list
+%% [Year,Mounth,Day]
+%% Returns: The generated timestamp
+%%
+%% @end
+-spec generate_date(DateList::list()) -> string().
+
+generate_date([First]) ->
+	case First < 10 of
+		true -> "0" ++ integer_to_list(First);
+		false -> "" ++ integer_to_list(First)
+	end;
+generate_date([First|Rest]) ->
+	case First < 10 of
+		true -> "0" ++ integer_to_list(First) ++ "-" ++ generate_date(Rest);
+		false -> "" ++ integer_to_list(First) ++ "-" ++ generate_date(Rest)
+	end.
 

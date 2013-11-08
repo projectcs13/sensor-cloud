@@ -38,7 +38,7 @@ post_test() ->
 								\"tags\" : \"testtag\"
 			}"),
 	check_returned_code(Response1, 200),
-	timer:sleep(800),
+	refresh(),
 	Response2 = get_request(?SUGGEST_URL++"testsmartphone2"),     
 	check_returned_code(Response2, 200),
 	{ok, {_, _ ,Body}} = Response2,
@@ -54,11 +54,11 @@ post_and_stream_test() ->
 	check_returned_code(Response1, 200),
 	{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} = Response1,
 	Id = lib_json:get_field(Body, "_id"),
-	timer:sleep(800),
+	refresh(),
 	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, _Body1}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"search\",\"resource_id\" : \""++lib_json:to_string(Id)++"\", \"private\" : \"false\", \"tags\":\"test_tag\"}"}, [], []),
-	timer:sleep(1000),
+	refresh(),
 	{ok, {{_Version11, 200, _ReasonPhrase11}, _Headers11, _Body11}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"search2\",\"resource_id\" : \""++lib_json:to_string(Id)++"\", \"private\" : \"false\", \"tags\":\"test2\"}"}, [], []),
-	timer:sleep(1000),
+	refresh(),
 	Response2 = get_request(?SUGGEST_URL++"testwithstream"),
 	check_returned_code(Response2, 200),
 	{ok, {_, _ ,Body2}} = Response2,
@@ -81,7 +81,7 @@ get_suggestion_test() ->
 								\"manufacturer\" : \"ericsson\"
 			}"),
 	check_returned_code(Response1, 200),
-	timer:sleep(800),
+	refresh(),
 	Response2 = get_request(?SUGGEST_URL ++ "testgetsuggestion"),
 	check_returned_code(Response2, 200),
 	{ok, {_, _ ,Body}} = Response2,
@@ -149,3 +149,11 @@ get_request(URL)                     -> request(get,  {URL, []}).
 
 request(Method, Request) ->
 	httpc:request(Method, Request, [], []).
+
+%% @doc
+%% Function: refresh/0
+%% Purpose: Help function to find refresh the sensorcloud index
+%% Returns: {ok/error, {{Version, Code, Reason}, Headers, Body}}
+%% @end
+refresh() ->
+	httpc:request(post, {"http://localhost:9200/sensorcloud/_refresh", [],"", ""}, [], []).
