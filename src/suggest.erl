@@ -177,6 +177,10 @@ update_suggestion(Stream) ->
 			end
 	end.
 
+%% @doc
+%% Updates the suggestion to reflect the changes that has been done in a resource.
+%% @end
+-spec update_resource(Resource::json(), ResourceId::string()) -> ok.
 update_resource(Resource, ResourceId) ->
 	Manufacturer = lib_json:get_field(Resource, "manufacturer"),
 	Model = lib_json:get_field(Resource, "model"),
@@ -206,7 +210,11 @@ update_resource(Resource, ResourceId) ->
 	ok.
 
 
-
+%% @doc
+%% Updates the weight of the suggestion after the new information has been added to it
+%% It takes into account both resource and stream.
+%% @end
+-spec update_score(Suggestion::json()) -> json().
 update_score(Suggestion) ->
 	Payload = lib_json:get_field(Suggestion, "suggest.payload"),
 	ResourceWeight = scoring:calc(Payload, resource),
