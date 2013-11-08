@@ -98,10 +98,16 @@ process_post(ReqData, State) ->
 %% @end
 -spec get_datapoint(ReqData::tuple(), State::string()) -> {list(), tuple(), string()}.
 get_datapoint(ReqData, State) ->
+        case wrq:get_qs_value("size",ReqData) of 
+            undefined ->
+                Size = 100;
+            SizeParam ->
+                Size = list_to_integer(SizeParam)
+        end,
 		case api_help:is_search(ReqData) of
 			false ->
 				Id = id_from_path(ReqData),			
-				case erlastic_search:search_limit(?INDEX, "datapoint", "streamid:" ++ Id, 100) of
+				case erlastic_search:search_limit(?INDEX, "datapoint", "streamid:" ++ Id, Size) of
 					{ok, Result} ->
 						EncodedResult = lib_json:encode(Result),
 						case re:run(EncodedResult, "\"max_score\":null", [{capture, first, list}]) of
@@ -148,9 +154,15 @@ process_search(ReqData, State, post) ->
 process_search(ReqData, State, get) ->
 		TempQuery = wrq:req_qs(ReqData),
 		Id = id_from_path(ReqData),
+        case wrq:get_qs_value("size",ReqData) of 
+		    undefined ->
+		        Size = 100;
+		    SizeParam ->
+		        Size = list_to_integer(SizeParam)
+        end,
 		case TempQuery of
 			[] ->   
-				case erlastic_search:search_limit(?INDEX, "datapoint","streamid:" ++ Id ++ "&sort=timestamp:asc", 100) of
+				case erlastic_search:search_limit(?INDEX, "datapoint","streamid:" ++ Id ++ "&sort=timestamp:asc", Size) of
 					{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
                 	{ok,JsonStruct} ->
 						       FinalJson = lib_json:get_list_and_add_id(JsonStruct),
@@ -158,7 +170,7 @@ process_search(ReqData, State, get) ->
 			 	end;
 			_ ->
 				TransformedQuery="streamid:" ++ Id ++ transform(TempQuery) ++ "&sort=timestamp:asc",
-				case erlastic_search:search_limit(?INDEX, "datapoint",TransformedQuery, 100) of
+				case erlastic_search:search_limit(?INDEX, "datapoint",TransformedQuery, Size) of
 					{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
                 	{ok,JsonStruct} ->
 						       FinalJson = lib_json:get_list_and_add_id(JsonStruct),

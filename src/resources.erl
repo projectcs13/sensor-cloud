@@ -192,8 +192,20 @@ process_search_post(ReqData, State) ->
 		undefined ->
 			{{halt,405}, ReqData, State};
 		UserId ->
+			    case wrq:get_qs_value("size",ReqData) of 
+	            undefined ->
+	                Size = "10";
+	            SizeParam ->
+	                Size = SizeParam
+	        end,
+	        case wrq:get_qs_value("from",ReqData) of
+	            undefined ->
+	                From = "0";
+	            FromParam ->
+	                From = FromParam
+	        end,
 			UserQuery = "\"user_id\":" ++ UserId,
-			FilteredJson = filter_json(Json, UserQuery),
+			FilteredJson = filter_json(Json, UserQuery, From, Size),
 			case erlastic_search:search_json(#erls_params{},?INDEX, "resource", FilteredJson) of % Maybe wanna take more
 				{error,Reason} -> 
 					{{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
@@ -240,13 +252,19 @@ get_resource(ReqData, State) ->
 			case proplists:get_value('resourceid', wrq:path_info(ReqData)) of
 				undefined ->
 					% List resources based on URI
+				    case wrq:get_qs_value("size",ReqData) of 
+			            undefined ->
+			                Size = 100;
+			            SizeParam ->
+			                Size = list_to_integer(SizeParam)
+			        end,
 					case proplists:get_value('userid', wrq:path_info(ReqData)) of
 						undefined ->
 							Query = [];
 						UserId ->
 							Query = "user_id:" ++ UserId
 					end,
-					case erlastic_search:search_limit(?INDEX, "resource", Query, 100) of % Maybe wanna take more
+					case erlastic_search:search_limit(?INDEX, "resource", Query, Size) of % Maybe wanna take more
 						{error,Reason} -> 
 							{{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
 						{ok,JsonStruct} ->
@@ -314,6 +332,18 @@ id_from_path(RD) ->
 filter_json(Json,UserQuery) ->
 	NewJson = string:sub_string(Json,1,string:len(Json)-1),
 	"{\"query\":{\"filtered\":"++NewJson++",\"filter\":{\"bool\":{\"must\":[{\"term\":{"++UserQuery++"}}]}}}}}".
+
+
+%% @doc
+%% Function: filter_json/3
+%% Purpose: Used to add private and User filters to the json query with pagination
+%% Returns: JSON string that is updated with filter and the from size parameters
+%% @end
+filter_json(Json, UserQuery, From, Size) ->
+        NewJson = string:sub_string(Json,1,string:len(Json)-1),
+        "{\"from\" : "++From++", \"size\" : "++Size++", \"query\":{\"filtered\":"++NewJson++",\"filter\":{\"bool\":{\"must\":[{\"term\":{"++UserQuery++"}}]}}}}}".
+
+
 
 %% @doc
 %% Function: generate_date/2
