@@ -10,8 +10,8 @@ print """\
 {"resource": "polling-resource", 
 	"streams": 
 		{ 
-			"temperature": {"value": %f, "timestamp": %s}, 
-			"humidity": {"value": %f, "timestamp": %s}
+			"temperature": {"value": %f, "timestamp": "%s"}, 
+			"humidity": {"value": %f, "timestamp": "%s"}
 		} 
 	}
 """ % (temperature, timestamp.strftime("%Y-%m-%d %H:%M:%S"), humidity, timestamp.strftime("%Y-%m-%d %H:%M:%S"))
