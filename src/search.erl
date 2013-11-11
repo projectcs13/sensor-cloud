@@ -105,13 +105,15 @@ process_search_post(ReqData, State) ->
         {Json,_,_} = api_help:json_handler(ReqData,State),
         FilteredJson = filter_json(Json, From, Size),
         case erlastic_search:search_json(#erls_params{},?INDEX, "stream", FilteredJson) of % Maybe wanna take more
-                {error,{Code1, _Body}} ->
+                {error,{Code1, _}} ->
+                        StreamSearch = [],
                         {{halt, Code1}, ReqData, State};
                 {ok,List1} ->
                         StreamSearch = lib_json:encode(List1) % May need to convert
         end,
         case erlastic_search:search_json(#erls_params{},?INDEX, "user", FilteredJson) of % Maybe wanna take more
-                {error,{Code2, _Body}} ->
+                {error,{Code2, _}} ->
+                        UserSearch = [],
                         {{halt, Code2}, ReqData, State};
                 {ok,List2} -> UserSearch = lib_json:encode(List2) % May need to convert
          end,
