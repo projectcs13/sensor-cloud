@@ -12,7 +12,7 @@
 	get_suggestion/2, 
 	add_suggestion/2,
 	update_suggestion/1,
-
+	update_stream/2,
 	update_resource/2
 	]).
 
@@ -211,6 +211,46 @@ update_resource(Resource, ResourceId) ->
 
 
 %% @doc
+%% Updates the suggestion to reflect the changes that has been done in a stream.
+%% @end
+-spec update_stream(Stream::json(), StreamId::string()) -> ok.
+update_stream(Stream, StreamId) ->
+	%fetch old values so that we can replace them
+	case erlastic_search:get_doc(?INDEX, "stream", StreamId) of
+		{error, _Reason} -> erlang:display("Stream not found");
+		{ok, OldStreamJson} ->
+			{_, OldStream} = get_stream_info(lib_json:get_field(OldStreamJson, "_source")),
+			{_, NewStream} = get_stream_info(Stream),
+			ResourceId = lib_json:get_field(Stream, "resource_id"),
+			case ResourceId of
+				undefined ->
+					ok;
+				_ ->
+					%fetch old suggestion
+					case erlastic_search:search(?INDEX, "suggestion", "resource_id:" ++ binary_to_list(ResourceId)) of
+						{error, _Reason2} -> erlang:diplay("Suggestion not found :S");
+						{ok, OldSuggestion} -> 
+							StreamList = lib_json:get_field(OldSuggestion, "hits.hits[0]._source.suggest.payload.streams"),
+							case string:str(StreamList, [OldStream]) of
+								0 -> erlang:display("Invalid position. Not matched properly");
+								Pos ->
+									SuggId = lib_json:get_field(OldSuggestion, "hits.hits[0]._id"),
+									Suggestion = lib_json:get_field(OldSuggestion, "hits.hits[0]._source"),
+									UpdatedSuggestion = lib_json:replace_field(Suggestion, lists:concat(["suggest.payload.streams[", Pos-1, "]"]), NewStream),
+									FinalSuggestion = update_score( UpdatedSuggestion),
+									case erlastic_search:index_doc_with_id(?INDEX, "suggestion", SuggId, FinalSuggestion) of 
+										{error, _Reason} -> erlang:display("Suggestion not updated ");
+										{ok, _} -> 	ok
+									end
+							end
+					end
+			end
+	end,
+	ok.
+
+
+
+%% @doc
 %% Updates the weight of the suggestion after the new information has been added to it
 %% It takes into account both resource and stream.
 %% @end
@@ -219,10 +259,15 @@ update_score(Suggestion) ->
 	Payload = lib_json:get_field(Suggestion, "suggest.payload"),
 	ResourceWeight = scoring:calc(Payload, resource),
 	Streams = lib_json:get_field(Payload, "streams"),
-	Fun = fun(Stream, Acc) -> 
-			scoring:calc(Stream,stream)+Acc
+	case Streams of
+		undefined ->
+			StreamWeight = 0;
+		_ -> 
+			Fun = fun(Stream, Acc) -> 
+					scoring:calc(Stream,stream)+Acc
+			end,
+			StreamWeight = lists:foldr(Fun, 0, Streams)
 	end,
-	StreamWeight = lists:foldr(Fun, 0, Streams),
 	Sum = ResourceWeight + StreamWeight,
 	lib_json:replace_field(Suggestion, "suggest.weight", Sum).
 

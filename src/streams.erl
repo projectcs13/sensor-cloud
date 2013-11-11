@@ -224,9 +224,11 @@ put_stream(ReqData, State) ->
 	StreamId = proplists:get_value('stream', wrq:path_info(ReqData)),
 	{Stream,_,_} = api_help:json_handler(ReqData,State),
 	Update = api_help:create_update(Stream),
+	suggest:update_stream(Stream, StreamId),
 	case api_help:update_doc(?INDEX, "stream", StreamId, Update) of 
 		{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
-		{ok,List} -> {true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
+		{ok,List} -> 
+			{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
 	end.
 
 
