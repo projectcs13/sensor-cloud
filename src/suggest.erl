@@ -26,21 +26,16 @@
 
 
 %% @doc
-%% Function: init/1
-%% Purpose: init function used to fetch path information from webmachine dispatcher.
-%% Returns: {ok, undefined}
+%% Init function used to fetch path information from webmachine dispatcher.
 %% @end
 -spec init([]) -> {ok, undefined}.
 init([]) -> 
 	{ok, undefined}.
 
 %% @doc
-%% Function: allowed_methods/2
-%% Purpose: Used to define what methods are allowed one the given URI's.
-%% Returns: {List, ReqData, State}, where list is the allowed methods for the given URI. 
+%% Define what methods are allowed one the given URI's. It is called automatically by webmachine
 %% @end
 -spec allowed_methods(ReqData::term(),State::term()) -> {list(), term(), term()}.
-
 allowed_methods(ReqData, State) ->
 	case api_help:parse_path(wrq:path(ReqData)) of
 		[{"suggest", _Term}] ->
@@ -52,10 +47,8 @@ allowed_methods(ReqData, State) ->
 
 
 %% @doc
-%% Function: content_types_provided/2
-%% Purpose: based on the Accept header on a 'GET' request, we provide different media types to the client.
+%% Based on the Accept header on a 'GET' request, we provide different media types to the client.
 %% A code 406 is returned to the client if we cannot return the media-type that the user has requested.
-%% Returns: {[{Mediatype, Handler}], ReqData, State}
 %% @end
 -spec content_types_provided(ReqData::term(),State::term()) -> {list(), term(), term()}.
 content_types_provided(ReqData, State) ->
@@ -221,7 +214,7 @@ update_stream(Stream, StreamId) ->
 		{ok, OldStreamJson} ->
 			{_, OldStream} = get_stream_info(lib_json:get_field(OldStreamJson, "_source")),
 			{_, NewStream} = get_stream_info(Stream),
-			ResourceId = lib_json:get_field(Stream, "resource_id"),
+			ResourceId = lib_json:get_field(OldStreamJson, "_source.resource_id"),
 			case ResourceId of
 				undefined ->
 					ok;
@@ -231,16 +224,21 @@ update_stream(Stream, StreamId) ->
 						{error, _Reason2} -> erlang:diplay("Suggestion not found :S");
 						{ok, OldSuggestion} -> 
 							StreamList = lib_json:get_field(OldSuggestion, "hits.hits[0]._source.suggest.payload.streams"),
-							case string:str(StreamList, [OldStream]) of
-								0 -> erlang:display("Invalid position. Not matched properly");
-								Pos ->
-									SuggId = lib_json:get_field(OldSuggestion, "hits.hits[0]._id"),
-									Suggestion = lib_json:get_field(OldSuggestion, "hits.hits[0]._source"),
-									UpdatedSuggestion = lib_json:replace_field(Suggestion, lists:concat(["suggest.payload.streams[", Pos-1, "]"]), NewStream),
-									FinalSuggestion = update_score( UpdatedSuggestion),
-									case erlastic_search:index_doc_with_id(?INDEX, "suggestion", SuggId, FinalSuggestion) of 
-										{error, _Reason} -> erlang:display("Suggestion not updated ");
-										{ok, _} -> 	ok
+							case StreamList of
+								undefined ->
+									ok;
+								_ ->
+									case string:str(StreamList, [OldStream]) of
+										0 -> erlang:display("Invalid position. Not matched properly");
+										Pos ->
+											SuggId = lib_json:get_field(OldSuggestion, "hits.hits[0]._id"),
+											Suggestion = lib_json:get_field(OldSuggestion, "hits.hits[0]._source"),
+											UpdatedSuggestion = lib_json:replace_field(Suggestion, lists:concat(["suggest.payload.streams[", Pos-1, "]"]), NewStream),
+											FinalSuggestion = update_score( UpdatedSuggestion),
+											case erlastic_search:index_doc_with_id(?INDEX, "suggestion", SuggId, FinalSuggestion) of 
+												{error, _Reason} -> erlang:display("Suggestion not updated ");
+												{ok, _} -> 	ok
+											end
 									end
 							end
 					end

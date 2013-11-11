@@ -18,6 +18,8 @@
 -include("webmachine.hrl").
 
 -define(INDEX, "sensorcloud").
+-define(RESTRCITEDUPDATE, ["resource_id","type","accuracy","min_val","max_val","quality","user_ranking","subscribers","last_update","creation_date","history_size","location"]).
+-define(RESTRCITEDCREATE, ["quality","user_ranking","subscribers","last_update","creation_date","history_size"]).
 
 %% @doc
 %% Function: init/1
@@ -131,14 +133,19 @@ process_post(ReqData, State) ->
 			case lib_json:get_field(ResAdded,"resource_id") == undefined of
 				true -> {false, wrq:set_resp_body("\"resource_id_missing\"",ReqData), State};
 				false ->
-					{{Year,Month,Day},_} = calendar:local_time(),
-					Date = generate_date([Year,Month,Day]),
-					DateAdded = api_help:add_field(ResAdded,"creation_date",Date),
-					case erlastic_search:index_doc(?INDEX, "stream", DateAdded) of	
-						{error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
-						{ok,List} -> 
-							suggest:update_suggestion(ResAdded),
-							{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
+					case do_any_field_exist(ResAdded,?RESTRCITEDCREATE) of
+						true ->
+							ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDCREATE),
+							ResFields2 = string:sub_string(ResFields1, 1, length(ResFields1)-2),
+							{{halt,409}, wrq:set_resp_body("{\"error\":\"Error caused by restricted field in document, these fields are restricted : " ++ ResFields2 ++"\"}", ReqData), State};
+						false ->
+							FieldsAdded = add_server_side_fields(ResAdded),
+							case erlastic_search:index_doc(?INDEX, "stream", FieldsAdded) of	
+								{error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
+								{ok,List} -> 
+									suggest:update_suggestion(ResAdded),
+									{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
+							end
 					end
 			end;
 		true ->
@@ -241,11 +248,18 @@ process_search_get(ReqData, State) ->
 put_stream(ReqData, State) ->
 	StreamId = proplists:get_value('stream', wrq:path_info(ReqData)),
 	{Stream,_,_} = api_help:json_handler(ReqData,State),
-	Update = api_help:create_update(Stream),
-	suggest:update_stream(Stream, StreamId),
-	case api_help:update_doc(?INDEX, "stream", StreamId, Update) of 
-		{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
-		{ok,List} -> {true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
+	case do_any_field_exist(Stream,?RESTRCITEDUPDATE) of
+			true -> 
+				ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDUPDATE),
+				ResFields2 = string:sub_string(ResFields1, 1, length(ResFields1)-2),
+				{{halt,409}, wrq:set_resp_body("{\"error\":\"Error caused by restricted field in document, these fields are restricted : " ++ ResFields2 ++"\"}", ReqData), State};
+			false ->
+				Update = api_help:create_update(Stream),
+				suggest:update_stream(Stream, StreamId),
+				case api_help:update_doc(?INDEX, "stream", StreamId, Update) of 
+					{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
+					{ok,List} -> {true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
+				end
 	end.
 
 
@@ -377,3 +391,61 @@ generate_date([First|Rest]) ->
 		true -> "0" ++ integer_to_list(First) ++ "-" ++ generate_date(Rest);
 		false -> "" ++ integer_to_list(First) ++ "-" ++ generate_date(Rest)
 	end.
+
+%% @doc
+%% Function: generate_timpestamp/2
+%% Purpose: Used to create a timestamp valid in ES
+%% from the input which should be the list
+%% [Year,Mounth,Day,Hour,Minute,Day]
+%% Returns: The generated timestamp
+%%
+%% @end
+-spec generate_timestamp(DateList::list(),Count::integer()) -> string().
+
+generate_timestamp([],_) ->
+        [];
+generate_timestamp([First|Rest],3) ->
+        case First < 10 of
+                true -> "T0" ++ integer_to_list(First) ++ generate_timestamp(Rest,4);
+                false -> "T" ++ integer_to_list(First) ++ generate_timestamp(Rest,4)
+        end;
+generate_timestamp([First|Rest],Count) ->
+        case First < 10 of
+                true -> "0" ++ integer_to_list(First) ++ generate_timestamp(Rest,Count+1);
+                false -> "" ++ integer_to_list(First) ++ generate_timestamp(Rest,Count+1)
+        end.
+		
+%% @doc
+%% Function: do_any_field_exist/2
+%% Purpose: Used to check if a JSON contains any of the given fields
+%% Returns: True if at least one of the given fields exist, false otherwise
+%% @end
+-spec do_any_field_exist(Json::string(),FieldList::list()) -> boolean().
+
+do_any_field_exist(_Json,[]) ->
+		false;
+do_any_field_exist(Json,[First|Rest]) ->
+		case lib_json:get_field(Json, First) of
+			undefined ->
+				do_any_field_exist(Json,Rest);
+			_ ->
+				true
+		end.
+		
+%% @doc
+%% Function: add_server_side_fields/1
+%% Purpose: Used to add all the fields that should be added server side
+%% Returns: The new json with the fields added
+%% @end
+-spec add_server_side_fields(Json::string()) -> string().
+
+add_server_side_fields(Json) ->
+	{{Year,Month,Day},{Hour,Min,Sec}} = calendar:local_time(),
+	Date = generate_date([Year,Month,Day]),
+	DateAdded = api_help:add_field(Json,"creation_date",Date),
+	Time = generate_timestamp([Year,Month,Day,Hour,Min,Sec],0) ++ ".000",
+	UpdateAdded = api_help:add_field(DateAdded,"last_update",Time),
+	QualityAdded = api_help:add_field(UpdateAdded,"quality",1.0),
+	UserRankingAdded = api_help:add_field(QualityAdded,"user_ranking",1.0),
+	SubsAdded = api_help:add_field(UserRankingAdded,"subscribers",1),
+	api_help:add_field(SubsAdded,"history_size",0).
