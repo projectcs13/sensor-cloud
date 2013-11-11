@@ -121,9 +121,9 @@ get_resource_test() ->
         %Get resource that doesn't exist
         {ok, {{_Version5, 500, _ReasonPhrase5}, _Headers5, Body5}} = httpc:request(get, {"http://localhost:8000/resources/1" ++ lib_json:to_string(DocId), []}, [], []),
         {{Year,Month,Day},_} = calendar:local_time(),
-    Date = generate_date([Year,Month,Day]),
-    % Tests to make sure the correct creation date is added
-    ?assertEqual(true,lib_json:get_field(Body2,"creation_date") == list_to_binary(Date)),
+    	Date = generate_date([Year,Month,Day]),
+    	% Tests to make sure the correct creation date is added
+    	?assertEqual(true,lib_json:get_field(Body2,"creation_date") == list_to_binary(Date)),
         ?assertEqual(true,lib_json:get_field(Body3,"creation_date") == list_to_binary(Date)),
         ?assertEqual(<<"get">>,lib_json:get_field(Body2,"test")),
         ?assertEqual(<<"get">>,lib_json:get_field(Body3,"test")),
@@ -140,7 +140,6 @@ get_resource_test() ->
 %% @end
 -spec restricted_fields_create_test() -> ok | {error, term()}.
 restricted_fields_create_test() ->
-		% Kolla vilken kod de ska ge tillbaka
 		{ok, {{_Version1, 409, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/resources", [], "application/json", "{\"creation_date\" : \"\"}"}, [], []),
 		?assertEqual(true,string:str(Body1,"error") =/= 0).
 		
@@ -155,7 +154,6 @@ restricted_fields_create_test() ->
 %% @end
 -spec restricted_fields_update_test() -> ok | {error, term()}.
 restricted_fields_update_test() ->
-		% Kolla vilken kod de ska ge tillbaka
 		{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/resources", [], "application/json", "{\n\"test\" : \"restricted\", \"user_id\" : \"asdascvsr213sda\"}"}, [], []),
 		DocId = lib_json:get_field(Body1,"_id"),
 		refresh(),

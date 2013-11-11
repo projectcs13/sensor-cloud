@@ -173,7 +173,6 @@ create_doc_without_resource_test() ->
 %% @end
 -spec restricted_fields_create_test() -> ok | {error, term()}.
 restricted_fields_create_test() ->
-		% Kolla vilken kod de ska ge tillbaka
 		{ok, {{_Version1, 409, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [], "application/json", "{\n\"quality\" : \"\"\n, \"resource_id\" : \"asdascvsr213sda\"}"}, [], []),
 		{ok, {{_Version2, 409, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/streams", [], "application/json", "{\n\"user_ranking\" : \"\"\n, \"resource_id\" : \"asdascvsr213sda\"}"}, [], []),
 		{ok, {{_Version3, 409, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(post, {"http://localhost:8000/streams", [], "application/json", "{\n\"subscribers\" : \"\"\n, \"resource_id\" : \"asdascvsr213sda\"}"}, [], []),
@@ -198,7 +197,6 @@ restricted_fields_create_test() ->
 %% @end
 -spec restricted_fields_update_test() -> ok | {error, term()}.
 restricted_fields_update_test() ->
-		% Kolla vilken kod de ska ge tillbaka
 		{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [], "application/json", "{\n\"test\" : \"restricted\"\n, \"resource_id\" : \"asdascvsr213sda\"}"}, [], []),
 		DocId = lib_json:get_field(Body1,"_id"),
 		refresh(),
