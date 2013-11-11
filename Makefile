@@ -61,6 +61,7 @@ install: get_libs #prep_dialyzer
 ### Downloads all depenedencies, bulds entire project and runs the project.
 run: compile
 	-export R_HOME="/usr/lib/R"
+	curl -XPUT localhost:9200/sensorcloud
 	$(ERL) -pa ebin/ lib/*/ebin/ lib/*/bin/ -boot start_sasl -s reloader -s engine -sname engine 
 
 ### Command: make run_es
