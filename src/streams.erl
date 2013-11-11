@@ -135,9 +135,9 @@ process_post(ReqData, State) ->
 				false ->
 					case do_any_field_exist(ResAdded,?RESTRCITEDCREATE) of
 						true ->
-							ResFields1 = lists:foldl(fun(X, Acc) -> X ++ "," ++ Acc end, "", ?RESTRCITEDCREATE),
-							ResFields2 = string:sub_string(ResFields1, 1, length(ResFields1)-1),
-							{{halt,409}, wrq:set_resp_body("{\"error\":\"Error caused by restricted field in document, these fields are restricted :" ++ ResFields2 ++"\"}", ReqData), State};
+							ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDCREATE),
+							ResFields2 = string:sub_string(ResFields1, 1, length(ResFields1)-2),
+							{{halt,409}, wrq:set_resp_body("{\"error\":\"Error caused by restricted field in document, these fields are restricted : " ++ ResFields2 ++"\"}", ReqData), State};
 						false ->
 							FieldsAdded = add_server_side_fields(ResAdded),
 							case erlastic_search:index_doc(?INDEX, "stream", FieldsAdded) of	
@@ -250,9 +250,9 @@ put_stream(ReqData, State) ->
 	{Stream,_,_} = api_help:json_handler(ReqData,State),
 	case do_any_field_exist(Stream,?RESTRCITEDUPDATE) of
 			true -> 
-				ResFields1 = lists:foldl(fun(X, Acc) -> X ++ "," ++ Acc end, "", ?RESTRCITEDUPDATE),
-				ResFields2 = string:sub_string(ResFields1, 1, length(ResFields1)-1),
-				{{halt,409}, wrq:set_resp_body("{\"error\":\"Error caused by restricted field in document, these fields are restricted :" ++ ResFields2 ++"\"}", ReqData), State};
+				ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDUPDATE),
+				ResFields2 = string:sub_string(ResFields1, 1, length(ResFields1)-2),
+				{{halt,409}, wrq:set_resp_body("{\"error\":\"Error caused by restricted field in document, these fields are restricted : " ++ ResFields2 ++"\"}", ReqData), State};
 			false ->
 				Update = api_help:create_update(Stream),
 				case api_help:update_doc(?INDEX, "stream", StreamId, Update) of 
