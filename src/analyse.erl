@@ -52,29 +52,6 @@ content_types_provided(ReqData, State) ->
 content_types_accepted(ReqData, State) ->
         {[{"application/json", get_analysis}], ReqData, State}.
 
-
-%% @doc
-%% Function: delete_resource/2
-%% Purpose: Deletes a resource and the streams associated with it
-%% Returns: ERROR = {{error,Errorcode} ReqData, State}
-%%                         OK = {ok, ReqData, State}
-%% @end
--spec delete_resource(ReqData::tuple(), State::string()) -> {string(), tuple(), string()}.
-delete_resource(ReqData, State) ->
-        erlang:display("No deletions here!"),
-        ok.
-
-%% @doc
-%% Function: process_post/2
-%% Purpose: Handle POST request, only working for create and not search - AS OF SPRINT 3
-%% Returns: {JSON-object(string), ReqData, State}
-%% @end
--spec process_post(ReqData::tuple(), State::string()) -> {atom(), tuple(), string()}.
-process_post(ReqData, State) ->
-        erlang:display("No posts!"),
-    ok.
-
-
 %% @doc
 %% Function: get_analysis/2
 %% Purpose: Used to handle GET requests by giving the document with the given
@@ -85,22 +62,23 @@ process_post(ReqData, State) ->
 %% @end
 -spec get_analysis(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 get_analysis(ReqData, State) ->
-        case proplists:get_value('streamid', wrq:path_info(ReqData)) of
-                undefined ->
-                        {{error,405}, wrq:set_resp_body("{\"error\":\"missing streamid\"}", ReqData), State};
-                StreamId ->
-                        % Get specific stream
-                        % @TODO: Make sure data is sorted by timestamp!!!!!
-                                
-                        case erlastic_search:search_limit(?INDEX, "datapoint","streamid:" ++ StreamId ++ "&sort=timestamp:desc", 50) of
-                        %case erlastic_search:search_json(#erls_params{}, ?INDEX, "datapoint", create_json(StreamId), []) of
-                                {error,Reason} ->
-                                        io:format("Error for stream " ++ StreamId),
-                                        {{error,Reason}, ReqData, State};
-                                {ok,JsonStruct} ->
-                                        {true,wrq:set_resp_body(forecast(lib_json:get_field(JsonStruct, "hits.hits")),ReqData),State}
-                        end
-        end.
+    case proplists:get_value('streamid', wrq:path_info(ReqData)) of
+        undefined ->
+            ErrorString = api_help:generate_error(<<"Missing stream id">>, 405),
+            {{halt, 405}, wrq:set_resp_body(ErrorString, ReqData), State};
+        StreamId ->
+            % Get specific stream
+            % @TODO: Make sure data is sorted by timestamp!!!!!
+                    
+            case erlastic_search:search_limit(?INDEX, "datapoint","streamid:" ++ StreamId ++ "&sort=timestamp:desc", 50) of
+            %case erlastic_search:search_json(#erls_params{}, ?INDEX, "datapoint", create_json(StreamId), []) of
+                    {error,{Code, Body}} ->
+                            ErrorString = api_help:generate_error(Body, Code),
+                            {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+                    {ok,JsonStruct} ->
+                            {true,wrq:set_resp_body(forecast(lib_json:get_field(JsonStruct, "hits.hits")),ReqData),State}
+            end
+    end.
 
 
 create_json(StreamId) ->
