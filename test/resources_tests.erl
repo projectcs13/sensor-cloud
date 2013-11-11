@@ -121,9 +121,9 @@ get_resource_test() ->
         %Get resource that doesn't exist
         {ok, {{_Version5, 500, _ReasonPhrase5}, _Headers5, Body5}} = httpc:request(get, {"http://localhost:8000/resources/1" ++ lib_json:to_string(DocId), []}, [], []),
         {{Year,Month,Day},_} = calendar:local_time(),
-    Date = generate_date([Year,Month,Day]),
-    % Tests to make sure the correct creation date is added
-    ?assertEqual(true,lib_json:get_field(Body2,"creation_date") == list_to_binary(Date)),
+    	Date = generate_date([Year,Month,Day]),
+    	% Tests to make sure the correct creation date is added
+    	?assertEqual(true,lib_json:get_field(Body2,"creation_date") == list_to_binary(Date)),
         ?assertEqual(true,lib_json:get_field(Body3,"creation_date") == list_to_binary(Date)),
         ?assertEqual(<<"get">>,lib_json:get_field(Body2,"test")),
         ?assertEqual(<<"get">>,lib_json:get_field(Body3,"test")),
@@ -132,6 +132,59 @@ get_resource_test() ->
         %Clean up
         httpc:request(delete, {"http://localhost:8000/resources/" ++ lib_json:to_string(DocId), []}, [], []).
 
+
+%% @doc
+%% Function: restricted_fields_create_test/0
+%% Purpose: Test that creation with restricted fields are not allowed
+%% Returns: ok | {error, term()}
+%% @end
+-spec restricted_fields_create_test() -> ok | {error, term()}.
+restricted_fields_create_test() ->
+		{ok, {{_Version1, 409, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/resources", [], "application/json", "{\"creation_date\" : \"\"}"}, [], []),
+		?assertEqual(true,string:str(Body1,"error") =/= 0).
+		
+		
+		
+%% @doc
+%% Function: restricted_fields_update_test/0
+%% Purpose: Test that update with restricted fields are not allowed
+%% Returns: ok | {error, term()}
+%%
+%% Side effects: creates 1 document in elasticsearch and deletes it
+%% @end
+-spec restricted_fields_update_test() -> ok | {error, term()}.
+restricted_fields_update_test() ->
+		{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/resources", [], "application/json", "{\n\"test\" : \"restricted\", \"user_id\" : \"asdascvsr213sda\"}"}, [], []),
+		DocId = lib_json:get_field(Body1,"_id"),
+		refresh(),
+		{ok, {{_Version2, 409, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(put, {"http://localhost:8000/resources/" ++ lib_json:to_string(DocId), [], "application/json", "{\"user_id\" : \"\"}"}, [], []),
+		{ok, {{_Version3, 409, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(put, {"http://localhost:8000/resources/" ++ lib_json:to_string(DocId), [], "application/json", "{\"type\" : \"\"}"}, [], []),
+		{ok, {{_Version4, 409, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(put, {"http://localhost:8000/resources/" ++ lib_json:to_string(DocId), [], "application/json", "{\"manufacturer\" : \"\"}"}, [], []),
+		{ok, {{_Version5, 409, _ReasonPhrase5}, _Headers5, Body5}} = httpc:request(put, {"http://localhost:8000/resources/" ++ lib_json:to_string(DocId), [], "application/json", "{\"uri\" : \"\"}"}, [], []),
+		{ok, {{_Version6, 409, _ReasonPhrase6}, _Headers6, Body6}} = httpc:request(put, {"http://localhost:8000/resources/" ++ lib_json:to_string(DocId), [], "application/json", "{\"creation_date\" : \"\"\}"}, [], []),
+		{ok, {{_Version7, 200, _ReasonPhrase7}, _Headers7, _Body7}} = httpc:request(delete, {"http://localhost:8000/resources/" ++ lib_json:to_string(DocId), []}, [], []),
+		?assertEqual(true,string:str(Body2,"error") =/= 0),
+		?assertEqual(true,string:str(Body3,"error") =/= 0),
+		?assertEqual(true,string:str(Body4,"error") =/= 0),
+		?assertEqual(true,string:str(Body5,"error") =/= 0),
+		?assertEqual(true,string:str(Body6,"error") =/= 0).
+		
+%% @doc
+%% Function: server_side_creation_test/0
+%% Purpose: Test that the correct fields are added server side
+%% Returns: ok | {error, term()}
+%%
+%% Side effects: creates 1 document in elasticsearch and deletes it
+%% @end
+-spec server_side_creation_test() -> ok | {error, term()}.
+
+server_side_creation_test() ->
+		{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/resources", [], "application/json", "{\"user_id\" : \"asdascvsr213sda\"}"}, [], []),
+		DocId = lib_json:get_field(Body1,"_id"),
+		refresh(),
+		{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(get, {"http://localhost:8000/resources/" ++ lib_json:to_string(DocId), []}, [], []),
+		{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, _Body3}} = httpc:request(delete, {"http://localhost:8000/resources/" ++ lib_json:to_string(DocId), []}, [], []),
+		?assertEqual(true,lib_json:get_field(Body2,"creation_date") =/= undefined).
 
 
 %% @doc

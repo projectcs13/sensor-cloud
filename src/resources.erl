@@ -6,12 +6,15 @@
 %%% Created : 9 Oct 2013 by ProjectCS13 <>
 %%%-------------------------------------------------------------------
 -module(resources).
--compile(export_all).
+-export([init/1, allowed_methods/2, content_types_provided/2, content_types_accepted/2,
+		 delete_resource/2, process_post/2, put_resource/2, get_resource/2, delete_streams_with_resource_id/1]).
 
 -include_lib("webmachine.hrl").
 -include_lib("erlastic_search.hrl").
 
 -define(INDEX, "sensorcloud").
+-define(RESTRCITEDUPDATE, ["user_id","type","accuracy","manufacturer","uri","creation_date"]).
+-define(RESTRCITEDCREATE, ["creation_date"]).
 
 %% @doc
 %% Function: init/1
@@ -162,16 +165,24 @@ process_post(ReqData, State) ->
 	case IsSearch of 
 		false ->
 			% Create
+
 			{Resource,_,_} = api_help:json_handler(ReqData,State),
-			{{Year,Month,Day},_} = calendar:local_time(),
-			Date = generate_date([Year,Month,Day]),
-			DateAdded = api_help:add_field(Resource,"creation_date",Date),
-			case erlastic_search:index_doc(?INDEX,"resource",DateAdded) of 
-				{error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
-				{ok, Json} -> 
-					ResourceId = lib_json:get_field(Json, "_id"),
-					suggest:add_suggestion(Resource, ResourceId),
-					{true, wrq:set_resp_body(lib_json:encode(Json), ReqData), State}
+			case do_any_field_exist(Resource,?RESTRCITEDCREATE) of
+				true ->
+					ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDCREATE),
+					ResFields2 = string:sub_string(ResFields1, 1, length(ResFields1)-2),
+					{{halt,409}, wrq:set_resp_body("{\"error\":\"Error caused by restricted field in document, these fields are restricted : " ++ ResFields2 ++"\"}", ReqData), State};
+				false ->
+					{{Year,Month,Day},_} = calendar:local_time(),
+					Date = generate_date([Year,Month,Day]),
+					DateAdded = api_help:add_field(Resource,"creation_date",Date),
+					case erlastic_search:index_doc(?INDEX,"resource",DateAdded) of 
+						{error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
+						{ok, Json} -> 
+							ResourceId = lib_json:get_field(Json, "_id"),
+							suggest:add_suggestion(Resource, ResourceId),
+							{true, wrq:set_resp_body(lib_json:encode(Json), ReqData), State}
+					end
 			end;
 		true ->
 			% Search
@@ -229,13 +240,20 @@ put_resource(ReqData, State) ->
 			{{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
 		{ok, _} ->
 			{UserJson,_,_} = api_help:json_handler(ReqData, State),
-			Update = api_help:create_update(UserJson),
-			case api_help:update_doc(?INDEX,"resource", Id, Update) of 
-				{error, Reason} -> 
-					{{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
-				{ok,List} -> 
-					suggest:update_resource(UserJson, Id),
-					{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
+			case do_any_field_exist(UserJson,?RESTRCITEDUPDATE) of
+				true ->
+					ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDUPDATE),
+					ResFields2 = string:sub_string(ResFields1, 1, length(ResFields1)-2),
+					{{halt,409}, wrq:set_resp_body("{\"error\":\"Error caused by restricted field in document, these fields are restricted : " ++ ResFields2 ++"\"}", ReqData), State};
+				false ->
+					Update = api_help:create_update(UserJson),
+					case api_help:update_doc(?INDEX,"resource", Id, Update) of 
+						{error, Reason} -> 
+							{{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
+						{ok,List} -> 
+							suggest:update_resource(UserJson, Id),
+							{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
+					end
 			end
 	end.
 
@@ -365,4 +383,22 @@ generate_date([First|Rest]) ->
 		true -> "0" ++ integer_to_list(First) ++ "-" ++ generate_date(Rest);
 		false -> "" ++ integer_to_list(First) ++ "-" ++ generate_date(Rest)
 	end.
+
+		
+%% @doc
+%% Function: do_any_field_exist/2
+%% Purpose: Used to check if a JSON contains any of the given fields
+%% Returns: True if at least one of the given fields exist, false otherwise
+%% @end
+-spec do_any_field_exist(Json::string(),FieldList::list()) -> boolean().
+
+do_any_field_exist(_Json,[]) ->
+		false;
+do_any_field_exist(Json,[First|Rest]) ->
+		case lib_json:get_field(Json, First) of
+			undefined ->
+				do_any_field_exist(Json,Rest);
+			_ ->
+				true
+		end.
 
