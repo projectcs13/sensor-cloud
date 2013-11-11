@@ -218,7 +218,13 @@ get_user(ReqData, State) ->
                         case id_from_path(ReqData) of
                                 undefined ->
                                         % Get all users
-                                        case erlastic_search:search_limit(?INDEX,"user","*:*",2000) of
+                                        case wrq:get_qs_value("size",ReqData) of 
+                                            undefined ->
+                                                Size = 100;
+                                            SizeParam ->
+                                                Size = list_to_integer(SizeParam)
+                                        end,
+                                        case erlastic_search:search_limit(?INDEX,"user","*:*",Size) of
                                                 {error, Reason} -> 
                                                         {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
 					        {ok,JsonStruct} ->

@@ -157,13 +157,25 @@ process_post(ReqData, State) ->
 process_search_post(ReqData, State) ->
 
         erlang:display("search with json request"),
+        case wrq:get_qs_value("size",ReqData) of 
+            undefined ->
+                Size = "10";
+            SizeParam ->
+                Size = SizeParam
+        end,
+        case wrq:get_qs_value("from",ReqData) of
+            undefined ->
+                From = "0";
+            FromParam ->
+                From = FromParam
+        end,
         {Json,_,_} = api_help:json_handler(ReqData,State),
         case proplists:get_value('res', wrq:path_info(ReqData)) of
                 undefined ->
-                        FilteredJson = filter_json(Json);
+                        FilteredJson = filter_json(Json, From, Size);
                 ResId ->
                         ResQuery = "\"resource\":" ++ ResId,
-                        FilteredJson = filter_json(Json, ResQuery)
+                        FilteredJson = filter_json(Json, ResQuery, From, Size)
         end,
         erlang:display(FilteredJson),
         case erlastic_search:search_json(#erls_params{},?INDEX, "stream", FilteredJson) of % Maybe wanna take more
@@ -182,6 +194,12 @@ process_search_post(ReqData, State) ->
 
 process_search_get(ReqData, State) ->
 	URIQuery = wrq:req_qs(ReqData),
+    case wrq:get_qs_value("size",ReqData) of 
+        undefined ->
+            Size = 100;
+        SizeParam ->
+            Size = list_to_integer(SizeParam)
+    end,
 	case proplists:get_value('user', wrq:path_info(ReqData)) of
 		undefined ->
 			UserQuery = [],
@@ -206,7 +224,7 @@ process_search_get(ReqData, State) ->
 				 end
 	end,
 	FullQuery = lists:append(api_help:transform(URIQuery,ResDef or UserDef),Query),
-	case erlastic_search:search_limit(?INDEX, "stream", FullQuery,200) of % Maybe wanna take more
+	case erlastic_search:search_limit(?INDEX, "stream", FullQuery,Size) of % Maybe wanna take more
 		{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
 		{ok,List} -> {lib_json:encode(List),ReqData,State} 
 	end.
@@ -251,6 +269,12 @@ get_stream(ReqData, State) ->
 			case proplists:get_value('stream', wrq:path_info(ReqData)) of
 				undefined ->
 				% List streams based on URI
+			        case wrq:get_qs_value("size",ReqData) of 
+			            undefined ->
+			                Size = 100;
+			            SizeParam ->
+			                Size = list_to_integer(SizeParam)
+			        end,
 					case proplists:get_value('user', wrq:path_info(ReqData)) of
 						undefined ->
 							UserQuery = [],
@@ -274,7 +298,7 @@ get_stream(ReqData, State) ->
 							 		false -> Query = "*"
 								 end
 					end,
-					case erlastic_search:search_limit(?INDEX, "stream", Query,200) of % Maybe wanna take more
+					case erlastic_search:search_limit(?INDEX, "stream", Query,Size) of % Maybe wanna take more
 						{error,Reason} -> 
 						      {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
 					        {ok,JsonStruct} ->
@@ -310,6 +334,28 @@ filter_json(Json) ->
 filter_json(Json,ResourceQuery) ->
         NewJson = string:sub_string(Json,1,string:len(Json)-1),
         "{\"query\":{\"filtered\":"++NewJson++",\"filter\":{\"bool\":{\"must\":[{\"term\":{\"private\":\"false\"}},{\"term\":{"++ResourceQuery++"}}]}}}}}".
+
+
+
+%% @doc
+%% Function: filter_json/3
+%% Purpose: Used to add private filters to the json query with pagination
+%% Returns: JSON string that is updated with filter and the from size parameters
+%% @end
+filter_json(Json, From, Size) ->
+        NewJson = string:sub_string(Json,1,string:len(Json)-1),
+        "{\"from\" : "++From++", \"size\" : "++Size++", \"query\":{\"filtered\":"++NewJson++",\"filter\":{\"bool\":{\"must\":{\"term\":{\"private\":\"false\"}}}}}}}".
+
+
+%% @doc
+%% Function: filter_json/4
+%% Purpose:  Used to add private and resource filters to the json query with pagination
+%% Returns: JSON string that is updated with filter and the from size parameters
+%% @end
+filter_json(Json, ResourceQuery, From, Size) ->
+         NewJson = string:sub_string(Json,1,string:len(Json)-1),
+        "{\"from\" : "++From++", \"size\" : "++Size++", \"query\":{\"filtered\":"++NewJson++",\"filter\":{\"bool\":{\"must\":[{\"term\":{\"private\":\"false\"}},{\"term\":{"++ResourceQuery++"}}]}}}}}".
+
 
 %% @doc
 %% Function: generate_date/2
