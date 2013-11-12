@@ -96,6 +96,12 @@ process_search_post(ReqData, State) ->
             SizeParam ->
                 Size = SizeParam
         end,
+		case wrq:get_qs_value("sort",ReqData) of
+            undefined ->
+                Sort = "user_ranking";
+            SortParam ->
+                Sort = SortParam
+        end,
         case wrq:get_qs_value("from",ReqData) of
             undefined ->
                 From = "0";
@@ -103,18 +109,16 @@ process_search_post(ReqData, State) ->
                 From = FromParam
         end,
         {Json,_,_} = api_help:json_handler(ReqData,State),
-        FilteredJson = filter_json(Json, From, Size),
+        FilteredJson = filter_json(Json, From, Size, Sort),
         case erlastic_search:search_json(#erls_params{},?INDEX, "stream", FilteredJson) of % Maybe wanna take more
                 {error,{Code1, _}} ->
-                        StreamSearch = [],
-                        {{halt, Code1}, ReqData, State};
+                        StreamSearch = "\"error\"";
                 {ok,List1} ->
                         StreamSearch = lib_json:encode(List1) % May need to convert
         end,
-        case erlastic_search:search_json(#erls_params{},?INDEX, "user", FilteredJson) of % Maybe wanna take more
+        case erlastic_search:search_json(#erls_params{},?INDEX, "user", lib_json:rm_field(FilteredJson, "sort")) of % Maybe wanna take more
                 {error,{Code2, _}} ->
-                        UserSearch = [],
-                        {{halt, Code2}, ReqData, State};
+                        UserSearch = "\"error\"";
                 {ok,List2} -> UserSearch = lib_json:encode(List2) % May need to convert
          end,
         SearchResults = "{\"streams\":"++ StreamSearch ++", \"users\":"++ UserSearch ++"}",
@@ -141,7 +145,18 @@ filter_json(Json) ->
 %% Purpose: Used to add private filters to the json query with pagination
 %% Returns: JSON string that is updated with filter and the from size parameters
 %% @end
-filter_json(Json, From, Size) ->
-        NewJson = string:sub_string(Json,1,string:len(Json)-1),
-        "{\"from\" : "++From++", \"size\" : "++Size++", \"query\":{\"filtered\":"++NewJson++",\"filter\":{\"bool\":{\"must\":{\"term\":{\"private\":\"false\"}}}}}}}".
-
+filter_json(Json, From, Size, Sort) ->
+	case lib_json:get_field(Json, "sort") of 
+		undefined -> 
+			UseSort = Sort, 
+			SortJson = Json;
+		SortValue -> 
+			UseSort = binary_to_list(SortValue),
+			SortJson = lib_json:rm_field(Json, "sort")
+	end,
+    NewJson = string:sub_string(SortJson,1,string:len(SortJson)-1),
+    "{\"from\" : "++From++
+	",\"size\" : "++Size++
+	",\"sort\" : \"" ++UseSort++
+	"\" ,\"query\" : {\"filtered\" : "++NewJson++
+	",\"filter\" : {\"bool\" : {\"must\" : {\"term\" : {\"private\" : \"false\"}}}}}}}".
