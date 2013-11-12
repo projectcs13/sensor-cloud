@@ -26,6 +26,7 @@
 -define(DATAPOINTS_URL, "http://localhost:8000/streams/4/data/").
 -define(TEST_VALUE, "3").
 -define(TEST_TIMESTAMP, "2").
+-define(INDEX, "sensorcloud").
 
 %% @doc
 %% Function: post_test/0
@@ -35,10 +36,13 @@
 %% @end
 -spec post_test() -> ok | {error, term()}.
 post_test() ->
+		erlastic_search:index_doc_with_id(?INDEX,"stream","4","{\"test\" : \"data_points\"}"),
+		refresh(),
         Response1 = post_request(?DATAPOINTS_URL, "application/json",
                                          "{\"value\":\"" ++ ?TEST_VALUE ++ "\", \"timestamp\": \"" ++ ?TEST_TIMESTAMP ++ "\"}"),
         check_returned_code(Response1, 200),
         refresh(),
+		erlastic_search:delete_doc(?INDEX,"stream","4"),
         ?assertNotMatch({error, "no match"}, get_index_id(?TEST_VALUE, ?TEST_TIMESTAMP)).
 
 
@@ -64,12 +68,15 @@ get_existing_datapoint_test() ->
 %% @end
 -spec no_timestamp_test() -> ok | {error, term()}.
 no_timestamp_test() ->
+		erlastic_search:index_doc_with_id(?INDEX,"stream","5","{\"test\" : \"data_points\"}"),
+		refresh(),
         Response1 = post_request("http://localhost:8000/streams/5/data/", "application/json",
                                          "{\"value\":\"55\"}"),
         check_returned_code(Response1, 200),
 		refresh(),
 		{ok,{_,_,Body}} = httpc:request(get, {"http://localhost:8000/streams/5/data/", []}, [], []),
 		ObjectList = lib_json:get_field(Body,"data"),
+		erlastic_search:delete_doc(?INDEX,"stream","5"),
         ?assertEqual(true, lib_json:get_field(lists:nth(1,ObjectList),"timestamp") =/= undefined).
 
 %% @doc
