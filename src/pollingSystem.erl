@@ -62,7 +62,7 @@ handle_info({rebuild, ResourceId}, PollersInfo)->
 		{error, ErrMessage} -> 
 			erlang:display(ErrMessage);
 		_ ->
-			Poller#pollerInfo.pid ! {rebuild}
+			gen_server:call(Poller#pollerInfo.pid, {rebuild})
 	end,
 	{noreply, PollersInfo}.
 
