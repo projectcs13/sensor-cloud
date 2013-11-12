@@ -105,6 +105,7 @@ delete_resource(ReqData, State) ->
 -spec delete_streams_with_resource_id(Id::string()) -> term().
 
 delete_streams_with_resource_id(Id) ->
+	api_help:refresh(),
 	Query = "resource_id:" ++ Id, 
 	case erlastic_search:search_limit(?INDEX, "stream", Query,500) of
 		{error,Reason} -> 

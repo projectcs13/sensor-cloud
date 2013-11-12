@@ -165,6 +165,7 @@ delete_user_test() ->
 	{ok, {{_Version10, 200, _ReasonPhrase10}, _Headers10, Body10}} = httpc:request(post, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId5) ++ "/data", [],"application/json", "{\"value\" : 2.0}"}, [], []),
 	{ok, {{_Version11, 200, _ReasonPhrase11}, _Headers11, Body11}} = httpc:request(post, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId6) ++ "/data", [],"application/json", "{\"value\" : 2.0}"}, [], []),
 	{ok, {{_Version12, 200, _ReasonPhrase12}, _Headers12, Body12}} = httpc:request(post, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId7) ++ "/data", [],"application/json", "{\"value\" : 2.0}"}, [], []),
+	refresh(),
 	{ok, {{_Version13, 200, _ReasonPhrase13}, _Headers13, Body13}} = httpc:request(delete, {"http://localhost:8000/users/" ++ lib_json:to_string(DocId), []}, [], []),
 	refresh(),
 	{ok, {{_Version14, 200, _ReasonPhrase14}, _Headers14, Body14}} = httpc:request(get, {"http://localhost:8000/users/"++ lib_json:to_string(DocId) ++"/resources", []}, [], []),
