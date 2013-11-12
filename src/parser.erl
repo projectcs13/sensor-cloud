@@ -12,8 +12,8 @@
 
 -module(parser).
 -include("parser.hrl").
+-include("common.hrl").
 
--define(INDEX, "sensorcloud").
 %% ====================================================================
 %% API functions
 %% ====================================================================
@@ -42,7 +42,7 @@ applyParser(ParsersList, Data, ContentType) ->
 %% Returns: {error, ErrMsg} | [#parser .....]
 %% @end
 getParsersById(ResourceId)->
-	case erlastic_search:search_limit(?INDEX, "parser", "resourceid:" ++ ResourceId, 100) of
+	case erlastic_search:search_limit(?ES_INDEX, "parser", "resourceid:" ++ ResourceId, 100) of
 		{ok, Result} ->
 			EncodedResult = lib_json:encode(Result),
 			case re:run(EncodedResult, "\"max_score\":null", [{capture, first, list}]) of
@@ -148,7 +148,7 @@ parseJson(Parser, Data) ->
 	FieldValue3 = {"timestamp":list_to_binary(StrYear++":"++StrMonth++":"++StrDay++" "++StrHour++":"++StrMinutes++":"++StrSeconds)},
 	FieldValues = [FieldValue1, FieldValue2, FieldValue3],
 	FinalJson = lib_json:add_values("{}", FieldValues),
-	case erlastic_search:index_doc(?INDEX, "datapoint", FinalJson) of
+	case erlastic_search:index_doc(?ES_INDEX, "datapoint", FinalJson) of
 		{error, Reason} -> erlang:display("Failed to insert the new datapoint into the elasticsearch for this reason: "++Reason),
 						   {error, Reason};
 		{ok,List} -> ok

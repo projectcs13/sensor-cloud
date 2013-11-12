@@ -11,8 +11,7 @@
 -behaviour(gen_server).
 -include("parser.hrl").
 -include("state.hrl").
--define(UA, "sensor-cloud:").
--define(INDEX, "sensorcloud").
+-include("common.hrl").
 
 
 %% ====================================================================
@@ -45,7 +44,7 @@ handle_call({rebuild}, _Form, State)->
 	%%Resource = erlastic:get_resource_by_id(ResourceId),  %% return a #resource record
 
 	%%I let each poller interact directly with the erlasticsearch module, not sure it is ok.
-	case erlastic_search:get_doc(?INDEX, "resource", ResourceId) of 
+	case erlastic_search:get_doc(?ES_INDEX, "resource", ResourceId) of 
 		{error,Reason} -> 
 			erlang:display("Failed to retrieve the resource according to resource`s id"),
 			erlang:display("The error reason: "++Reason),
