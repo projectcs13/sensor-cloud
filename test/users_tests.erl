@@ -78,7 +78,7 @@ get_existing_user_test() ->
 -spec get_non_existing_user_test() -> ok | {error, term()}.
 get_non_existing_user_test() ->
 	Response1 = get_request(?USERS_URL ++ "non-existing-key"),
-	check_returned_code(Response1, 500).
+	check_returned_code(Response1, 404).
 
 
 %% @doc
@@ -161,11 +161,10 @@ delete_user_test() ->
 	{ok, {{_Version11, 200, _ReasonPhrase11}, _Headers11, Body11}} = httpc:request(get, {"http://localhost:8000/users/"++ lib_json:to_string(DocId) ++"/resources/"++ lib_json:to_string(DocId2) ++ "/streams", []}, [], []),
 	{ok, {{_Version12, 200, _ReasonPhrase12}, _Headers12, Body12}} = httpc:request(get, {"http://localhost:8000/users/"++ lib_json:to_string(DocId) ++"/resources/"++ lib_json:to_string(DocId3) ++ "/streams", []}, [], []),
 	% Delete a resource that doesn't exist
-	{ok, {{_Version13, 500, _ReasonPhrase13}, _Headers13, Body13}} = httpc:request(delete, {"http://localhost:8000/users/idthatdoesntexist", []}, [], []),
-	?assertEqual("{\"hits\":[]}",Body10),
-	?assertEqual("{\"hits\":[]}",Body11),
-	?assertEqual("{\"hits\":[]}",Body12),
-	?assertEqual("{\"error\":\"not_found\"}",Body13).
+	{ok, {{_Version13, 404, _ReasonPhrase13}, _Headers13, Body13}} = httpc:request(delete, {"http://localhost:8000/users/idthatdoesntexist", []}, [], []),
+	?assertEqual("{\"resources\":[]}",Body10),
+	?assertEqual("{\"streams\":[]}",Body11),
+	?assertEqual("{\"streams\":[]}",Body12).
 
 	
 
@@ -180,7 +179,7 @@ delete_user_test() ->
 -spec delete_non_existing_user_test() -> ok | {error, term()}.
 delete_non_existing_user_test() ->	
 	Response1 = delete_request(?USERS_URL++"non-existing-key"),
-	check_returned_code(Response1, 500).
+	check_returned_code(Response1, 404).
 
 
 %% @doc

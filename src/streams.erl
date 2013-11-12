@@ -59,7 +59,7 @@ allowed_methods(ReqData, State) ->
 			{['GET', 'PUT', 'DELETE'], ReqData, State};
 		[error] ->
 		    {[], ReqData, State} 
-end.
+	end.
 
 
 
@@ -93,16 +93,19 @@ content_types_accepted(ReqData, State) ->
 %% Purpose: Used to handle DELETE requests by deleting the stream in elastic search
 %% Returns: {Success, ReqData, State}, where Success is true if delete is successful
 %% and false otherwise.
+%% FIX: This function relies on direct contact with elastic search at localhost:9200
 %% @end
 -spec delete_resource(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 
 delete_resource(ReqData, State) ->
 	Id = proplists:get_value('stream', wrq:path_info(ReqData)),
 	case erlastic_search:delete_doc(?INDEX,"stream", Id) of
-			{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
-			{ok,List} -> httpc:request(delete, {"http://localhost:9200/sensorcloud/datapoint/_query?q=streamid:" 
-                  		 ++ Id, []}, [], []),
-				 	{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
+		{error, {Code, Body}} -> 
+			ErrorString = api_help:generate_error(Body, Code),
+			{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+		{ok,List} -> 
+			httpc:request(delete, {"http://localhost:9200/sensorcloud/datapoint/_query?q=streamid:" ++ Id, []}, [], []),
+			 	{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
 	end.
 
 
@@ -162,8 +165,6 @@ process_post(ReqData, State) ->
 -spec process_search_post(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 
 process_search_post(ReqData, State) ->
-
-        erlang:display("search with json request"),
         case wrq:get_qs_value("size",ReqData) of 
             undefined ->
                 Size = "10";
@@ -184,9 +185,10 @@ process_search_post(ReqData, State) ->
                         ResQuery = "\"resource\":" ++ ResId,
                         FilteredJson = filter_json(Json, ResQuery, From, Size)
         end,
-        erlang:display(FilteredJson),
         case erlastic_search:search_json(#erls_params{},?INDEX, "stream", FilteredJson) of % Maybe wanna take more
-                {error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
+                {error, {Code, Body}} -> 
+            				ErrorString = api_help:generate_error(Body, Code),
+            				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
                 {ok,List} -> {true,wrq:set_resp_body(lib_json:encode(List),ReqData),State} % May need to convert
         end.
 
@@ -232,7 +234,9 @@ process_search_get(ReqData, State) ->
 	end,
 	FullQuery = lists:append(api_help:transform(URIQuery,ResDef or UserDef),Query),
 	case erlastic_search:search_limit(?INDEX, "stream", FullQuery,Size) of % Maybe wanna take more
-		{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
+		{error, {Code, Body}} -> 
+            				ErrorString = api_help:generate_error(Body, Code),
+            				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 		{ok,List} -> {lib_json:encode(List),ReqData,State} 
 	end.
 
@@ -257,7 +261,9 @@ put_stream(ReqData, State) ->
 				Update = api_help:create_update(Stream),
 				suggest:update_stream(Stream, StreamId),
 				case api_help:update_doc(?INDEX, "stream", StreamId, Update) of 
-					{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
+		{error, {Code, Body}} -> 
+            				ErrorString = api_help:generate_error(Body, Code),
+            				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 					{ok,List} -> {true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
 				end
 	end.
@@ -313,17 +319,19 @@ get_stream(ReqData, State) ->
 								 end
 					end,
 					case erlastic_search:search_limit(?INDEX, "stream", Query,Size) of % Maybe wanna take more
-						{error,Reason} -> 
-						      {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
-					        {ok,JsonStruct} ->
-						       FinalJson = lib_json:get_list_and_add_id(JsonStruct),
-						       {FinalJson, ReqData, State} 
+						{error, {Code, Body}} -> 
+            				ErrorString = api_help:generate_error(Body, Code),
+            				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+					    {ok,JsonStruct} ->
+						    FinalJson = lib_json:get_list_and_add_id(JsonStruct, streams),
+						    {FinalJson, ReqData, State} 
 					end;
 				StreamId ->
 				% Get specific stream
 					case erlastic_search:get_doc(?INDEX, "stream", StreamId) of 
-						{error, Reason} -> 
-							{{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
+						{error, {Code, Body}} -> 
+            				ErrorString = api_help:generate_error(Body, Code),
+            				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 						{ok,JsonStruct} -> 	 
 						        FinalJson = lib_json:get_and_add_id(JsonStruct),
 						        {FinalJson, ReqData, State}

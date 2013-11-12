@@ -345,3 +345,18 @@ convert_binary_to_string([First|Rest]) ->
 					 false -> [First] ++ convert_binary_to_string(Rest)
 				 end
 	end.
+
+%% @doc
+%% Purpose: generate an appropriate error string depending on the error code
+%%
+%% TODO: parse Body for more accurate response text
+%%
+-spec generate_error(JSONString::string(), integer()) -> string().
+
+generate_error(Body, ErrorCode) ->
+	ErrorString = integer_to_list(ErrorCode),
+	case ErrorCode of
+		404 -> Reason = "not found";
+		_ -> Reason = binary_to_list(Body)
+	end,
+	"Status " ++ ErrorString ++ "\nError: " ++ Reason.

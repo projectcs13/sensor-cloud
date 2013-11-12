@@ -79,7 +79,9 @@ get_suggestion(ReqData, State) ->
 					}                                      
 				}",
 			case erlastic_search:suggest(?INDEX, Query) of	
-				{error, Reason} -> {lib_json:encode(Reason),ReqData, State};
+				{error, {Code, Body}} -> 
+    				ErrorString = api_help:generate_error(Body, Code),
+    				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 				{ok,List} -> 
 					EncodedList = lib_json:encode(List),
 					case re:run(EncodedList, "\"options\":\\[\\]", [{capture, first, list}]) of

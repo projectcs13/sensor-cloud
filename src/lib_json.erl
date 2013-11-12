@@ -30,7 +30,8 @@
 %% Specialized functions - Exports
 %% ====================================================================
 -export([get_and_add_id/1, 
-	 get_list_and_add_id/1
+	 get_list_and_add_id/1,
+     get_list_and_add_id/2
 	]).
 
 %% ====================================================================
@@ -391,6 +392,7 @@ get_and_add_id(JsonStruct) ->
 %% @doc 
 %% Get the search results and performs get_and_add_id/1 on each
 %% elements in the result list.
+%% NOTE: Deprecated, use get_list_and_add_id/2 instead
 %%
 %% TODO Move to api_help
 %% @end 
@@ -399,6 +401,21 @@ get_list_and_add_id(JsonStruct) ->
     HitsList = get_field(JsonStruct, "hits.hits"),
     AddedId = lists:map(fun(X) -> get_and_add_id(X) end, HitsList),
     set_attr(hits, AddedId).
+
+%% @doc 
+%% Get the search results and performs get_and_add_id/1 on each
+%% elements in the result list. The resulting list will be returned
+%% as a proper JSON object with the JsonKey as the attribute.
+%%
+%% Return: get_list_and_add_id(List, Attribute) -> "{\"Attribute\": List}"
+%%
+%% TODO Move to api_help
+%% @end 
+-spec get_list_and_add_id(JsonStruct::mochijson(), atom()) -> json_string().
+get_list_and_add_id(JsonStruct, JsonKey) ->
+    HitsList = get_field(JsonStruct, "hits.hits"),
+    AddedId = lists:map(fun(X) -> get_and_add_id(X) end, HitsList),
+    set_attr(JsonKey, AddedId).
 
 
 %% ====================================================================

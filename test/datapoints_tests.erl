@@ -69,7 +69,7 @@ no_timestamp_test() ->
         check_returned_code(Response1, 200),
 		refresh(),
 		{ok,{_,_,Body}} = httpc:request(get, {"http://localhost:8000/streams/5/data/", []}, [], []),
-		ObjectList = lib_json:get_field(Body,"hits"),
+		ObjectList = lib_json:get_field(Body,"data"),
         ?assertEqual(true, lib_json:get_field(lists:nth(1,ObjectList),"timestamp") =/= undefined).
 
 %% @doc
@@ -112,7 +112,7 @@ get_non_existent_datapoint_test() ->
         Response1 = get_request(?DATAPOINTS_URL ++ "_search?_id=" ++ "nonexistent"),
 		{ok, Rest} = Response1,
 		{_,_,Result} = Rest,
-	    ?assertNotEqual(0, string:str(Result, "hits\":[]")).
+	    ?assertNotEqual(0, string:str(Result, "data\":[]")).
 
 post_request(URL, ContentType, Body) -> request(post, {URL, [], ContentType, Body}).
 get_request(URL) -> request(get, {URL, []}).
@@ -123,6 +123,7 @@ request(Method, Request) ->
 %% Function: refresh/0
 %% Purpose: Help function to find refresh the sensorcloud index
 %% Returns: {ok/error, {{Version, Code, Reason}, Headers, Body}}
+%% FIX: This relies on having a connection with elastic search on localhost:9200
 %% @end
 refresh() ->
     httpc:request(post, {"http://localhost:9200/sensorcloud/_refresh", [],"", ""}, [], []).
