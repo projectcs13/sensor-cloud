@@ -12,7 +12,7 @@
 	get_suggestion/2, 
 	add_suggestion/2,
 	update_suggestion/1,
-
+	update_stream/2,
 	update_resource/2
 	]).
 
@@ -26,21 +26,16 @@
 
 
 %% @doc
-%% Function: init/1
-%% Purpose: init function used to fetch path information from webmachine dispatcher.
-%% Returns: {ok, undefined}
+%% Init function used to fetch path information from webmachine dispatcher.
 %% @end
 -spec init([]) -> {ok, undefined}.
 init([]) -> 
 	{ok, undefined}.
 
 %% @doc
-%% Function: allowed_methods/2
-%% Purpose: Used to define what methods are allowed one the given URI's.
-%% Returns: {List, ReqData, State}, where list is the allowed methods for the given URI. 
+%% Define what methods are allowed one the given URI's. It is called automatically by webmachine
 %% @end
 -spec allowed_methods(ReqData::term(),State::term()) -> {list(), term(), term()}.
-
 allowed_methods(ReqData, State) ->
 	case api_help:parse_path(wrq:path(ReqData)) of
 		[{"suggest", _Term}] ->
@@ -52,10 +47,8 @@ allowed_methods(ReqData, State) ->
 
 
 %% @doc
-%% Function: content_types_provided/2
-%% Purpose: based on the Accept header on a 'GET' request, we provide different media types to the client.
+%% Based on the Accept header on a 'GET' request, we provide different media types to the client.
 %% A code 406 is returned to the client if we cannot return the media-type that the user has requested.
-%% Returns: {[{Mediatype, Handler}], ReqData, State}
 %% @end
 -spec content_types_provided(ReqData::term(),State::term()) -> {list(), term(), term()}.
 content_types_provided(ReqData, State) ->
@@ -86,7 +79,9 @@ get_suggestion(ReqData, State) ->
 					}                                      
 				}",
 			case erlastic_search:suggest(?INDEX, Query) of	
-				{error, Reason} -> {lib_json:encode(Reason),ReqData, State};
+				{error, {Code, Body}} -> 
+    				ErrorString = api_help:generate_error(Body, Code),
+    				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 				{ok,List} -> 
 					EncodedList = lib_json:encode(List),
 					case re:run(EncodedList, "\"options\":\\[\\]", [{capture, first, list}]) of
@@ -211,6 +206,51 @@ update_resource(Resource, ResourceId) ->
 
 
 %% @doc
+%% Updates the suggestion to reflect the changes that has been done in a stream.
+%% @end
+-spec update_stream(Stream::json(), StreamId::string()) -> ok.
+update_stream(Stream, StreamId) ->
+	%fetch old values so that we can replace them
+	case erlastic_search:get_doc(?INDEX, "stream", StreamId) of
+		{error, _Reason} -> erlang:display("Stream not found");
+		{ok, OldStreamJson} ->
+			{_, OldStream} = get_stream_info(lib_json:get_field(OldStreamJson, "_source")),
+			{_, NewStream} = get_stream_info(Stream),
+			ResourceId = lib_json:get_field(OldStreamJson, "_source.resource_id"),
+			case ResourceId of
+				undefined ->
+					ok;
+				_ ->
+					%fetch old suggestion
+					case erlastic_search:search(?INDEX, "suggestion", "resource_id:" ++ binary_to_list(ResourceId)) of
+						{error, _Reason2} -> erlang:diplay("Suggestion not found :S");
+						{ok, OldSuggestion} -> 
+							StreamList = lib_json:get_field(OldSuggestion, "hits.hits[0]._source.suggest.payload.streams"),
+							case StreamList of
+								undefined ->
+									ok;
+								_ ->
+									case string:str(StreamList, [OldStream]) of
+										0 -> erlang:display("Invalid position. Not matched properly");
+										Pos ->
+											SuggId = lib_json:get_field(OldSuggestion, "hits.hits[0]._id"),
+											Suggestion = lib_json:get_field(OldSuggestion, "hits.hits[0]._source"),
+											UpdatedSuggestion = lib_json:replace_field(Suggestion, lists:concat(["suggest.payload.streams[", Pos-1, "]"]), NewStream),
+											FinalSuggestion = update_score( UpdatedSuggestion),
+											case erlastic_search:index_doc_with_id(?INDEX, "suggestion", SuggId, FinalSuggestion) of 
+												{error, _Reason} -> erlang:display("Suggestion not updated ");
+												{ok, _} -> 	ok
+											end
+									end
+							end
+					end
+			end
+	end,
+	ok.
+
+
+
+%% @doc
 %% Updates the weight of the suggestion after the new information has been added to it
 %% It takes into account both resource and stream.
 %% @end
@@ -219,10 +259,15 @@ update_score(Suggestion) ->
 	Payload = lib_json:get_field(Suggestion, "suggest.payload"),
 	ResourceWeight = scoring:calc(Payload, resource),
 	Streams = lib_json:get_field(Payload, "streams"),
-	Fun = fun(Stream, Acc) -> 
-			scoring:calc(Stream,stream)+Acc
+	case Streams of
+		undefined ->
+			StreamWeight = 0;
+		_ -> 
+			Fun = fun(Stream, Acc) -> 
+					scoring:calc(Stream,stream)+Acc
+			end,
+			StreamWeight = lists:foldr(Fun, 0, Streams)
 	end,
-	StreamWeight = lists:foldr(Fun, 0, Streams),
 	Sum = ResourceWeight + StreamWeight,
 	lib_json:replace_field(Suggestion, "suggest.weight", Sum).
 
