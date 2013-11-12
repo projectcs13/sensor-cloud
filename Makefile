@@ -5,7 +5,6 @@
 ################################################################################
 ERL := erl
 REBAR := ./rebar
-# DIALYZE_INCLUDE = -I lib/erlastic_search/include/ -I lib/webmachine/include/ -I lib/rabbitmq-erlang-client/include -I lib/erlson/include/
 ################################################################################
 
 
@@ -24,12 +23,6 @@ get_libs:
 	@$(REBAR) compile
 	$(MAKE) -C lib/rabbitmq-server
 	$(MAKE) -C lib/rabbitmq-erlang-client
-
-# prep_dialyzer:
-# 	dialyzer --build_plt --apps kernel stdlib erts mnesia eunit
-
-# dialyze: 
-# 	dialyzer -pa ebin/ $(DIALYZE_INCLUDE) src/*.erl lib/erlson/ebin/
 
 clean_emacs_vsn_files:
 	rm -rf *~
@@ -50,16 +43,17 @@ clean_emacs_vsn_files:
 
 ### Command: make
 ### Builds the entire project, excluding the dependencies.
-all: compile #dialyze
+all: compile
 
 ### Command: make install
 ### Downloads all dependencies and builds the entire project
-install: get_libs #prep_dialyzer
+install: get_libs
+	$(ERL) -pa ebin -s config -config config/engine.config
 
 ### Command: make run
 ### Downloads all depenedencies, bulds entire project and runs the project.
 run: compile
-	$(ERL) -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname engine 
+	$(ERL) -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname engine -config config/engine.config
 
 ### Command: make run_es
 ### Runs elastic search
