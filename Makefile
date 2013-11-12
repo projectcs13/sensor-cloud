@@ -24,6 +24,7 @@ get_libs:
 	@$(REBAR) compile
 	$(MAKE) -C lib/rabbitmq-server
 	$(MAKE) -C lib/rabbitmq-erlang-client
+	$(MAKE) -C lib/rErlang
 
 # prep_dialyzer:
 # 	dialyzer --build_plt --apps kernel stdlib erts mnesia eunit
@@ -59,7 +60,9 @@ install: get_libs #prep_dialyzer
 ### Command: make run
 ### Downloads all depenedencies, bulds entire project and runs the project.
 run: compile
-	$(ERL) -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname engine 
+	-export R_HOME="/usr/lib/R"
+	curl -XPUT localhost:9200/sensorcloud
+	$(ERL) -pa ebin/ lib/*/ebin/ lib/*/bin/ -boot start_sasl -s reloader -s engine -sname engine 
 
 ### Command: make run_es
 ### Runs elastic search
@@ -75,27 +78,37 @@ run_rabbit:
 ### Compile project resources (not libraries) and runs all eunit tests.
 test: compile
 	-@mkdir test-results
-	$(ERL) -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname engine -s test run
+	curl -XDELETE localhost:9200/sensorcloud
+	curl -XPUT localhost:9200/sensorcloud
+	$(ERL) -pa ebin/ lib/*/ebin/ lib/*/bin/ -boot start_sasl -s reloader -s engine -sname engine -s test run
 
 test_json: compile
 	-@mkdir test-results
-	$(ERL) -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname engine -eval 'test:run(lib_json)'
+	$(ERL) -pa ebin/ lib/*/ebin/ lib/*/bin/ -boot start_sasl -s reloader -s engine -sname engine -eval 'test:run(lib_json)'
 
 test_resource: compile
 	-@mkdir test-results
-	$(ERL) -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname engine -eval 'test:run(resource)'
+	curl -XDELETE localhost:9200/sensorcloud
+	curl -XPUT localhost:9200/sensorcloud
+	$(ERL) -pa ebin/ lib/*/ebin/ lib/*/bin/ -boot start_sasl -s reloader -s engine -sname engine -eval 'test:run(resource)'
 
 test_streams: compile
 	-@mkdir test-results
-	$(ERL) -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname engine -eval 'test:run(streams)'
+	curl -XDELETE localhost:9200/sensorcloud
+	curl -XPUT localhost:9200/sensorcloud
+	$(ERL) -pa ebin/ lib/*/ebin/ lib/*/bin/ -boot start_sasl -s reloader -s engine -sname engine -eval 'test:run(streams)'
 
 test_suggest: compile
 	-@mkdir test-results
-	$(ERL) -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname engine -eval 'test:run(suggest)'
+	curl -XDELETE localhost:9200/sensorcloud
+	curl -XPUT localhost:9200/sensorcloud
+	$(ERL) -pa ebin/ lib/*/ebin/ lib/*/bin/ -boot start_sasl -s reloader -s engine -sname engine -eval 'test:run(suggest)'
 
 test_users: compile
 	-@mkdir test-results
-	$(ERL) -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname engine -eval 'test:run(users)'
+	curl -XDELETE localhost:9200/sensorcloud
+	curl -XPUT localhost:9200/sensorcloud
+	$(ERL) -pa ebin/ lib/*/ebin/ lib/*/bin/ -boot start_sasl -s reloader -s engine -sname engine -eval 'test:run(users)'
 
 ### Command: make docs
 ### Genereats all of the documentation files

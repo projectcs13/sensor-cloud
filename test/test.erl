@@ -17,19 +17,6 @@
 %% Returns: ok | no_return()
 %% @end
 run() ->
-	post_request(?RESOURCE_URL, "application/json", 
-							"{
-								\"suggestion\" : {           
-									\"properties\" : {      
-										\"resource_id\" : { \"type\" : \"string\" },
-										\"suggest\" : { \"type\" : \"completion\",
-											\"index_analyzer\" : \"simple\",      
-											\"search_analyzer\" : \"simple\",
-											\"payloads\" : true
-										}
-									}
-							    }
-			}"),
 	run("ebin").
 
 

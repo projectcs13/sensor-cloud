@@ -66,7 +66,7 @@ get_stream_test() ->
 	{ok, {{_Version5, 200, _ReasonPhrase5}, _Headers5, Body5}} = httpc:request(get, {"http://localhost:8000/streams/_search?user_id=0", []}, [], []),
 	{ok, {{_Version6, 200, _ReasonPhrase6}, _Headers6, Body6}} = httpc:request(post, {"http://localhost:8000/streams/_search",[],"application/json", "{\"query\":{\"term\" : { \"test\" : \"get\" }}}"}, [], []),
 	% Test get for missing index
-	{ok, {{_Version7, 500, _ReasonPhrase7}, _Headers7, Body7}} = httpc:request(get, {"http://localhost:8000/streams/1", []}, [], []),
+	{ok, {{_Version7, 404, _ReasonPhrase7}, _Headers7, Body7}} = httpc:request(get, {"http://localhost:8000/streams/1", []}, [], []),
 	% Test delete
 	{ok, {{_Version8, 200, _ReasonPhrase8}, _Headers8, Body8}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId1), []}, [], []),
 	{ok, {{_Version9, 200, _ReasonPhrase9}, _Headers9, Body9}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId2), []}, [], []),
@@ -77,12 +77,11 @@ get_stream_test() ->
 	?assertEqual(true,lib_json:get_field(Body3,"creation_date") == list_to_binary(Date)),
 	?assertEqual(<<"get">>,lib_json:get_field(Body3,"test")),
 	?assertEqual(true,lib_json:get_field(Body3,"private") == <<"false">>),
-	?assertEqual(true,lib_json:field_value_exists(Body4,"hits[*].test", <<"get">>)),
+	?assertEqual(true,lib_json:field_value_exists(Body4,"streams[*].test", <<"get">>)),
 	?assertEqual(true,lib_json:field_value_exists(Body5,"hits.hits[*]._source.test", <<"get">>)),
 	?assertEqual(true,lib_json:get_field(Body5,"hits.total") >= 2), % Needed in case unempty elasticsearch
 	?assertEqual(true,lib_json:field_value_exists(Body5,"hits.hits[*]._source.test", <<"get">>)),
 	?assertEqual(true,lib_json:get_field(Body6,"hits.total") >= 2), % Needed in case unempty elasticsearch
-	?assertEqual(true,string:str(Body7,"not_found") =/= 0),
 	?assertEqual(true,lib_json:get_field(Body8,"_id") == DocId1),
 	?assertEqual(true,lib_json:get_field(Body9,"_id") == DocId2).
 
@@ -112,7 +111,7 @@ put_stream_test() ->
 	{ok, {{_Version7, 200, _ReasonPhrase7}, _Headers7, Body7}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId1), []}, [], []),
 	{ok, {{_Version8, 200, _ReasonPhrase8}, _Headers8, Body8}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId2), []}, [], []),
 	% Test update on missing doc
-	{ok, {{_Version9, 500, _ReasonPhrase9}, _Headers9, Body9}} = httpc:request(put, {"http://localhost:8000/streams/1", [], "application/json", "{\n\"test\" : \"put\"\n}"}, [], []),
+	{ok, {{_Version9, 404, _ReasonPhrase9}, _Headers9, Body9}} = httpc:request(put, {"http://localhost:8000/streams/1", [], "application/json", "{\n\"test\" : \"put\"\n}"}, [], []),
 	?assertEqual(<<"false">>,lib_json:get_field(Body5,"private")),
 	?assertEqual(true,lib_json:get_field(Body5,"private") =/= <<"true">>),
 	?assertEqual(true,lib_json:get_field(Body6,"private") =/= <<"false">>),
@@ -122,9 +121,8 @@ put_stream_test() ->
 	?assertEqual(true,lib_json:get_field(Body6,"test") == <<"put">>),
 	?assertEqual(true,lib_json:get_field(Body6,"test") =/= <<"get">>),
 	?assertEqual(true,lib_json:get_field(Body7,"_id") == DocId1),
-	?assertEqual(true,lib_json:get_field(Body8,"_id") == DocId2),
-	?assertEqual(true,string:str(Body9,"not_found") =/= 0).
-
+	?assertEqual(true,lib_json:get_field(Body8,"_id") == DocId2).
+	
 %% @doc
 %% Function: delete_stream_test/0
 %% Purpose: Test the delete_stream function by doing some HTTP requests
@@ -145,12 +143,10 @@ delete_stream_test() ->
 	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId1), []}, [], []),
 	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId2), []}, [], []),
 	% Test delete on missing index
-	{ok, {{_Version5, 500, _ReasonPhrase5}, _Headers5, Body5}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId1), []}, [], []),
-	{ok, {{_Version6, 500, _ReasonPhrase6}, _Headers6, Body6}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId2), []}, [], []),
+	{ok, {{_Version5, 404, _ReasonPhrase5}, _Headers5, Body5}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId1), []}, [], []),
+	{ok, {{_Version6, 404, _ReasonPhrase6}, _Headers6, Body6}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId2), []}, [], []),
 	?assertEqual(true,lib_json:get_field(Body3,"_id") == DocId1),
-	?assertEqual(true,lib_json:get_field(Body4,"_id") == DocId2),
-	?assertEqual(true,string:str(Body5,"not_found") =/= 0),
-	?assertEqual(true,string:str(Body6,"not_found") =/= 0).
+	?assertEqual(true,lib_json:get_field(Body4,"_id") == DocId2).
 
 %% @doc
 %% Function: create_doc_without_resource_test/0
@@ -165,6 +161,88 @@ create_doc_without_resource_test() ->
  	{ok, {{_Version2, 500, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/users/0/streams", [], "application/json", "{\n\"test\" : \"get\"\n}"}, [], []),
 	?assertEqual(true,string:str(Body1,"resource_id_missing") =/= 0),
 	?assertEqual(true,string:str(Body2,"resource_id_missing") =/= 0).
+
+%% @doc
+%% Function: restricted_fields_create_test/0
+%% Purpose: Test that creation with restricted fields are not allowed
+%% Returns: ok | {error, term()}
+%% @end
+-spec restricted_fields_create_test() -> ok | {error, term()}.
+restricted_fields_create_test() ->
+		{ok, {{_Version1, 409, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [], "application/json", "{\n\"quality\" : \"\"\n, \"resource_id\" : \"asdascvsr213sda\"}"}, [], []),
+		{ok, {{_Version2, 409, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/streams", [], "application/json", "{\n\"user_ranking\" : \"\"\n, \"resource_id\" : \"asdascvsr213sda\"}"}, [], []),
+		{ok, {{_Version3, 409, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(post, {"http://localhost:8000/streams", [], "application/json", "{\n\"subscribers\" : \"\"\n, \"resource_id\" : \"asdascvsr213sda\"}"}, [], []),
+		{ok, {{_Version4, 409, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(post, {"http://localhost:8000/streams", [], "application/json", "{\n\"last_update\" : \"\"\n, \"resource_id\" : \"asdascvsr213sda\"}"}, [], []),
+		{ok, {{_Version5, 409, _ReasonPhrase5}, _Headers5, Body5}} = httpc:request(post, {"http://localhost:8000/streams", [], "application/json", "{\n\"creation_date\" : \"\"\n, \"resource_id\" : \"asdascvsr213sda\"}"}, [], []),
+		{ok, {{_Version6, 409, _ReasonPhrase6}, _Headers6, Body6}} = httpc:request(post, {"http://localhost:8000/streams", [], "application/json", "{\n\"history_size\" : \"\"\n, \"resource_id\" : \"asdascvsr213sda\"}"}, [], []),
+		?assertEqual(true,string:str(Body1,"error") =/= 0),
+		?assertEqual(true,string:str(Body2,"error") =/= 0),
+		?assertEqual(true,string:str(Body3,"error") =/= 0),
+		?assertEqual(true,string:str(Body4,"error") =/= 0),
+		?assertEqual(true,string:str(Body5,"error") =/= 0),
+		?assertEqual(true,string:str(Body6,"error") =/= 0).
+		
+		
+		
+%% @doc
+%% Function: restricted_fields_update_test/0
+%% Purpose: Test that update with restricted fields are not allowed
+%% Returns: ok | {error, term()}
+%%
+%% Side effects: creates 1 document in elasticsearch and deletes it
+%% @end
+-spec restricted_fields_update_test() -> ok | {error, term()}.
+restricted_fields_update_test() ->
+		{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [], "application/json", "{\n\"test\" : \"restricted\"\n, \"resource_id\" : \"asdascvsr213sda\"}"}, [], []),
+		DocId = lib_json:get_field(Body1,"_id"),
+		refresh(),
+		{ok, {{_Version2, 409, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(put, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId), [], "application/json", "{\"user_ranking\" : \"\"}"}, [], []),
+		{ok, {{_Version3, 409, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(put, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId), [], "application/json", "{\"subscribers\" : \"\"}"}, [], []),
+		{ok, {{_Version4, 409, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(put, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId), [], "application/json", "{\"last_update\" : \"\"}"}, [], []),
+		{ok, {{_Version5, 409, _ReasonPhrase5}, _Headers5, Body5}} = httpc:request(put, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId), [], "application/json", "{\"creation_date\" : \"\"}"}, [], []),
+		{ok, {{_Version6, 409, _ReasonPhrase6}, _Headers6, Body6}} = httpc:request(put, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId), [], "application/json", "{\"history_size\" : \"\"\}"}, [], []),
+		{ok, {{_Version7, 409, _ReasonPhrase7}, _Headers7, Body7}} = httpc:request(put, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId), [], "application/json", "{\"resource_id\" : \"\"\}"}, [], []),
+		{ok, {{_Version8, 409, _ReasonPhrase8}, _Headers8, Body8}} = httpc:request(put, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId), [], "application/json", "{\"type\" : \"\"\}"}, [], []),
+		{ok, {{_Version9, 409, _ReasonPhrase9}, _Headers9, Body9}} = httpc:request(put, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId), [], "application/json", "{\"accuracy\" : \"\"\}"}, [], []),
+		{ok, {{_Version10, 409, _ReasonPhrase10}, _Headers10, Body10}} = httpc:request(put, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId), [], "application/json", "{\"quality\" : \"\"\}"}, [], []),
+		{ok, {{_Version11, 409, _ReasonPhrase11}, _Headers11, Body11}} = httpc:request(put, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId), [], "application/json", "{\"min_val\" : \"\"\}"}, [], []),
+		{ok, {{_Version12, 409, _ReasonPhrase12}, _Headers12, Body12}} = httpc:request(put, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId), [], "application/json", "{\"max_val\" : \"\"\}"}, [], []),
+		{ok, {{_Version13, 409, _ReasonPhrase13}, _Headers13, Body13}} = httpc:request(put, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId), [], "application/json", "{\"location\" : \"\"\}"}, [], []),
+		{ok, {{_Version14, 200, _ReasonPhrase14}, _Headers14, _Body14}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId), []}, [], []),
+		?assertEqual(true,string:str(Body2,"error") =/= 0),
+		?assertEqual(true,string:str(Body3,"error") =/= 0),
+		?assertEqual(true,string:str(Body4,"error") =/= 0),
+		?assertEqual(true,string:str(Body5,"error") =/= 0),
+		?assertEqual(true,string:str(Body6,"error") =/= 0),
+		?assertEqual(true,string:str(Body7,"error") =/= 0),
+		?assertEqual(true,string:str(Body8,"error") =/= 0),
+		?assertEqual(true,string:str(Body9,"error") =/= 0),
+		?assertEqual(true,string:str(Body10,"error") =/= 0),
+		?assertEqual(true,string:str(Body11,"error") =/= 0),
+		?assertEqual(true,string:str(Body12,"error") =/= 0),
+		?assertEqual(true,string:str(Body13,"error") =/= 0).		
+		
+%% @doc
+%% Function: server_side_creation_test/0
+%% Purpose: Test that the correct fields are added server side
+%% Returns: ok | {error, term()}
+%%
+%% Side effects: creates 1 document in elasticsearch and deletes it
+%% @end
+-spec server_side_creation_test() -> ok | {error, term()}.
+
+server_side_creation_test() ->
+		{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [], "application/json", "{\"resource_id\" : \"asdascvsr213sda\"}"}, [], []),
+		DocId = lib_json:get_field(Body1,"_id"),
+		refresh(),
+		{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(get, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId), []}, [], []),
+		{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, _Body3}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId), []}, [], []),
+		?assertEqual(true,lib_json:get_field(Body2,"quality") =/= undefined),
+		?assertEqual(true,lib_json:get_field(Body2,"user_ranking") =/= undefined),
+		?assertEqual(true,lib_json:get_field(Body2,"subscribers") =/= undefined),
+		?assertEqual(true,lib_json:get_field(Body2,"last_update") =/= undefined),
+		?assertEqual(true,lib_json:get_field(Body2,"creation_date") =/= undefined),
+		?assertEqual(true,lib_json:get_field(Body2,"history_size") =/= undefined).
 
 %% @doc
 %% Function: refresh/0
