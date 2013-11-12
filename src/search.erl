@@ -110,7 +110,6 @@ process_search_post(ReqData, State) ->
         end,
         {Json,_,_} = api_help:json_handler(ReqData,State),
         FilteredJson = filter_json(Json, From, Size, Sort),
-		erlang:display(FilteredJson),
         case erlastic_search:search_json(#erls_params{},?INDEX, "stream", FilteredJson) of % Maybe wanna take more
                 {error,{Code1, _}} ->
                         StreamSearch = "\"error\"";
