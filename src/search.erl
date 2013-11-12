@@ -162,7 +162,7 @@ filter_json(Json) ->
 filter_json(Json, From, Size, Sort) ->
 	case lib_json:get_field(Json, "sort") of 
 		undefined -> 
-			UseSort = Sort, 
+			UseSort = "\"" ++ Sort ++ "\"", 
 			SortJson = Json;
 		SortValue when is_binary(SortValue) -> 
 			UseSort = "\"" ++ binary_to_list(SortValue) ++ "\"",
