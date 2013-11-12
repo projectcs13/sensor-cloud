@@ -255,6 +255,7 @@ put_stream(ReqData, State) ->
 				{{halt,409}, wrq:set_resp_body("{\"error\":\"Error caused by restricted field in document, these fields are restricted : " ++ ResFields2 ++"\"}", ReqData), State};
 			false ->
 				Update = api_help:create_update(Stream),
+				suggest:update_stream(Stream, StreamId),
 				case api_help:update_doc(?INDEX, "stream", StreamId, Update) of 
 					{error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
 					{ok,List} -> {true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
