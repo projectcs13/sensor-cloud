@@ -56,8 +56,7 @@ all: compile #dialyze
 ### Command: make install
 ### Downloads all dependencies and builds the entire project
 install: get_libs #prep_dialyzer
-	 mv lib/elasticsearch-servicewrapper/service lib/elasticsearch/bin/service
-	 rm -rf lib/elasticsearch-servicewrapper
+	 cp lib/elasticsearch-servicewrapper/service lib/elasticsearch/bin/service
 
 ### Command: make run
 ### Downloads all depenedencies, bulds entire project and runs the project.
