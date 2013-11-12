@@ -113,6 +113,13 @@ delete_resource(ReqData, State) ->
 			end
 	end.
 
+%% @doc
+%% Function: delete_data_points_wtih_stream_id/1
+%% Purpose: Used to delete all data-points with the given id as parent
+%% Returns: {ok} or {error,Reason} 
+%% FIX: This function relies on direct contact with elastic search at localhost:9200
+%% @end
+-spec delete_data_points_with_stream_id(Id::term()) -> term()..
 
 delete_data_points_with_stream_id(Id) when is_binary(Id) ->
 	{ok, {{_Version, Code, _ReasonPhrase}, _Headers, Body}} = httpc:request(delete, {"http://localhost:9200/sensorcloud/datapoint/_query?q=streamid:" ++ binary_to_list(Id), []}, [], []),
