@@ -119,7 +119,7 @@ delete_resource(ReqData, State) ->
 %% Returns: {ok} or {error,Reason} 
 %% FIX: This function relies on direct contact with elastic search at localhost:9200
 %% @end
--spec delete_data_points_with_stream_id(Id::term()) -> term()..
+-spec delete_data_points_with_stream_id(Id::term()) -> term().
 
 delete_data_points_with_stream_id(Id) when is_binary(Id) ->
 	{ok, {{_Version, Code, _ReasonPhrase}, _Headers, Body}} = httpc:request(delete, {"http://localhost:9200/sensorcloud/datapoint/_query?q=streamid:" ++ binary_to_list(Id), []}, [], []),
