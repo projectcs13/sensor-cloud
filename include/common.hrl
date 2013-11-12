@@ -1,5 +1,5 @@
 %% @doc
-%% Author: Gabriel Tholsgård
+%% Author: Gabriel Tholsgård, Li Hao
 %% [www.csproj13.student.it.uu.se]
 %% == common settings and names include file ==
 %% Provides definitions and settings for common things
@@ -14,4 +14,10 @@
 -endif.
 
 
+
+
+%% User Agent of httpc request
+-ifndef(UA).
+-define(UA, "sensor-cloud:").
+-endif.
 
