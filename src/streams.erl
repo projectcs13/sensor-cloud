@@ -130,21 +130,28 @@ process_post(ReqData, State) ->
 				ResId ->
 					ResAdded = api_help:add_field(UserAdded,"resource_id",ResId)
 			end,
-			case lib_json:get_field(ResAdded,"resource_id") == undefined of
-				true -> {false, wrq:set_resp_body("\"resource_id_missing\"",ReqData), State};
-				false ->
+			case lib_json:get_field(ResAdded,"resource_id") of
+				undefined -> {false, wrq:set_resp_body("\"resource_id_missing\"",ReqData), State};
+				ResourceId ->
 					case do_any_field_exist(ResAdded,?RESTRCITEDCREATE) of
 						true ->
 							ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDCREATE),
 							ResFields2 = string:sub_string(ResFields1, 1, length(ResFields1)-2),
 							{{halt,409}, wrq:set_resp_body("{\"error\":\"Error caused by restricted field in document, these fields are restricted : " ++ ResFields2 ++"\"}", ReqData), State};
 						false ->
-							FieldsAdded = add_server_side_fields(ResAdded),
-							case erlastic_search:index_doc(?INDEX, "stream", FieldsAdded) of	
-								{error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
-								{ok,List} -> 
-									suggest:update_suggestion(ResAdded),
-									{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
+							case erlastic_search:get_doc(?INDEX, "resource", ResourceId) of
+								{error,not_found} ->
+									{{halt,409}, wrq:set_resp_body("{\"error\":\"no document with resource_id given is present in the system\"}", ReqData), State};
+								{error,Reason} ->
+									{{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
+								{ok,_} ->
+									FieldsAdded = add_server_side_fields(ResAdded),
+									case erlastic_search:index_doc(?INDEX, "stream", FieldsAdded) of	
+										{error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
+										{ok,List} -> 
+											suggest:update_suggestion(ResAdded),
+											{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
+									end
 							end
 					end
 			end;
