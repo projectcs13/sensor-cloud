@@ -53,7 +53,7 @@ get_resources_using_polling_test() ->
 						 "application/json",
 						 "{\"model\" : \"test-model2\"}"
 						}, [], []),
-	timer:sleep(500),
+	timer:sleep(1000),
 	?assertMatch(1, length(poll_help:get_resources_using_polling())),
 	
 	%% Test that should return a list of length two.
@@ -61,7 +61,7 @@ get_resources_using_polling_test() ->
 						 "application/json",
 						 "{\"model\" : \"test-model\", \"uri\" : \"127.0.0.2\"}"
 						}, [], []),
-	timer:sleep(800),
+	timer:sleep(1000),
 	?assertMatch(2, length(poll_help:get_resources_using_polling())).
 
 
