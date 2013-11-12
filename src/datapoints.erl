@@ -81,11 +81,19 @@ process_post(ReqData, State) ->
 							TimeStampAdded = DatapointJson
 					end,
 					FinalJson = api_help:add_field(TimeStampAdded, "streamid", Id),
-					case erlastic_search:index_doc(?INDEX, "datapoint", FinalJson) of
-						{error, {Code, Body}} -> 
-            				ErrorString = api_help:generate_error(Body, Code),
-            				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-						{ok,List} -> {true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
+					case erlastic_search:get_doc(?INDEX, "stream", Id) of
+						 {error,{404,_}} ->
+							 {{halt,409}, wrq:set_resp_body("{\"error\":\"no document with resource_id given is present in the system\"}", ReqData), State};
+                         {error,{Code,Body}} ->
+                             ErrorString = api_help:generate_error(Body, Code),
+                             {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+                         {ok,_} ->
+							 case erlastic_search:index_doc(?INDEX, "datapoint", FinalJson) of
+								{error, {Code, Body}} -> 
+            						ErrorString = api_help:generate_error(Body, Code),
+            						{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+								{ok,List} -> {true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
+							 end
 					end
 			end;
 		true ->
