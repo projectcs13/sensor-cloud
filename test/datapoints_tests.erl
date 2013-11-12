@@ -69,6 +69,7 @@ no_timestamp_test() ->
         check_returned_code(Response1, 200),
 		refresh(),
 		{ok,{_,_,Body}} = httpc:request(get, {"http://localhost:8000/streams/5/data/", []}, [], []),
+		erlang:display(Body),
 		ObjectList = lib_json:get_field(Body,"data"),
         ?assertEqual(true, lib_json:get_field(lists:nth(1,ObjectList),"timestamp") =/= undefined).
 

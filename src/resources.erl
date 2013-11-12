@@ -150,9 +150,14 @@ get_streams([JSON | Tl]) ->
 
 delete_streams([]) -> {ok};
 delete_streams([StreamId|Rest]) ->
-	case erlastic_search:delete_doc(?INDEX, "stream", StreamId) of 
-		{error,Reason} -> {error,Reason};
-		{ok,_List} -> delete_streams(Rest)
+	case streams:delete_data_points_with_stream_id(StreamId) of
+        {error,{Code, Body}} -> 
+            {error,{Code, Body}};
+        {ok} ->
+			case erlastic_search:delete_doc(?INDEX, "stream", StreamId) of 
+				{error,Reason} -> {error,Reason};
+				{ok,_List} -> delete_streams(Rest)
+			end
 	end.
 
 %% @doc

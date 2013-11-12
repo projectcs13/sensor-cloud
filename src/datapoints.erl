@@ -112,11 +112,8 @@ get_datapoint(ReqData, State) ->
 			case erlastic_search:search_limit(?INDEX, "datapoint", "streamid:" ++ Id, Size) of
 				{ok, Result} ->
 					EncodedResult = lib_json:encode(Result),
-					case re:run(EncodedResult, "\"max_score\":null", [{capture, first, list}]) of
-						{match, _} -> {{halt, 404}, ReqData, State};
-						nomatch -> FinalJson = lib_json:get_list_and_add_id(Result, data),
-					       {FinalJson, ReqData, State}
-					end;
+					FinalJson = lib_json:get_list_and_add_id(Result, data),
+					{FinalJson, ReqData, State};
 				{error, {Code, Body}} -> 
         				ErrorString = api_help:generate_error(Body, Code),
         				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State}
