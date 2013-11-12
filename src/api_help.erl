@@ -112,11 +112,16 @@ create_update(Stream) ->
 -spec add_field(Stream::string(),FieldName::string(),FieldValue::term()) -> string().
 
 add_field(Stream,FieldName,FieldValue) ->
-	case is_integer(FieldValue) of
+	case is_list(FieldValue) of
 		true ->
-			string:substr(Stream,1,length(Stream)-1) ++ ",\"" ++ FieldName ++ "\":" ++ FieldValue ++ "}";
+			string:substr(Stream,1,length(Stream)-1) ++ ",\"" ++ FieldName ++ "\":\"" ++ FieldValue ++ "\"}";
 		false ->
-			string:substr(Stream,1,length(Stream)-1) ++ ",\"" ++ FieldName ++ "\":\"" ++ FieldValue ++ "\"}"
+			case is_integer(FieldValue) of
+				true ->
+					string:substr(Stream,1,length(Stream)-1) ++ ",\"" ++ FieldName ++ "\":" ++ integer_to_list(FieldValue) ++ "}";
+				false ->
+					string:substr(Stream,1,length(Stream)-1) ++ ",\"" ++ FieldName ++ "\":" ++ float_to_list(FieldValue,[{decimals,1}]) ++ "}"
+			end
 	end.
 			
 
