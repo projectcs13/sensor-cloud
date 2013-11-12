@@ -150,13 +150,16 @@ filter_json(Json, From, Size, Sort) ->
 		undefined -> 
 			UseSort = Sort, 
 			SortJson = Json;
+		SortValue when is_binary(SortValue) -> 
+			UseSort = "\"" ++ binary_to_list(SortValue) ++ "\"",
+			SortJson = lib_json:rm_field(Json, "sort");
 		SortValue -> 
-			UseSort = binary_to_list(SortValue),
+			UseSort = SortValue,
 			SortJson = lib_json:rm_field(Json, "sort")
 	end,
     NewJson = string:sub_string(SortJson,1,string:len(SortJson)-1),
     "{\"from\" : "++From++
 	",\"size\" : "++Size++
-	",\"sort\" : \"" ++UseSort++
-	"\" ,\"query\" : {\"filtered\" : "++NewJson++
+	",\"sort\" : " ++UseSort++
+	",\"query\" : {\"filtered\" : "++NewJson++
 	",\"filter\" : {\"bool\" : {\"must\" : {\"term\" : {\"private\" : \"false\"}}}}}}}".
