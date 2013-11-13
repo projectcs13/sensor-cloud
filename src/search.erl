@@ -111,18 +111,32 @@ process_search_post(ReqData, State) ->
         {Json,_,_} = api_help:json_handler(ReqData,State),
         FilteredJson = filter_json(Json, From, Size, Sort),
         case erlastic_search:search_json(#erls_params{},?INDEX, "stream", FilteredJson) of % Maybe wanna take more
-                {error,{Code1, _}} ->
-                        StreamSearch = "\"error\"";
+                {error, Reason1} ->
+                        StreamSearch = {error, Reason1};
                 {ok,List1} ->
                         StreamSearch = lib_json:encode(List1) % May need to convert
         end,
         case erlastic_search:search_json(#erls_params{},?INDEX, "user", lib_json:rm_field(FilteredJson, "sort")) of % Maybe wanna take more
-                {error,{Code2, _}} ->
-                        UserSearch = "\"error\"";
-                {ok,List2} -> UserSearch = lib_json:encode(List2) % May need to convert
+                {error, Reason2} ->
+                        UserSearch = {error, Reason2};
+                {ok,List2} -> 
+			UserSearch = lib_json:encode(List2) % May need to convert
          end,
-        SearchResults = "{\"streams\":"++ StreamSearch ++", \"users\":"++ UserSearch ++"}",
-        {true,wrq:set_resp_body(SearchResults,ReqData),State}.
+	% check search-results for error
+	case StreamSearch of
+	    {error, {Body, Code}} ->
+		ErrorString = api_help:generate_error(Body, Code),
+		{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+	    _ -> 
+		case UserSearch of
+		  {error, {Body, Code}} ->
+		    ErrorString = api_help:generate_error(Body, Code),
+		    {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+		  _ ->
+        		SearchResults = "{\"streams\":"++ StreamSearch ++", \"users\":"++ UserSearch ++"}",
+        		{true,wrq:set_resp_body(SearchResults,ReqData),State}
+		end
+	end.
 %% GROUPS ARE NOT IMPLEMENTED
 %%         case erlastic_search:search_json(#erls_params{},?INDEX, "group", FilteredJson) of % Maybe wanna take more
 %%                 {error,Reason} -> {{halt,Reason}, ReqData, State};
