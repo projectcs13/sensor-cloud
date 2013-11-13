@@ -16,7 +16,7 @@
                 process_post/2]).
 
 -include("webmachine.hrl").
--include("api.hrl").
+-include("field_restrictions.hrl").
 
 %% @doc
 %% Function: init/1

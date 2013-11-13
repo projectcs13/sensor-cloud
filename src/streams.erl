@@ -16,7 +16,7 @@
 
 -include_lib("erlastic_search.hrl").
 -include("webmachine.hrl").
--include("api.hrl").
+-include("field_restrictions.hrl").
 
 %% @doc
 %% Function: init/1
