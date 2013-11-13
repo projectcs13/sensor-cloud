@@ -182,7 +182,8 @@ process_post(ReqData, State) ->
 					{{Year,Month,Day},_} = calendar:local_time(),
 					Date = generate_date([Year,Month,Day]),
 					DateAdded = api_help:add_field(Resource,"creation_date",Date),
-					case erlastic_search:index_doc(?INDEX,"resource",DateAdded) of 
+					FinalResource = suggest:add_resource_suggestion_fields(DateAdded),
+					case erlastic_search:index_doc(?INDEX,"resource",FinalResource) of 
 						{error, {Code, Body}} -> 
 							ErrorString = api_help:generate_error(Body, Code),
 							{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
