@@ -381,8 +381,23 @@ do_only_fields_exist(Json,List) ->
 								   end, 0, Values),
 	NumFields == NumCorrectFields.
 
+%% @doc
+%% Function: count_fields/1
+%% Purpose: Used to return the number of fields in the given JSON
+%% Returns: The number of fields in the given JSON
+%% @end
+-spec count_fields(Json::string()) -> integer().
+
 count_fields(Json) ->
 	count_fields(Json,1).
+
+
+%% @doc
+%% Function: count_fields/2
+%% Purpose: Used to return the number of fields in the given JSON
+%% Returns: The number of fields in the given JSON
+%% @end
+-spec count_fields(Json::string(),Position::integer()) -> integer().
 
 count_fields(Json,Pos) ->
 	case Pos == length(Json) of
