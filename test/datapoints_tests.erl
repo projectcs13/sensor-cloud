@@ -37,11 +37,11 @@
 -spec post_test() -> ok | {error, term()}.
 post_test() ->
 		erlastic_search:index_doc_with_id(?INDEX,"stream","4","{\"test\" : \"data_points\"}"),
-		refresh(),
+		api_help:refresh(),
         Response1 = post_request(?DATAPOINTS_URL, "application/json",
                                          "{\"value\":\"" ++ ?TEST_VALUE ++ "\", \"timestamp\": \"" ++ ?TEST_TIMESTAMP ++ "\"}"),
         check_returned_code(Response1, 200),
-        refresh(),
+        api_help:refresh(),
 		erlastic_search:delete_doc(?INDEX,"stream","4"),
         ?assertNotMatch({error, "no match"}, get_index_id(?TEST_VALUE, ?TEST_TIMESTAMP)).
 
@@ -69,11 +69,11 @@ get_existing_datapoint_test() ->
 -spec no_timestamp_test() -> ok | {error, term()}.
 no_timestamp_test() ->
 		erlastic_search:index_doc_with_id(?INDEX,"stream","5","{\"test\" : \"data_points\"}"),
-		refresh(),
+		api_help:refresh(),
         Response1 = post_request("http://localhost:8000/streams/5/data/", "application/json",
                                          "{\"value\":\"55\"}"),
         check_returned_code(Response1, 200),
-		refresh(),
+		api_help:refresh(),
 		{ok,{_,_,Body}} = httpc:request(get, {"http://localhost:8000/streams/5/data/", []}, [], []),
 		ObjectList = lib_json:get_field(Body,"data"),
 		erlastic_search:delete_doc(?INDEX,"stream","5"),
@@ -126,12 +126,4 @@ get_request(URL) -> request(get, {URL, []}).
 request(Method, Request) ->
     httpc:request(Method, Request, [], []).
 
-%% @doc
-%% Function: refresh/0
-%% Purpose: Help function to find refresh the sensorcloud index
-%% Returns: {ok/error, {{Version, Code, Reason}, Headers, Body}}
-%% FIX: This relies on having a connection with elastic search on localhost:9200
-%% @end
-refresh() ->
-    httpc:request(post, {"http://localhost:9200/sensorcloud/_refresh", [],"", ""}, [], []).
 
