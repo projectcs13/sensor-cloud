@@ -137,15 +137,17 @@ process_post(ReqData, State) ->
 			case lib_json:get_field(ResAdded,"resource_id") of
 				undefined -> {false, wrq:set_resp_body("\"resource_id_missing\"",ReqData), State};
 				ResourceId ->
-					case api_help:do_any_field_exist(ResAdded,?RESTRCITEDCREATE) of
-						true ->
+					case {api_help:do_any_field_exist(ResAdded,?RESTRCITEDCREATE),api_help:do_only_fields_exist(ResAdded,?ACCEPTEDFIELDS)} of
+						{true,_} ->
 							ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDCREATE),
 							ResFields2 = string:sub_string(ResFields1, 1, length(ResFields1)-2),
 							{{halt,409}, wrq:set_resp_body("{\"error\":\"Error caused by restricted field in document, these fields are restricted : " ++ ResFields2 ++"\"}", ReqData), State};
-						false ->
+						{false,false} ->
+							{{halt,403}, wrq:set_resp_body(generate_error("Unsupported field(s)", 403), ReqData), State};
+						{false,true} ->
 							case erlastic_search:get_doc(?INDEX, "resource", ResourceId) of
 								{error,{404,_}} ->
-									{{halt,409}, wrq:set_resp_body("{\"error\":\"no document with resource_id given is present in the system\"}", ReqData), State};
+									{{halt,403}, wrq:set_resp_body("{\"error\":\"no document with resource_id given is present in the system\"}", ReqData), State};
 								{error,{Code,Body}} ->
 									ErrorString = api_help:generate_error(Body, Code),
             						{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
@@ -261,20 +263,22 @@ process_search_get(ReqData, State) ->
 put_stream(ReqData, State) ->
 	StreamId = proplists:get_value('stream', wrq:path_info(ReqData)),
 	{Stream,_,_} = api_help:json_handler(ReqData,State),
-	case api_help:do_any_field_exist(Stream,?RESTRCITEDUPDATE) of
-			true -> 
-				ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDUPDATE),
-				ResFields2 = string:sub_string(ResFields1, 1, length(ResFields1)-2),
-				{{halt,409}, wrq:set_resp_body("{\"error\":\"Error caused by restricted field in document, these fields are restricted : " ++ ResFields2 ++"\"}", ReqData), State};
-			false ->
-				Update = api_help:create_update(Stream),
-				suggest:update_stream(Stream, StreamId),
-				case api_help:update_doc(?INDEX, "stream", StreamId, Update) of 
-		{error, {Code, Body}} -> 
-            				ErrorString = api_help:generate_error(Body, Code),
-            				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-					{ok,List} -> {true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
-				end
+	case {api_help:do_any_field_exist(Stream,?RESTRCITEDUPDATE),api_help:do_only_fields_exist(Stream,?ACCEPTEDFIELDS)} of
+		{true,_} -> 
+			ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDUPDATE),
+			ResFields2 = string:sub_string(ResFields1, 1, length(ResFields1)-2),
+			{{halt,409}, wrq:set_resp_body("{\"error\":\"Error caused by restricted field in document, these fields are restricted : " ++ ResFields2 ++"\"}", ReqData), State};
+		{false,false} ->
+			{{halt,403}, wrq:set_resp_body(generate_error("Unsupported field(s)", 403), ReqData), State};
+		{false,true} ->
+			Update = api_help:create_update(Stream),
+			suggest:update_stream(Stream, StreamId),
+			case api_help:update_doc(?INDEX, "stream", StreamId, Update) of 
+				{error, {Code, Body}} -> 
+					ErrorString = api_help:generate_error(Body, Code),
+            		{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+				{ok,List} -> {true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
+			end
 	end.
 
 

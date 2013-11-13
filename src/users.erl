@@ -170,21 +170,26 @@ delete_resources([ResourceId|Rest]) ->
 -spec put_user(ReqData::tuple(), State::string()) -> {true, tuple(), string()}.
 put_user(ReqData, State) ->
     Id = id_from_path(ReqData),
+	{UserJson,_,_} = api_help:json_handler(ReqData, State),
     %check if doc already exists
-    case erlastic_search:get_doc(?INDEX, "user", Id) of
-        {error, {Code, Body}} -> 
-            ErrorString = api_help:generate_error(Body, Code),
-            {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-        {ok, List} ->
-            {UserJson,_,_} = api_help:json_handler(ReqData, State),
-            case erlastic_search:index_doc_with_id(?INDEX, "user", Id, UserJson) of
-                {error, {Code, Body}} -> 
-                    ErrorString = api_help:generate_error(Body, Code),
-                    {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-                {ok, Json} ->
-		            {true, wrq:set_resp_body(lib_json:encode(Json), ReqData), State}
-            end
-    end.
+	case api_help:do_only_fields_exist(UserJson,?ACCEPTEDFIELDS) of
+		false ->
+			{{halt,403}, wrq:set_resp_body(generate_error("Unsupported field(s)", 403), ReqData), State};
+		true ->
+			case erlastic_search:get_doc(?INDEX, "user", Id) of
+				{error, {Code, Body}} -> 
+					ErrorString = api_help:generate_error(Body, Code),
+					{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+				{ok, List} ->
+            		case erlastic_search:index_doc_with_id(?INDEX, "user", Id, UserJson) of
+                		{error, {Code, Body}} -> 
+                    		ErrorString = api_help:generate_error(Body, Code),
+                    		{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+                		{ok, Json} ->
+		            		{true, wrq:set_resp_body(lib_json:encode(Json), ReqData), State}
+            		end
+    		end
+	end.
 
 
 %% @doc
@@ -201,12 +206,17 @@ process_post(ReqData, State) ->
     case api_help:is_search(ReqData) of
         false ->
             {UserJson,_,_} = api_help:json_handler(ReqData, State),
-            case erlastic_search:index_doc(?INDEX, "user", UserJson) of
-                {error, {Code, Body}} -> 
-                    ErrorString = api_help:generate_error(Body, Code),
-                    {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-                {ok,List} -> 
-                    {true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
+			case api_help:do_only_fields_exist(UserJson,?ACCEPTEDFIELDS) of
+				false ->
+					{{halt,403}, wrq:set_resp_body(generate_error("Unsupported field(s)", 403), ReqData), State};
+				true ->
+					case erlastic_search:index_doc(?INDEX, "user", UserJson) of
+						{error, {Code, Body}} -> 
+							ErrorString = api_help:generate_error(Body, Code),
+                    		{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+                		{ok,List} -> 
+                    		{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
+					end
             end;
         true ->
             process_search(ReqData,State, post)                        

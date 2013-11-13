@@ -168,21 +168,22 @@ process_post(ReqData, State) ->
 	case IsSearch of 
 		false ->
 			% Create
-
 			{Resource,_,_} = api_help:json_handler(ReqData,State),
-			case api_help:do_any_field_exist(Resource,?RESTRCITEDCREATE) of
-				true ->
+			case {api_help:do_any_field_exist(Resource,?RESTRCITEDCREATE),api_help:do_only_fields_exist(Resource,?ACCEPTEDFIELDS)} of
+				{true,_} ->
 					ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDCREATE),
 					ResFields2 = string:sub_string(ResFields1, 1, length(ResFields1)-2),
 					{{halt,409}, wrq:set_resp_body("{\"error\":\"Error caused by restricted field in document, these fields are restricted : " ++ ResFields2 ++"\"}", ReqData), State};
-				false ->
+				{false,false} ->
+					{{halt,403}, wrq:set_resp_body(generate_error("Unsupported field(s)", 403), ReqData), State};
+				{false,true} ->
 					{{Year,Month,Day},_} = calendar:local_time(),
 					Date = generate_date([Year,Month,Day]),
 					DateAdded = api_help:add_field(Resource,"creation_date",Date),
 					case erlastic_search:index_doc(?INDEX,"resource",DateAdded) of 
-				{error, {Code, Body}} -> 
-            		ErrorString = api_help:generate_error(Body, Code),
-            		{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+						{error, {Code, Body}} -> 
+							ErrorString = api_help:generate_error(Body, Code),
+							{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 						{ok, Json} -> 
 							ResourceId = lib_json:get_field(Json, "_id"),
 							suggest:add_suggestion(Resource, ResourceId),
@@ -247,17 +248,19 @@ put_resource(ReqData, State) ->
             {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 		{ok, _} ->
 			{UserJson,_,_} = api_help:json_handler(ReqData, State),
-			case api_help:do_any_field_exist(UserJson,?RESTRCITEDUPDATE) of
-				true ->
+			case {api_help:do_any_field_exist(UserJson,?RESTRCITEDUPDATE),api_help:do_only_fields_exist(UserJson,?ACCEPTEDFIELDS)} of
+				{true,_} ->
 					ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDUPDATE),
 					ResFields2 = string:sub_string(ResFields1, 1, length(ResFields1)-2),
 					{{halt,409}, wrq:set_resp_body("{\"error\":\"Error caused by restricted field in document, these fields are restricted : " ++ ResFields2 ++"\"}", ReqData), State};
-				false ->
+				{false,false} ->
+					{{halt,403}, wrq:set_resp_body(generate_error("Unsupported field(s)", 403), ReqData), State};
+				{false,true} ->
 					Update = api_help:create_update(UserJson),
 					case api_help:update_doc(?INDEX,"resource", Id, Update) of 
-				{error, {Code, Body}} -> 
-            		ErrorString = api_help:generate_error(Body, Code),
-            		{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+						{error, {Code, Body}} -> 
+							ErrorString = api_help:generate_error(Body, Code),
+							{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 						{ok,List} -> 
 							suggest:update_resource(UserJson, Id),
 							{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
