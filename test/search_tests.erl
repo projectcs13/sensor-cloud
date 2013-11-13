@@ -33,11 +33,11 @@ init_test() ->
 %% Returns: ok | {error, term()}
 %% @end
 process_search_post_test() ->
-	{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} = httpc:request(post, {"http://localhost:8000/resources", [],"application/json", "{\"test\" : \"search\"}"}, [], []),
+	{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} = httpc:request(post, {"http://localhost:8000/resources", [],"application/json", "{\"name\" : \"search\"}"}, [], []),
 	ResourceId = lib_json:get_field(Body,"_id"),
 	refresh(),
-    {ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"search\",\"resource_id\" : \"" ++ lib_json:to_string(ResourceId) ++ "\", \"private\" : \"false\"}"}, [], []),
-    {ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"search\",\"resource_id\" : \"" ++ lib_json:to_string(ResourceId) ++ "\", \"private\" : \"true\"}"}, [], []),
+    {ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"name\" : \"search\",\"resource_id\" : \"" ++ lib_json:to_string(ResourceId) ++ "\", \"private\" : \"false\"}"}, [], []),
+    {ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"name\" : \"search\",\"resource_id\" : \"" ++ lib_json:to_string(ResourceId) ++ "\", \"private\" : \"true\"}"}, [], []),
     DocId1 = lib_json:get_field(Body1,"_id"),
     DocId2 = lib_json:get_field(Body2,"_id"),
     refresh(),

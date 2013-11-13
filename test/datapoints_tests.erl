@@ -37,11 +37,11 @@
 -spec post_test() -> ok | {error, term()}.
 post_test() ->
 		erlastic_search:index_doc_with_id(?INDEX,"stream","4","{\"test\" : \"data_points\"}"),
-		refresh(),
+		api_help:refresh(),
         Response1 = post_request(?DATAPOINTS_URL, "application/json",
                                          "{\"value\":\"" ++ ?TEST_VALUE ++ "\", \"timestamp\": \"" ++ ?TEST_TIMESTAMP ++ "\"}"),
         check_returned_code(Response1, 200),
-        refresh(),
+        api_help:refresh(),
 		erlastic_search:delete_doc(?INDEX,"stream","4"),
         ?assertNotMatch({error, "no match"}, get_index_id(?TEST_VALUE, ?TEST_TIMESTAMP)).
 
@@ -69,14 +69,13 @@ get_existing_datapoint_test() ->
 -spec no_timestamp_test() -> ok | {error, term()}.
 no_timestamp_test() ->
 		erlastic_search:index_doc_with_id(?INDEX,"stream","5","{\"test\" : \"data_points\"}"),
-		refresh(),
+		api_help:refresh(),
         Response1 = post_request("http://localhost:8000/streams/5/data/", "application/json",
                                          "{\"value\":\"55\"}"),
         check_returned_code(Response1, 200),
-		refresh(),
+		api_help:refresh(),
 		{ok,{_,_,Body}} = httpc:request(get, {"http://localhost:8000/streams/5/data/", []}, [], []),
 		ObjectList = lib_json:get_field(Body,"data"),
-		erlastic_search:delete_doc(?INDEX,"stream","5"),
         ?assertEqual(true, lib_json:get_field(lists:nth(1,ObjectList),"timestamp") =/= undefined).
 
 %% @doc
@@ -121,17 +120,21 @@ get_non_existent_datapoint_test() ->
 		{_,_,Result} = Rest,
 	    ?assertNotEqual(0, string:str(Result, "data\":[]")).
 
+
+%% @doc
+%% Function: add_unsupported_field_test/0
+%% Purpose: Test that unsuported fields are not allowed to be added 
+%%          on create
+%% Returns: ok | {error, term()}
+%% @end
+-spec add_unsupported_field_test() -> ok | {error, term()}.
+add_unsupported_field_test() ->
+	{ok, {{_Version1, 403, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams/5/data", [],"application/json", "{\"test\":\"asdas\",\"value\" : 5.0}"}, [], []),
+	erlastic_search:delete_doc(?INDEX,"stream","5").
+
 post_request(URL, ContentType, Body) -> request(post, {URL, [], ContentType, Body}).
 get_request(URL) -> request(get, {URL, []}).
 request(Method, Request) ->
     httpc:request(Method, Request, [], []).
 
-%% @doc
-%% Function: refresh/0
-%% Purpose: Help function to find refresh the sensorcloud index
-%% Returns: {ok/error, {{Version, Code, Reason}, Headers, Body}}
-%% FIX: This relies on having a connection with elastic search on localhost:9200
-%% @end
-refresh() ->
-    httpc:request(post, {"http://localhost:9200/sensorcloud/_refresh", [],"", ""}, [], []).
 
