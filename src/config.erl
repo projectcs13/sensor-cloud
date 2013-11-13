@@ -15,7 +15,8 @@ start() ->
     %% Lines = read_file_lines(FileName),
     %% NewLines = config_lines(Lines),
     %% write_lines(FileName, NewLines),
-    elastic_search_config(),
+    ?DEBUG(application:get_all_env(engine)),
+    erlastic_search_config(),
     rabbit_mq_config(),
     webmachine_config(),
     init:stop().
@@ -24,7 +25,7 @@ start() ->
 %% Runs the configuration mechanism for the elastic search and erlastic libraries
 %% @end
 -spec elastic_search_config() -> ok | error.
-elastic_search_config() ->
+erlastic_search_config() ->
     case file:get_cwd() of
 	{ok, CWD} ->
 	    File = CWD ++ "/lib/erlastic_search/include/erlastic_search.hrl",
@@ -33,7 +34,7 @@ elastic_search_config() ->
 	    Fun = fun("host"++Line, Acc) ->
 			  NewLine = case application:get_env(engine, es_ip) of
 					{ok, Ip} ->				  
-					    "host = "++ Ip ++ ":: string(),";
+					    "host = \""++ Ip ++ "\":: string(),\n";
 					_ ->
 					    ?ERROR("Environment variable 'es_ip' is not set"),
 					    "host"++Line
@@ -42,7 +43,7 @@ elastic_search_config() ->
 		     ("port"++Line, Acc) ->
 			  NewLine = case application:get_env(engine, es_port) of
 					{ok, Port} ->			
-					    "port = "++ Port ++ ":: integer(),";
+					    "port = "++ integer_to_list(Port) ++ ":: integer(),\n";
 					_ ->
 					    ?ERROR("Environment variable 'es_port' is not set"),
 					    "port"++Line
