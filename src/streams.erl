@@ -118,17 +118,11 @@ process_post(ReqData, State) ->
 	case api_help:is_search(ReqData) of 
 		false ->
 			{Stream,_,_} = api_help:json_handler(ReqData, State),
-			case proplists:get_value('user', wrq:path_info(ReqData)) of
-				undefined ->
-					UserAdded = Stream;
-				UserId ->
-					UserAdded = api_help:add_field(Stream,"user_id",UserId)
-			end,
 			case proplists:get_value('res', wrq:path_info(ReqData)) of
 				undefined ->
-					ResAdded = UserAdded;
+					ResAdded = Stream;
 				ResId ->
-					ResAdded = api_help:add_field(UserAdded,"resource_id",ResId)
+					ResAdded = api_help:add_field(Stream,"resource_id",ResId)
 			end,
 			case lib_json:get_field(ResAdded,"resource_id") of
 				undefined -> {false, wrq:set_resp_body("\"resource_id_missing\"",ReqData), State};

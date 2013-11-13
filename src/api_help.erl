@@ -392,7 +392,12 @@ count_fields(Json,Pos) ->
 				"\":" ->
 					1 + count_fields(Json,Pos+1);
 				_ ->
-					count_fields(Json,Pos+1)
+					case string:substr(Json, Pos, 3) of
+						"\" :" ->
+							1 + count_fields(Json,Pos+1);
+						_ ->
+							count_fields(Json,Pos+1)
+					end
 			end
 	end.
 

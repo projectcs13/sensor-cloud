@@ -21,7 +21,7 @@
 %% Fields for resources
 -define(RESTRCITEDUPDATERESOURCES, ["creation_date"]).
 -define(RESTRCITEDCREATERESOURCES, ["creation_date"]).
--define(ACCEPTEDFIELDSRESOURCES, ["user_id","name","tags","description","type","manufacturer","uri","polling_freq","creation_date","uuid"]).
+-define(ACCEPTEDFIELDSRESOURCES, ["user_id","name","tags","model","description","type","manufacturer","uri","polling_freq","creation_date","uuid"]).
 
 %% Fields for data-points
 -define(ACCEPTEDFIELDSDATAPOINTS, ["streamid","timestamp","value"]).
