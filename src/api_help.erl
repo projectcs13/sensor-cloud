@@ -360,3 +360,11 @@ generate_error(Body, ErrorCode) ->
 		_ -> Reason = binary_to_list(Body)
 	end,
 	"Status " ++ ErrorString ++ "\nError: " ++ Reason.
+
+%% @doc
+%% Function: refresh/0
+%% Purpose: Help function to find refresh the sensorcloud index
+%% Returns: {ok/error, {{Version, Code, Reason}, Headers, Body}}
+%% @end
+refresh() ->
+	httpc:request(post, {"http://localhost:9200/sensorcloud/_refresh", [],"", ""}, [], []).
