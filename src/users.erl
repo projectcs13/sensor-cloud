@@ -171,7 +171,7 @@ put_user(ReqData, State) ->
     %check if doc already exists
 	case api_help:do_only_fields_exist(UserJson,?ACCEPTEDFIELDSUSERS) of
 		false ->
-			{{halt,403}, wrq:set_resp_body(api_help:generate_error("Unsupported field(s)", 403), ReqData), State};
+			{{halt,403}, wrq:set_resp_body("Unsupported field(s)", ReqData), State};
 		true ->
 			case erlastic_search:get_doc(?INDEX, "user", Id) of
 				{error, {Code, Body}} -> 
@@ -205,7 +205,7 @@ process_post(ReqData, State) ->
             {UserJson,_,_} = api_help:json_handler(ReqData, State),
 			case api_help:do_only_fields_exist(UserJson,?ACCEPTEDFIELDSUSERS) of
 				false ->
-					{{halt,403}, wrq:set_resp_body(api_help:generate_error("Unsupported field(s)", 403), ReqData), State};
+					{{halt,403}, wrq:set_resp_body("Unsupported field(s)", ReqData), State};
 				true ->
 					case erlastic_search:index_doc(?INDEX, "user", UserJson) of
 						{error, {Code, Body}} -> 

@@ -171,7 +171,7 @@ process_post(ReqData, State) ->
 					ResFields2 = string:sub_string(ResFields1, 1, length(ResFields1)-2),
 					{{halt,409}, wrq:set_resp_body("{\"error\":\"Error caused by restricted field in document, these fields are restricted : " ++ ResFields2 ++"\"}", ReqData), State};
 				{false,false} ->
-					{{halt,403}, wrq:set_resp_body(api_help:generate_error("Unsupported field(s)", 403), ReqData), State};
+					{{halt,403}, wrq:set_resp_body("Unsupported field(s)", ReqData), State};
 				{false,true} ->
 					{{Year,Month,Day},_} = calendar:local_time(),
 					Date = generate_date([Year,Month,Day]),
@@ -250,7 +250,7 @@ put_resource(ReqData, State) ->
 					ResFields2 = string:sub_string(ResFields1, 1, length(ResFields1)-2),
 					{{halt,409}, wrq:set_resp_body("{\"error\":\"Error caused by restricted field in document, these fields are restricted : " ++ ResFields2 ++"\"}", ReqData), State};
 				{false,false} ->
-					{{halt,403}, wrq:set_resp_body(api_help:generate_error("Unsupported field(s)", 403), ReqData), State};
+					{{halt,403}, wrq:set_resp_body("Unsupported field(s)", ReqData), State};
 				{false,true} ->
 					Update = api_help:create_update(UserJson),
 					case api_help:update_doc(?INDEX,"resource", Id, Update) of 
