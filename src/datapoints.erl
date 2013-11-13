@@ -92,7 +92,20 @@ process_post(ReqData, State) ->
 								{error, {Code, Body}} -> 
             						ErrorString = api_help:generate_error(Body, Code),
             						{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-								{ok,List} -> {true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
+								{ok,List} -> 
+									Msg = list_to_binary(FinalJson),
+									StreamExchange = list_to_binary("streams."++Id),
+                                    %% Connect
+                                    {ok, Connection} =
+                                        amqp_connection:start(#amqp_params_network{host = "localhost"}),
+                                    %% Open channel
+                                    {ok, Channel} = amqp_connection:open_channel(Connection),
+                                    %% Declare exchange
+                                    amqp_channel:call(Channel, #'exchange.declare'{exchange = StreamExchange, type = <<"fanout">>}),        
+                                    %% Send
+                                    amqp_channel:cast(Channel, #'basic.publish'{exchange = StreamExchange}, #amqp_msg{payload = Msg}),
+
+								{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
 							 end
 					end
 			end;
