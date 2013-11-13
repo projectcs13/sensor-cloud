@@ -166,7 +166,16 @@ delete_user_test() ->
 	?assertEqual("{\"streams\":[]}",Body12).
 
 	
-
+%% @doc
+%% Function: add_unsupported_field_test/0
+%% Purpose: Test that unsuported fields are not allowed to be added 
+%%          on create or update
+%% Returns: ok | {error, term()}
+%% @end
+-spec add_unsupported_field_test() -> ok | {error, term()}.
+add_unsupported_field_test() ->
+	{ok, {{_Version1, 403, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/users", [],"application/json", "{\"test\":\"asdas\",\"username\" : \"test\"}"}, [], []),
+	{ok, {{_Version2, 403, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(put, {"http://localhost:8000/users/1", [],"application/json", "{\"test\":\"asdas\",\"username\" : \"test\"}"}, [], []).
 
 
 %% @doc

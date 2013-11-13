@@ -253,6 +253,26 @@ server_side_creation_test() ->
 	?assertEqual(true,lib_json:get_field(Body2,"creation_date") =/= undefined),
 	?assertEqual(true,lib_json:get_field(Body2,"history_size") =/= undefined).
 
+
+%% @doc
+%% Function: add_unsupported_field_test/0
+%% Purpose: Test that unsuported fields are not allowed to be added 
+%%          on create or update
+%% Returns: ok | {error, term()}
+%% @end
+-spec add_unsupported_field_test() -> ok | {error, term()}.
+add_unsupported_field_test() ->
+	{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} = httpc:request(post, {"http://localhost:8000/resources", [], "application/json", "{\"user_id\" : \"asdascvsr213sda\"}"}, [], []),
+	ResourceId = lib_json:get_field(Body,"_id"),
+	refresh(),
+	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [], "application/json", "{\"resource_id\" : \"" ++ lib_json:to_string(ResourceId) ++ "\"}"}, [], []),
+	DocId = lib_json:get_field(Body1,"_id"),
+	refresh(),
+	{ok, {{_Version2, 403, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\":\"asdas\",\"resource_id\" : \"test\"}"}, [], []),
+	{ok, {{_Version3, 403, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(put, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId), [],"application/json", "{\"test\":\"asdas\",\"name\" : \"test\"}"}, [], []),
+	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, _Body4}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId), []}, [], []),
+	{ok, {{_Version5, 200, _ReasonPhrase5}, _Headers5, _Body5}} = httpc:request(delete, {"http://localhost:8000/resources/" ++ lib_json:to_string(ResourceId), []}, [], []).
+
 %% @doc
 %% Function: refresh/0
 %% Purpose: Help function to find refresh the sensorcloud index

@@ -177,6 +177,21 @@ server_side_creation_test() ->
 		{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, _Body3}} = httpc:request(delete, {"http://localhost:8000/resources/" ++ lib_json:to_string(DocId), []}, [], []),
 		?assertEqual(true,lib_json:get_field(Body2,"creation_date") =/= undefined).
 
+%% @doc
+%% Function: add_unsupported_field_test/0
+%% Purpose: Test that unsuported fields are not allowed to be added 
+%%          on create or update
+%% Returns: ok | {error, term()}
+%% @end
+-spec add_unsupported_field_test() -> ok | {error, term()}.
+add_unsupported_field_test() ->
+	{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} = httpc:request(post, {"http://localhost:8000/resources", [], "application/json", "{\"user_id\" : \"asdascvsr213sda\"}"}, [], []),
+	DocId = lib_json:get_field(Body,"_id"),
+	refresh(),
+	{ok, {{_Version1, 403, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/resources", [],"application/json", "{\"test\":\"asdas\",\"name\" : \"test\"}"}, [], []),
+	{ok, {{_Version2, 403, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(put, {"http://localhost:8000/resources/" ++ lib_json:to_string(DocId), [],"application/json", "{\"test\":\"asdas\",\"name\" : \"test\"}"}, [], []),
+	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, _Body3}} = httpc:request(delete, {"http://localhost:8000/resources/" ++ lib_json:to_string(DocId), []}, [], []).
+
 
 %% @doc
 %% Function: generate_date/2
