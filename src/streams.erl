@@ -18,7 +18,7 @@
 -include("webmachine.hrl").
 
 -define(INDEX, "sensorcloud").
--define(RESTRCITEDUPDATE, ["resource_id","type","accuracy","min_val","max_val","quality","user_ranking","subscribers","last_update","creation_date","history_size","location"]).
+-define(RESTRCITEDUPDATE, ["quality","user_ranking","subscribers","last_update","creation_date","history_size"]).
 -define(RESTRCITEDCREATE, ["quality","user_ranking","subscribers","last_update","creation_date","history_size"]).
 -define(ACCEPTEDFIELDS, []).
 

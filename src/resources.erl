@@ -13,7 +13,7 @@
 -include_lib("erlastic_search.hrl").
 
 -define(INDEX, "sensorcloud").
--define(RESTRCITEDUPDATE, ["user_id","type","accuracy","manufacturer","uri","creation_date"]).
+-define(RESTRCITEDUPDATE, ["creation_date"]).
 -define(RESTRCITEDCREATE, ["creation_date"]).
 -define(ACCEPTEDFIELDS, []).
 
