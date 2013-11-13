@@ -156,17 +156,10 @@ restricted_fields_update_test() ->
 		{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/resources", [], "application/json", "{\n\"test\" : \"restricted\", \"user_id\" : \"asdascvsr213sda\"}"}, [], []),
 		DocId = lib_json:get_field(Body1,"_id"),
 		api_help:refresh(),
-		{ok, {{_Version2, 409, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(put, {"http://localhost:8000/resources/" ++ lib_json:to_string(DocId), [], "application/json", "{\"user_id\" : \"\"}"}, [], []),
-		{ok, {{_Version3, 409, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(put, {"http://localhost:8000/resources/" ++ lib_json:to_string(DocId), [], "application/json", "{\"type\" : \"\"}"}, [], []),
-		{ok, {{_Version4, 409, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(put, {"http://localhost:8000/resources/" ++ lib_json:to_string(DocId), [], "application/json", "{\"manufacturer\" : \"\"}"}, [], []),
-		{ok, {{_Version5, 409, _ReasonPhrase5}, _Headers5, Body5}} = httpc:request(put, {"http://localhost:8000/resources/" ++ lib_json:to_string(DocId), [], "application/json", "{\"uri\" : \"\"}"}, [], []),
-		{ok, {{_Version6, 409, _ReasonPhrase6}, _Headers6, Body6}} = httpc:request(put, {"http://localhost:8000/resources/" ++ lib_json:to_string(DocId), [], "application/json", "{\"creation_date\" : \"\"\}"}, [], []),
-		{ok, {{_Version7, 200, _ReasonPhrase7}, _Headers7, _Body7}} = httpc:request(delete, {"http://localhost:8000/resources/" ++ lib_json:to_string(DocId), []}, [], []),
-		?assertEqual(true,string:str(Body2,"error") =/= 0),
-		?assertEqual(true,string:str(Body3,"error") =/= 0),
-		?assertEqual(true,string:str(Body4,"error") =/= 0),
-		?assertEqual(true,string:str(Body5,"error") =/= 0),
-		?assertEqual(true,string:str(Body6,"error") =/= 0).
+		{ok, {{_Version2, 409, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(put, {"http://localhost:8000/resources/" ++ lib_json:to_string(DocId), [], "application/json", "{\"creation_date\" : \"\"\}"}, [], []),
+		{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, _Body3}} = httpc:request(delete, {"http://localhost:8000/resources/" ++ lib_json:to_string(DocId), []}, [], []),
+		?assertEqual(true,string:str(Body2,"error") =/= 0).
+
 		
 %% @doc
 %% Function: server_side_creation_test/0
