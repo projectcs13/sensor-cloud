@@ -11,11 +11,7 @@
 
 -include_lib("webmachine.hrl").
 -include_lib("erlastic_search.hrl").
-
--define(INDEX, "sensorcloud").
--define(RESTRCITEDUPDATE, ["creation_date"]).
--define(RESTRCITEDCREATE, ["creation_date"]).
--define(ACCEPTEDFIELDS, []).
+-include("api.hrl").
 
 %% @doc
 %% Function: init/1
@@ -169,9 +165,9 @@ process_post(ReqData, State) ->
 		false ->
 			% Create
 			{Resource,_,_} = api_help:json_handler(ReqData,State),
-			case {api_help:do_any_field_exist(Resource,?RESTRCITEDCREATE),api_help:do_only_fields_exist(Resource,?ACCEPTEDFIELDS)} of
+			case {api_help:do_any_field_exist(Resource,?RESTRCITEDCREATERESOURCES),api_help:do_only_fields_exist(Resource,?ACCEPTEDFIELDSRESOURCES)} of
 				{true,_} ->
-					ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDCREATE),
+					ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDCREATERESOURCES),
 					ResFields2 = string:sub_string(ResFields1, 1, length(ResFields1)-2),
 					{{halt,409}, wrq:set_resp_body("{\"error\":\"Error caused by restricted field in document, these fields are restricted : " ++ ResFields2 ++"\"}", ReqData), State};
 				{false,false} ->
@@ -248,9 +244,9 @@ put_resource(ReqData, State) ->
             {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 		{ok, _} ->
 			{UserJson,_,_} = api_help:json_handler(ReqData, State),
-			case {api_help:do_any_field_exist(UserJson,?RESTRCITEDUPDATE),api_help:do_only_fields_exist(UserJson,?ACCEPTEDFIELDS)} of
+			case {api_help:do_any_field_exist(UserJson,?RESTRCITEDUPDATERESOURCES),api_help:do_only_fields_exist(UserJson,?ACCEPTEDFIELDSRESOURCES)} of
 				{true,_} ->
-					ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDUPDATE),
+					ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDUPDATERESOURCES),
 					ResFields2 = string:sub_string(ResFields1, 1, length(ResFields1)-2),
 					{{halt,409}, wrq:set_resp_body("{\"error\":\"Error caused by restricted field in document, these fields are restricted : " ++ ResFields2 ++"\"}", ReqData), State};
 				{false,false} ->

@@ -16,10 +16,7 @@
                 process_post/2]).
 
 -include("webmachine.hrl").
-
-
--define(INDEX, "sensorcloud").
--define(ACCEPTEDFIELDS, []).
+-include("api.hrl").
 
 %% @doc
 %% Function: init/1
@@ -172,7 +169,7 @@ put_user(ReqData, State) ->
     Id = id_from_path(ReqData),
 	{UserJson,_,_} = api_help:json_handler(ReqData, State),
     %check if doc already exists
-	case api_help:do_only_fields_exist(UserJson,?ACCEPTEDFIELDS) of
+	case api_help:do_only_fields_exist(UserJson,?ACCEPTEDFIELDSUSERS) of
 		false ->
 			{{halt,403}, wrq:set_resp_body(generate_error("Unsupported field(s)", 403), ReqData), State};
 		true ->
@@ -206,7 +203,7 @@ process_post(ReqData, State) ->
     case api_help:is_search(ReqData) of
         false ->
             {UserJson,_,_} = api_help:json_handler(ReqData, State),
-			case api_help:do_only_fields_exist(UserJson,?ACCEPTEDFIELDS) of
+			case api_help:do_only_fields_exist(UserJson,?ACCEPTEDFIELDSUSERS) of
 				false ->
 					{{halt,403}, wrq:set_resp_body(generate_error("Unsupported field(s)", 403), ReqData), State};
 				true ->

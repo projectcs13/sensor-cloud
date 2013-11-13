@@ -10,12 +10,11 @@
 		 process_post/2, get_datapoint/2]).
 
 -include("webmachine.hrl").
+-include("api.hrl").
 -include_lib("erlastic_search.hrl").
 -include_lib("amqp_client.hrl").
 -include_lib("pubsub.hrl").
 
--define(INDEX, "sensorcloud").
--define(ACCEPTEDFIELDS, []).
 
 %% @doc
 %% Function: init/1
@@ -82,7 +81,7 @@ process_post(ReqData, State) ->
 							TimeStampAdded = DatapointJson
 					end,
 					FinalJson = api_help:add_field(TimeStampAdded, "streamid", Id),
-					case api_help:do_only_fields_exist(FinalJson,?ACCEPTEDFIELDS) of
+					case api_help:do_only_fields_exist(FinalJson,?ACCEPTEDFIELDSDATAPOINTS) of
 						false -> 
 							{{halt,403}, wrq:set_resp_body(generate_error("Unsupported field(s)", 403), ReqData), State};
 						true ->

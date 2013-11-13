@@ -16,11 +16,7 @@
 
 -include_lib("erlastic_search.hrl").
 -include("webmachine.hrl").
-
--define(INDEX, "sensorcloud").
--define(RESTRCITEDUPDATE, ["quality","user_ranking","subscribers","last_update","creation_date","history_size"]).
--define(RESTRCITEDCREATE, ["quality","user_ranking","subscribers","last_update","creation_date","history_size"]).
--define(ACCEPTEDFIELDS, []).
+-include("api.hrl").
 
 %% @doc
 %% Function: init/1
@@ -137,9 +133,9 @@ process_post(ReqData, State) ->
 			case lib_json:get_field(ResAdded,"resource_id") of
 				undefined -> {false, wrq:set_resp_body("\"resource_id_missing\"",ReqData), State};
 				ResourceId ->
-					case {api_help:do_any_field_exist(ResAdded,?RESTRCITEDCREATE),api_help:do_only_fields_exist(ResAdded,?ACCEPTEDFIELDS)} of
+					case {api_help:do_any_field_exist(ResAdded,?RESTRCITEDCREATESTREAMS),api_help:do_only_fields_exist(ResAdded,?ACCEPTEDFIELDSSTREAMS)} of
 						{true,_} ->
-							ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDCREATE),
+							ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDCREATESTREAMS),
 							ResFields2 = string:sub_string(ResFields1, 1, length(ResFields1)-2),
 							{{halt,409}, wrq:set_resp_body("{\"error\":\"Error caused by restricted field in document, these fields are restricted : " ++ ResFields2 ++"\"}", ReqData), State};
 						{false,false} ->
@@ -263,9 +259,9 @@ process_search_get(ReqData, State) ->
 put_stream(ReqData, State) ->
 	StreamId = proplists:get_value('stream', wrq:path_info(ReqData)),
 	{Stream,_,_} = api_help:json_handler(ReqData,State),
-	case {api_help:do_any_field_exist(Stream,?RESTRCITEDUPDATE),api_help:do_only_fields_exist(Stream,?ACCEPTEDFIELDS)} of
+	case {api_help:do_any_field_exist(Stream,?RESTRCITEDUPDATESTREAMS),api_help:do_only_fields_exist(Stream,?ACCEPTEDFIELDSSTREAMS)} of
 		{true,_} -> 
-			ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDUPDATE),
+			ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDUPDATESTREAMS),
 			ResFields2 = string:sub_string(ResFields1, 1, length(ResFields1)-2),
 			{{halt,409}, wrq:set_resp_body("{\"error\":\"Error caused by restricted field in document, these fields are restricted : " ++ ResFields2 ++"\"}", ReqData), State};
 		{false,false} ->
