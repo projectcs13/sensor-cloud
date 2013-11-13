@@ -176,7 +176,7 @@ process_search(ReqData, State, get) ->
     end,
 	case TempQuery of
 		[] ->   
-			case erlastic_search:search_limit(?INDEX, "datapoint","streamid:" ++ Id ++ "&sort=timestamp:asc", Size) of
+			case erlastic_search:search_limit(?INDEX, "datapoint","streamid:" ++ Id ++ "&sort=timestamp:desc", Size) of
 				{error, {Code, Body}} -> 
     				ErrorString = api_help:generate_error(Body, Code),
     				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
@@ -185,7 +185,7 @@ process_search(ReqData, State, get) ->
 			       {FinalJson, ReqData, State}
 		 	end;
 		_ ->
-			TransformedQuery="streamid:" ++ Id ++ transform(TempQuery) ++ "&sort=timestamp:asc",
+			TransformedQuery="streamid:" ++ Id ++ transform(TempQuery) ++ "&sort=timestamp:desc",
 			case erlastic_search:search_limit(?INDEX, "datapoint",TransformedQuery, Size) of
 				{error, {Code, Body}} -> 
     				ErrorString = api_help:generate_error(Body, Code),
