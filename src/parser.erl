@@ -28,7 +28,15 @@
 %% @end
 -spec applyParser(list(),any() ,string()) -> ok | {error, string()}.
 applyParser(ParsersList, Data, ContentType) -> 
+	
+	%% only for testing
+	erlang:display("run function: applyParser/3"),
+	
 	Parsers = get_parsers_with_content_type(ContentType, ParsersList, []),
+	
+	%% only for testing
+	erlang:display("the length of appropriate parsers: "++integer_to_list(length(Parsers))),
+	
 	case Parsers == [] of
 		false -> 
 				doParsing(ParsersList, Data, ContentType);
@@ -42,18 +50,20 @@ applyParser(ParsersList, Data, ContentType) ->
 %% Returns: {error, ErrMsg} | [#parser .....]
 %% @end
 getParsersById(ResourceId)->
-	case erlastic_search:search_limit(?ES_INDEX, "parser", "resourceid:" ++ ResourceId, 100) of
+	erlang:display("run function: parser:getParsersById/1"),
+	case erlastic_search:search_limit(?ES_INDEX, "parser", "resource_id:" ++ integer_to_list(ResourceId), 100) of
 		{ok, Result} ->
 			EncodedResult = lib_json:encode(Result),
 			case re:run(EncodedResult, "\"max_score\":null", [{capture, first, list}]) of
 				{match, _} -> {error, "parsers not found"};
 				nomatch -> FinalJsonList = lib_json:get_field(lib_json:get_list_and_add_id(Result), "hits"),
-					       FinalJsonList,
 						   
 						   %%transform this json list to record list
 						   jsonToRecord(FinalJsonList, [])
 			end;
-		_ -> {error, "parsers not found"}
+		_ ->
+			erlang:display("an error happens: parsers not found"),
+			{error, "parsers not found"}
 	end. 
 
 %% ====================================================================
@@ -69,10 +79,10 @@ getParsersById(ResourceId)->
 jsonToRecord([], Res)->
 	Res;
 jsonToRecord([Item|Tail], Res)->
-	Tmp = #parser{resource_id = lib_json:get_field(Item, "resourceid"),
-				  stream_id = lib_json:get_field(Item, "streamid"),
-				  input_parser = lib_json:get_field(Item, "inputparser"),
-				  input_type = lib_json:get_field(Item, "inputtype")
+	Tmp = #parser{resource_id = lib_json:get_field(Item, "resource_id"),
+				  stream_id = lib_json:get_field(Item, "stream_id"),
+				  input_parser = binary_to_list(lib_json:get_field(Item, "input_parser")),
+				  input_type = binary_to_list(lib_json:get_field(Item, "input_type"))
 				 },
 	jsonToRecord(Tail, [Tmp|Res]).
 
@@ -103,6 +113,10 @@ processParser([Item|Tail], Res)->
 %% @end
 -spec parseJson(record(), any()) -> ok.
 parseJson(Parser, Data) ->
+	
+	%% only for testing
+	erlang:display("run function: parseJson/2"),
+	
 	%% extract the wanted value from the json-data and store it in the DB
 	%% return the status of the transaction, ok or {error, ErrMsg}
 
@@ -121,19 +135,19 @@ parseJson(Parser, Data) ->
 	%%so currently we only consider the time when we receive the datapackage
 	case is_integer(StreamId) of
 		true->
-			FieldValue1 = {"streamid":integer_to_binary(StreamId)};
+			FieldValue1 = {"streamid",integer_to_binary(StreamId)};
 		_ ->
-			FieldValue1 = {"streamid":list_to_binary(StreamId)}
+			FieldValue1 = {"streamid",list_to_binary(StreamId)}
 	end,
 	case is_integer(Res) of
 		true->
-			FieldValue2 = {"value":integer_to_binary(Res)};
+			FieldValue2 = {"value",integer_to_binary(Res)};
 		_->
 			case is_float(Res) of
 				true->
-					FieldValue2 = {"value":float_to_binary(Res)};
+					FieldValue2 = {"value",float_to_binary(Res)};
 				_ ->
-					FieldValue2 = {"value":list_to_binary(Res)}
+					FieldValue2 = {"value",list_to_binary(Res)}
 			end
 	end,
 	{{Year, Month, Day}, {Hour, Minutes, Seconds}} = calendar:now_to_universal_time(os:timestamp()),
@@ -145,13 +159,18 @@ parseJson(Parser, Data) ->
 	StrMinutes = integer_to_list(Minutes),
 	StrSeconds = integer_to_list(Seconds),
 	
-	FieldValue3 = {"timestamp":list_to_binary(StrYear++":"++StrMonth++":"++StrDay++" "++StrHour++":"++StrMinutes++":"++StrSeconds)},
+	FieldValue3 = {"timestamp",list_to_binary(StrYear++":"++StrMonth++":"++StrDay++" "++StrHour++":"++StrMinutes++":"++StrSeconds)},
 	FieldValues = [FieldValue1, FieldValue2, FieldValue3],
 	FinalJson = lib_json:add_values("{}", FieldValues),
+	
 	case erlastic_search:index_doc(?ES_INDEX, "datapoint", FinalJson) of
 		{error, Reason} -> erlang:display("Failed to insert the new datapoint into the elasticsearch for this reason: "++Reason),
 						   {error, Reason};
-		{ok,List} -> ok
+		{ok,List} -> 
+			%% only for testing
+			erlang:display("the final data which is inserted into the database: "++FinalJson),
+			
+			ok
 	end.
 
 %% @doc

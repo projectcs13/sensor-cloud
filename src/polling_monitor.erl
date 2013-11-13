@@ -37,5 +37,5 @@ start_link()->
 %% @end
 init(_)->
 	{ok, {{simple_one_for_one, 5, 60},
-		  [{poller, {poller, start_link, [#state{}]}, transient, 1000, worker, [poller]}]
+		  [{poller, {poller, start_link, []}, transient, 1000, worker, [poller]}]
 		 }}.

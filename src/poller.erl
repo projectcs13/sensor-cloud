@@ -17,7 +17,10 @@
 %% ====================================================================
 %% API functions
 %% ====================================================================
--export([init/1, handle_call/3, handle_info/2, terminate/2]).
+-export([start_link/1, init/1, handle_call/3, handle_info/2, terminate/2]).
+
+start_link(State)->
+	gen_server:start_link(?MODULE, State, []).
 
 %% @doc
 %% Function: init/1
@@ -83,32 +86,43 @@ handle_info({probe}, State)->
 	ResourceId = State#state.resourceid,
 	ParsersList = State#state.parserslist,
 	Url = State#state.url,
+	
+	%% only for testing
+	erlang:display(Url),
+	
 	%%communicate with external resources
 	%%http://userprimary.net/posts/2009/04/04/exploring-erlangs-http-client/
 	
-	{ok, {{HttpVer, Code, Msg}, Headers, Body}} =
-    	http:request(get, {Url, [{"User-Agent", (?UA++ResourceId)}]}, [], []),
-	case Code==200 of
-		true->
-			case check_header(Headers) of
-				"application/json" ->
-					parser:applyParser(ParsersList, Body, "application/json");
-				"no content type" ->
-					%%error
-					erlang:display("no content type is offered in the response");
+	case httpc:request(get, {Url, [{"User-Agent", (?UA++integer_to_list(ResourceId))}]}, [], []) of
+		{ok, {{HttpVer, Code, Msg}, Headers, Body}}->
+			case Code==200 of
+				true->
+					case check_header(Headers) of
+						"application/json" ->
+							parser:applyParser(ParsersList, Body, "application/json");
+						"no content type" ->
+							%%error
+							erlang:display("no content type is offered in the response");
+						_ ->
+							%%the other options
+								erlang:display("other content type")
+					end;
 				_ ->
-					%%the other options
-						erlang:display("other content type")
-			end;
+					%%polling fails
+					erlang:display("polling failed")
+			end,
+			{noreply, State};
+		{error, Reason}->
+			erlang:display("failed to poll external resource, "++Reason),
+			{noreply, State};
 		_ ->
-			%%polling fails
-			erlang:display("polling failed")
-	end,
-	{noreply, State}.
+			erlang:display("failed to poll external resource"),
+			{noreply, State}
+	end.
 
 terminate(_T, State)->
 	Url = State#state.url,
-	erlang:display("the poller for "+Url+" stops working!"),
+	erlang:display("the poller for "++Url++" stops working!"),
 	application:stop(inets).
 	
 %% @doc
