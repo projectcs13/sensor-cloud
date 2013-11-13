@@ -19,7 +19,7 @@
 
 
 -define(INDEX, "sensorcloud").
-
+-define(ACCEPTEDFIELDS, []).
 
 %% @doc
 %% Function: init/1
