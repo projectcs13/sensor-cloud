@@ -10,16 +10,13 @@
 %% @end
 -module(streams).
 -export([init/1, allowed_methods/2, content_types_provided/2, content_types_accepted/2,
-		 delete_resource/2, process_post/2, put_stream/2, get_stream/2]).
+		 delete_resource/2, process_post/2, put_stream/2, get_stream/2,delete_data_points_with_stream_id/1]).
 
 
 
 -include_lib("erlastic_search.hrl").
 -include("webmachine.hrl").
-
--define(INDEX, "sensorcloud").
--define(RESTRCITEDUPDATE, ["resource_id","type","accuracy","min_val","max_val","quality","user_ranking","subscribers","last_update","creation_date","history_size","location"]).
--define(RESTRCITEDCREATE, ["quality","user_ranking","subscribers","last_update","creation_date","history_size"]).
+-include("field_restrictions.hrl").
 
 %% @doc
 %% Function: init/1
@@ -99,15 +96,44 @@ content_types_accepted(ReqData, State) ->
 
 delete_resource(ReqData, State) ->
 	Id = proplists:get_value('stream', wrq:path_info(ReqData)),
-	case erlastic_search:delete_doc(?INDEX,"stream", Id) of
+	case delete_data_points_with_stream_id(Id) of 
 		{error, {Code, Body}} -> 
-			ErrorString = api_help:generate_error(Body, Code),
-			{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-		{ok,List} -> 
-			httpc:request(delete, {"http://localhost:9200/sensorcloud/datapoint/_query?q=streamid:" ++ Id, []}, [], []),
-			 	{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
+            ErrorString = api_help:generate_error(Body, Code),
+            {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+		{ok} ->
+			case erlastic_search:delete_doc(?INDEX,"stream", Id) of
+				{error, {Code, Body}} -> 
+					ErrorString = api_help:generate_error(Body, Code),
+				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+				{ok,List} -> 
+			 		{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
+			end
 	end.
 
+%% @doc
+%% Function: delete_data_points_with_stream_id/1
+%% Purpose: Used to delete all data-points with the given id as parent
+%% Returns: {ok} or {error,Reason} 
+%% FIX: This function relies on direct contact with elastic search at localhost:9200
+%% @end
+-spec delete_data_points_with_stream_id(Id::string() | binary()) -> term().
+
+delete_data_points_with_stream_id(Id) when is_binary(Id) ->
+	{ok, {{_Version, Code, _ReasonPhrase}, _Headers, Body}} = httpc:request(delete, {"http://localhost:9200/sensorcloud/datapoint/_query?q=streamid:" ++ binary_to_list(Id), []}, [], []),
+	case Code of
+		200 ->
+			{ok};
+		Code ->
+			{error,{Code, Body}}
+	end;
+delete_data_points_with_stream_id(Id) ->
+	{ok, {{_Version, Code, _ReasonPhrase}, _Headers, Body}} = httpc:request(delete, {"http://localhost:9200/sensorcloud/datapoint/_query?q=streamid:" ++ Id, []}, [], []),
+	case Code of
+		200 ->
+			{ok};
+		Code ->
+			{error,{Code, Body}}
+	end.
 
 %% @doc
 %% Function: process_post/2
@@ -121,30 +147,26 @@ process_post(ReqData, State) ->
 	case api_help:is_search(ReqData) of 
 		false ->
 			{Stream,_,_} = api_help:json_handler(ReqData, State),
-			case proplists:get_value('user', wrq:path_info(ReqData)) of
-				undefined ->
-					UserAdded = Stream;
-				UserId ->
-					UserAdded = api_help:add_field(Stream,"user_id",UserId)
-			end,
 			case proplists:get_value('res', wrq:path_info(ReqData)) of
 				undefined ->
-					ResAdded = UserAdded;
+					ResAdded = Stream;
 				ResId ->
-					ResAdded = api_help:add_field(UserAdded,"resource_id",ResId)
+					ResAdded = api_help:add_field(Stream,"resource_id",ResId)
 			end,
 			case lib_json:get_field(ResAdded,"resource_id") of
 				undefined -> {false, wrq:set_resp_body("\"resource_id_missing\"",ReqData), State};
 				ResourceId ->
-					case do_any_field_exist(ResAdded,?RESTRCITEDCREATE) of
-						true ->
-							ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDCREATE),
+					case {api_help:do_any_field_exist(ResAdded,?RESTRCITEDCREATESTREAMS),api_help:do_only_fields_exist(ResAdded,?ACCEPTEDFIELDSSTREAMS)} of
+						{true,_} ->
+							ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDCREATESTREAMS),
 							ResFields2 = string:sub_string(ResFields1, 1, length(ResFields1)-2),
 							{{halt,409}, wrq:set_resp_body("{\"error\":\"Error caused by restricted field in document, these fields are restricted : " ++ ResFields2 ++"\"}", ReqData), State};
-						false ->
+						{false,false} ->
+							{{halt,403}, wrq:set_resp_body("Unsupported field(s)", ReqData), State};
+						{false,true} ->
 							case erlastic_search:get_doc(?INDEX, "resource", ResourceId) of
 								{error,{404,_}} ->
-									{{halt,409}, wrq:set_resp_body("{\"error\":\"no document with resource_id given is present in the system\"}", ReqData), State};
+									{{halt,403}, wrq:set_resp_body("{\"error\":\"no document with resource_id given is present in the system\"}", ReqData), State};
 								{error,{Code,Body}} ->
 									ErrorString = api_help:generate_error(Body, Code),
             						{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
@@ -260,20 +282,22 @@ process_search_get(ReqData, State) ->
 put_stream(ReqData, State) ->
 	StreamId = proplists:get_value('stream', wrq:path_info(ReqData)),
 	{Stream,_,_} = api_help:json_handler(ReqData,State),
-	case do_any_field_exist(Stream,?RESTRCITEDUPDATE) of
-			true -> 
-				ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDUPDATE),
-				ResFields2 = string:sub_string(ResFields1, 1, length(ResFields1)-2),
-				{{halt,409}, wrq:set_resp_body("{\"error\":\"Error caused by restricted field in document, these fields are restricted : " ++ ResFields2 ++"\"}", ReqData), State};
-			false ->
-				Update = api_help:create_update(Stream),
-				suggest:update_stream(Stream, StreamId),
-				case api_help:update_doc(?INDEX, "stream", StreamId, Update) of 
-		{error, {Code, Body}} -> 
-            				ErrorString = api_help:generate_error(Body, Code),
-            				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-					{ok,List} -> {true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
-				end
+	case {api_help:do_any_field_exist(Stream,?RESTRCITEDUPDATESTREAMS),api_help:do_only_fields_exist(Stream,?ACCEPTEDFIELDSSTREAMS)} of
+		{true,_} -> 
+			ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDUPDATESTREAMS),
+			ResFields2 = string:sub_string(ResFields1, 1, length(ResFields1)-2),
+			{{halt,409}, wrq:set_resp_body("{\"error\":\"Error caused by restricted field in document, these fields are restricted : " ++ ResFields2 ++"\"}", ReqData), State};
+		{false,false} ->
+			{{halt,403}, wrq:set_resp_body("Unsupported field(s)", ReqData), State};
+		{false,true} ->
+			Update = api_help:create_update(Stream),
+			suggest:update_stream(Stream, StreamId),
+			case api_help:update_doc(?INDEX, "stream", StreamId, Update) of 
+				{error, {Code, Body}} -> 
+					ErrorString = api_help:generate_error(Body, Code),
+            		{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+				{ok,List} -> {true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
+			end
 	end.
 
 
@@ -431,22 +455,6 @@ generate_timestamp([First|Rest],Count) ->
                 false -> "" ++ integer_to_list(First) ++ generate_timestamp(Rest,Count+1)
         end.
 		
-%% @doc
-%% Function: do_any_field_exist/2
-%% Purpose: Used to check if a JSON contains any of the given fields
-%% Returns: True if at least one of the given fields exist, false otherwise
-%% @end
--spec do_any_field_exist(Json::string(),FieldList::list()) -> boolean().
-
-do_any_field_exist(_Json,[]) ->
-		false;
-do_any_field_exist(Json,[First|Rest]) ->
-		case lib_json:get_field(Json, First) of
-			undefined ->
-				do_any_field_exist(Json,Rest);
-			_ ->
-				true
-		end.
 		
 %% @doc
 %% Function: add_server_side_fields/1
