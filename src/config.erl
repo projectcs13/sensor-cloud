@@ -39,7 +39,7 @@ elastic_search_config() ->
 					    "host"++Line
 				    end,
 			  [NewLine | Acc];
-		     ("port"++Line) ->
+		     ("port"++Line, Acc) ->
 			  NewLine = case application:get_env(engine, es_port) of
 					{ok, Port} ->			
 					    "port = "++ Port ++ ":: integer(),";
@@ -48,7 +48,7 @@ elastic_search_config() ->
 					    "port"++Line
 				    end,
 			  [NewLine | Acc];
-		     (Line) ->
+		     (Line, Acc) ->
 			  [Line | Acc]
 		  end,
 	    NewLines = lists:foldr(Fun, [], StrippedLines),
