@@ -10,7 +10,7 @@
 %% @end
 -module(streams).
 -export([init/1, allowed_methods/2, content_types_provided/2, content_types_accepted/2,
-		 delete_resource/2, process_post/2, put_stream/2, get_stream/2]).
+		 delete_resource/2, process_post/2, put_stream/2, get_stream/2,delete_data_points_with_stream_id/1]).
 
 
 
@@ -18,7 +18,7 @@
 -include("webmachine.hrl").
 
 -define(INDEX, "sensorcloud").
--define(RESTRCITEDUPDATE, ["resource_id","type","accuracy","min_val","max_val","quality","user_ranking","subscribers","last_update","creation_date","history_size","location"]).
+-define(RESTRCITEDUPDATE, ["quality","user_ranking","subscribers","last_update","creation_date","history_size"]).
 -define(RESTRCITEDCREATE, ["quality","user_ranking","subscribers","last_update","creation_date","history_size"]).
 
 %% @doc
@@ -99,15 +99,44 @@ content_types_accepted(ReqData, State) ->
 
 delete_resource(ReqData, State) ->
 	Id = proplists:get_value('stream', wrq:path_info(ReqData)),
-	case erlastic_search:delete_doc(?INDEX,"stream", Id) of
+	case delete_data_points_with_stream_id(Id) of 
 		{error, {Code, Body}} -> 
-			ErrorString = api_help:generate_error(Body, Code),
-			{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-		{ok,List} -> 
-			httpc:request(delete, {"http://localhost:9200/sensorcloud/datapoint/_query?q=streamid:" ++ Id, []}, [], []),
-			 	{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
+            ErrorString = api_help:generate_error(Body, Code),
+            {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+		{ok} ->
+			case erlastic_search:delete_doc(?INDEX,"stream", Id) of
+				{error, {Code, Body}} -> 
+					ErrorString = api_help:generate_error(Body, Code),
+				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+				{ok,List} -> 
+			 		{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
+			end
 	end.
 
+%% @doc
+%% Function: delete_data_points_with_stream_id/1
+%% Purpose: Used to delete all data-points with the given id as parent
+%% Returns: {ok} or {error,Reason} 
+%% FIX: This function relies on direct contact with elastic search at localhost:9200
+%% @end
+-spec delete_data_points_with_stream_id(Id::string() | binary()) -> term().
+
+delete_data_points_with_stream_id(Id) when is_binary(Id) ->
+	{ok, {{_Version, Code, _ReasonPhrase}, _Headers, Body}} = httpc:request(delete, {"http://localhost:9200/sensorcloud/datapoint/_query?q=streamid:" ++ binary_to_list(Id), []}, [], []),
+	case Code of
+		200 ->
+			{ok};
+		Code ->
+			{error,{Code, Body}}
+	end;
+delete_data_points_with_stream_id(Id) ->
+	{ok, {{_Version, Code, _ReasonPhrase}, _Headers, Body}} = httpc:request(delete, {"http://localhost:9200/sensorcloud/datapoint/_query?q=streamid:" ++ Id, []}, [], []),
+	case Code of
+		200 ->
+			{ok};
+		Code ->
+			{error,{Code, Body}}
+	end.
 
 %% @doc
 %% Function: process_post/2

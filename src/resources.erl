@@ -13,7 +13,7 @@
 -include_lib("erlastic_search.hrl").
 
 -define(INDEX, "sensorcloud").
--define(RESTRCITEDUPDATE, ["user_id","type","accuracy","manufacturer","uri","creation_date"]).
+-define(RESTRCITEDUPDATE, ["creation_date"]).
 -define(RESTRCITEDCREATE, ["creation_date"]).
 
 %% @doc
@@ -105,6 +105,7 @@ delete_resource(ReqData, State) ->
 -spec delete_streams_with_resource_id(Id::string()) -> term().
 
 delete_streams_with_resource_id(Id) ->
+	api_help:refresh(),
 	Query = "resource_id:" ++ Id, 
 	case erlastic_search:search_limit(?INDEX, "stream", Query,500) of
 		{error,Reason} -> 
@@ -150,9 +151,14 @@ get_streams([JSON | Tl]) ->
 
 delete_streams([]) -> {ok};
 delete_streams([StreamId|Rest]) ->
-	case erlastic_search:delete_doc(?INDEX, "stream", StreamId) of 
-		{error,Reason} -> {error,Reason};
-		{ok,_List} -> delete_streams(Rest)
+	case streams:delete_data_points_with_stream_id(StreamId) of
+        {error,{Code, Body}} -> 
+            {error,{Code, Body}};
+        {ok} ->
+			case erlastic_search:delete_doc(?INDEX, "stream", StreamId) of 
+				{error,Reason} -> {error,Reason};
+				{ok,_List} -> delete_streams(Rest)
+			end
 	end.
 
 %% @doc

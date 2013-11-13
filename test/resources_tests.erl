@@ -34,7 +34,7 @@ process_search_post_test() ->
         {ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/resources", [],"application/json", "{\"test\" : \"post\",\"user_id\" : \"7\"}"}, [], []),
         DocId1 = lib_json:get_field(Body1,"_id"),
         ?assertEqual(true,lib_json:get_field(Body1,"ok")),        
-        refresh(),
+        api_help:refresh(),
         {ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(post, {"http://localhost:8000/users/7/resources/_search", [],"application/json", "{\"query\":{\"match_all\":{}}}"}, [], []),
         {ok, {{_Version3, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(post, {"http://localhost:8000/users/5/resources/_search", [],"application/json", "{\"query\":{\"match_all\":{}}}"}, [], []),
         {ok, {{_Version8, 200, _ReasonPhrase5}, _Headers5, _Body5}} = httpc:request(delete, {"http://localhost:8000/resources/" ++ lib_json:to_string(DocId1), []}, [], []),
@@ -51,7 +51,7 @@ process_search_post_test() ->
 process_post_test() ->
         {ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/resources", [],"application/json", "{\"test\" : \"post\",\"user_id\" : \"0\",\"streams\" : \"1\"}"}, [], []),
         {ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/users/0/resources/", [],"application/json", "{\"test\" : \"post\",\"user_id\" : \"0\",\"streams\" : \"1\"}"}, [], []),
-        refresh(),
+        api_help:refresh(),
         ?assertEqual(true,lib_json:get_field(Body1,"ok")),        
         ?assertEqual(true,lib_json:get_field(Body2,"ok")),
         %Clean up after the test
@@ -69,12 +69,12 @@ delete_resource_test() ->
         % Create a resource and two streams, then delete the resource and check if streams are automatically deleted
         {ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/resources", [],"application/json", "{\"test\" : \"delete\",\"user_id\" : \"1\"}"}, [], []),
         DocId = lib_json:get_field(Body2,"_id"),
-        refresh(),
+        api_help:refresh(),
         httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"delete\",\"user_id\" : \"1\", \"resource_id\" : \"" ++ lib_json:to_string(DocId) ++ "\"}"}, [], []),
         httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"delete\",\"user_id\" : \"1\", \"resource_id\" : \"" ++ lib_json:to_string(DocId) ++ "\"}"}, [], []),
-        refresh(),
+        api_help:refresh(),
         {ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(delete, {"http://localhost:8000/resources/" ++ lib_json:to_string(DocId), []}, [], []),
-        refresh(),
+        api_help:refresh(),
         {ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(get, {"http://localhost:8000/users/1/resources/"++lib_json:to_string(DocId)++"/streams", []}, [], []),
         % Delete a resource that doesn't exist
         {ok, {{_Version5, 404, _ReasonPhrase5}, _Headers5, _Body5}} = httpc:request(delete, {"http://localhost:8000/resources/1", []}, [], []),
@@ -91,7 +91,7 @@ delete_resource_test() ->
 %% @end
 put_resource_test() ->
         {ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/resources/", [],"application/json", "{\"name\" : \"put1\",\"user_id\" : \"0\",\"streams\" : \"1\"}"}, [], []),
-        refresh(),
+        api_help:refresh(),
         DocId = lib_json:get_field(Body1,"_id"),
         {ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(put, {"http://localhost:8000/resources/" ++ lib_json:to_string(DocId) , [],"application/json", "{\"name\" : \"put2\"}"}, [], []),
         {ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(get, {"http://localhost:8000/resources/" ++ lib_json:to_string(DocId), []}, [], []),
@@ -113,7 +113,7 @@ put_resource_test() ->
 %% @end
 get_resource_test() ->
     {ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/resources/", [],"application/json", "{\"test\" : \"get\",\"user_id\" : \"0\"}"}, [], []),
-    refresh(),
+    api_help:refresh(),
     DocId = lib_json:get_field(Body1,"_id"),
     {ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(get, {"http://localhost:8000/resources/" ++ lib_json:to_string(DocId), []}, [], []),
     {ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(get, {"http://localhost:8000/users/0/resources/" ++ lib_json:to_string(DocId), []}, [], []),
@@ -155,18 +155,11 @@ restricted_fields_create_test() ->
 restricted_fields_update_test() ->
 		{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/resources", [], "application/json", "{\n\"test\" : \"restricted\", \"user_id\" : \"asdascvsr213sda\"}"}, [], []),
 		DocId = lib_json:get_field(Body1,"_id"),
-		refresh(),
-		{ok, {{_Version2, 409, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(put, {"http://localhost:8000/resources/" ++ lib_json:to_string(DocId), [], "application/json", "{\"user_id\" : \"\"}"}, [], []),
-		{ok, {{_Version3, 409, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(put, {"http://localhost:8000/resources/" ++ lib_json:to_string(DocId), [], "application/json", "{\"type\" : \"\"}"}, [], []),
-		{ok, {{_Version4, 409, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(put, {"http://localhost:8000/resources/" ++ lib_json:to_string(DocId), [], "application/json", "{\"manufacturer\" : \"\"}"}, [], []),
-		{ok, {{_Version5, 409, _ReasonPhrase5}, _Headers5, Body5}} = httpc:request(put, {"http://localhost:8000/resources/" ++ lib_json:to_string(DocId), [], "application/json", "{\"uri\" : \"\"}"}, [], []),
-		{ok, {{_Version6, 409, _ReasonPhrase6}, _Headers6, Body6}} = httpc:request(put, {"http://localhost:8000/resources/" ++ lib_json:to_string(DocId), [], "application/json", "{\"creation_date\" : \"\"\}"}, [], []),
-		{ok, {{_Version7, 200, _ReasonPhrase7}, _Headers7, _Body7}} = httpc:request(delete, {"http://localhost:8000/resources/" ++ lib_json:to_string(DocId), []}, [], []),
-		?assertEqual(true,string:str(Body2,"error") =/= 0),
-		?assertEqual(true,string:str(Body3,"error") =/= 0),
-		?assertEqual(true,string:str(Body4,"error") =/= 0),
-		?assertEqual(true,string:str(Body5,"error") =/= 0),
-		?assertEqual(true,string:str(Body6,"error") =/= 0).
+		api_help:refresh(),
+		{ok, {{_Version2, 409, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(put, {"http://localhost:8000/resources/" ++ lib_json:to_string(DocId), [], "application/json", "{\"creation_date\" : \"\"\}"}, [], []),
+		{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, _Body3}} = httpc:request(delete, {"http://localhost:8000/resources/" ++ lib_json:to_string(DocId), []}, [], []),
+		?assertEqual(true,string:str(Body2,"error") =/= 0).
+
 		
 %% @doc
 %% Function: server_side_creation_test/0
@@ -180,7 +173,7 @@ restricted_fields_update_test() ->
 server_side_creation_test() ->
 		{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/resources", [], "application/json", "{\"user_id\" : \"asdascvsr213sda\"}"}, [], []),
 		DocId = lib_json:get_field(Body1,"_id"),
-		refresh(),
+		api_help:refresh(),
 		{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(get, {"http://localhost:8000/resources/" ++ lib_json:to_string(DocId), []}, [], []),
 		{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, _Body3}} = httpc:request(delete, {"http://localhost:8000/resources/" ++ lib_json:to_string(DocId), []}, [], []),
 		?assertEqual(true,lib_json:get_field(Body2,"creation_date") =/= undefined).
@@ -206,11 +199,3 @@ generate_date([First|Rest]) ->
                 true -> "0" ++ integer_to_list(First) ++ "-" ++ generate_date(Rest);
                 false -> "" ++ integer_to_list(First) ++ "-" ++ generate_date(Rest)
         end.
-
-%% @doc
-%% Function: refresh/0
-%% Purpose: Help function to find refresh the sensorcloud index
-%% Returns: {ok/error, {{Version, Code, Reason}, Headers, Body}}
-%% @end
-refresh() ->
-        httpc:request(post, {"http://localhost:9200/sensorcloud/_refresh", [],"", ""}, [], []).
