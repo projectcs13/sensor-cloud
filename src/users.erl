@@ -104,6 +104,7 @@ delete_resource(ReqData, State) ->
 %% @end
 -spec delete_resources_with_user_id(Id::string()) -> term().
 delete_resources_with_user_id(Id) ->
+	api_help:refresh(),
     Query = "user_id:" ++ Id, 
     case erlastic_search:search_limit(?INDEX, "resource", Query,500) of
         {error,{Code, Body}} ->
