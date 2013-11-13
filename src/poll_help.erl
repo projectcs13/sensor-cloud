@@ -12,8 +12,13 @@
 
 -include("common.hrl").
 -include_lib("erlastic_search.hrl").
+-include("erlson.hrl").
+-include("json.hrl").
+-include("poller.hrl").
 
--export([get_resources_using_polling/0]).
+-export([get_resources_using_polling/0,
+		 json_to_record_resources/1,
+		 json_to_record_resource/1]).
 
 
 
@@ -46,8 +51,59 @@ get_resources_using_polling() ->
 
 
 
+%% @doc
+%% Function: json_to_record_resources/1
+%% Purpose: Converts a list of resource Jsons to a list of pollerInfo records
+%% Returns: [] | [Resource, ...]
+%% @end
+-spec json_to_record_resources([json()]) -> [] | [record()].
+json_to_record_resources([]) -> [];
+json_to_record_resources([H|T]) ->
+	[json_to_record_resource(H) | json_to_record_resources(T)].
+
+
+
+
+%% @doc
+%% Function: json_to_record_resource/1
+%% Purpose: Converts a resource Json to a pollerInfo record
+%% Returns: Resource
+%% @end
+-spec json_to_record_resource(Resource::json()) -> record().
+json_to_record_resource(Resource) ->
+	Name = case lib_json:get_field(Resource, "_source.name") of
+			   undefined -> undefined;
+			   N -> binary_to_list(N)
+		   end,
+	Url = case lib_json:get_field(Resource, "_source.uri") of
+			  undefined -> undefined;
+			  U -> binary_to_list(U)
+		  end,
+	#pollerInfo{resourceid = binary_to_list(lib_json:get_field(Resource, "_id")),
+				name = Name,
+				url = Url,
+				frequency = lib_json:get_field(Resource, "_source.polling_freq")}.
+
+
 %% ====================================================================
 %% Internal functions
 %% ====================================================================
+
+	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 

@@ -112,11 +112,16 @@ create_update(Stream) ->
 -spec add_field(Stream::string(),FieldName::string(),FieldValue::term()) -> string().
 
 add_field(Stream,FieldName,FieldValue) ->
-	case is_integer(FieldValue) of
+	case is_list(FieldValue) of
 		true ->
-			string:substr(Stream,1,length(Stream)-1) ++ ",\"" ++ FieldName ++ "\":" ++ FieldValue ++ "}";
+			string:substr(Stream,1,length(Stream)-1) ++ ",\"" ++ FieldName ++ "\":\"" ++ FieldValue ++ "\"}";
 		false ->
-			string:substr(Stream,1,length(Stream)-1) ++ ",\"" ++ FieldName ++ "\":\"" ++ FieldValue ++ "\"}"
+			case is_integer(FieldValue) of
+				true ->
+					string:substr(Stream,1,length(Stream)-1) ++ ",\"" ++ FieldName ++ "\":" ++ integer_to_list(FieldValue) ++ "}";
+				false ->
+					string:substr(Stream,1,length(Stream)-1) ++ ",\"" ++ FieldName ++ "\":" ++ float_to_list(FieldValue,[{decimals,1}]) ++ "}"
+			end
 	end.
 			
 
@@ -340,3 +345,26 @@ convert_binary_to_string([First|Rest]) ->
 					 false -> [First] ++ convert_binary_to_string(Rest)
 				 end
 	end.
+
+%% @doc
+%% Purpose: generate an appropriate error string depending on the error code
+%%
+%% TODO: parse Body for more accurate response text
+%%
+-spec generate_error(JSONString::string(), integer()) -> string().
+
+generate_error(Body, ErrorCode) ->
+	ErrorString = integer_to_list(ErrorCode),
+	case ErrorCode of
+		404 -> Reason = "not found";
+		_ -> Reason = binary_to_list(Body)
+	end,
+	"Status " ++ ErrorString ++ "\nError: " ++ Reason.
+
+%% @doc
+%% Function: refresh/0
+%% Purpose: Help function to find refresh the sensorcloud index
+%% Returns: {ok/error, {{Version, Code, Reason}, Headers, Body}}
+%% @end
+refresh() ->
+	httpc:request(post, {"http://localhost:9200/sensorcloud/_refresh", [],"", ""}, [], []).

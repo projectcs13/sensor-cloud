@@ -25,10 +25,7 @@
 -define(RESOURCE_URL, "http://localhost:8000/resources/").
 
 %% @doc
-%% Function: post_test/0
-%% Purpose: Test a post request
-%% Returns: ok | {error, term()}
-%%
+%% Test a post request
 %% @end
 -spec post_test() -> ok | {error, term()}.
 post_test() ->
@@ -38,28 +35,32 @@ post_test() ->
 								\"tags\" : \"testtag\"
 			}"),
 	check_returned_code(Response1, 200),
-	timer:sleep(800),
+	refresh(),
 	Response2 = get_request(?SUGGEST_URL++"testsmartphone2"),     
 	check_returned_code(Response2, 200),
 	{ok, {_, _ ,Body}} = Response2,
 	?assertEqual(<<"testtag">>,lib_json:get_field(Body, "testsuggest[0].options[0].payload.tags")).
 
 
+%% @doc
+%% Test creating a suggestion which contains both resource and streams
+%% @end
+-spec post_and_stream_test() -> ok | {error, term()}.
 post_and_stream_test() ->
 	Response1 = post_request(?RESOURCE_URL, "application/json", 
 							"{
-								\"model\" : \"test3resource\",
+								\"model\" : \"testwithstream\",
 								\"tags\" : \"testtag\"
 			}"),
 	check_returned_code(Response1, 200),
 	{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} = Response1,
 	Id = lib_json:get_field(Body, "_id"),
-	timer:sleep(800),
+	refresh(),
 	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, _Body1}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"search\",\"resource_id\" : \""++lib_json:to_string(Id)++"\", \"private\" : \"false\", \"tags\":\"test_tag\"}"}, [], []),
-	timer:sleep(1000),
+	refresh(),
 	{ok, {{_Version11, 200, _ReasonPhrase11}, _Headers11, _Body11}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"search2\",\"resource_id\" : \""++lib_json:to_string(Id)++"\", \"private\" : \"false\", \"tags\":\"test2\"}"}, [], []),
-	timer:sleep(1000),
-	Response2 = get_request(?SUGGEST_URL++"test3resource"),
+	refresh(),
+	Response2 = get_request(?SUGGEST_URL++"testwithstream"),
 	check_returned_code(Response2, 200),
 	{ok, {_, _ ,Body2}} = Response2,
 	?assertEqual(<<"testtag">>,lib_json:get_field(Body2, "testsuggest[0].options[0].payload.tags")),
@@ -68,31 +69,25 @@ post_and_stream_test() ->
 
 
 %% @doc
-%% Function: get_suggestion_test/0
-%% Purpose: Test a get request for a suggestion
-%% Returns: ok | {error, term()}
-%%
+%% Test a get request for a suggestion
 %% @end
 -spec get_suggestion_test() -> ok | {error, term()}.
 get_suggestion_test() ->
 	Response1 = post_request(?RESOURCE_URL, "application/json", 
 							"{
-								\"model\" : \"testanother\",
+								\"model\" : \"testgetsuggestion\",
 								\"manufacturer\" : \"ericsson\"
 			}"),
 	check_returned_code(Response1, 200),
-	timer:sleep(800),
-	Response2 = get_request(?SUGGEST_URL ++ "testanother"),
+	refresh(),
+	Response2 = get_request(?SUGGEST_URL ++ "testgetsuggestion"),
 	check_returned_code(Response2, 200),
 	{ok, {_, _ ,Body}} = Response2,
 	?assertEqual(<<"ericsson">>,lib_json:get_field(Body, "testsuggest[0].options[0].payload.manufacturer")).
 
 
 %% @doc
-%% Function: get_non_existing_term_test/0
-%% Purpose: Test a get request for a model that doesn't exist
-%% Returns: ok | {error, term()}
-%%
+%% Test a get request for a model that doesn't exist
 %% @end
 -spec get_non_existing_term_test() -> ok | {error, term()}.
 get_non_existing_term_test() ->
@@ -101,11 +96,77 @@ get_non_existing_term_test() ->
 
 
 
+%% @doc
+%% Updates a resource and makes sure that the suggestion was updated properly
+%% @end
+-spec update_resource_test() -> ok | {error, term()}.
+update_resource_test() ->
+	Response1 = post_request(?RESOURCE_URL, "application/json", 
+							"{
+								\"model\" : \"testupdate\",
+								\"tags\" : \"testtag\",
+								\"manufacturer\" : \"testmanu\"
+			}"),
+	check_returned_code(Response1, 200),
+	{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} = Response1,
+	Id = lib_json:get_field(Body, "_id"),
+	refresh(),
+	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, _Body1}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"search\",\"resource_id\" : \""++lib_json:to_string(Id)++"\", \"private\" : \"false\", \"tags\":\"test_tag\"}"}, [], []),
+	refresh(),
+	{ok, {{_Version11, 200, _ReasonPhrase11}, _Headers11, _Body11}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"search2\",\"resource_id\" : \""++lib_json:to_string(Id)++"\", \"private\" : \"false\", \"tags\":\"test2\"}"}, [], []),
+	refresh(),
+	Response2 = get_request(?SUGGEST_URL++"testupdate"),
+	check_returned_code(Response2, 200),
+	{ok, {_, _ ,Body2}} = Response2,
+	?assertEqual(<<"testtag">>,lib_json:get_field(Body2, "testsuggest[0].options[0].payload.tags")),
+	?assertEqual(true, lib_json:field_value_exists(Body2, "testsuggest[0].options[0].payload.streams[*].tags",<<"test_tag">>)),
+	?assertEqual(<<"test2">>, lib_json:get_field_value(Body2, "testsuggest[0].options[0].payload.streams[*].tags",<<"test2">>)),
+	{ok, {{_Version21, 200, _ReasonPhrase21}, _Headers21, _Body21}} = httpc:request(put, {"http://localhost:8000/resources/"++lib_json:to_string(Id), [],"application/json", "{\"model\" : \"testupdate\",\"tags\" : \"newtag\"}"}, [], []),
+	refresh(),
+	{ok, {_, _ ,Body3}} = get_request(?SUGGEST_URL++"testupdate"),
+	?assertEqual(<<"newtag">>,lib_json:get_field(Body3, "testsuggest[0].options[0].payload.tags")),
+	?assertEqual(true, lib_json:field_value_exists(Body3, "testsuggest[0].options[0].payload.streams[*].tags",<<"test_tag">>)),
+	?assertEqual(<<"test2">>, lib_json:get_field_value(Body3, "testsuggest[0].options[0].payload.streams[*].tags",<<"test2">>)).
+
+
 
 %% @doc
-%% Function: check_returned_code/0
-%% Purpose: Checks if the Response has the correct http return code
-%%
+%% Updates a stream and makes sure that the suggestion was updated properly
+%% @end
+-spec update_stream_test() -> ok | {error, term()}.
+update_stream_test() ->
+	Response1 = post_request(?RESOURCE_URL, "application/json", 
+							"{
+								\"model\" : \"teststreamupdate\",
+								\"tags\" : \"testtag\",
+								\"manufacturer\" : \"testmanu\"
+			}"),
+	check_returned_code(Response1, 200),
+	{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} = Response1,
+	Id = lib_json:get_field(Body, "_id"),
+	refresh(),
+	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, _Body1}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"search\",\"resource_id\" : \""++lib_json:to_string(Id)++"\", \"private\" : \"false\", \"tags\":\"test_tag\"}"}, [], []),
+	refresh(),
+	{ok, {{_Version11, 200, _ReasonPhrase11}, _Headers11, Body11}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"search2\",\"resource_id\" : \""++lib_json:to_string(Id)++"\", \"private\" : \"false\", \"tags\":\"test2\"}"}, [], []),
+	StreamId = lib_json:get_field(Body11, "_id"),
+	refresh(),
+	Response2 = get_request(?SUGGEST_URL++"teststreamupdate"),
+	check_returned_code(Response2, 200),
+	{ok, {_, _ ,Body2}} = Response2,
+	?assertEqual(<<"testtag">>,lib_json:get_field(Body2, "testsuggest[0].options[0].payload.tags")),
+	?assertEqual(true, lib_json:field_value_exists(Body2, "testsuggest[0].options[0].payload.streams[*].tags",<<"test_tag">>)),
+	?assertEqual(<<"test2">>, lib_json:get_field_value(Body2, "testsuggest[0].options[0].payload.streams[*].tags",<<"test2">>)),
+	{ok, {{_Version21, 200, _ReasonPhrase21}, _Headers21, _Body21}} = httpc:request(put, {"http://localhost:8000/streams/"++lib_json:to_string(StreamId), [],"application/json", "{\"test\" : \"search2\", \"private\" : \"false\", \"tags\":\"newtest2\"}"}, [], []),
+	refresh(),
+	{ok, {_, _ ,Body3}} = get_request(?SUGGEST_URL++"teststreamupdate"),
+	?assertEqual(<<"testtag">>,lib_json:get_field(Body3, "testsuggest[0].options[0].payload.tags")),
+	?assertEqual(true, lib_json:field_value_exists(Body3, "testsuggest[0].options[0].payload.streams[*].tags",<<"test_tag">>)),
+	?assertEqual(<<"newtest2">>, lib_json:get_field_value(Body3, "testsuggest[0].options[0].payload.streams[*].tags",<<"newtest2">>)).
+
+
+
+%% @doc
+%% Checks if the Response has the correct http return code
 %% @end
 -spec check_returned_code(string(), integer()) -> ok.
 check_returned_code(Response, Code) ->
@@ -116,7 +177,14 @@ check_returned_code(Response, Code) ->
 
 post_request(URL, ContentType, Body) -> request(post, {URL, [], ContentType, Body}).
 
+put_request(URL, ContentType, Body) -> request(put, {URL, [], ContentType, Body}).
 get_request(URL)                     -> request(get,  {URL, []}).
 
 request(Method, Request) ->
 	httpc:request(Method, Request, [], []).
+
+%% @doc
+%% Help function to find refresh the sensorcloud index
+%% @end
+refresh() ->
+	httpc:request(post, {"http://localhost:9200/sensorcloud/_refresh", [],"", ""}, [], []).
