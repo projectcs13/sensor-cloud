@@ -76,7 +76,6 @@ no_timestamp_test() ->
 		api_help:refresh(),
 		{ok,{_,_,Body}} = httpc:request(get, {"http://localhost:8000/streams/5/data/", []}, [], []),
 		ObjectList = lib_json:get_field(Body,"data"),
-		erlastic_search:delete_doc(?INDEX,"stream","5"),
         ?assertEqual(true, lib_json:get_field(lists:nth(1,ObjectList),"timestamp") =/= undefined).
 
 %% @doc
@@ -120,6 +119,18 @@ get_non_existent_datapoint_test() ->
 		{ok, Rest} = Response1,
 		{_,_,Result} = Rest,
 	    ?assertNotEqual(0, string:str(Result, "data\":[]")).
+
+
+%% @doc
+%% Function: add_unsupported_field_test/0
+%% Purpose: Test that unsuported fields are not allowed to be added 
+%%          on create
+%% Returns: ok | {error, term()}
+%% @end
+-spec add_unsupported_field_test() -> ok | {error, term()}.
+add_unsupported_field_test() ->
+	{ok, {{_Version1, 403, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams/5/data", [],"application/json", "{\"test\":\"asdas\",\"value\" : 5.0}"}, [], []),
+	erlastic_search:delete_doc(?INDEX,"stream","5").
 
 post_request(URL, ContentType, Body) -> request(post, {URL, [], ContentType, Body}).
 get_request(URL) -> request(get, {URL, []}).

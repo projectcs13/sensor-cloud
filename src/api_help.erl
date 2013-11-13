@@ -347,6 +347,76 @@ convert_binary_to_string([First|Rest]) ->
 	end.
 
 %% @doc
+%% Function: do_any_field_exist/2
+%% Purpose: Used to check if a JSON contains any of the given fields
+%% Returns: True if at least one of the given fields exist, false otherwise
+%% @end
+-spec do_any_field_exist(Json::string(),FieldList::list()) -> boolean().
+
+do_any_field_exist(_Json,[]) ->
+		false;
+do_any_field_exist(Json,[First|Rest]) ->
+		case lib_json:get_field(Json, First) of
+			undefined ->
+				do_any_field_exist(Json,Rest);
+			_ ->
+				true
+		end.
+
+
+%% @doc
+%% Function: do_only_fields_exist/2
+%% Purpose: Used to check if a JSON contains only fields given in the list
+%% Returns: True if all fields are in the list, false otherwise
+%% @end
+-spec do_only_fields_exist(Json::string(),FieldList::list()) -> boolean().
+
+do_only_fields_exist(Json,List) ->
+	NumFields = count_fields(lib_json:to_string(Json)),
+	Values = lib_json:get_fields(Json, List),
+	NumCorrectFields = lists:foldl(fun(X, Sum) -> case X of 
+													  undefined -> Sum;
+													  _ -> Sum + 1
+												  end
+								   end, 0, Values),
+	NumFields == NumCorrectFields.
+
+%% @doc
+%% Function: count_fields/1
+%% Purpose: Used to return the number of fields in the given JSON
+%% Returns: The number of fields in the given JSON
+%% @end
+-spec count_fields(Json::string()) -> integer().
+
+count_fields(Json) ->
+	count_fields(Json,1).
+
+
+%% @doc
+%% Function: count_fields/2
+%% Purpose: Used to return the number of fields in the given JSON
+%% Returns: The number of fields in the given JSON
+%% @end
+-spec count_fields(Json::string(),Position::integer()) -> integer().
+
+count_fields(Json,Pos) ->
+	case Pos == length(Json) of
+		true -> 0;
+		false ->
+			case string:substr(Json, Pos, 2) of
+				"\":" ->
+					1 + count_fields(Json,Pos+1);
+				_ ->
+					case string:substr(Json, Pos, 3) of
+						"\" :" ->
+							1 + count_fields(Json,Pos+1);
+						_ ->
+							count_fields(Json,Pos+1)
+					end
+			end
+	end.
+
+%% @doc
 %% Purpose: generate an appropriate error string depending on the error code
 %%
 %% TODO: parse Body for more accurate response text
