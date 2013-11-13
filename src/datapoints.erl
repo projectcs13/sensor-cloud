@@ -83,7 +83,7 @@ process_post(ReqData, State) ->
 					FinalJson = api_help:add_field(TimeStampAdded, "streamid", Id),
 					case api_help:do_only_fields_exist(FinalJson,?ACCEPTEDFIELDSDATAPOINTS) of
 						false -> 
-							{{halt,403}, wrq:set_resp_body(generate_error("Unsupported field(s)", 403), ReqData), State};
+							{{halt,403}, wrq:set_resp_body(api_help:generate_error("Unsupported field(s)", 403), ReqData), State};
 						true ->
 							case erlastic_search:get_doc(?INDEX, "stream", Id) of
 						 		{error,{404,_}} ->
