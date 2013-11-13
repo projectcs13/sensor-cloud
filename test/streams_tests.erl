@@ -221,27 +221,15 @@ restricted_fields_update_test() ->
 	{ok, {{_Version4, 409, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(put, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId), [], "application/json", "{\"last_update\" : \"\"}"}, [], []),
 	{ok, {{_Version5, 409, _ReasonPhrase5}, _Headers5, Body5}} = httpc:request(put, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId), [], "application/json", "{\"creation_date\" : \"\"}"}, [], []),
 	{ok, {{_Version6, 409, _ReasonPhrase6}, _Headers6, Body6}} = httpc:request(put, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId), [], "application/json", "{\"history_size\" : \"\"\}"}, [], []),
-	{ok, {{_Version7, 409, _ReasonPhrase7}, _Headers7, Body7}} = httpc:request(put, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId), [], "application/json", "{\"resource_id\" : \"\"\}"}, [], []),
-	{ok, {{_Version8, 409, _ReasonPhrase8}, _Headers8, Body8}} = httpc:request(put, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId), [], "application/json", "{\"type\" : \"\"\}"}, [], []),
-	{ok, {{_Version9, 409, _ReasonPhrase9}, _Headers9, Body9}} = httpc:request(put, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId), [], "application/json", "{\"accuracy\" : \"\"\}"}, [], []),
-	{ok, {{_Version10, 409, _ReasonPhrase10}, _Headers10, Body10}} = httpc:request(put, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId), [], "application/json", "{\"quality\" : \"\"\}"}, [], []),
-	{ok, {{_Version11, 409, _ReasonPhrase11}, _Headers11, Body11}} = httpc:request(put, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId), [], "application/json", "{\"min_val\" : \"\"\}"}, [], []),
-	{ok, {{_Version12, 409, _ReasonPhrase12}, _Headers12, Body12}} = httpc:request(put, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId), [], "application/json", "{\"max_val\" : \"\"\}"}, [], []),
-	{ok, {{_Version13, 409, _ReasonPhrase13}, _Headers13, Body13}} = httpc:request(put, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId), [], "application/json", "{\"location\" : \"\"\}"}, [], []),
-	{ok, {{_Version14, 200, _ReasonPhrase14}, _Headers14, _Body14}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId), []}, [], []),
-	{ok, {{_Version15, 200, _ReasonPhrase15}, _Headers15, _Body15}} = httpc:request(delete, {"http://localhost:8000/resources/" ++ lib_json:to_string(ResourceId), []}, [], []),
+	{ok, {{_Version7, 409, _ReasonPhrase7}, _Headers7, Body7}} = httpc:request(put, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId), [], "application/json", "{\"quality\" : \"\"\}"}, [], []),
+	{ok, {{_Version8, 200, _ReasonPhrase8}, _Headers8, _Body8}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId), []}, [], []),
+	{ok, {{_Version9, 200, _ReasonPhrase9}, _Headers9, _Body9}} = httpc:request(delete, {"http://localhost:8000/resources/" ++ lib_json:to_string(ResourceId), []}, [], []),
 	?assertEqual(true,string:str(Body2,"error") =/= 0),
 	?assertEqual(true,string:str(Body3,"error") =/= 0),
 	?assertEqual(true,string:str(Body4,"error") =/= 0),
 	?assertEqual(true,string:str(Body5,"error") =/= 0),
 	?assertEqual(true,string:str(Body6,"error") =/= 0),
-	?assertEqual(true,string:str(Body7,"error") =/= 0),
-	?assertEqual(true,string:str(Body8,"error") =/= 0),
-	?assertEqual(true,string:str(Body9,"error") =/= 0),
-	?assertEqual(true,string:str(Body10,"error") =/= 0),
-	?assertEqual(true,string:str(Body11,"error") =/= 0),
-	?assertEqual(true,string:str(Body12,"error") =/= 0),
-	?assertEqual(true,string:str(Body13,"error") =/= 0).		
+	?assertEqual(true,string:str(Body7,"error") =/= 0).		
 	
 %% @doc
 %% Function: server_side_creation_test/0
