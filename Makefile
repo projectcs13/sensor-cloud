@@ -18,6 +18,9 @@ compile:
 	@$(REBAR) compile skip_deps=true
 
 ### get_libs will download and install all project libraries
+conf:
+	$(ERL) -pa ebin -s config -config config/engine.config
+
 get_libs:
 	@@$(REBAR) get-deps
 	@$(REBAR) compile
@@ -48,9 +51,9 @@ all: compile
 
 ### Command: make install
 ### Downloads all dependencies and builds the entire project
-install: get_libs
+install: get_libs conf
 	 cp -r lib/elasticsearch-servicewrapper/service lib/elasticsearch/bin/
-	$(ERL) -pa ebin -s config -config config/engine.config
+
 
 ### Command: make run
 ### Downloads all depenedencies, bulds entire project and runs the project.
