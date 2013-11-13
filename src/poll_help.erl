@@ -67,7 +67,7 @@ json_to_record_resources([H|T]) ->
 %% @doc
 %% Function: json_to_record_resource/1
 %% Purpose: Converts a resource Json to a pollerInfo record
-%% Returns: [] | Resource
+%% Returns: Resource
 %% @end
 -spec json_to_record_resource(Resource::json()) -> record().
 json_to_record_resource(Resource) ->
