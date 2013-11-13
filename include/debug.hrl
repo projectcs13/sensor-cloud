@@ -1,7 +1,7 @@
 %% Author: Tommy Mattsson <toma10293@student.uu.se>
 %% [www.csproj13.student.it.uu.se]
 %% == debug include file ==
-%% Provides definitions for creating JSON string objects
+%% Provides useful macros used for debugging. 
 %%
 %% @end
 -define(INFO(X), ?GENERIC("INFO", X)).

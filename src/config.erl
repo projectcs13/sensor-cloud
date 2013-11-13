@@ -30,23 +30,27 @@ elastic_search_config() ->
 	    File = CWD ++ "/lib/erlastic_search/include/erlastic_search.hrl",
 	    Lines = read_file_lines(File),
 	    StrippedLines = lists:map(fun string:strip/1, Lines),
-	    Fun = fun("host"++Line) ->
-			  case application:get_env(engine, es_ip) of
-			      {ok, Ip} ->				  
-				  "host = "++ Ip ++ ":: string(),";
-			      _ ->
-				  ?ERROR("Environment variable 'es_ip' is not set"),
-				  "host"++Line
-			  end;
+	    Fun = fun("host"++Line, Acc) ->
+			  NewLine = case application:get_env(engine, es_ip) of
+					{ok, Ip} ->				  
+					    "host = "++ Ip ++ ":: string(),";
+					_ ->
+					    ?ERROR("Environment variable 'es_ip' is not set"),
+					    "host"++Line
+				    end,
+			  [NewLine | Acc];
 		     ("port"++Line) ->
-			  case application:get_env(engine, es_port) of
-			      {ok, Port} ->			
-				  "port = "++ Port ++ ":: integer(),";
-			      _ ->
-				  ?ERROR("Environment variable 'es_port' is not set"),
-				  "port"++Line
-			  end
-		  end,	 
+			  NewLine = case application:get_env(engine, es_port) of
+					{ok, Port} ->			
+					    "port = "++ Port ++ ":: integer(),";
+					_ ->
+					    ?ERROR("Environment variable 'es_port' is not set"),
+					    "port"++Line
+				    end,
+			  [NewLine | Acc];
+		     (Line) ->
+			  [Line | Acc]
+		  end,
 	    NewLines = lists:foldr(Fun, [], StrippedLines),
 	    write_lines(File, NewLines),
 	    ?DEBUG("Finished configuring elastic_search config options");
