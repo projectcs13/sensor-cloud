@@ -156,23 +156,26 @@ add_suggestion(Resource, ResourceId) ->
 	end.
 
 
+%% @doc
+%% When inserting a new resource, it generates the suggest fields
+%% @end
 add_resource_suggestion_fields(Resource) ->
 	Manufacturer = lib_json:get_field(Resource,"manufacturer"),
 	Model = lib_json:get_field(Resource,"model"),
 	Tags = lib_json:get_field(Resource,"tags"),
-	%tags should be split to a json list
 	lib_json:add_values(Resource,[
 			{"manufacturer_suggest", Manufacturer},
 			{"tags_suggest", Tags},
 			{"model_suggest", Model}
 			]).
 
-
+%% @doc
+%% When inserting a new stream, it generates the suggest fields
+%% @end
 add_stream_suggestion_fields(Resource) ->
 	Name = lib_json:get_field(Resource,"name"),
 	Type = lib_json:get_field(Resource,"type"),
 	Tags = lib_json:get_field(Resource,"tags"),
-	%tags should be split to a json list
 	lib_json:add_values(Resource,[
 			{"name_suggest", Name},
 			{"tags_suggest", Tags},
