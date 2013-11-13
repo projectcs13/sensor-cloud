@@ -11,10 +11,7 @@
 
 -include_lib("webmachine.hrl").
 -include_lib("erlastic_search.hrl").
-
--define(INDEX, "sensorcloud").
--define(RESTRCITEDUPDATE, ["creation_date"]).
--define(RESTRCITEDCREATE, ["creation_date"]).
+-include("field_restrictions.hrl").
 
 %% @doc
 %% Function: init/1
@@ -173,21 +170,22 @@ process_post(ReqData, State) ->
 	case IsSearch of 
 		false ->
 			% Create
-
 			{Resource,_,_} = api_help:json_handler(ReqData,State),
-			case do_any_field_exist(Resource,?RESTRCITEDCREATE) of
-				true ->
-					ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDCREATE),
+			case {api_help:do_any_field_exist(Resource,?RESTRCITEDCREATERESOURCES),api_help:do_only_fields_exist(Resource,?ACCEPTEDFIELDSRESOURCES)} of
+				{true,_} ->
+					ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDCREATERESOURCES),
 					ResFields2 = string:sub_string(ResFields1, 1, length(ResFields1)-2),
 					{{halt,409}, wrq:set_resp_body("{\"error\":\"Error caused by restricted field in document, these fields are restricted : " ++ ResFields2 ++"\"}", ReqData), State};
-				false ->
+				{false,false} ->
+					{{halt,403}, wrq:set_resp_body("Unsupported field(s)", ReqData), State};
+				{false,true} ->
 					{{Year,Month,Day},_} = calendar:local_time(),
 					Date = generate_date([Year,Month,Day]),
 					DateAdded = api_help:add_field(Resource,"creation_date",Date),
 					case erlastic_search:index_doc(?INDEX,"resource",DateAdded) of 
-				{error, {Code, Body}} -> 
-            		ErrorString = api_help:generate_error(Body, Code),
-            		{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+						{error, {Code, Body}} -> 
+							ErrorString = api_help:generate_error(Body, Code),
+							{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 						{ok, Json} -> 
 							ResourceId = lib_json:get_field(Json, "_id"),
 							suggest:add_suggestion(Resource, ResourceId),
@@ -252,17 +250,19 @@ put_resource(ReqData, State) ->
             {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 		{ok, _} ->
 			{UserJson,_,_} = api_help:json_handler(ReqData, State),
-			case do_any_field_exist(UserJson,?RESTRCITEDUPDATE) of
-				true ->
-					ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDUPDATE),
+			case {api_help:do_any_field_exist(UserJson,?RESTRCITEDUPDATERESOURCES),api_help:do_only_fields_exist(UserJson,?ACCEPTEDFIELDSRESOURCES)} of
+				{true,_} ->
+					ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDUPDATERESOURCES),
 					ResFields2 = string:sub_string(ResFields1, 1, length(ResFields1)-2),
 					{{halt,409}, wrq:set_resp_body("{\"error\":\"Error caused by restricted field in document, these fields are restricted : " ++ ResFields2 ++"\"}", ReqData), State};
-				false ->
+				{false,false} ->
+					{{halt,403}, wrq:set_resp_body("Unsupported field(s)", ReqData), State};
+				{false,true} ->
 					Update = api_help:create_update(UserJson),
 					case api_help:update_doc(?INDEX,"resource", Id, Update) of 
-				{error, {Code, Body}} -> 
-            		ErrorString = api_help:generate_error(Body, Code),
-            		{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+						{error, {Code, Body}} -> 
+							ErrorString = api_help:generate_error(Body, Code),
+							{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 						{ok,List} -> 
 							suggest:update_resource(UserJson, Id),
 							{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
@@ -401,22 +401,4 @@ generate_date([First|Rest]) ->
 		true -> "0" ++ integer_to_list(First) ++ "-" ++ generate_date(Rest);
 		false -> "" ++ integer_to_list(First) ++ "-" ++ generate_date(Rest)
 	end.
-
-		
-%% @doc
-%% Function: do_any_field_exist/2
-%% Purpose: Used to check if a JSON contains any of the given fields
-%% Returns: True if at least one of the given fields exist, false otherwise
-%% @end
--spec do_any_field_exist(Json::string(),FieldList::list()) -> boolean().
-
-do_any_field_exist(_Json,[]) ->
-		false;
-do_any_field_exist(Json,[First|Rest]) ->
-		case lib_json:get_field(Json, First) of
-			undefined ->
-				do_any_field_exist(Json,Rest);
-			_ ->
-				true
-		end.
 
