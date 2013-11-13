@@ -35,12 +35,12 @@ inets:start().
 process_search_post_test() ->
 	{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} = httpc:request(post, {"http://localhost:8000/resources", [],"application/json", "{\"test\" : \"search\"}"}, [], []),
 	ResourceId = lib_json:get_field(Body,"_id"),
-	refresh(),
+	api_help:refresh(),
 	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"search\",\"resource_id\" : \"" ++ lib_json:to_string(ResourceId) ++ "\", \"private\" : \"false\"}"}, [], []),
     {ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"search\",\"resource_id\" : \"" ++ lib_json:to_string(ResourceId) ++ "\", \"private\" : \"true\"}"}, [], []),
     DocId1 = lib_json:get_field(Body1,"_id"),
     DocId2 = lib_json:get_field(Body2,"_id"),
-    refresh(),
+    api_help:refresh(),
     {ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(post, {"http://localhost:8000/streams/_search", [],"application/json", "{\"query\":{\"match_all\":{}}}"}, [], []),
     {ok, {{_Version8, 200, _ReasonPhrase8}, _Headers8, _Body8}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId1), []}, [], []),
     {ok, {{_Version9, 200, _ReasonPhrase9}, _Headers9, _Body9}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId2), []}, [], []),
@@ -60,13 +60,13 @@ process_search_post_test() ->
 get_stream_test() ->
 	{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} = httpc:request(post, {"http://localhost:8000/resources", [],"application/json", "{\"test\" : \"search\"}"}, [], []),
 	ResourceId = lib_json:get_field(Body,"_id"),
-	refresh(),
+	api_help:refresh(),
 	% Test create
 	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"get\",\"user_id\" : \"0\", \"resource_id\" : \"" ++ lib_json:to_string(ResourceId) ++ "\", \"private\" : \"false\"}"}, [], []),
 	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"test\" : \"get\",\"user_id\" : \"0\", \"resource_id\" : \"" ++ lib_json:to_string(ResourceId) ++ "\", \"private\" : \"false\"}"}, [], []),
 	DocId1 = lib_json:get_field(Body1,"_id"),
 	DocId2 = lib_json:get_field(Body2,"_id"),
-	refresh(),
+	api_help:refresh(),
 	% Test get and search
 	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(get, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId1), []}, [], []),
 	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(get, {"http://localhost:8000/users/0/resources/" ++ lib_json:to_string(ResourceId) ++ "/streams", []}, [], []),
@@ -104,13 +104,13 @@ get_stream_test() ->
 put_stream_test() ->
 	{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} = httpc:request(post, {"http://localhost:8000/resources", [],"application/json", "{\"test\" : \"search\"}"}, [], []),
 	ResourceId = lib_json:get_field(Body,"_id"),
-	refresh(),
+	api_help:refresh(),
 	% Test create
 	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [], "application/json", "{\n\"test\" : \"get\",\n\"private\" : \"true\"\n, \"resource_id\" : \"" ++ lib_json:to_string(ResourceId) ++ "\"}"}, [], []),
 	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/users/0/resources/" ++ lib_json:to_string(ResourceId) ++ "/streams", [], "application/json", "{\n\"test\" : \"get\",\n\"private\" : \"true\"\n}"}, [], []),
 	DocId1 = lib_json:get_field(Body1,"_id"),
 	DocId2 = lib_json:get_field(Body2,"_id"),
-	refresh(),
+	api_help:refresh(),
 	% Test update
 	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, _Body3}} = httpc:request(put, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId1), [], "application/json", "{\n\"test\" : \"put\",\n\"private\" : \"false\"\n}"}, [], []),
 	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, _Body4}} = httpc:request(put, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId2), [], "application/json", "{\n\"test\" : \"put\"\n}"}, [], []),
@@ -146,18 +146,18 @@ put_stream_test() ->
 delete_stream_test() ->
 	{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} = httpc:request(post, {"http://localhost:8000/resources", [],"application/json", "{\"test\" : \"search\"}"}, [], []),
 	ResourceId = lib_json:get_field(Body,"_id"),
-	refresh(),
+	api_help:refresh(),
 	% Test create
 	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [], "application/json", "{\n\"test\" : \"get\"\n, \"resource_id\" : \"" ++ lib_json:to_string(ResourceId) ++ "\"}"}, [], []),
 	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/users/0/resources/" ++ lib_json:to_string(ResourceId) ++ "/streams", [], "application/json", "{\n\"test\" : \"get\"\n}"}, [], []),
 	DocId1 = lib_json:get_field(Body1,"_id"),
 	DocId2 = lib_json:get_field(Body2,"_id"),
-	refresh(),
+	api_help:refresh(),
 	% Test delete
 	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId1), []}, [], []),
 	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId2), []}, [], []),
 	{ok, {{_Version5, 200, _ReasonPhrase5}, _Headers5, _Body5}} = httpc:request(delete, {"http://localhost:8000/resources/" ++ lib_json:to_string(ResourceId), []}, [], []),
-	refresh(),
+	api_help:refresh(),
 	% Test delete on missing index
 	{ok, {{_Version6, 404, _ReasonPhrase6}, _Headers6, Body6}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId1), []}, [], []),
 	{ok, {{_Version7, 404, _ReasonPhrase7}, _Headers7, Body7}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId2), []}, [], []),
@@ -212,10 +212,10 @@ restricted_fields_create_test() ->
 restricted_fields_update_test() ->
 	{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} = httpc:request(post, {"http://localhost:8000/resources", [],"application/json", "{\"test\" : \"search\"}"}, [], []),
 	ResourceId = lib_json:get_field(Body,"_id"),
-	refresh(),
+	api_help:refresh(),
 	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [], "application/json", "{\n\"test\" : \"restricted\"\n, \"resource_id\" : \"" ++ lib_json:to_string(ResourceId) ++ "\"}"}, [], []),
 	DocId = lib_json:get_field(Body1,"_id"),
-	refresh(),
+	api_help:refresh(),
 	{ok, {{_Version2, 409, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(put, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId), [], "application/json", "{\"user_ranking\" : \"\"}"}, [], []),
 	{ok, {{_Version3, 409, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(put, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId), [], "application/json", "{\"subscribers\" : \"\"}"}, [], []),
 	{ok, {{_Version4, 409, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(put, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId), [], "application/json", "{\"last_update\" : \"\"}"}, [], []),
@@ -243,10 +243,10 @@ restricted_fields_update_test() ->
 server_side_creation_test() ->
 	{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} = httpc:request(post, {"http://localhost:8000/resources", [],"application/json", "{\"test\" : \"search\"}"}, [], []),
 	ResourceId = lib_json:get_field(Body,"_id"),
-	refresh(),
+	api_help:refresh(),
 	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [], "application/json", "{\"resource_id\" : \"" ++ lib_json:to_string(ResourceId) ++ "\"}"}, [], []),
 	DocId = lib_json:get_field(Body1,"_id"),
-	refresh(),
+	api_help:refresh(),
 	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(get, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId), []}, [], []),
 	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, _Body3}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId), []}, [], []),
 	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, _Body4}} = httpc:request(delete, {"http://localhost:8000/resources/" ++ lib_json:to_string(ResourceId), []}, [], []),
@@ -257,13 +257,6 @@ server_side_creation_test() ->
 	?assertEqual(true,lib_json:get_field(Body2,"creation_date") =/= undefined),
 	?assertEqual(true,lib_json:get_field(Body2,"history_size") =/= undefined).
 
-%% @doc
-%% Function: refresh/0
-%% Purpose: Help function to find refresh the sensorcloud index
-%% Returns: {ok/error, {{Version, Code, Reason}, Headers, Body}}
-%% @end
-refresh() ->
-	httpc:request(post, {"http://localhost:9200/sensorcloud/_refresh", [],"", ""}, [], []).
 
 %% @doc
 %% Function: generate_date/2
