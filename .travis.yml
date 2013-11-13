@@ -1,6 +1,7 @@
 language: erlang
 env: R_HOME=/usr/lib/R
-service: - rabbitmq
+service: 
+  - rabbitmq
 before_install:
   - sudo apt-get install -qq xsltproc 
   - sudo add-apt-repository "deb http://ftp.sunet.se/pub/lang/CRAN/bin/linux/ubuntu precise/" 
