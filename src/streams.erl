@@ -381,7 +381,7 @@ get_stream(ReqData, State) ->
 %% @end
 filter_json(Json) ->
         NewJson = string:sub_string(Json,1,string:len(Json)-1),
-        "{\"query\":{\"filtered\":"++NewJson++",\"filter\":{\"bool\":{\"must\":{\"term\":{\"private\":\"false\"}}}}}}}".
+        "{\"query\":{\"filtered\":"++NewJson++",\"filter\":{\"bool\":{\"must_not\":{\"term\":{\"private\":\"true\"}}}}}}}".
 
 %% @doc
 %% Function: filter_json/2
@@ -390,7 +390,7 @@ filter_json(Json) ->
 %% @end
 filter_json(Json,ResourceQuery) ->
         NewJson = string:sub_string(Json,1,string:len(Json)-1),
-        "{\"query\":{\"filtered\":"++NewJson++",\"filter\":{\"bool\":{\"must\":[{\"term\":{\"private\":\"false\"}},{\"term\":{"++ResourceQuery++"}}]}}}}}".
+        "{\"query\":{\"filtered\":"++NewJson++",\"filter\":{\"bool\":{\"must_not\":[{\"term\":{\"private\":\"true\"}},{\"term\":{"++ResourceQuery++"}}]}}}}}".
 
 
 
@@ -401,7 +401,7 @@ filter_json(Json,ResourceQuery) ->
 %% @end
 filter_json(Json, From, Size) ->
         NewJson = string:sub_string(Json,1,string:len(Json)-1),
-        "{\"from\" : "++From++", \"size\" : "++Size++", \"query\":{\"filtered\":"++NewJson++",\"filter\":{\"bool\":{\"must\":{\"term\":{\"private\":\"false\"}}}}}}}".
+        "{\"from\" : "++From++", \"size\" : "++Size++", \"query\":{\"filtered\":"++NewJson++",\"filter\":{\"bool\":{\"must_not\":{\"term\":{\"private\":\"true\"}}}}}}}".
 
 
 %% @doc
@@ -411,7 +411,7 @@ filter_json(Json, From, Size) ->
 %% @end
 filter_json(Json, ResourceQuery, From, Size) ->
          NewJson = string:sub_string(Json,1,string:len(Json)-1),
-        "{\"from\" : "++From++", \"size\" : "++Size++", \"query\":{\"filtered\":"++NewJson++",\"filter\":{\"bool\":{\"must\":[{\"term\":{\"private\":\"false\"}},{\"term\":{"++ResourceQuery++"}}]}}}}}".
+        "{\"from\" : "++From++", \"size\" : "++Size++", \"query\":{\"filtered\":"++NewJson++",\"filter\":{\"bool\":{\"must_not\":[{\"term\":{\"private\":\"true\"}},{\"term\":{"++ResourceQuery++"}}]}}}}}".
 
 
 %% @doc
