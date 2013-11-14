@@ -174,7 +174,9 @@ process_post(ReqData, State) ->
 									FieldsAdded = add_server_side_fields(ResAdded),
 									Final = suggest:add_stream_suggestion_fields(FieldsAdded),
 									case erlastic_search:index_doc(?INDEX, "stream", Final) of	
-										{error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
+										{error,{Code,Body}} ->
+											ErrorString = api_help:generate_error(Body, Code),
+            										{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 										{ok,List} -> 
 											suggest:update_suggestion(ResAdded),
 											{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
