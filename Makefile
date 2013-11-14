@@ -71,7 +71,7 @@ run_es:
 ### Runs rabbitMQ server
 run_rabbit:
 	sudo lib/rabbitmq-server/scripts/rabbitmq-server
-
+	
 ### Command: make test
 ### Compile project resources (not libraries) and runs all eunit tests.
 test: compile
