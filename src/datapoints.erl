@@ -10,11 +10,11 @@
 		 process_post/2, get_datapoint/2]).
 
 -include("webmachine.hrl").
+-include("field_restrictions.hrl").
 -include_lib("erlastic_search.hrl").
 -include_lib("amqp_client.hrl").
 -include_lib("pubsub.hrl").
 
--define(INDEX, "sensorcloud").
 
 %% @doc
 %% Function: init/1
@@ -81,19 +81,37 @@ process_post(ReqData, State) ->
 							TimeStampAdded = DatapointJson
 					end,
 					FinalJson = api_help:add_field(TimeStampAdded, "streamid", Id),
-					case erlastic_search:get_doc(?INDEX, "stream", Id) of
-						 {error,{404,_}} ->
-							 {{halt,409}, wrq:set_resp_body("{\"error\":\"no document with streamid given is present in the system\"}", ReqData), State};
-                         {error,{Code,Body}} ->
-                             ErrorString = api_help:generate_error(Body, Code),
-                             {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-                         {ok,_} ->
-							 case erlastic_search:index_doc(?INDEX, "datapoint", FinalJson) of
-								{error, {Code, Body}} -> 
-            						ErrorString = api_help:generate_error(Body, Code),
-            						{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-								{ok,List} -> {true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
-							 end
+					case api_help:do_only_fields_exist(FinalJson,?ACCEPTEDFIELDSDATAPOINTS) of
+						false -> 
+							{{halt,403}, wrq:set_resp_body("Unsupported field(s)", ReqData), State};
+						true ->
+							case erlastic_search:get_doc(?INDEX, "stream", Id) of
+						 		{error,{404,_}} ->
+							 		{{halt,409}, wrq:set_resp_body("{\"error\":\"no document with streamid given is present in the system\"}", ReqData), State};
+                         		{error,{Code,Body}} ->
+                             		ErrorString = api_help:generate_error(Body, Code),
+                             		{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+                        		 {ok,_} ->
+							 		case erlastic_search:index_doc(?INDEX, "datapoint", FinalJson) of
+										{error, {Code, Body}} -> 
+            								ErrorString = api_help:generate_error(Body, Code),
+            								{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+								{ok,List} -> 
+									Msg = list_to_binary(FinalJson),
+									StreamExchange = list_to_binary("streams."++Id),
+                                    %% Connect
+                                    {ok, Connection} =
+                                        amqp_connection:start(#amqp_params_network{host = "localhost"}),
+                                    %% Open channel
+                                    {ok, Channel} = amqp_connection:open_channel(Connection),
+                                    %% Declare exchange
+                                    amqp_channel:call(Channel, #'exchange.declare'{exchange = StreamExchange, type = <<"fanout">>}),        
+                                    %% Send
+                                    amqp_channel:cast(Channel, #'basic.publish'{exchange = StreamExchange}, #amqp_msg{payload = Msg}),
+
+								{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
+							 		end
+							end
 					end
 			end;
 		true ->
@@ -120,11 +138,8 @@ get_datapoint(ReqData, State) ->
 			case erlastic_search:search_limit(?INDEX, "datapoint", "streamid:" ++ Id, Size) of
 				{ok, Result} ->
 					EncodedResult = lib_json:encode(Result),
-					case re:run(EncodedResult, "\"max_score\":null", [{capture, first, list}]) of
-						{match, _} -> {{halt, 404}, ReqData, State};
-						nomatch -> FinalJson = lib_json:get_list_and_add_id(Result, data),
-					       {FinalJson, ReqData, State}
-					end;
+					FinalJson = lib_json:get_list_and_add_id(Result, data),
+					{FinalJson, ReqData, State};
 				{error, {Code, Body}} -> 
         				ErrorString = api_help:generate_error(Body, Code),
         				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State}
@@ -176,7 +191,7 @@ process_search(ReqData, State, get) ->
     end,
 	case TempQuery of
 		[] ->   
-			case erlastic_search:search_limit(?INDEX, "datapoint","streamid:" ++ Id ++ "&sort=timestamp:asc", Size) of
+			case erlastic_search:search_limit(?INDEX, "datapoint","streamid:" ++ Id ++ "&sort=timestamp:desc", Size) of
 				{error, {Code, Body}} -> 
     				ErrorString = api_help:generate_error(Body, Code),
     				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
@@ -185,7 +200,7 @@ process_search(ReqData, State, get) ->
 			       {FinalJson, ReqData, State}
 		 	end;
 		_ ->
-			TransformedQuery="streamid:" ++ Id ++ transform(TempQuery) ++ "&sort=timestamp:asc",
+			TransformedQuery="streamid:" ++ Id ++ transform(TempQuery) ++ "&sort=timestamp:desc",
 			case erlastic_search:search_limit(?INDEX, "datapoint",TransformedQuery, Size) of
 				{error, {Code, Body}} -> 
     				ErrorString = api_help:generate_error(Body, Code),

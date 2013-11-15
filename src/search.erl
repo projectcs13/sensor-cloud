@@ -116,7 +116,7 @@ process_search_post(ReqData, State) ->
                 {ok,List1} ->
                     case lib_json:get_field(Json, "query.filtered.query.query_string.query") of
                         QueryString when is_binary(QueryString) ->
-                            erlang:display(binary_to_list(QueryString));
+                            erlastic_search:index_doc(?INDEX,"search_query","{\"suggest\":{\"input\":[\""++ binary_to_list(QueryString) ++"\"],\"weight\":1}}");
                         _ ->
                             erlang:display("No query string text")
                     end,
@@ -157,7 +157,7 @@ process_search_post(ReqData, State) ->
 %% @end
 filter_json(Json) ->
         NewJson = string:sub_string(Json,1,string:len(Json)-1),
-        "{\"query\":{\"filtered\":"++NewJson++",\"filter\":{\"bool\":{\"must\":{\"term\":{\"private\":\"false\"}}}}}}}".
+        "{\"query\":{\"filtered\":"++NewJson++",\"filter\":{\"bool\":{\"must_not\":{\"term\":{\"private\":\"true\"}}}}}}}".
 
 
 %% @doc
@@ -182,7 +182,7 @@ filter_json(Json, From, Size, Sort) ->
 	",\"size\" : "++Size++
 	",\"sort\" : " ++UseSort++
 	",\"query\" : {\"filtered\" : "++NewJson++
-	",\"filter\" : {\"bool\" : {\"must\" : {\"term\" : {\"private\" : \"false\"}}}}}}}".
+	",\"filter\" : {\"bool\" : {\"must_not\" : {\"term\" : {\"private\" : \"true\"}}}}}}}".
 
     %% Started creating the above Json with lib_json, but it is alot more work...
     %EmptyJson = "{}",
@@ -194,3 +194,4 @@ filter_json(Json, From, Size, Sort) ->
     %PrivateAttribute = {private, list_to_binary("false")},
     %TermAttribute = {term, "{}")},
     %FilteredJson = lib_json:add_value(EmptyJson, "filtered", list_to_binary(Sort)),
+
