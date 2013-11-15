@@ -490,6 +490,7 @@ generate_error(Body, ErrorCode) ->
 %% Function: refresh/0
 %% Purpose: Help function to find refresh the sensorcloud index
 %% Returns: {ok/error, {{Version, Code, Reason}, Headers, Body}}
+%% FIX: This function relies on direct contact with elastic search at localhost:9200
 %% @end
 refresh() ->
 	httpc:request(post, {"http://localhost:9200/sensorcloud/_refresh", [],"", ""}, [], []).
