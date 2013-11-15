@@ -112,9 +112,15 @@ process_search_post(ReqData, State) ->
         FilteredJson = filter_json(Json, From, Size, Sort),
         case erlastic_search:search_json(#erls_params{},?INDEX, "stream", FilteredJson) of % Maybe wanna take more
                 {error, Reason1} ->
-                        StreamSearch = {error, Reason1};
+                    StreamSearch = {error, Reason1};
                 {ok,List1} ->
-                        StreamSearch = lib_json:encode(List1) % May need to convert
+                    case lib_json:get_field(Json, "query.filtered.query.query_string.query") of
+                        QueryString when is_binary(QueryString) ->
+                            erlang:display(binary_to_list(QueryString));
+                        _ ->
+                            erlang:display("No query string text")
+                    end,
+                    StreamSearch = lib_json:encode(List1) % May need to convert
         end,
         case erlastic_search:search_json(#erls_params{},?INDEX, "user", lib_json:rm_field(FilteredJson, "sort")) of % Maybe wanna take more
                 {error, Reason2} ->
@@ -177,3 +183,14 @@ filter_json(Json, From, Size, Sort) ->
 	",\"sort\" : " ++UseSort++
 	",\"query\" : {\"filtered\" : "++NewJson++
 	",\"filter\" : {\"bool\" : {\"must\" : {\"term\" : {\"private\" : \"false\"}}}}}}}".
+
+    %% Started creating the above Json with lib_json, but it is alot more work...
+    %EmptyJson = "{}",
+    %FromAttribute = {from, list_to_binary(From)},
+    %SizeAttribute = {size, list_to_binary(Size)},
+    %SortAttribute = {sort, list_to_binary(Sort)},
+    %lib_json:add_values(EmptyJson, [FromAttribute, SizeAttribute, SortAttribute]),
+    %FilteredAttribute = {filtered, "{}"},
+    %PrivateAttribute = {private, list_to_binary("false")},
+    %TermAttribute = {term, "{}")},
+    %FilteredJson = lib_json:add_value(EmptyJson, "filtered", list_to_binary(Sort)),
