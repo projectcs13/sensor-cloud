@@ -75,7 +75,7 @@ process_post(ReqData, State) ->
 					case lib_json:get_field(DatapointJson,"timestamp") of
 						undefined ->
 							{{Year,Month,Day},{Hour,Minute,Second}} = calendar:local_time(),
-							TimeStamp = generate_timestamp([Year,Month,Day,Hour,Minute,Second],0) ++ ".000",
+							TimeStamp = api_help:generate_timestamp([Year,Month,Day,Hour,Minute,Second],0),
 							TimeStampAdded = api_help:add_field(DatapointJson, "timestamp", TimeStamp);
 						_ ->
 							TimeStampAdded = DatapointJson
@@ -252,25 +252,3 @@ id_from_path(RD) ->
 		Id -> Id
 	end.
 
-%% @doc
-%% Function: generate_timpestamp/2
-%% Purpose: Used to create a timestamp valid in ES
-%%          from the input which should be the list
-%%          [Year,Mounth,Day,Hour,Minute,Day]
-%% Returns: The generated timestamp
-%%
-%% @end
--spec generate_timestamp(DateList::list(),Count::integer()) -> string().
-
-generate_timestamp([],_) ->
-	[];
-generate_timestamp([First|Rest],3) ->
-	case First < 10 of
-		true -> "T0" ++ integer_to_list(First) ++ generate_timestamp(Rest,4);
-		false -> "T" ++ integer_to_list(First) ++ generate_timestamp(Rest,4)
-	end;
-generate_timestamp([First|Rest],Count) ->
-	case First < 10 of
-		true -> "0" ++ integer_to_list(First) ++ generate_timestamp(Rest,Count+1);
-		false -> "" ++ integer_to_list(First) ++ generate_timestamp(Rest,Count+1)
-	end.
