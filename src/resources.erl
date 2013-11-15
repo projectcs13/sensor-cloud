@@ -259,7 +259,8 @@ put_resource(ReqData, State) ->
 				{false,false} ->
 					{{halt,403}, wrq:set_resp_body("Unsupported field(s)", ReqData), State};
 				{false,true} ->
-					Update = api_help:create_update(UserJson),
+					NewJson = suggest:add_resource_suggestion_fields(UserJson),
+					Update = api_help:create_update(NewJson),
 					case api_help:update_doc(?INDEX,"resource", Id, Update) of 
 						{error, {Code, Body}} -> 
 							ErrorString = api_help:generate_error(Body, Code),
