@@ -18,18 +18,6 @@
 %% ====================================================================
 -export([start_link/0, init/1, handle_info/2, handle_cast/2, handle_call/3, terminate/2]).
 
-%%this function only does some initialization of the testing data
-test()->
-    inets:start(),
-    %%insert a new resource
-    httpc:request(post, {"http://localhost:9200/sensorcloud/resource", [], "application/json", "{\"user_id\":1, \"name\":\"testing\", \"tags\":\"\", \"description\":\"the temperature in uppsala\", \"type\":\"application/json\", \"manufacturer\":\"volvo\", \"streams\":\"1\", \"uri\":\"http://130.238.15.199:8000/cgi-bin/resource.py\", \"polling_freq\":1000, \"creation_date\":\"\"} "}, [], []),
-    
-    %%insert two new parsers
-    httpc:request(post, {"http://localhost:9200/sensorcloud/parser", [], "application/json", "{\"resource_id\":1, \"stream_id\":17, \"input_parser\":\"streams/temperature/value\", \"input_type\":\"application/json\" }"}, [], []),
-    httpc:request(post, {"http://localhost:9200/sensorcloud/parser", [], "application/json", "{\"resource_id\":1, \"stream_id\":17, \"input_parser\":\"streams/humidity/value\", \"input_type\":\"application/json\" }"}, [], []),
-    
-    application:stop(inets).
-
 %% @doc
 %% Function: start_link/0
 %% Purpose: init function used to generate the supervisor process, polling_monitor, and create all pollers.
@@ -37,11 +25,6 @@ test()->
 %% Side effects: spawn supervisor process and register it by name supervisor. spawn pollingBoss supervisor and register it by its name.
 %% @end
 start_link()->
-	%%for testing
-	erlastic_search_app:start(),
-	timer:sleep(1000),
-	%%test(),
-	%%testing ends
 	
 	case whereis(polling_supervisor) of
 		undefined->			
@@ -73,24 +56,9 @@ init(_)->
 %% Returns: {noreply, NewState}
 %% Side effects: send message to specific poller and update the state of gen_server.
 %% @end
-handle_info({addNewPoller, Poller}, PollersInfo)->
-	erlang:display("receive info: {addNewPoller, Poller}"),
-	{noreply, [Poller|PollersInfo]};
-handle_info({update, ResourceId, NewUrl}, PollersInfo)->
-	erlang:display("receive info: {update, ResourceId, NewUrl}"),
-	{noreply, updateInfo(PollersInfo, ResourceId, NewUrl)};
-handle_info({rebuild, ResourceId}, PollersInfo)->
-	erlang:display("receive info: {rebuild, ResourceId}"),
-	%%find pid from the records list according to resource id
-	Poller = find_poller_by_id(ResourceId, PollersInfo),
-	%%and sends rebuild function to the poller
-	case Poller of
-		{error, ErrMessage} -> 
-			erlang:display(ErrMessage);
-		_ ->
-			gen_server:call(Poller#pollerInfo.pid, {rebuild})
-	end,
-	{noreply, PollersInfo}.
+handle_info({print, Message}, State)->
+	erlang:display(Message),
+	{noreply, State}.
 
 %% @doc
 %% Function: handle_cast/2
@@ -99,34 +67,50 @@ handle_info({rebuild, ResourceId}, PollersInfo)->
 %% Returns: {noreply, NewState}
 %% Side effects: create new poller and send message to specific poller.
 %% @end
-handle_cast({create_poller, #pollerInfo{resourceid = ResourceId, name = ResourceName, url = Url, frequency = Frequency}}, State)->
+handle_cast({create_poller, #pollerInfo{resourceid = ResourceId, name = ResourceName, url = Url, frequency = Frequency}}, PollersInfo)->
 	erlang:display("receive cast: {create_poller, pollerInfo}"),
 	
-	%% TODO create erlastic function to get all parsers for a specific resource
-	Parsers = parser:getParsersById(ResourceId),
-	%%generate a new poller to the pollingBoss
-
-	%%only for testing
-	case whereis(polling_monitor) of
-		undefined->
-			erlang:display("polling monitor is not running");
-		_ ->
-			continue
-	end,
+	Parsers = poll_help:get_parsers_by_id(ResourceId),
 	
 	{ok, Pid}=supervisor:start_child(polling_monitor, [#state{resourceid=ResourceId, url=Url, parserslist=Parsers}]),
 	Record = #pollerInfo{resourceid=ResourceId, name=ResourceName, url=Url, frequency=Frequency, pid=Pid},
-	%%add this poller into the pollers infor storage of the server_loop
-	%%polling_supervisor!{addNewPoller, Record},
 	%%use timer library to create scheduler for this poller
 	timer:start(),
 	timer:send_interval(Frequency, Pid, {probe}),
-	{noreply, [Record|State]};
-handle_cast({rebuild_poller, ResourceId}, State)->
-	erlang:display("receive cast: {rebuild_poller, ResourceId}"),
+	{noreply, [Record|PollersInfo]};
+handle_cast({terminate, ResourceId}, PollersInfo)->
+	erlang:display("receive cast: {terminate, ResourceId}"),
+	Poller = find_poller_by_id(ResourceId, PollersInfo),
+	case Poller of
+		{error, ErrMsg}->
+			erlang:display(ErrMsg),
+			{noreply, PollersInfo};
+		_ ->
+			supervisor:terminate_child(polling_monitor, Poller#pollerInfo.pid),
+			supervisor:delete_child(polling_monitor, Poller#pollerInfo.pid),
+			{noreply, delete_info(PollersInfo, ResourceId)}
+	end;
+handle_cast({rebuild, ResourceId}, PollersInfo)->
+	erlang:display("receive cast: {rebuild, ResourceId}"),
 	
-	polling_supervisor!{rebuild, ResourceId},
-	{noreply, State}.
+	%%find pid from the records list according to resource id
+	Poller = find_poller_by_id(ResourceId, PollersInfo),
+	case Poller of
+		{error, ErrMessage} -> 
+			erlang:display(ErrMessage),
+			NewPollersInfo = PollersInfo;
+		_ ->
+			{update, ResourceId, NewUrl} = gen_server:call(Poller#pollerInfo.pid, {rebuild}),
+			%%change the url of the poller information stored
+			NewPollersInfo = update_info(PollersInfo, ResourceId, NewUrl)
+	end,
+	{noreply, NewPollersInfo};
+handle_cast({add_new_poller, Poller}, PollersInfo)->
+	erlang:display("receive cast: {add_new_poller, Poller}"),
+	{noreply, [Poller|PollersInfo]};
+handle_cast({update, ResourceId, NewUrl}, PollersInfo)->
+	erlang:display("receive cast: {update, ResourceId, NewUrl}"),
+	{noreply, update_info(PollersInfo, ResourceId, NewUrl)}.
 	
 %% @doc
 %% Function: handle_call/2
@@ -139,16 +123,9 @@ handle_call(create_pollers, _Form, State)->
 	%%extract all the resources data from the database
 	%%and store the information into specific data structure
 	
-	%%create pollers for each resource and add them into the server_loop.\
-				%% [{#pollerInfo{...}}, {#pollerInfo{...}}]
-	%% TODO create erlastic function for getting all resources using polling.
-	
-	%%PollerList = streams:get_all_pollers(),
-	PollerList = [#pollerInfo{resourceid=1, name="temperature", url="http://130.238.15.199:8000/cgi-bin/resource.py", frequency=13}],
-	
-	%%lists:foreach(create_poller, PollerList),
+	PollerList = poll_help:json_to_record_resources(poll_help:get_resources_using_polling()),
+
 	create_poller_for_each(PollerList),
-	%%return the list of pollers` information list
 	{reply, ok, State}.
 
 %% @doc
@@ -156,14 +133,14 @@ handle_call(create_pollers, _Form, State)->
 %% Purpose: controls what happen when this pulling supervisor stops working!.
 %% Returns: ok
 %% @end
-terminate(_T, State)->
+terminate(_T, _State)->
 	erlang:display("polling supervisor stops working!").
 
 
 %% ====================================================================
 %% Internal functions
 %% ====================================================================
-
+			
 %% @doc
 %% Function: create_poller_for_each/1
 %% Purpose: make asynchronous call to polling_supervisor to create poller for each item in polling information list.
@@ -188,61 +165,32 @@ find_poller_by_id(ResourceId, [Poller|Tail]) ->
 	end.
 
 %% @doc
-%% Function: create_pollers/0
-%% Purpose: function used to extract all pollers from the datastore and create every poller for each of them.
-%% Returns: ok
+%% Function: delete_info/2
+%% Purpose: delete a resource record with the resource`s id
+%% Returns: NewPollersRecordList | []
 %% @end
-%%-spec create_pollers() -> ok.
-%%create_pollers()->
-	%%extract all the resources data from the database
-	%%and store the information into specific data structure
-	
-	%%create pollers for each resource and add them into the server_loop.\
-				%% [{#pollerInfo{...}}, {#pollerInfo{...}}]
-	%% TODO create erlastic function for getting all resources using polling.
-%%	PollerList = streams:get_all_pollers(),
-%%	lists:foreach(create_poller, PollerList)
-	%%return the list of pollers` information list
-%%	.
-
+-spec delete_info(list(), integer()) -> list().
+delete_info([], _)->[];
+delete_info([Poller|Tail], ResourceId)->
+	case Poller#pollerInfo.resourceid == ResourceId of
+		true->
+			Tail;
+		_->
+			[Poller|delete_info(Tail, ResourceId)]
+	end.
 
 %% @doc
-%% Function: updateInfo/3
+%% Function: update_info/3
 %% Purpose: after poller done its rebuild, supervisor uses this function to update its pollers` info store.
 %% Returns: NewPollersRecordList | []
 %% @end
--spec updateInfo(list(), integer(), string()) -> list().
-updateInfo([], _, _) -> [];
-updateInfo([Poller|Tail], ResourceId, NewUrl) ->
+-spec update_info(list(), integer(), string()) -> list().
+update_info([], _, _) -> [];
+update_info([Poller|Tail], ResourceId, NewUrl) ->
 	case Poller#pollerInfo.resourceid == ResourceId of
 		true->
 			[Poller#pollerInfo{url = NewUrl} | Tail];
 		_ ->
-			[Poller | updateInfo(Tail, ResourceId, NewUrl)]
+			[Poller | update_info(Tail, ResourceId, NewUrl)]
 	end.
-
-
-%% @doc
-%% Function: server_loop/1
-%% Purpose: the main loop of supervisor to process the coming messages
-%% @end
-%%-spec server_loop(list()) -> none().
-%%server_loop(PollersInfo)->
-%%	receive
-%%		{addNewPoller, Poller}->
-%%			server_loop([Poller|PollersInfo]);
-%%		{update, ResourceId, NewUrl}->
-%%			server_loop( updateInfo(PollersInfo, ResourceId, NewUrl) );
-%%		{rebuild, ResourceId}->
-%%			%%find pid from the records list according to resource id
-%%			Poller = find_poller_by_id(ResourceId, PollersInfo),
-%%			%%and sends rebuild function to the poller
-%%			case Poller of
-%%				{error, ErrMessage} -> 
-%%					erlang:display(ErrMessage);
-%%				_ ->
-%%					Poller#pollerInfo.pid ! {rebuild}
-%%			end,
-%%			server_loop(PollersInfo)
-%%	end.
 

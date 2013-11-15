@@ -17,7 +17,7 @@
 %% ====================================================================
 %% API functions
 %% ====================================================================
--export([applyParser/3, getParsersById/1]).
+-export([applyParser/3]).
 
 %% @doc
 %% Function: applyParser/3
@@ -28,10 +28,6 @@
 %% @end
 -spec applyParser(list(),any() ,string()) -> ok | {error, string()}.
 applyParser(ParsersList, Data, ContentType) -> 
-	
-	%% only for testing
-	erlang:display("run function: applyParser/3"),
-	
 	Parsers = get_parsers_with_content_type(ContentType, ParsersList, []),
 	
 	%% only for testing
@@ -44,47 +40,11 @@ applyParser(ParsersList, Data, ContentType) ->
 				{error, "the parsers for this type do not exist"}
 	end.
 
-%% @doc
-%% Function: getParsersById/1
-%% Purpose: get parsers list according to specific resource id 
-%% Returns: {error, ErrMsg} | [#parser .....]
-%% @end
-getParsersById(ResourceId)->
-	erlang:display("run function: parser:getParsersById/1"),
-	case erlastic_search:search_limit(?ES_INDEX, "parser", "resource_id:" ++ integer_to_list(ResourceId), 100) of
-		{ok, Result} ->
-			EncodedResult = lib_json:encode(Result),
-			case re:run(EncodedResult, "\"max_score\":null", [{capture, first, list}]) of
-				{match, _} -> {error, "parsers not found"};
-				nomatch -> FinalJsonList = lib_json:get_field(lib_json:get_list_and_add_id(Result), "hits"),
-						   
-						   %%transform this json list to record list
-						   jsonToRecord(FinalJsonList, [])
-			end;
-		_ ->
-			erlang:display("an error happens: parsers not found"),
-			{error, "parsers not found"}
-	end. 
+
 
 %% ====================================================================
 %% Internal functions
 %% ====================================================================
-
-
-%% @doc
-%% Function: jsonToRecord/2
-%% Purpose: transform the json list to parser record list 
-%% Returns: list()
-%% @end
-jsonToRecord([], Res)->
-	Res;
-jsonToRecord([Item|Tail], Res)->
-	Tmp = #parser{resource_id = lib_json:get_field(Item, "resource_id"),
-				  stream_id = lib_json:get_field(Item, "stream_id"),
-				  input_parser = binary_to_list(lib_json:get_field(Item, "input_parser")),
-				  input_type = binary_to_list(lib_json:get_field(Item, "input_type"))
-				 },
-	jsonToRecord(Tail, [Tmp|Res]).
 
 %% @doc
 %% Function: processParser/2
@@ -113,12 +73,6 @@ processParser([Item|Tail], Res)->
 %% @end
 -spec parseJson(record(), any()) -> ok.
 parseJson(Parser, Data) ->
-	
-	%% only for testing
-	erlang:display("run function: parseJson/2"),
-	
-	%% extract the wanted value from the json-data and store it in the DB
-	%% return the status of the transaction, ok or {error, ErrMsg}
 
 	%%extract the data from the coming data
 	ResourceId = Parser#parser.resource_id,
@@ -168,7 +122,7 @@ parseJson(Parser, Data) ->
 						   {error, Reason};
 		{ok,List} -> 
 			%% only for testing
-			erlang:display("the final data which is inserted into the database: "++FinalJson),
+			%% erlang:display("the final data which is inserted into the database: "++FinalJson),
 			
 			ok
 	end.
@@ -224,7 +178,7 @@ doParsing([Parser|ParsersList], Data, ContentType) ->
 %% Returns: The patterns suitable for the current content type
 %% @end
 -spec get_parsers_with_content_type(string(), list(), list()) -> list().
-get_parsers_with_content_type(Content_type, [], L) -> L;
+get_parsers_with_content_type(_Content_type, [], L) -> L;
 get_parsers_with_content_type(Content_type, [Parser|Parsers], L) ->
 	case Parser#parser.input_type == Content_type of
 		true -> get_parsers_with_content_type(Content_type, Parsers, [Parser|L]);

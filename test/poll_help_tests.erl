@@ -1,4 +1,4 @@
-%% @author Gabriel Tholsgård
+%% @author Gabriel Tholsgård, Li Hao
 %%   [www.csproj13.student.it.uu.se]
 %% @version 1.0
 %% @copyright [Copyright information]
@@ -9,10 +9,11 @@
 %%
 %% @end
 
--module(poll_help_test).
+-module(poll_help_tests).
 
 -include("common.hrl").
 -include("poller.hrl").
+-include("parser.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("inets/include/mod_auth.hrl").
 
@@ -181,8 +182,66 @@ json_to_record_resources_test() ->
 	
 	%% Clear all entered resources.
 	clear_resource_type().
-	
 
+%% @doc
+%% Function: get_parsers_by_id_test/0
+%% Purpose: test poll_help:get_parsers_by_id_test/1 function
+%% Returns: ok | {error, term()}.
+%% @end
+get_parsers_by_id_test() ->
+	
+	%% Clear all parsers stored in elasticsearch
+	clear_parser_type(),
+	timer:sleep(1000),
+	
+	post_parser(1, 13, "application/json","streams/temperature/value"),
+	timer:sleep(1000),
+	ParserList = poll_help:get_parsers_by_id("1"),
+	Parser = lists:nth(1, ParserList),
+	?assertEqual(1, length(ParserList)),
+	?assertEqual(1, Parser#parser.resource_id),
+	?assertEqual(13, Parser#parser.stream_id),
+	?assertEqual("streams/temperature/value", Parser#parser.input_parser),
+	?assertEqual("application/json", Parser#parser.input_type),
+	
+	%% Clear all entered parsers.
+	clear_parser_type().
+
+get_datapoint_test()->
+	
+	%% clear all datapoints stored in elasticsearch
+	clear_datapoint_type(),
+	timer:sleep(1000),
+	
+	Res0 = poll_help:get_datapoint(12),
+	post_datapoint(12, 13),
+	timer:sleep(1000),
+	Res1 = poll_help:get_datapoint(12),
+	?assertEqual(0, length(Res0)),
+	?assertEqual(1, length(Res1)),
+	?assertEqual(12, lib_json:get_field(lists:nth(1, Res1), "streamid")),
+	?assertEqual(13, lib_json:get_field(lists:nth(1, Res1), "value")),
+	
+	%% clear all datapoints stored in elasticsearch
+	clear_datapoint_type().
+
+post_datapoint_test()->
+	
+	%% clear all datapoints stored in elasticsearch
+	clear_datapoint_type(),
+	timer:sleep(500),
+	
+	Res0 = poll_help:get_datapoint(11),
+	poll_help:post_datapoint(11,101),
+	timer:sleep(1000),
+	Res1 = poll_help:get_datapoint("11"),
+	?assertEqual(0, length(Res0)),
+	?assertEqual(1, length(Res1)),
+	?assertEqual("11", binary_to_list(lib_json:get_field(lists:nth(1, Res1), "streamid"))),
+	?assertEqual("101", binary_to_list(lib_json:get_field(lists:nth(1, Res1), "value"))),
+	
+	%% clear all datapoints stored in elasticsearch
+	clear_datapoint_type().
 
 %% ====================================================================
 %% Internal functions
@@ -192,8 +251,7 @@ json_to_record_resources_test() ->
 
 %% @doc
 %% Function: clear_resource_type/0
-%% Purpose: Transform a list of resources in json format to a list of resources
-%%          in the form of the record #pollerInfo.
+%% Purpose: Delete all the resource in elasticsearch.
 %% Returns: {ok, Result} | {ok, saved_to_file} | {error, Reason}.
 %% @end
 -spec clear_resource_type() ->
@@ -203,7 +261,29 @@ json_to_record_resources_test() ->
 clear_resource_type() ->
 	httpc:request(delete, {?ES_ADDR ++ "/resource", []}, [], []).
 
+%% @doc
+%% Function: clear_datapoint_type/0
+%% Purpose: Delete all the datapoints in elasticsearch.
+%% Returns: {ok, Result} | {ok, saved_to_file} | {error, Reason}.
+%% @end
+-spec clear_datapoint_type() ->
+		  {ok, term()}
+		| {ok, saved_to_file}
+		| {error, term()}.
+clear_datapoint_type()->
+	httpc:request(delete, {?ES_ADDR ++ "/datapoint", []}, [], []).
 
+%% @doc
+%% Function: clear_parser_type/0
+%% Purpose: Delete all the parsers in elasticsearch.
+%% Returns: {ok, Result} | {ok, saved_to_file} | {error, Reason}.
+%% @end
+-spec clear_parser_type() ->
+		  {ok, term()}
+		| {ok, saved_to_file}
+		| {error, term()}.
+clear_parser_type() ->
+	httpc:request(delete, {?ES_ADDR ++ "/parser", []}, [], []).
 
 %% @doc
 %% Function: post_resource/3
@@ -222,7 +302,7 @@ post_resource(Name, Url, Freq) when is_integer(Freq) ->
 		end,
 	U = case Url of
 			"" -> "";
-			_ -> ", \"uri\" : \"" ++ Url ++ "\""
+			_ -> ", \"url\" : \"" ++ Url ++ "\""
 		end,
 	F = "\"polling_freq\" : " ++ integer_to_list(Freq),
 	httpc:request(post, {?ES_ADDR ++ "/resource", [],
@@ -231,7 +311,70 @@ post_resource(Name, Url, Freq) when is_integer(Freq) ->
 						},
 				  [], []).
 
+%% @doc
+%% Function: post_datapoint/3
+%% Purpose: Post a datapoint using the values provided.
+%% Returns: {ok, Result} | {ok, saved_to_file} | {error, Reason}.
+%% @end
+-spec post_datapoint(StreamId :: integer(), Value :: number()) ->
+		  {ok, term()}
+		| {ok, saved_to_file}
+		| {error, term()}.
+post_datapoint(StreamId, Value) when is_integer(StreamId) ->
+	SId = "\"streamid\":" ++ integer_to_list(StreamId) ++ "",
+	case is_integer(Value) of
+		true->
+			Va = integer_to_list(Value);
+		_ ->
+			case is_float(Value) of
+				true->
+					Va = float_to_list(Value);
+				_->
+					Va = Value
+			end
+	end,
+	Val = ", \"value\":" ++ Va ++ "",
+	{{Year, Month, Day}, {Hour, Minutes, Seconds}} = calendar:now_to_universal_time(os:timestamp()),
+	
+	StrYear = integer_to_list(Year),
+	StrMonth = integer_to_list(Month),
+	StrDay = integer_to_list(Day),
+	StrHour = integer_to_list(Hour),
+	StrMinutes = integer_to_list(Minutes),
+	StrSeconds = integer_to_list(Seconds),
+	
+	Timestamp = ", \"timestamp\":\""++StrYear++":"++StrMonth++":"++StrDay++" "++StrHour++":"++StrMinutes++":"++StrSeconds++"\"",
+	
+	FinalData = "{"++SId++Val++Timestamp++"}",
+	httpc:request(post, {?ES_ADDR++"/datapoint", [], "application/json",
+						 FinalData}, 
+				  [], []).
 
+%% @doc
+%% Function: post_parser/4
+%% Purpose: Post a parser using the values provided, if 'InputType' or 'InputParser' is
+%%          empty they are ignored.
+%% Returns: {ok, Result} | {ok, saved_to_file} | {error, Reason}.
+%% @end
+-spec post_parser(ResourceId :: integer(), StreamId :: integer(), InputType :: string(), InputParser :: string()) ->
+		  {ok, term()}
+		| {ok, saved_to_file}
+		| {error, term()}.
+post_parser(ResourceId, StreamId, InputType, InputParser) when is_integer(ResourceId), is_integer(StreamId)->
+	It = case InputType of
+			 "" -> "";
+			 _ -> ", \"input_type\":\"" ++ InputType ++ "\""
+		 end,
+	Ip = case InputParser of
+			 "" -> "";
+			 _ -> ", \"input_parser\":\"" ++ InputParser ++ "\""
+		 end,
+	Ri = integer_to_list(ResourceId),
+	Si = integer_to_list(StreamId),
+	{ok, Res} = httpc:request(post, {?ES_ADDR ++ "/parser", [],
+						 "application/json",
+						 "{\"resource_id\":"++Ri++", \"stream_id\":"++Si++It++Ip++"}"
+						}, [],[]).
 
 %% @doc
 %% Function: post_resource/2
@@ -256,13 +399,13 @@ post_resource(Name, "") ->
 post_resource("", Url) ->
 	httpc:request(post, {?ES_ADDR ++ "/resource", [],
 						 "application/json",
-						 "{\"uri\" : \"" ++ Url ++ "\" }"
+						 "{\"url\" : \"" ++ Url ++ "\" }"
 						}, [], []);
 post_resource(Name, Url) ->
 	httpc:request(post, {?ES_ADDR ++ "/resource", [],
 						 "application/json",
 						 "{\"name\" : \"" ++ Name ++ "\"" ++
-							 ", \"uri\" : \"" ++ Url ++ "\" }"
+							 ", \"url\" : \"" ++ Url ++ "\" }"
 						}, [], []).
 
 

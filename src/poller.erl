@@ -19,6 +19,11 @@
 %% ====================================================================
 -export([start_link/1, init/1, handle_call/3, handle_info/2, terminate/2]).
 
+%% @doc
+%% Function: start_link/1
+%% Purpose: start function used to start the poller, will call init/1 function later
+%% Returns: {ok, Pid} | {error, ErrMsg}
+%% @end
 start_link(State)->
 	gen_server:start_link(?MODULE, State, []).
 
@@ -26,6 +31,7 @@ start_link(State)->
 %% Function: init/1
 %% Purpose: init function used to initialize this poller gen_server.
 %% Returns: {ok, State}
+%% Side Effects: start inets and start the ssl
 %% @end
 init(State)->
 	application:start(inets),
@@ -42,9 +48,7 @@ handle_call({rebuild}, _Form, State)->
 	Url = State#state.url,
 	%%to rebuild the poller 
 	%%extract the url from the datastore according to resource id
-	%%get the pasers from the datastore\
-	%% TODO Check the available erlastic function calls
-	%%Resource = erlastic:get_resource_by_id(ResourceId),  %% return a #resource record
+	%%get the pasers from the datastore
 
 	%%I let each poller interact directly with the erlasticsearch module, not sure it is ok.
 	case erlastic_search:get_doc(?ES_INDEX, "resource", ResourceId) of 
@@ -56,8 +60,7 @@ handle_call({rebuild}, _Form, State)->
 		{ok,JsonStruct} ->
 		    FinalJson = lib_json:get_and_add_id(JsonStruct),
 			
-			%% TODO Query erlastic for all parsers for resource with a specific resourceId (same as in pollingSystem)
-			Parsers = parser:getParsersById(ResourceId), %% return a list of parsers [#parser, ...]
+			Parsers = poll_help:get_parsers_by_id(ResourceId), %% return a list of parsers [#parser, ...]
 			case Parsers of
 				{error, ErrMsg} ->
 					erlang:display("parsers not found"),
@@ -72,10 +75,13 @@ handle_call({rebuild}, _Form, State)->
 					FinalUrl = NewUrl;
 				_ ->
 					FinalUrl = binary_to_list(NewUrl)
-			end,
+			end,			
 			%% notify the supervisor to refresh its records
-			{reply, {update, ResourceId, NewUrl}, #state{resourceid=ResourceId, url=FinalUrl, parserslist=Parsers}}
-	end.
+			{reply, {update, ResourceId, FinalUrl}, #state{resourceid=ResourceId, url=FinalUrl, parserslist=Parsers}}
+	end;
+handle_call({check_info}, _Form, State)->
+	%% return the information of poller
+	{reply, {info, State}, State}.
 	
 %% @doc
 %% Function: handle_info/2
@@ -87,13 +93,10 @@ handle_info({probe}, State)->
 	ParsersList = State#state.parserslist,
 	Url = State#state.url,
 	
-	%% only for testing
-	erlang:display(Url),
-	
 	%%communicate with external resources
 	%%http://userprimary.net/posts/2009/04/04/exploring-erlangs-http-client/
 	
-	case httpc:request(get, {Url, [{"User-Agent", (?UA++integer_to_list(ResourceId))}]}, [], []) of
+	case httpc:request(get, {Url, [{"User-Agent", (?UA++ResourceId)}]}, [], []) of
 		{ok, {{HttpVer, Code, Msg}, Headers, Body}}->
 			case Code==200 of
 				true->
@@ -124,51 +127,6 @@ terminate(_T, State)->
 	Url = State#state.url,
 	erlang:display("the poller for "++Url++" stops working!"),
 	application:stop(inets).
-	
-%% @doc
-%% Function: poller_loop/3
-%% Purpose: the main loop of each poller to process the incoming messages.
-%% @end
-%%-spec poller_loop(integer(), string(), list()) ->none().
-%%poller_loop(ResourceId, Url, ParsersList)->
-%%	receive
-%%		{rebuild}->
-%%			%%to rebuild the poller 
-			%%extract the url from the datastore according to resource id
-			%%get the pasers from the datastore\
-			%% TODO Check the available erlastic function calls
-%%			Resource = erlastic:get_resource_by_id(ResourceId),  %% return a #resource record
-			%% TODO Query erlastic for all parsers for resource with a specific resourceId (same as in pollingSystem)
-%%			Parsers = parser:get_parsers_by_id(ResourceId), %% return a list of parsers [#parser, ...]
-%%			NewUrl = Resource#resource.polling_url,
-			%% notify the supervisor to refresh its records
-%%			supervisor ! {update, ResourceId, NewUrl},
-%%			poller_loop(ResourceId, NewUrl, Parsers);
-%%		{probe}->
-			%%communicate with external resources
-			%%http://userprimary.net/posts/2009/04/04/exploring-erlangs-http-client/
-%%			application:start(inets),
-%%			{ok, {{HttpVer, Code, Msg}, Headers, Body}} =
- %%   			http:request(get, {Url, [{"User-Agent", (?UA++ResourceId)}]}, [], []),
-%%			case Code==200 of
-%%				true->
-%%					case check_header(Headers) of
-%%						"application/json" ->
-%%							parser:applyParser(ParsersList, Body, "application/json");
-%%						"no content type" ->
-%%							%%error
-%%							erlang:display("no content type is offered in the response");
-%%						_ ->
-							%%the other options
-%%							erlang:display("other content type")
-%%					end;
-%%				_ ->
-					%%polling fails
-%%					erlang:display("polling failed")
-%%			end,
-%%			application:stop(inets),
-%%			poller_loop(ResourceId, Url, ParsersList)
-%%	end.
 
 %% ====================================================================
 %% Internal functions
