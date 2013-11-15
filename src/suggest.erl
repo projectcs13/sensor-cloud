@@ -75,6 +75,12 @@ content_types_provided(ReqData, State) ->
 %% Handles GET request for text autocompletion.
 %%
 %% Example URL: localhost:8000/suggest/my_field/my_text?size=5 
+%%
+%% Case 3:
+%% Handles GET requests for phrase_suggestion/auto_completion
+%%
+%% Example URL: localhost:8000/suggest/_search?query=test
+%% This will try to find completion suggestions for the query "test"
 %% @end
 -spec get_suggestion(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 get_suggestion(ReqData, State) ->
@@ -125,14 +131,14 @@ get_suggestion(ReqData, State) ->
             undefined ->
                 erlang:display("No query specified!");
             QueryString ->
-            	SuggestJson = "{\"suggestion\":{\"text\":\""++ QueryString ++"\",\"completion\":{\"field\":\"suggest\",\"fuzzy\":true}}}",
+            	SuggestJson = "{\"suggestion\":{\"text\":\""++ QueryString ++"\",\"completion\":{\"field\":\"search_suggest\",\"fuzzy\":true}}}",
             	case erlastic_search:suggest(?INDEX, SuggestJson) of
             		{error, {Code, Body}} -> 
 						ErrorString = api_help:generate_error(Body, Code),
 						{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 					{ok,List} ->
 						OutputJson = lib_json:set_attr("suggestions",lib_json:get_field(List, "suggestion[0].options")),
-                		{true,wrq:set_resp_body(OutputJson ,ReqData),State}
+                		{OutputJson ,ReqData ,State}
                 end
         	end
 	end.

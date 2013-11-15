@@ -116,7 +116,7 @@ process_search_post(ReqData, State) ->
                 {ok,List1} ->
                     case lib_json:get_field(Json, "query.filtered.query.query_string.query") of
                         QueryString when is_binary(QueryString) ->
-                            erlastic_search:index_doc(?INDEX,"search_query","{\"suggest\":{\"input\":[\""++ binary_to_list(QueryString) ++"\"],\"weight\":1}}");
+                            erlastic_search:index_doc(?INDEX,"search_query","{\"search_suggest\":{\"input\":[\""++ binary_to_list(QueryString) ++"\"],\"weight\":1}}");
                         _ ->
                             erlang:display("No query string text")
                     end,
