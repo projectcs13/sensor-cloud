@@ -95,31 +95,58 @@ process_post(ReqData, State) ->
 reduce(VirtualStreamId, Streams, TimestampFrom, Function, ReqData, State) ->
 	% (aggregated *) average, min, max, std deviation, count, sum of squares, variance
 	Query = create_query(Function, Streams, TimestampFrom),
-   
+	
 	% should also update the connection of vstream <--> streams
+	
+	
+	case erlastic_search:search_json(#erls_params{},?INDEX, "datapoint", lib_json:to_string(Query)) of
+		{error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
+		{ok,JsonStruct} ->
+			%%		check what happens if list is empty, improve with bulk posting
+			%%   	{true,wrq:set_resp_body(lib_json:encode(FinalJson),ReqData),State},
+			
+			
+			%Do we ever need to post all the data?
+			%NewDatapoints = lists:map(fun(Json) -> 
+			%							RmId = lib_json:get_field(Json, "_source"),
+			%							FinalDatapoint = lib_json:replace_field(RmId, "streamid", VirtualStreamId),
+			%						  	erlastic_search:index_doc(?INDEX, "datapoint", FinalDatapoint)
+			%						 end, DatapointsList),
 
-	% in the statistics query the I can get the "statistical" field to push
-		case erlastic_search:search_json(#erls_params{},?INDEX, "datapoint", lib_json:to_string(Query)) of
-				{error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
-				{ok,JsonStruct} ->
-					%%		check what happens if list is empty, improve with bulk posting
-					%%   	{true,wrq:set_resp_body(lib_json:encode(FinalJson),ReqData),State},
-			erlang:display(lib_json:to_string(JsonStruct)),
-							DatapointsList = lib_json:get_field(JsonStruct, "hits.hits"),
-						
-							NewDatapoints = lists:map(fun(Json) -> 
-														RmId = lib_json:get_field(Json, "_source"),
-														FinalDatapoint = lib_json:replace_field(RmId, "streamid", VirtualStreamId),
-													  	erlastic_search:index_doc(?INDEX, "datapoint", FinalDatapoint)
-													 end, DatapointsList),
-							
-							%%will post all datapoints one by one, improve with bulk posting should be like the following
-%% 							case erlastic_search:bulk_index_docs(?INDEX, "datapoint", NewDatapoints) of
-%% 									{error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
-%% 									{ok,List} -> {true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
-%% 							end
-							{true, wrq:set_resp_body("\"status\":\"ok\"", ReqData), State} %% need to fix message returned
-		end.
+
+	% what do we store if whe do not aggregate and thus the statistics are only a single value?
+			case string:str(Function, [<<"aggregate">>]) of %is aggregate the proper name? maybe groupby?
+            	0 ->
+					{{Year,Month,Day},_} = calendar:local_time(),
+					Date = generate_date([Year,Month,Day]), % to be reconsidered
+					DatapointsList = lib_json:get_field(JsonStruct, "facets.statistics.terms"),
+					FinalDatapoint = lib_json:set_attrs([
+														   {"timestamp", lib_json:get_field(JsonStruct, Date)}, %does timestamp have a 
+														   {"streamid", VirtualStreamId},
+														   {"value",  lib_json:get_field(JsonStruct, binary_to_list(lists:nth(1, Function)))}
+														  ]),
+					erlang:display(FinalDatapoint),
+					erlastic_search:index_doc(?INDEX, "datapoint", FinalDatapoint);
+				_->
+					DatapointsList = lib_json:get_field(JsonStruct, "facets.tag_price_stats.terms"),
+					NewDatapoints = lists:map(fun(Json) -> 
+													  FinalDatapoint = lib_json:set_attrs([
+																						   {"timestamp", lib_json:get_field(Json, "term")},
+																						   {"streamid", VirtualStreamId},
+																						   {"value",  lib_json:get_field(Json, binary_to_list(lists:nth(2, Function)))}
+																						  ]),
+													  erlang:display(FinalDatapoint),
+													  erlastic_search:index_doc(?INDEX, "datapoint", FinalDatapoint)
+											  end, DatapointsList)
+			
+			%%will post all datapoints one by one, improve with bulk posting should be like the following
+			%% 							case erlastic_search:bulk_index_docs(?INDEX, "datapoint", NewDatapoints) of
+			%% 									{error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
+			%% 									{ok,List} -> {true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
+			%% 							end
+			end,
+			{true, wrq:set_resp_body("\"status\":\"ok\"", ReqData), State} %% need to fix message returned
+	end.
 
  
 %% @doc
@@ -129,7 +156,7 @@ reduce(VirtualStreamId, Streams, TimestampFrom, Function, ReqData, State) ->
 %% @end
 -spec create_query(Function::string(), Streams::string(), TimestampFrom::string()) -> {string()}.
 create_query(Function, Streams, TimestampFrom) ->
-	%size to be passed as a variable??
+	%size to be passed as a variable?? but it will not work in the terms facets query...
 	Query = lib_json:set_attrs(
 		  [{size, 100},
 		   {"query", "{}"},
@@ -151,7 +178,7 @@ create_query(Function, Streams, TimestampFrom) ->
 						  	 {"facets.statistics", "{}"},
 						  	 {"facets.statistics.statistical", "{}"},
 						  	 {"facets.statistics.statistical.script", '(Long) _source.value'}]; %I have to get the value here in another way
-			_ -> %		["aggregate", "min" "max" "total" "average"] ->		can also support custom calculations like *,+,-,/, ^(prob)
+			_ -> %		["aggregate", "min" "max" "total(==sum)" ] ->		can also support custom calculations like *,+,-,/, ^(prob)
 					% as above
 					Facet = [{"facets", "{}"},
 							{"facets.tag_price_stats", "{}"},
@@ -162,37 +189,6 @@ create_query(Function, Streams, TimestampFrom) ->
 	end,
 	lib_json:add_values(Query, Facet)
 .
-
-
-%% @doc
-%% Function: process_search/3
-%% Purpose: Does search for Datapoints for either search done with POST or GET
-%% Returns: {true, ReqData, State} || {{error, Reason}, ReqData, State}
-
-%the POST range query should be structed as follows:
-%	curl -XPOST http://localhost:8000/streams/1/data/_search -d '{
-%		"size" : 100,
-%		query:{
-% 		   "filtered" : {
-% 		       "query" : {
-%  		          "term" : { "streamid" : Id }
-%  		      }, "filter" : {  "range" : {    "timestamp" : {"gte" : timestampFromValue,"lte" : timestampToValue}}}}
-%		 },"sort" : [{"timestamp" : {"order" : "asc"}}]  }'
-%the GET range query should be structed as follows:
-%	curl -XGET http://localhost:8000/streams/Id/data/_search    --   to return all the datapoints of the current stream
-%or	curl -XGET http://localhost:8000/streams/Id/data/_search\?timestampFrom\=timestampFromValue\&timestampTo\=timestampToValue    --   for range query
-%or 	curl -XGET http://localhost:8000/streams/Id/data/_search\?timestampFrom\=timestampFromValue   --   for lower bounded only range qquery
-%% @end
--spec process_search(ReqData::tuple(), State::string(), term()) ->
-		{list(), tuple(), string()}.
-process_search(ReqData, State, post) ->
-		{Json,_,_} = api_help:json_handler(ReqData,State),
-		case erlastic_search:search_json(#erls_params{},?INDEX, "datapoint", Json) of
-				{error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
-				{ok,JsonStruct} ->
-						       FinalJson = lib_json:get_list_and_add_id(JsonStruct),
-						       {true,wrq:set_resp_body(lib_json:encode(FinalJson),ReqData),State}
-		end.
 
 
 %% @doc
