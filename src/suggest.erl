@@ -157,30 +157,52 @@ add_suggestion(Resource, ResourceId) ->
 
 
 %% @doc
-%% When inserting a new resource, it generates the suggest fields
+%% When inserting or updating a resource, it generates the suggest fields
 %% @end
 add_resource_suggestion_fields(Resource) ->
-	Manufacturer = lib_json:get_field(Resource,"manufacturer"),
-	Model = lib_json:get_field(Resource,"model"),
-	Tags = lib_json:get_field(Resource,"tags"),
-	lib_json:add_values(Resource,[
-			{"manufacturer_suggest", Manufacturer},
-			{"tags_suggest", Tags},
-			{"model_suggest", Model}
-			]).
+	case lib_json:get_field(Resource,"manufacturer") of
+		undefined ->
+			Temp1 = Resource;
+		Manufacturer ->
+			Temp1 = lib_json:add_value(Resource, "manufacturer_suggest", Manufacturer)
+	end,
+	case lib_json:get_field(Resource,"model") of
+		undefined ->
+			Temp2 = Temp1;
+		Model ->
+			Temp2 = lib_json:add_value(Temp1, "model_suggest", Model)
+	end,
+	case lib_json:get_field(Resource,"tags") of
+		undefined ->
+			Temp3 = Temp2;
+		Tags ->
+			Temp3 = lib_json:add_value(Temp2, "tags_suggest", Tags)
+	end,
+	Temp3.
 
 %% @doc
-%% When inserting a new stream, it generates the suggest fields
+%% When inserting or updating a stream, it generates the suggest fields
 %% @end
-add_stream_suggestion_fields(Resource) ->
-	Name = lib_json:get_field(Resource,"name"),
-	Type = lib_json:get_field(Resource,"type"),
-	Tags = lib_json:get_field(Resource,"tags"),
-	lib_json:add_values(Resource,[
-			{"name_suggest", Name},
-			{"tags_suggest", Tags},
-			{"type_suggest", Type}
-			]).
+add_stream_suggestion_fields(Stream) ->
+	case lib_json:get_field(Stream,"name") of
+		undefined ->
+			Temp1 = Stream;
+		Name ->
+			Temp1 = lib_json:add_value(Stream, "name_suggest", Name)
+	end,
+	case lib_json:get_field(Stream,"type") of
+		undefined ->
+			Temp2 = Temp1;
+		Type ->
+			Temp2 = lib_json:add_value(Temp1, "type_suggest", Type)
+	end,
+	case lib_json:get_field(Stream,"tags") of
+		undefined ->
+			Temp3 = Temp2;
+		Tags ->
+			Temp3 = lib_json:add_value(Temp2, "tags_suggest", Tags)
+	end,
+	Temp3.
 
 
 %% @doc

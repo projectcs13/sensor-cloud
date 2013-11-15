@@ -178,7 +178,7 @@ text_autocompletion_test() ->
 	{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} = Response1,
 	Id = lib_json:get_field(Body, "_id"),
 	api_help:refresh(),
-	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, _Body1}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"name\" : \"search\",\"resource_id\" : \""++lib_json:to_string(Id)++"\", \"private\" : \"false\", \"tags\":\"test_auto_tag\"}"}, [], []),
+	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"name\" : \"search\",\"resource_id\" : \""++lib_json:to_string(Id)++"\", \"private\" : \"false\", \"tags\":\"test_auto_tag\"}"}, [], []),
 	api_help:refresh(),
 	Response2 = get_request(?SUGGEST_URL++"model/"++"testauto"),
 	Response3 = get_request(?SUGGEST_URL++"tags/"++"testautotag"),
@@ -191,7 +191,15 @@ text_autocompletion_test() ->
 	{ok, {_, _ ,Body4}} = Response4,
 	?assertEqual(<<"testauto">>,lib_json:get_field(Body2, "suggestions[0].text")),
 	?assertEqual(<<"testautotag">>, lib_json:get_field(Body3, "suggestions[0].text")),
-	?assertEqual(<<"test_auto_tag">>, lib_json:get_field(Body4, "suggestions[0].text")).
+	?assertEqual(<<"test_auto_tag">>, lib_json:get_field(Body4, "suggestions[0].text")),
+	%make changes to resource/stream and check if it got updated
+	StreamId = lib_json:get_field(Body1, "_id"),
+	{ok, {{_Version21, 200, _ReasonPhrase21}, _Headers21, _Body21}} = httpc:request(put, {"http://localhost:8000/streams/"++lib_json:to_string(StreamId), [],"application/json", "{\"name\" : \"newsearch\", \"private\" : \"false\", \"tags\":\"newtag\"}"}, [], []),
+	api_help:refresh(),
+	Response5 = get_request(?SUGGEST_URL++"name/"++"newsearch"),
+	check_returned_code(Response5, 200),
+	{ok, {_, _ ,Body5}} = Response5,
+	?assertEqual(<<"newsearch">>, lib_json:get_field(Body5, "suggestions[0].text")).
 
 %% @doc
 %% Checks if the Response has the correct http return code
