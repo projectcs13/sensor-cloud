@@ -12,19 +12,78 @@
 %% for configuration files in libraries.
 %% @end
 start() ->
-    %% Lines = read_file_lines(FileName),
-    %% NewLines = config_lines(Lines),
-    %% write_lines(FileName, NewLines),
-    ?DEBUG(application:get_all_env(engine)),
-    erlastic_search_config(),
-    rabbit_mq_config(),
-    webmachine_config(),
+    case config_sanity_check() of
+	ok ->
+	    ;
+	error ->
+	    erlang:exit(config_file_error)
+    end,
+    %% erlastic_search_config(),
+    %% rabbit_mq_config(),
+    %% webmachine_config(),
     init:stop().
+
+config_sanity_check() ->
+    case file:get_cwd() of
+	{ok, CWD} ->
+	    File = CWD ++ "/config/engine.config",
+	    case file:open(File, [read]) of
+		{ok, Fd} ->
+		    case io:scan_erl_exprs(Fd, "") of
+			{ok, List, _EndLine} ->
+			    Fun = fun({',',_},Acc) -> 
+					  Acc;
+				     ({'{',_},Acc) ->
+					  Acc;
+				     ({'}',_},Acc) ->
+					  Acc;
+				     ({'[',_},Acc) ->
+					  Acc;
+				     ({']',_},Acc) ->
+					  Acc;
+				     ({dot,_},Acc) ->
+					  Acc;
+				     ({atom,_,engine},Acc) ->
+					  Acc;
+				     ({_,_,X},Acc) ->
+					  [X|Acc]
+				  end,
+			    FilterAndPair = pair(lists:foldr(Fun, [], List)),
+			    Fun2 = fun({ConfOpt, ConfVal}) ->
+					   case application:get_env(engine, ConfOpt) of
+					       {ok, ConfVal} ->
+						   ?DEBUG(lists:concat(["Config option '", ConfOpt, "' is defined"]));
+					       {ok, _} ->
+						   ?ERROR(lists:concat(["Config option '", ConfOpt, "' is defined, but has wrong value in relation to the config file"]));
+					       undefined ->
+						   ?ERROR(lists:concat(["Config option '", ConfOpt, "' is not defined"]))
+					   end
+				   end,
+			    lists:foreach(Fun2, FilterAndPair);
+			_ ->
+			    ?ERROR("Unable to read from config file"),
+			    error
+		    end;
+		_ ->
+		    ?ERROR("Unable to get current working directory, aborting config sanity check"),
+		    error
+	    end;
+	_ ->
+	    ?ERROR("Unable to open config file, aborting configuration mechanismt"),
+	    error
+    end.
+
+pair(List) ->
+    pair(List, []).
+pair([], Acc) ->
+    lists:reverse(Acc);
+pair([A, B| Tl], Acc) ->
+    pair(Tl, [{A,B} | Acc]).
 
 %% @doc
 %% Runs the configuration mechanism for the elastic search and erlastic libraries
 %% @end
--spec elastic_search_config() -> ok | error.
+-spec erlastic_search_config() -> ok | error.
 erlastic_search_config() ->
     case file:get_cwd() of
 	{ok, CWD} ->
