@@ -151,7 +151,7 @@ process_search_post(ReqData, State) ->
 %% @end
 filter_json(Json) ->
         NewJson = string:sub_string(Json,1,string:len(Json)-1),
-        "{\"query\":{\"filtered\":"++NewJson++",\"filter\":{\"bool\":{\"must\":{\"term\":{\"private\":\"false\"}}}}}}}".
+        "{\"query\":{\"filtered\":"++NewJson++",\"filter\":{\"bool\":{\"must_not\":{\"term\":{\"private\":\"true\"}}}}}}}".
 
 
 %% @doc
@@ -176,4 +176,4 @@ filter_json(Json, From, Size, Sort) ->
 	",\"size\" : "++Size++
 	",\"sort\" : " ++UseSort++
 	",\"query\" : {\"filtered\" : "++NewJson++
-	",\"filter\" : {\"bool\" : {\"must\" : {\"term\" : {\"private\" : \"false\"}}}}}}}".
+	",\"filter\" : {\"bool\" : {\"must_not\" : {\"term\" : {\"private\" : \"true\"}}}}}}}".
