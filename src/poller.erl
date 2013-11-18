@@ -69,18 +69,16 @@ handle_call({rebuild}, _Form, State)->
 					erlang:display("parsers not found"),
 					{reply, {error, ErrMsg}, State};
 				_ ->
-					continue
-			end,
-			
-			NewUrl = lib_json:get_field(FinalJson, "url"),
-			case is_binary(NewUrl) of
-				false->
-					FinalUrl = NewUrl;
-				_ ->
-					FinalUrl = binary_to_list(NewUrl)
-			end,			
-			%% notify the supervisor to refresh its records
-			{reply, {update, ResourceId, FinalUrl}, #state{resourceid=ResourceId, url=FinalUrl, parserslist=Parsers}}
+					NewUrl = lib_json:get_field(FinalJson, "url"),
+					case is_binary(NewUrl) of
+						false->
+							FinalUrl = NewUrl;
+						_ ->
+							FinalUrl = binary_to_list(NewUrl)
+					end,			
+					%% notify the supervisor to refresh its records
+					{reply, {update, ResourceId, FinalUrl}, #state{resourceid=ResourceId, url=FinalUrl, parserslist=Parsers}}
+			end
 	end;
 handle_call({check_info}, _Form, State)->
 	%% return the information of poller

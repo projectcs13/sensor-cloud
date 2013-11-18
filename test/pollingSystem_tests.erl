@@ -135,7 +135,7 @@ rebuild_system_test()->
 	timer:sleep(500),
 	
 	%% this new url is fake, only for testing
-    post_resource_with_id(1, "test", ?POLL_ADD2, 1000, "application/json"),
+    post_resource_with_id(1, "test2", ?POLL_ADD2, 1000, "application/json"),
 	timer:sleep(500),
 	gen_server:cast(polling_supervisor, {rebuild, "1"}),
 	timer:sleep(1000),
@@ -161,7 +161,7 @@ rebuild_system_test()->
 	post_resource_with_id(1, "test", ?POLL_ADD, 1000, "application/json"),
 	timer:sleep(500),
 	gen_server:cast(polling_supervisor, {rebuild, "1"}),
-	timer:sleep(1000),
+	
 	ChildrenList2 = supervisor:which_children(polling_monitor),
 	?assertEqual(1, length(ChildrenList2)),
 	{_, Pid2, _, _} = lists:nth(1, ChildrenList2),
