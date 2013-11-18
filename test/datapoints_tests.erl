@@ -36,7 +36,7 @@
 %% @end
 -spec post_test() -> ok | {error, term()}.
 post_test() ->
-		erlastic_search:index_doc_with_id(?INDEX,"stream","4","{\"test\" : \"data_points\"}"),
+		erlastic_search:index_doc_with_id(?INDEX,"stream","4","{\"test\" : \"data_points\",\"history_size\":0}"),
 		api_help:refresh(),
         Response1 = post_request(?DATAPOINTS_URL, "application/json",
                                          "{\"value\":\"" ++ ?TEST_VALUE ++ "\", \"timestamp\": \"" ++ ?TEST_TIMESTAMP ++ "\"}"),
@@ -68,7 +68,7 @@ get_existing_datapoint_test() ->
 %% @end
 -spec no_timestamp_test() -> ok | {error, term()}.
 no_timestamp_test() ->
-		erlastic_search:index_doc_with_id(?INDEX,"stream","5","{\"test\" : \"data_points\"}"),
+		erlastic_search:index_doc_with_id(?INDEX,"stream","5","{\"test\" : \"data_points\",\"history_size\":0}"),
 		api_help:refresh(),
         Response1 = post_request("http://localhost:8000/streams/5/data/", "application/json",
                                          "{\"value\":\"55\"}"),
@@ -78,6 +78,30 @@ no_timestamp_test() ->
 		ObjectList = lib_json:get_field(Body,"data"),
         ?assertEqual(true, lib_json:get_field(lists:nth(1,ObjectList),"timestamp") =/= undefined).
 
+%% @doc
+%% Function: update_stream_fields_test/0
+%% Purpose: Test adding a datapoint and see that the
+%%          stream is updated
+%% Returns: ok | {error, term()}
+%%
+%% @end
+-spec update_stream_fields_test() -> ok | {error, term()}.
+update_stream_fields_test() ->
+	{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} = httpc:request(post, {"http://localhost:8000/resources", [],"application/json", "{\"name\" : \"search\"}"}, [], []),
+	ResourceId = lib_json:get_field(Body,"_id"),
+	api_help:refresh(),
+	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"name\" : \"search\",\"resource_id\" : \"" ++ lib_json:to_string(ResourceId) ++ "\", \"private\" : \"false\"}"}, [], []),
+	StreamId = lib_json:get_field(Body1,"_id"),
+	api_help:refresh(),
+	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/streams/" ++ lib_json:to_string(StreamId) ++ "/data", [],"application/json", "{\"value\":5.0}"}, [], []),
+	api_help:refresh(),
+	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(get, {"http://localhost:8000/streams/" ++ lib_json:to_string(StreamId), []}, [], []),
+	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(get, {"http://localhost:8000/streams/" ++ lib_json:to_string(StreamId) ++ "/data", []}, [], []),
+	{ok, {{_Version5, 200, _ReasonPhrase5}, _Headers5, _Body5}} = httpc:request(delete, {"http://localhost:8000/resources/" ++ lib_json:to_string(ResourceId), []}, [], []),
+	ObjectList = lib_json:get_field(Body4,"data"),
+    ?assertEqual(lib_json:get_field(Body3,"last_update"), lib_json:get_field(lists:nth(1,ObjectList),"timestamp")),
+	?assertEqual(lib_json:get_field(Body3,"history_size"),1).
+	
 %% @doc
 %% Function: get_index_id/0
 %% Purpose: Searches the ES and returns the _id of a datapoint

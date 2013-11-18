@@ -96,20 +96,25 @@ process_post(ReqData, State) ->
 										{error, {Code, Body}} -> 
             								ErrorString = api_help:generate_error(Body, Code),
             								{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-								{ok,List} -> 
-									Msg = list_to_binary(FinalJson),
-									StreamExchange = list_to_binary("streams."++Id),
-                                    %% Connect
-                                    {ok, Connection} =
-                                        amqp_connection:start(#amqp_params_network{host = "localhost"}),
-                                    %% Open channel
-                                    {ok, Channel} = amqp_connection:open_channel(Connection),
-                                    %% Declare exchange
-                                    amqp_channel:call(Channel, #'exchange.declare'{exchange = StreamExchange, type = <<"fanout">>}),        
-                                    %% Send
-                                    amqp_channel:cast(Channel, #'basic.publish'{exchange = StreamExchange}, #amqp_msg{payload = Msg}),
-
-								{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
+										{ok,List} -> 
+											FinalTimeStamp = lib_json:get_field(FinalJson, "timestamp"),
+											case update_fields_in_stream(Id,FinalTimeStamp,ReqData,State) of
+												{{halt, Code}, ReqData, State} ->
+													{{halt, Code}, ReqData, State};
+												ok ->
+													Msg = list_to_binary(FinalJson),
+													StreamExchange = list_to_binary("streams."++Id),
+                                   					%% Connect
+                                   					{ok, Connection} =
+                                       					 amqp_connection:start(#amqp_params_network{host = "localhost"}),
+                                    				%% Open channel
+                                    				{ok, Channel} = amqp_connection:open_channel(Connection),
+                                    				%% Declare exchange
+                                    				amqp_channel:call(Channel, #'exchange.declare'{exchange = StreamExchange, type = <<"fanout">>}),        
+                                    				%% Send
+                                   					amqp_channel:cast(Channel, #'basic.publish'{exchange = StreamExchange}, #amqp_msg{payload = Msg}),
+													{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
+											end
 							 		end
 							end
 					end
@@ -251,6 +256,37 @@ id_from_path(RD) ->
 			end;
 		Id -> Id
 	end.
+
+
+%% @doc
+%% Function: id_from_path/4
+%% Purpose: Update the history_size field and last_update
+%%          fields in the stream that is given
+%% Returns: ok or {{halt,ErrorCode},ReqData,State}
+%%
+%% Side effects: Updates the document with the given id in ES
+%% @end
+-spec update_fields_in_stream(StreamId::string()|binary(),TimeStamp::string()|binary(),ReqData::term(),State::term()) -> ok | {{halt,integer()},term(),term()}.
+
+update_fields_in_stream(StreamId,TimeStamp,ReqData,State) ->
+	case erlastic_search:get_doc(?INDEX, "stream", StreamId) of
+		{error, {Code, Body}} -> 
+			ErrorString = api_help:generate_error(Body, Code),
+            {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+		{ok,StreamJson} ->
+			OldHistorySize = lib_json:get_field(StreamJson, "_source.history_size"),
+			Json = lib_json:set_attrs([{"last_update", TimeStamp} , {"history_size", OldHistorySize+1}]),
+			Update = api_help:create_update(Json),
+			case api_help:update_doc(?INDEX, "stream", StreamId, Update) of
+				{error, {Code, Body}} -> 
+					ErrorString = api_help:generate_error(Body, Code),
+					{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+				{ok,_} ->
+					ok
+			end
+	end.
+  
+
 
 %% @doc
 %% Function: generate_timpestamp/2
