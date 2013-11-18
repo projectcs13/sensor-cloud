@@ -11,7 +11,6 @@
 
 -include("webmachine.hrl").
 -include("field_restrictions.hrl").
--include("json.hrl").
 -include_lib("erlastic_search.hrl").
 -include_lib("amqp_client.hrl").
 -include_lib("pubsub.hrl").
