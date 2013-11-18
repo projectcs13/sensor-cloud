@@ -43,8 +43,6 @@
 init_test() ->
 	inets:start(),
 	
-	%% make the fake resource running
-	
 	%%insert a new resource
 	clear_resource_type(),
 	timer:sleep(500),
