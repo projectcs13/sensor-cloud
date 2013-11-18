@@ -13,6 +13,8 @@ before_script:
 - "python -m CGIHTTPServer 8001 &"
 - "python -m CGIHTTPServer 8002 &"
 - "cd ../../"
+- "make run_es &"
+- "make run_rabbit &"
 otp_release:
 #  - R16B02
 #  - R16B01
