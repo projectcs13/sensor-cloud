@@ -21,9 +21,9 @@
 %% before running this testing code, please change the following address to your address
 %% the python server code locates in scripts/python/cgi-bin folder
 %% under the python folder, run the following command:
-%% python -m CGIHTTPServer 8000
+%% python -m CGIHTTPServer 8001
 -ifndef(POLL_ADD).
--define(POLL_ADD, "http://localhost:8000/cgi-bin/resource.py").
+-define(POLL_ADD, "http://localhost:8001/cgi-bin/resource.py").
 -endif.
 
 -export([]).

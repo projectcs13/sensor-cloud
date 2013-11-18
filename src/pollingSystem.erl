@@ -100,7 +100,7 @@ handle_cast({rebuild, ResourceId}, PollersInfo)->
 	Poller = find_poller_by_id(ResourceId, PollersInfo),
 	case Poller of
 		{error, ErrMessage} -> 
-			erlang:display(ErrMessage),
+			erlang:display("the error in finding poller: " ++ ErrMessage),
 			NewPollersInfo = PollersInfo;
 		_ ->
 			{update, ResourceId, NewUrl} = gen_server:call(Poller#pollerInfo.pid, {rebuild}),
