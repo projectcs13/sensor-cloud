@@ -415,49 +415,7 @@ filter_json(Json, ResourceQuery, From, Size) ->
         "{\"from\" : "++From++", \"size\" : "++Size++", \"query\":{\"filtered\":"++NewJson++",\"filter\":{\"bool\":{\"must_not\":[{\"term\":{\"private\":\"true\"}},{\"term\":{"++ResourceQuery++"}}]}}}}}".
 
 
-%% @doc
-%% Function: generate_date/2
-%% Purpose: Used to create a date valid in ES
-%%          from the input which should be the list
-%%          [Year,Mounth,Day]
-%% Returns: The generated timestamp
-%%
-%% @end
--spec generate_date(DateList::list()) -> string().
 
-generate_date([First]) ->
-	case First < 10 of
-		true -> "0" ++ integer_to_list(First);
-		false -> "" ++ integer_to_list(First)
-	end;
-generate_date([First|Rest]) ->
-	case First < 10 of
-		true -> "0" ++ integer_to_list(First) ++ "-" ++ generate_date(Rest);
-		false -> "" ++ integer_to_list(First) ++ "-" ++ generate_date(Rest)
-	end.
-
-%% @doc
-%% Function: generate_timpestamp/2
-%% Purpose: Used to create a timestamp valid in ES
-%% from the input which should be the list
-%% [Year,Mounth,Day,Hour,Minute,Day]
-%% Returns: The generated timestamp
-%%
-%% @end
--spec generate_timestamp(DateList::list(),Count::integer()) -> string().
-
-generate_timestamp([],_) ->
-        [];
-generate_timestamp([First|Rest],3) ->
-        case First < 10 of
-                true -> "T0" ++ integer_to_list(First) ++ generate_timestamp(Rest,4);
-                false -> "T" ++ integer_to_list(First) ++ generate_timestamp(Rest,4)
-        end;
-generate_timestamp([First|Rest],Count) ->
-        case First < 10 of
-                true -> "0" ++ integer_to_list(First) ++ generate_timestamp(Rest,Count+1);
-                false -> "" ++ integer_to_list(First) ++ generate_timestamp(Rest,Count+1)
-        end.
 		
 		
 %% @doc
@@ -469,9 +427,9 @@ generate_timestamp([First|Rest],Count) ->
 
 add_server_side_fields(Json) ->
 	{{Year,Month,Day},{Hour,Min,Sec}} = calendar:local_time(),
-	Date = generate_date([Year,Month,Day]),
+	Date = api_help:generate_date([Year,Month,Day]),
 	DateAdded = api_help:add_field(Json,"creation_date",Date),
-	Time = generate_timestamp([Year,Month,Day,Hour,Min,Sec],0) ++ ".000",
+	Time = api_help:generate_timestamp([Year,Month,Day,Hour,Min,Sec],0),
 	UpdateAdded = api_help:add_field(DateAdded,"last_update",Time),
 	QualityAdded = api_help:add_field(UpdateAdded,"quality",1.0),
 	UserRankingAdded = api_help:add_field(QualityAdded,"user_ranking",1.0),
