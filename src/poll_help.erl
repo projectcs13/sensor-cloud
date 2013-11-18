@@ -36,6 +36,7 @@
 %% Purpose: get a datapoint from elasticsearch 
 %% Returns: [string() ...] | {error, ErrMsg}
 %% @end
+-spec get_datapoint(integer() | string()) -> tuple() | list().
 get_datapoint(StreamId)->
 	case is_integer(StreamId) of
 		true->
@@ -58,6 +59,7 @@ get_datapoint(StreamId)->
 %% Purpose: post a new datapoint into the elasticsearch 
 %% Returns: ok | {error, ErrMsg}
 %% @end
+-spec post_datapoint(integer()|string(), any()) -> atom() | tuple().
 post_datapoint(StreamId, Value)->
 	case is_integer(StreamId) of
 		true->
@@ -101,6 +103,7 @@ post_datapoint(StreamId, Value)->
 %% Purpose: get parsers list according to specific resource id 
 %% Returns: {error, ErrMsg} | [#parser .....]
 %% @end
+-spec get_parsers_by_id(string()) -> tuple() | list().
 get_parsers_by_id(ResourceId)->
 	case erlastic_search:search_limit(?ES_INDEX, "parser", "resource_id:" ++ ResourceId, 100) of
 		{ok, Result} ->
@@ -184,6 +187,7 @@ json_to_record_resource(Resource) ->
 %% Purpose: transform the json list to parser record list 
 %% Returns: list()
 %% @end
+-spec jsonToRecord(list(), list()) -> list().
 jsonToRecord([], Res)->
 	Res;
 jsonToRecord([Item|Tail], Res)->

@@ -60,6 +60,7 @@ init_test() ->
 %% Purpose: Test if the testing data has been inserted into elasticsearch
 %% Returns: ok | {error, term()}.
 %% @end
+-spec initialization_test() -> atom() | tuple().
 initialization_test()->
 	PollerInforList = poll_help:json_to_record_resources(poll_help:get_resources_using_polling()),
 	Resource  = lists:nth(1, PollerInforList),
@@ -77,6 +78,7 @@ initialization_test()->
 %% Purpose: Test if the polling system could be started and generate necessary pollers
 %% Returns: ok | {error, term()}.
 %% @end
+-spec polling_system_test() -> atom() | tuple().
 polling_system_test()->
 	pollingSystem:start_link(),
 	timer:sleep(1000),
@@ -121,6 +123,7 @@ polling_system_test()->
 %% Purpose: Test if the polling sytem could rebuild the poller
 %% Returns: ok | {error, term()}.
 %% @end
+-spec rebuild_system_test() -> atom() | tuple().
 rebuild_system_test()->
 
 	%% testing rebuild
@@ -170,6 +173,7 @@ rebuild_system_test()->
 %% Purpose: Test if polling system could terminate the poller
 %% Returns: ok | {error, term()}.
 %% @end
+-spec terminate_system_test() -> atom() | tuple().
 terminate_system_test()->
 	ChildrenList = supervisor:which_children(polling_monitor),
 	?assertEqual(1, length(ChildrenList)),
@@ -183,6 +187,7 @@ terminate_system_test()->
 %% Purpose: clear all the data what have been inserted into elasticsearch
 %% Returns: ok | {error, term()}.
 %% @end
+-spec clear_system_test() -> atom() | tuple().
 clear_system_test()->
 
 	%% clear all already stored resource in elasticsearch
@@ -199,6 +204,10 @@ clear_system_test()->
 %% Purpose: Post a resource using the values provided.
 %% Returns: {ok, Result} | {error, Reason}.
 %% @end
+-spec post_resource_with_id(Id :: integer(), Name :: string(), Url :: string(), Freq :: integer()|string(), Type :: string()) ->
+		  {ok, term()}
+		| {ok, saved_to_file}
+		| {error, term()}.
 post_resource_with_id(Id, Name, Url, Freq, Type)->
 	N = case Name of
 			"" -> "";
