@@ -26,6 +26,10 @@
 -define(POLL_ADD, "http://localhost:8001/cgi-bin/resource.py").
 -endif.
 
+-ifndef(POLL_ADD2).
+-define(POLL_ADD2 ,"http://localhost:8002/cgi-bin/resource.py").
+-endif.
+
 -export([]).
 
 %% ====================================================================
@@ -131,7 +135,7 @@ rebuild_system_test()->
 	timer:sleep(500),
 	
 	%% this new url is fake, only for testing
-    post_resource_with_id(1, "test", "http://130.238.15.222:8080/", 1000, "application/json"),
+    post_resource_with_id(1, "test", ?POLL_ADD2, 1000, "application/json"),
 	timer:sleep(500),
 	gen_server:cast(polling_supervisor, {rebuild, "1"}),
 	timer:sleep(1000),
@@ -141,7 +145,7 @@ rebuild_system_test()->
 	{info, State} = gen_server:call(Pid, {check_info}),
 	?assertEqual(true, is_record(State, state)),
 	?assertEqual("1", State#state.resourceid),
-	?assertEqual("http://130.238.15.222:8080/", State#state.url),
+	?assertEqual(?POLL_ADD2, State#state.url),
 	ParsersList = State#state.parserslist,
 	?assertEqual(2, length(ParsersList)),
 
