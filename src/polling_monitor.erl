@@ -27,6 +27,7 @@
 %% Purpose: start function used to generate the polling_monitor process.
 %% Returns: {already_started, pid()} | {shutdown, term()} | ok
 %% @end
+-spec start_link() -> tuple() | atom().
 start_link()->
 	supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
@@ -35,6 +36,7 @@ start_link()->
 %% Purpose: init function used to initialize the polling_monitor, will called by supervisor:start_link()
 %% Returns: {ok, specification of the children}
 %% @end
+-spec init(any()) -> tuple().
 init(_)->
 	{ok, {{simple_one_for_one, 5, 60},
 		  [{poller, {poller, start_link, []}, transient, 1000, worker, [poller]}]

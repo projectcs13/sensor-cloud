@@ -216,7 +216,7 @@ post_resource_with_id(Id, Name, Url, Freq, Type)->
 		end,
 	T = ", \"type\":\"" ++ Type ++"\"",
 	Data = "{"++N++U++F++T++"}",
-	erlastic_search:index_doc_with_id(?ES_INDEX, "resource", 1, Data).
+	erlastic_search:index_doc_with_id(?ES_INDEX, "resource", Id, Data).
 
 %% @doc
 %% Function: post_parser/4

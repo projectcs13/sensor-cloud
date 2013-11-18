@@ -24,6 +24,7 @@
 %% Returns: ok | {error, ErrMsg}
 %% Side effects: spawn supervisor process and register it by name supervisor. spawn pollingBoss supervisor and register it by its name.
 %% @end
+-spec start_link() -> atom() | tuple().
 start_link()->
 	
 	case whereis(polling_supervisor) of
@@ -46,6 +47,7 @@ start_link()->
 %% Purpose: init function called by gen_server:start_link() method, used to initialize the state of gen_server
 %% Returns: {ok, State}
 %% @end
+-spec init(any()) -> tuple().
 init(_)->
 	{ok, []}.
 
@@ -56,6 +58,7 @@ init(_)->
 %% Returns: {noreply, NewState}
 %% Side effects: send message to specific poller and update the state of gen_server.
 %% @end
+-spec handle_info(any(), any()) -> tuple().
 handle_info({print, Message}, State)->
 	erlang:display(Message),
 	{noreply, State}.
@@ -67,8 +70,9 @@ handle_info({print, Message}, State)->
 %% Returns: {noreply, NewState}
 %% Side effects: create new poller and send message to specific poller.
 %% @end
+-spec handle_cast(any(), any()) -> tuple().
 handle_cast({create_poller, #pollerInfo{resourceid = ResourceId, name = ResourceName, url = Url, frequency = Frequency}}, PollersInfo)->
-	erlang:display("receive cast: {create_poller, pollerInfo}"),
+	%% erlang:display("receive cast: {create_poller, pollerInfo}"),
 	
 	Parsers = poll_help:get_parsers_by_id(ResourceId),
 	
@@ -79,7 +83,7 @@ handle_cast({create_poller, #pollerInfo{resourceid = ResourceId, name = Resource
 	timer:send_interval(Frequency, Pid, {probe}),
 	{noreply, [Record|PollersInfo]};
 handle_cast({terminate, ResourceId}, PollersInfo)->
-	erlang:display("receive cast: {terminate, ResourceId}"),
+	%% erlang:display("receive cast: {terminate, ResourceId}"),
 	Poller = find_poller_by_id(ResourceId, PollersInfo),
 	case Poller of
 		{error, ErrMsg}->
@@ -91,9 +95,8 @@ handle_cast({terminate, ResourceId}, PollersInfo)->
 			{noreply, delete_info(PollersInfo, ResourceId)}
 	end;
 handle_cast({rebuild, ResourceId}, PollersInfo)->
-	erlang:display("receive cast: {rebuild, ResourceId}"),
+	%% erlang:display("receive cast: {rebuild, ResourceId}"),
 	
-	%%find pid from the records list according to resource id
 	Poller = find_poller_by_id(ResourceId, PollersInfo),
 	case Poller of
 		{error, ErrMessage} -> 
@@ -106,10 +109,10 @@ handle_cast({rebuild, ResourceId}, PollersInfo)->
 	end,
 	{noreply, NewPollersInfo};
 handle_cast({add_new_poller, Poller}, PollersInfo)->
-	erlang:display("receive cast: {add_new_poller, Poller}"),
+	%% erlang:display("receive cast: {add_new_poller, Poller}"),
 	{noreply, [Poller|PollersInfo]};
 handle_cast({update, ResourceId, NewUrl}, PollersInfo)->
-	erlang:display("receive cast: {update, ResourceId, NewUrl}"),
+	%% erlang:display("receive cast: {update, ResourceId, NewUrl}"),
 	{noreply, update_info(PollersInfo, ResourceId, NewUrl)}.
 	
 %% @doc
@@ -118,8 +121,9 @@ handle_cast({update, ResourceId, NewUrl}, PollersInfo)->
 %% Returns: {reply, (reply_message), (new_state_of_gen_server)}
 %% Side effects: creates pollers for specific resource
 %% @end
+-spec handle_call(atom(), tuple(), any()) -> tuple().
 handle_call(create_pollers, _Form, State)->
-	erlang:display("receive request: create_pollers"),
+	%% erlang:display("receive request: create_pollers"),
 	%%extract all the resources data from the database
 	%%and store the information into specific data structure
 	
@@ -133,6 +137,7 @@ handle_call(create_pollers, _Form, State)->
 %% Purpose: controls what happen when this pulling supervisor stops working!.
 %% Returns: ok
 %% @end
+-spec terminate(tuple(), any()) -> atom().
 terminate(_T, _State)->
 	erlang:display("polling supervisor stops working!").
 
@@ -146,6 +151,7 @@ terminate(_T, _State)->
 %% Purpose: make asynchronous call to polling_supervisor to create poller for each item in polling information list.
 %% Returns: ok
 %% @end
+-spec create_poller_for_each(list(tuple())) -> atom().
 create_poller_for_each([])->ok;
 create_poller_for_each([PollerInfo|PollerInfoList])->
 	gen_server:cast(polling_supervisor, {create_poller, PollerInfo}),
@@ -156,7 +162,7 @@ create_poller_for_each([PollerInfo|PollerInfoList])->
 %% Purpose: find one specific poller record in the pollers` information list.
 %% Returns: #pollerInfo | {error, ErrMsg}
 %% @end
--spec find_poller_by_id(integer(), list()) -> term() | {error, string()}.
+-spec find_poller_by_id(integer(), list(tuple())) -> term() | {error, string()}.
 find_poller_by_id(_ResourceId, []) -> {error, "id doesn`t exist"};
 find_poller_by_id(ResourceId, [Poller|Tail]) ->
 	case Poller#pollerInfo.resourceid == ResourceId of
@@ -169,7 +175,7 @@ find_poller_by_id(ResourceId, [Poller|Tail]) ->
 %% Purpose: delete a resource record with the resource`s id
 %% Returns: NewPollersRecordList | []
 %% @end
--spec delete_info(list(), integer()) -> list().
+-spec delete_info(list(tuple()), integer()) -> list().
 delete_info([], _)->[];
 delete_info([Poller|Tail], ResourceId)->
 	case Poller#pollerInfo.resourceid == ResourceId of
@@ -184,7 +190,7 @@ delete_info([Poller|Tail], ResourceId)->
 %% Purpose: after poller done its rebuild, supervisor uses this function to update its pollers` info store.
 %% Returns: NewPollersRecordList | []
 %% @end
--spec update_info(list(), integer(), string()) -> list().
+-spec update_info(list(tuple()), integer(), string()) -> list().
 update_info([], _, _) -> [];
 update_info([Poller|Tail], ResourceId, NewUrl) ->
 	case Poller#pollerInfo.resourceid == ResourceId of

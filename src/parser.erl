@@ -31,7 +31,7 @@ applyParser(ParsersList, Data, ContentType) ->
 	Parsers = get_parsers_with_content_type(ContentType, ParsersList, []),
 	
 	%% only for testing
-	erlang:display("the length of appropriate parsers: "++integer_to_list(length(Parsers))),
+	%% erlang:display("the length of appropriate parsers: "++integer_to_list(length(Parsers))),
 	
 	case Parsers == [] of
 		false -> 
@@ -52,6 +52,7 @@ applyParser(ParsersList, Data, ContentType) ->
 %% Example: ["streams","temperature","value"] => "streams.temperature.value" 
 %% Returns: string()
 %% @end
+-spec processParser(list(string()), list(string())) -> list(string()).
 processParser([Item|Tail], Res)->
 	case Item=="/" of
 		true->
@@ -71,7 +72,7 @@ processParser([Item|Tail], Res)->
 %% Returns: ok | {error, ErrMsg}
 %% Side effects: Stores the newly parsed data point in the DB
 %% @end
--spec parseJson(record(), any()) -> ok.
+-spec parseJson(tuple(), any()) -> ok.
 parseJson(Parser, Data) ->
 
 	%%extract the data from the coming data
@@ -89,9 +90,9 @@ parseJson(Parser, Data) ->
 	%%so currently we only consider the time when we receive the datapackage
 	case is_integer(StreamId) of
 		true->
-			FieldValue1 = {"streamid",integer_to_binary(StreamId)};
+			FieldValue1 = {"stream_id",integer_to_binary(StreamId)};
 		_ ->
-			FieldValue1 = {"streamid",list_to_binary(StreamId)}
+			FieldValue1 = {"stream_id",list_to_binary(StreamId)}
 	end,
 	case is_integer(Res) of
 		true->
@@ -133,7 +134,7 @@ parseJson(Parser, Data) ->
 %% Returns: ok
 %% Side effects: Stores the newly parsed data point in the DB
 %% @end
--spec parseText(record(), any()) -> ok.
+-spec parseText(tuple(), any()) -> ok.
 parseText(Parser, Data) ->
 	%% extract the wanted value from the text-data and store it in the DB
 	%% return the status of the transaction, ok or {error, ErrMsg}

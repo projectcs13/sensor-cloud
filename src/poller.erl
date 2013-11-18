@@ -24,6 +24,7 @@
 %% Purpose: start function used to start the poller, will call init/1 function later
 %% Returns: {ok, Pid} | {error, ErrMsg}
 %% @end
+-spec start_link(tuple()) -> tuple() | atom().
 start_link(State)->
 	gen_server:start_link(?MODULE, State, []).
 
@@ -33,6 +34,7 @@ start_link(State)->
 %% Returns: {ok, State}
 %% Side Effects: start inets and start the ssl
 %% @end
+-spec init(tuple()) -> tuple().
 init(State)->
 	application:start(inets),
 	ssl:start(),
@@ -43,6 +45,7 @@ init(State)->
 %% Purpose: handle synchronous call of gen_server, could be called via: gen_server:call(pid(), {rebuild})
 %% Returns: {reply, (returned message), (new state of gen_server)}
 %% @end
+-spec handle_call(any(), tuple(), tuple()) -> {reply, any(), tuple()}.
 handle_call({rebuild}, _Form, State)->
 	ResourceId = State#state.resourceid,
 	Url = State#state.url,
@@ -88,6 +91,7 @@ handle_call({check_info}, _Form, State)->
 %% Purpose: handle messages processing of the gen_server, could be called via: pid()!{probe}
 %% Returns: {noreply, NewState}
 %% @end
+-spec handle_info(any(), tuple()) -> {noreply, tuple()}.
 handle_info({probe}, State)->
 	ResourceId = State#state.resourceid,
 	ParsersList = State#state.parserslist,
@@ -123,6 +127,12 @@ handle_info({probe}, State)->
 			{noreply, State}
 	end.
 
+%% @doc
+%% Function: terminate/2
+%% Purpose: handles what is going to do when the poller is terminated
+%% Returns: ok | {error, Reason}
+%% @end
+-spec terminate(tuple(), tuple()) -> atom | tuple().
 terminate(_T, State)->
 	Url = State#state.url,
 	erlang:display("the poller for "++Url++" stops working!"),
@@ -137,7 +147,7 @@ terminate(_T, State)->
 %% Purpose: used to return the content-type of the response from the response`s header.
 %% Returns: "no content type" | content-type
 %% @end
--spec check_header(list()) -> string().
+-spec check_header(list(string())) -> string().
 check_header([]) -> "no content type";
 check_header([Tuple|Tail]) ->
 	case Tuple of
