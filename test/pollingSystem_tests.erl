@@ -23,7 +23,7 @@
 %% under the python folder, run the following command:
 %% python -m CGIHTTPServer 8000
 -ifndef(POLL_ADD).
--define(POLL_ADD, "http://130.238.15.222:8000/cgi-bin/resource.py").
+-define(POLL_ADD, "http://localhost:8000/cgi-bin/resource.py").
 -endif.
 
 -export([]).
@@ -42,6 +42,8 @@
 -spec init_test() -> ok | {error, term()}.
 init_test() ->
 	inets:start(),
+	
+	%% make the fake resource running
 	
 	%%insert a new resource
 	clear_resource_type(),
