@@ -82,6 +82,20 @@ is_search(ReqData) ->
 	URIList = string:tokens(wrq:path(ReqData), "/"),
 	(string:sub_string(lists:nth(length(URIList),URIList),1,7) == "_search").
 
+	%% @doc
+%% Function: is_rank/1
+%% Purpose: Used to decide if the URI specifie a rank request
+%% Returns: True if URI specifies a rank request, false otherwise
+%% @end
+-spec is_rank(ReqData::term()) -> boolean().
+is_rank(ReqData) ->
+	case string:str(wrq:disp_path(ReqData),"_rank") of
+		0 ->
+			false;
+		_ ->
+			true
+	end.
+
 %% @doc
 %% Function: json_handler/2
 %% Purpose: Used to get the json object from the request

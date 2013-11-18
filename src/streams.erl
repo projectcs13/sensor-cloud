@@ -250,22 +250,40 @@ process_search_get(ReqData, State) ->
 -spec put_stream(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 
 put_stream(ReqData, State) ->
-	StreamId = proplists:get_value('stream', wrq:path_info(ReqData)),
-	{Stream,_,_} = api_help:json_handler(ReqData,State),
-	case do_any_field_exist(Stream,?RESTRCITEDUPDATE) of
-			true -> 
-				ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDUPDATE),
-				ResFields2 = string:sub_string(ResFields1, 1, length(ResFields1)-2),
-				{{halt,409}, wrq:set_resp_body("{\"error\":\"Error caused by restricted field in document, these fields are restricted : " ++ ResFields2 ++"\"}", ReqData), State};
-			false ->
-				Update = api_help:create_update(Stream),
-				suggest:update_stream(Stream, StreamId),
-				case api_help:update_doc(?INDEX, "stream", StreamId, Update) of 
-		{error, {Code, Body}} -> 
-            				ErrorString = api_help:generate_error(Body, Code),
-            				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-					{ok,List} -> {true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
-				end
+	case api_help:is_rank(ReqData) of
+		false ->
+			StreamId = proplists:get_value('stream', wrq:path_info(ReqData)),
+			{Stream,_,_} = api_help:json_handler(ReqData,State),
+			case do_any_field_exist(Stream,?RESTRCITEDUPDATE) of
+					true -> 
+						ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDUPDATE),
+						ResFields2 = string:sub_string(ResFields1, 1, length(ResFields1)-2),
+						{{halt,409}, wrq:set_resp_body("{\"error\":\"Error caused by restricted field in document, these fields are restricted : " ++ ResFields2 ++"\"}", ReqData), State};
+					false ->
+						Update = api_help:create_update(Stream),
+						suggest:update_stream(Stream, StreamId),
+						case api_help:update_doc(?INDEX, "stream", StreamId, Update) of 
+				{error, {Code, Body}} -> 
+		            				ErrorString = api_help:generate_error(Body, Code),
+		            				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+							{ok,List} -> {true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
+						end
+			end;
+		true ->
+			case wrq:get_qs_value("ranking",ReqData) of 
+			Ranking when (Ranking >= 0.0) and (Ranking =< 5.0) ->
+                Do ranking stuff;
+            _ ->
+                {{halt,409}, wrq:set_resp_body("{\"error\":\"Error, no ranking specified."\"}", ReqData), State}
+        	end,
+        	case wrq:get_qs_value("user_id",ReqData) of 
+            undefined ->
+                {{halt,409}, wrq:set_resp_body("{\"error\":\"Error, no user_id specified."\"}", ReqData), State}
+            UserId ->
+                Size = SizeParam
+        	end,
+
+		%%RANKING
 	end.
 
 
