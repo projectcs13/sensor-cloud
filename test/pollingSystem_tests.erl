@@ -49,15 +49,15 @@ init_test() ->
 	
 	%%insert a new resource
 	clear_resource_type(),
-	timer:sleep(500),
+	api_help:refresh(),
     post_resource_with_id(1, "test", ?POLL_ADD, 1000, "application/json"),
 	
     %%insert two new parsers
 	clear_parser_type(),
-	timer:sleep(500),
+	api_help:refresh(),
     post_parser(1,17,"application/json","streams/temperature/value"),
 	post_parser(1,15,"application/json","streams/humidity/value"),
-	timer:sleep(1000).
+	api_help:refresh().
 
 %% @doc
 %% Function: initialization_test/0
@@ -132,11 +132,11 @@ rebuild_system_test()->
 
 	%% testing rebuild
 	clear_resource_type(),
-	timer:sleep(500),
+	api_help:refresh(),
 	
 	%% this new url is fake, only for testing
     post_resource_with_id(1, "test2", ?POLL_ADD2, 1000, "application/json"),
-	timer:sleep(500),
+	api_help:refresh(),
 	gen_server:cast(polling_supervisor, {rebuild, "1"}),
 	timer:sleep(1000),
 	ChildrenList = supervisor:which_children(polling_monitor),
@@ -157,9 +157,9 @@ rebuild_system_test()->
 	erlang:display("!!!!!!!!!!!!!!!!!"),
 
 	clear_resource_type(),
-	timer:sleep(500),
+	api_help:refresh(),
 	post_resource_with_id(1, "test", ?POLL_ADD, 1000, "application/json"),
-	timer:sleep(500),
+	api_help:refresh(),
 	gen_server:cast(polling_supervisor, {rebuild, "1"}),
 	
 	ChildrenList2 = supervisor:which_children(polling_monitor),

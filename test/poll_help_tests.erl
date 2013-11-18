@@ -25,7 +25,7 @@
 %% ====================================================================
 
 %% @doc
-%% Function: inti_test/0
+%% Function: init_test/0
 %% Purpose: Used to start the inets to be able to do HTTP requests
 %% Returns: ok | {error, term()}
 %%
@@ -188,14 +188,15 @@ json_to_record_resources_test() ->
 %% Purpose: test poll_help:get_parsers_by_id_test/1 function
 %% Returns: ok | {error, term()}.
 %% @end
+-spec get_parsers_by_id_test() -> atom() | {error, term()}.
 get_parsers_by_id_test() ->
 	
 	%% Clear all parsers stored in elasticsearch
 	clear_parser_type(),
-	timer:sleep(1000),
+	api_help:refresh(),
 	
 	post_parser(1, 13, "application/json","streams/temperature/value"),
-	timer:sleep(1000),
+	api_help:refresh(),
 	ParserList = poll_help:get_parsers_by_id("1"),
 	Parser = lists:nth(1, ParserList),
 	?assertEqual(1, length(ParserList)),
@@ -207,15 +208,21 @@ get_parsers_by_id_test() ->
 	%% Clear all entered parsers.
 	clear_parser_type().
 
+%% @doc
+%% Function: get_datapoint_test/0
+%% Purpose: test poll_help:get_datapoint_test/1 function
+%% Returns: ok | {error, term()}.
+%% @end
+-spec get_datapoint_test() -> atom() | tuple().
 get_datapoint_test()->
 	
 	%% clear all datapoints stored in elasticsearch
 	clear_datapoint_type(),
-	timer:sleep(1000),
+	api_help:refresh(),
 	
 	Res0 = poll_help:get_datapoint(12),
 	post_datapoint(12, 13),
-	timer:sleep(1000),
+	api_help:refresh(),
 	Res1 = poll_help:get_datapoint(12),
 	?assertEqual(0, length(Res0)),
 	?assertEqual(1, length(Res1)),
@@ -225,15 +232,21 @@ get_datapoint_test()->
 	%% clear all datapoints stored in elasticsearch
 	clear_datapoint_type().
 
+%% @doc
+%% Function: post_datapoint_test/0
+%% Purpose: test poll_help:post_datapoint_test/2 function
+%% Returns: ok | {error, term()}.
+%% @end
+-spec post_datapoint_test() -> atom() | tuple().
 post_datapoint_test()->
 	
 	%% clear all datapoints stored in elasticsearch
 	clear_datapoint_type(),
-	timer:sleep(500),
+	api_help:refresh(),
 	
 	Res0 = poll_help:get_datapoint(11),
 	poll_help:post_datapoint(11,101),
-	timer:sleep(1000),
+	api_help:refresh(),
 	Res1 = poll_help:get_datapoint("11"),
 	?assertEqual(0, length(Res0)),
 	?assertEqual(1, length(Res1)),
