@@ -40,19 +40,13 @@ allowed_methods(ReqData, State) ->
 			{['POST', 'GET'], ReqData, State};
 		[{"users", _UserID}, {"streams","_search"}] ->
 			{['POST', 'GET'], ReqData, State};
-		[{"users", _UserID}, {"resources", _ResourceID}, {"streams", "_search"}] ->
-		  	{['POST', 'GET'], ReqData, State};
 		[{"streams"}] ->
 			{['POST', 'GET'], ReqData, State}; 
 		[{"users", _UserID}, {"streams"}] ->
 			{['POST', 'GET'], ReqData, State};
-		[{"users", _UserID}, {"resources", _ResourceID}, {"streams"}] ->
-			{['POST', 'GET'], ReqData, State};
 		[{"streams", _StreamID}] ->
 			{['GET', 'PUT', 'DELETE'], ReqData, State};
 		[{"users", _UserID}, {"streams", _StreamID}] ->
-			{['GET', 'PUT', 'DELETE'], ReqData, State};
-		[{"users", _UserID}, {"resources", _ResourceID}, {"streams", _StreamID}] ->
 			{['GET', 'PUT', 'DELETE'], ReqData, State};
 		[error] ->
 		    {[], ReqData, State} 
@@ -104,7 +98,7 @@ delete_resource(ReqData, State) ->
 			case erlastic_search:delete_doc(?INDEX,"stream", Id) of
 				{error, {Code, Body}} -> 
 					ErrorString = api_help:generate_error(Body, Code),
-				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+					{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 				{ok,List} -> 
 			 		{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
 			end
@@ -147,16 +141,16 @@ process_post(ReqData, State) ->
 	case api_help:is_search(ReqData) of 
 		false ->
 			{Stream,_,_} = api_help:json_handler(ReqData, State),
-			case proplists:get_value('res', wrq:path_info(ReqData)) of
+			case proplists:get_value('user', wrq:path_info(ReqData)) of
 				undefined ->
-					ResAdded = Stream;
-				ResId ->
-					ResAdded = api_help:add_field(Stream,"resource_id",ResId)
+					UserAdded = Stream;
+				UId ->
+					UserAdded = api_help:add_field(Stream,"resource_id",ResId)
 			end,
-			case lib_json:get_field(ResAdded,"resource_id") of
-				undefined -> {false, wrq:set_resp_body("\"resource_id_missing\"",ReqData), State};
-				ResourceId ->
-					case {api_help:do_any_field_exist(ResAdded,?RESTRCITEDCREATESTREAMS),api_help:do_only_fields_exist(ResAdded,?ACCEPTEDFIELDSSTREAMS)} of
+			case lib_json:get_field(UserAdded,"user_id") of
+				undefined -> {false, wrq:set_resp_body("\"user_id missing\"",ReqData), State};
+				UserId ->
+					case {api_help:do_any_field_exist(UserAdded,?RESTRCITEDCREATESTREAMS),api_help:do_only_fields_exist(UserAdded,?ACCEPTEDFIELDSSTREAMS)} of
 						{true,_} ->
 							ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDCREATESTREAMS),
 							ResFields2 = string:sub_string(ResFields1, 1, length(ResFields1)-2),
@@ -164,21 +158,21 @@ process_post(ReqData, State) ->
 						{false,false} ->
 							{{halt,403}, wrq:set_resp_body("Unsupported field(s)", ReqData), State};
 						{false,true} ->
-							case erlastic_search:get_doc(?INDEX, "resource", ResourceId) of
+							case erlastic_search:get_doc(?INDEX, "user", UserId) of
 								{error,{404,_}} ->
 									{{halt,403}, wrq:set_resp_body("{\"error\":\"no document with resource_id given is present in the system\"}", ReqData), State};
 								{error,{Code,Body}} ->
 									ErrorString = api_help:generate_error(Body, Code),
             						{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 								{ok,_} ->
-									FieldsAdded = add_server_side_fields(ResAdded),
+									FieldsAdded = add_server_side_fields(UserAdded),
 									Final = suggest:add_stream_suggestion_fields(FieldsAdded),
 									case erlastic_search:index_doc(?INDEX, "stream", Final) of	
 										{error,{Code,Body}} ->
 											ErrorString = api_help:generate_error(Body, Code),
-            										{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+            								{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 										{ok,List} -> 
-											suggest:update_suggestion(ResAdded),
+											suggest:update_suggestion(UserAdded),
 											{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
 									end
 							end
@@ -211,18 +205,19 @@ process_search_post(ReqData, State) ->
                 From = FromParam
         end,
         {Json,_,_} = api_help:json_handler(ReqData,State),
-        case proplists:get_value('res', wrq:path_info(ReqData)) of
+        case proplists:get_value('user', wrq:path_info(ReqData)) of
                 undefined ->
                         FilteredJson = filter_json(Json, From, Size);
-                ResId ->
-                        ResQuery = "\"resource\":" ++ ResId,
+                UserId ->
+                        ResQuery = "\"user_id\":" ++ UserId,
                         FilteredJson = filter_json(Json, ResQuery, From, Size)
         end,
         case erlastic_search:search_json(#erls_params{},?INDEX, "stream", FilteredJson) of % Maybe wanna take more
                 {error, {Code, Body}} -> 
-            				ErrorString = api_help:generate_error(Body, Code),
-            				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-                {ok,List} -> {true,wrq:set_resp_body(lib_json:encode(List),ReqData),State} % May need to convert
+					ErrorString = api_help:generate_error(Body, Code),
+            		{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+                {ok,List} -> 
+					{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State} % May need to convert
         end.
 
 
@@ -250,27 +245,13 @@ process_search_get(ReqData, State) ->
 			UserQuery = "user_id:" ++ UserId,
 			UserDef = true
 		end,
-	case proplists:get_value('res', wrq:path_info(ReqData)) of
-		undefined ->
-			ResQuery = [],
-			ResDef = false;
-		ResId ->
-			ResQuery = "resource_id:" ++ ResId,
-			ResDef = true
-	end,
-	case ResDef and UserDef of
-		true -> Query = UserQuery ++ "&" ++ ResQuery; 
-		false -> case ResDef or UserDef of
-					 true -> Query = UserQuery ++ ResQuery;
-					 false -> Query = ""
-				 end
-	end,
-	FullQuery = lists:append(api_help:transform(URIQuery,ResDef or UserDef),Query),
+	FullQuery = lists:append(api_help:transform(URIQuery,UserDef),UserQuery),
 	case erlastic_search:search_limit(?INDEX, "stream", FullQuery,Size) of % Maybe wanna take more
 		{error, {Code, Body}} -> 
-            				ErrorString = api_help:generate_error(Body, Code),
-            				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-		{ok,List} -> {lib_json:encode(List),ReqData,State} 
+			ErrorString = api_help:generate_error(Body, Code),
+            {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+		{ok,List} -> 
+			{lib_json:encode(List),ReqData,State} 
 	end.
 
 
@@ -300,7 +281,8 @@ put_stream(ReqData, State) ->
 				{error, {Code, Body}} -> 
 					ErrorString = api_help:generate_error(Body, Code),
             		{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-				{ok,List} -> {true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
+				{ok,List} -> 
+					{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
 			end
 	end.
 
@@ -339,20 +321,9 @@ get_stream(ReqData, State) ->
 							UserQuery = "user_id:" ++ UserId,
 							UserDef = true
 					end,
-					case proplists:get_value('res', wrq:path_info(ReqData)) of
-						undefined ->
-							ResQuery = [],
-							ResDef = false;
-						ResId ->
-							ResQuery = "resource_id:" ++ ResId,
-							ResDef = true
-					end,
-					case ResDef and UserDef of
-						true -> Query = ResQuery;
-						false -> case ResDef or UserDef of
-							 		true -> Query = UserQuery ++ ResQuery;
-							 		false -> Query = "*"
-								 end
+					case UserDef of
+						true -> Query = UserQuery;
+						false -> Query = "*"
 					end,
 					case erlastic_search:search_limit(?INDEX, "stream", Query,Size) of % Maybe wanna take more
 						{error, {Code, Body}} -> 
@@ -369,8 +340,8 @@ get_stream(ReqData, State) ->
             				ErrorString = api_help:generate_error(Body, Code),
             				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 						{ok,JsonStruct} -> 	 
-						        FinalJson = lib_json:get_and_add_id(JsonStruct),
-						        {FinalJson, ReqData, State}
+						    FinalJson = lib_json:get_and_add_id(JsonStruct),
+						    {FinalJson, ReqData, State}
 					end
 				end
 	end.
