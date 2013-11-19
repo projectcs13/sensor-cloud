@@ -78,9 +78,9 @@ get_search(ReqData, State) ->
             Values ->
                 {NrValues, _} = string:to_integer(Values)
     end,
-    case wrq:get_qs_value("streamid",ReqData) of 
+    case wrq:get_qs_value("stream_id",ReqData) of 
             undefined ->
-                ErrorString = api_help:generate_error(<<"Invalid streamid">>, 405),
+                ErrorString = api_help:generate_error(<<"Invalid stream_id">>, 405),
                 {{halt, 405}, wrq:set_resp_body(ErrorString, ReqData), State};
             StreamIds ->
                 IdList = string:tokens(StreamIds, ","),
@@ -182,7 +182,7 @@ get_history([Head|Rest], NrValues, Acc) ->
                 ErrorString = api_help:generate_error(Body, Code),
                 IdAndDataJson = "{\"id\":\""++Head++"\",\"data\":{\"error\": \""++ErrorString++"\"}";
         {ok,JsonStruct} ->
-                IdAndDataJson = parse_datapoints(lib_json:get_field(JsonStruct, "hits.hits"),"{\"id\":\""++Head++"\",\"data\":[]}")  
+                IdAndDataJson = parse_datapoints(lib_json:get_field(JsonStruct, "hits.hits"),"{\"stream_id\":\""++Head++"\",\"data\":[]}")  
     end,
     get_history(Rest, NrValues, lib_json:add_value(Acc,"history",IdAndDataJson)).
 
