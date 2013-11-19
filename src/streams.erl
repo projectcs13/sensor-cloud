@@ -145,7 +145,7 @@ process_post(ReqData, State) ->
 				undefined ->
 					UserAdded = Stream;
 				UId ->
-					UserAdded = api_help:add_field(Stream,"resource_id",ResId)
+					UserAdded = api_help:add_field(Stream,"user_id",UId)
 			end,
 			case lib_json:get_field(UserAdded,"user_id") of
 				undefined -> {false, wrq:set_resp_body("\"user_id missing\"",ReqData), State};

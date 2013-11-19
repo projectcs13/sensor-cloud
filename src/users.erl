@@ -98,12 +98,12 @@ delete_resource(ReqData, State) ->
 
 
 %% @doc
-%% Function: delete_streams_with_resource_id/1
-%% Purpose: Deletes the first 500 streams associated with the given resourceid
+%% Function: delete_streams_with_user_id/1
+%% Purpose: Deletes the streams with the given user id
 %% Returns:  ERROR = {error,Errorcode}
 %%			 OK = {ok}
 %% @end
--spec delete_streams_with_resource_id(Id::string()) -> term().
+-spec delete_streams_with_user_id(Id::string()) -> term().
 
 delete_streams_with_user_id(Id) ->
 	api_help:refresh(),

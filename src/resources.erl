@@ -7,7 +7,7 @@
 %%%-------------------------------------------------------------------
 -module(resources).
 -export([init/1, allowed_methods/2, content_types_provided/2, content_types_accepted/2,
-		 delete_resource/2, process_post/2, put_resource/2, get_resource/2, delete_streams_with_resource_id/1]).
+		 delete_resource/2, process_post/2, put_resource/2, get_resource/2]).
 
 -include_lib("webmachine.hrl").
 -include_lib("erlastic_search.hrl").
