@@ -37,7 +37,7 @@ allowed_methods(ReqData, State) ->
 		[{"streams", _Id}, {"data", "_search"}] ->
 			{['POST','GET'], ReqData, State};
 		[{"streams", _Id}, {"data"}] ->
-			{['GET', 'POST', 'DELETE'], ReqData, State};
+			{['GET', 'POST'], ReqData, State};
 		[error] ->
 				{[], ReqData, State}
 	end.

@@ -32,7 +32,7 @@ init([]) ->
 allowed_methods(ReqData, State) ->
 	case api_help:parse_path(wrq:path(ReqData)) of
 		[{"resources"}] ->
-			{['POST'], ReqData, State};
+			{['POST','GET'], ReqData, State};
 		[{"resources", _ResourceID}] ->
 			{['GET', 'PUT', 'DELETE'], ReqData, State};
 		[{"resources", "_search" ++ _Query}] ->
