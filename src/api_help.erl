@@ -145,7 +145,8 @@ is_search(ReqData) ->
 -spec json_handler(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 
 json_handler(ReqData, State) ->
-	[{Value,_ }] = mochiweb_util:parse_qs(wrq:req_body(ReqData)), 
+	Value = binary_to_list(wrq:req_body(ReqData)),
+	%[{Value,_ }] = mochiweb_util:parse_qs(wrq:req_body(ReqData)), 
 	{Value, ReqData, State}.
 
 %% @doc
