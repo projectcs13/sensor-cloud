@@ -158,13 +158,13 @@ process_post(ReqData, State) ->
 						{false,false} ->
 							{{halt,403}, wrq:set_resp_body("Unsupported field(s)", ReqData), State};
 						{false,true} ->
-							case erlastic_search:get_doc(?INDEX, "user", UserId) of
-								{error,{404,_}} ->
-									{{halt,403}, wrq:set_resp_body("{\"error\":\"no document with resource_id given is present in the system\"}", ReqData), State};
-								{error,{Code,Body}} ->
-									ErrorString = api_help:generate_error(Body, Code),
-            						{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-								{ok,_} ->
+			%				case erlastic_search:get_doc(?INDEX, "user", UserId) of
+			%					{error,{404,_}} ->
+			%						{{halt,403}, wrq:set_resp_body("{\"error\":\"no document with resource_id given is present in the system\"}", ReqData), State};
+			%					{error,{Code,Body}} ->
+			%						ErrorString = api_help:generate_error(Body, Code),
+            %						{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+			%					{ok,_} ->
 									FieldsAdded = add_server_side_fields(UserAdded),
 									%Final = suggest:add_stream_suggestion_fields(FieldsAdded),
 									case erlastic_search:index_doc(?INDEX, "stream", FieldsAdded) of	
@@ -175,7 +175,7 @@ process_post(ReqData, State) ->
 											%suggest:update_suggestion(UserAdded),
 											{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
 									end
-							end
+			%				end
 					end
 			end;
 		true ->
