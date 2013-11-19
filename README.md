@@ -1,19 +1,31 @@
-#Sensor Cloud Engine
-[![Build Status](https://travis-ci.org/projectcs13/sensor-cloud.png)](https://travis-ci.org/projectcs13/sensor-cloud)
+# Sensor Cloud Engine
+
 Welcome to the "Project CS 2013" project
 
-Running the project:
+## Running the project
 
-0. Download and compile the dependencies, and compile the project sources
-   $ make install
+1. Download and compile the dependencies, and compile the project sources
 
-1. Run the application
-   $ make run
+        make install
 
-Running tests:
+2. Run the application
 
-0. Download and compile the dependencies, and compile the project sources
-   $ make install
+        make run
 
-1. Run the tests
-   $ make test
+## Running tests
+
+1. Download and compile the dependencies, and compile the project sources
+
+        make install
+        
+2. Start Elastic Search server
+
+        make run_es
+
+2. Run the tests
+
+        make test
+
+## Code Status
+
+[![Build Status](https://travis-ci.org/projectcs13/sensor-cloud.png)](https://travis-ci.org/projectcs13/sensor-cloud)

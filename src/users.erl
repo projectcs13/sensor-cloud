@@ -16,10 +16,7 @@
                 process_post/2]).
 
 -include("webmachine.hrl").
-
-
--define(INDEX, "sensorcloud").
-
+-include("field_restrictions.hrl").
 
 %% @doc
 %% Function: init/1
@@ -39,16 +36,16 @@ init([]) ->
 %% @end
 -spec allowed_methods(ReqData::tuple(), State::string()) -> {list(), tuple(), string()}.
 allowed_methods(ReqData, State) ->
-        case api_help:parse_path(wrq:path(ReqData)) of                
-                [{"users","_search"}] ->
-                        {['POST','GET'], ReqData, State};
-                [{"users",_Id}] ->
-                        {['GET', 'PUT', 'DELETE'], ReqData, State};
-                [{"users"}] ->
-                        {['POST','GET'], ReqData, State};
-                [error] ->
-                        {[], ReqData, State}
-        end.
+    case api_help:parse_path(wrq:path(ReqData)) of                
+        [{"users","_search"}] ->
+            {['POST','GET'], ReqData, State};
+        [{"users",_Id}] ->
+            {['GET', 'PUT', 'DELETE'], ReqData, State};
+        [{"users"}] ->
+            {['POST','GET'], ReqData, State};
+        [error] ->
+            {[], ReqData, State}
+    end.
 
 
 
@@ -83,13 +80,18 @@ content_types_accepted(ReqData, State) ->
 %% @end
 -spec delete_resource(ReqData::tuple(), State::string()) -> {string(), tuple(), string()}.
 delete_resource(ReqData, State) ->
-        Id = id_from_path(ReqData),
-        case delete_resources_with_user_id(Id) of
-        {error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
+    Id = id_from_path(ReqData),
+    case delete_resources_with_user_id(Id) of
+        {error, {Code, Body}} -> 
+            ErrorString = api_help:generate_error(Body, Code),
+            {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
         {ok} ->
             case erlastic_search:delete_doc(?INDEX,"user", Id) of
-                    {error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
-                    {ok,List} -> {true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
+                {error, {Code, Body}} -> 
+                    ErrorString = api_help:generate_error(Body, Code),
+                    {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+                {ok,List} -> 
+                    {true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
             end
     end.
 
@@ -102,17 +104,17 @@ delete_resource(ReqData, State) ->
 %% @end
 -spec delete_resources_with_user_id(Id::string()) -> term().
 delete_resources_with_user_id(Id) ->
+	api_help:refresh(),
     Query = "user_id:" ++ Id, 
     case erlastic_search:search_limit(?INDEX, "resource", Query,500) of
-        {error,Reason} ->
-            erlang:display("\n\n\nThis is where the error is!\n\n\n"), 
-            {error,Reason};
+        {error,{Code, Body}} ->
+            {error,{Code, Body}};
         {ok,List} -> 
             case get_resources(List) of
                 [] -> {ok};
                 Streams ->
                     case delete_resources(Streams) of
-                        {error,Reason} -> {error, Reason};
+                        {error,{Code, Body}} -> {error, {Code, Body}};
                         {ok} -> {ok}
                     end
             end
@@ -145,12 +147,13 @@ get_resources([JSON | Tl]) ->
 %% @end
 delete_resources([]) -> {ok};
 delete_resources([ResourceId|Rest]) ->
-    case resource:delete_streams_with_resource_id(ResourceId) of
-        {error,Reason} -> {error,Reason};
+    case resources:delete_streams_with_resource_id(ResourceId) of
+        {error,{Code, Body}} -> 
+            {error,{Code, Body}};
         {ok} ->
             case erlastic_search:delete_doc(?INDEX,"resource", ResourceId) of
-                    {error,Reason} -> {error,Reason};
-                    {ok,_List} -> delete_resources(Rest)
+                {error,{Code, Body}} -> {error,{Code, Body}};
+                {ok,_List} -> delete_resources(Rest)
             end
     end.
 
@@ -164,19 +167,27 @@ delete_resources([ResourceId|Rest]) ->
 %% @end
 -spec put_user(ReqData::tuple(), State::string()) -> {true, tuple(), string()}.
 put_user(ReqData, State) ->
-        case id_from_path(ReqData) of
-                undefined -> {false ,wrq:set_resp_body("{\"error\":\"Incorrect user\"}", ReqData), State};
-                Id ->        
-                        %check if doc already exists
-                        case erlastic_search:get_doc(?INDEX, "user", Id) of
-                                {error, Reason} ->
-                                        {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
-                                {ok, List} ->
-                                        {UserJson,_,_} = api_help:json_handler(ReqData, State),
-                                        erlastic_search:index_doc_with_id(?INDEX, "user", Id, UserJson),
-                                        {true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
-                        end
-        end.
+    Id = id_from_path(ReqData),
+	{UserJson,_,_} = api_help:json_handler(ReqData, State),
+    %check if doc already exists
+	case api_help:do_only_fields_exist(UserJson,?ACCEPTEDFIELDSUSERS) of
+		false ->
+			{{halt,403}, wrq:set_resp_body("Unsupported field(s)", ReqData), State};
+		true ->
+			case erlastic_search:get_doc(?INDEX, "user", Id) of
+				{error, {Code, Body}} -> 
+					ErrorString = api_help:generate_error(Body, Code),
+					{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+				{ok, List} ->
+            		case erlastic_search:index_doc_with_id(?INDEX, "user", Id, UserJson) of
+                		{error, {Code, Body}} -> 
+                    		ErrorString = api_help:generate_error(Body, Code),
+                    		{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+                		{ok, Json} ->
+		            		{true, wrq:set_resp_body(lib_json:encode(Json), ReqData), State}
+            		end
+    		end
+	end.
 
 
 %% @doc
@@ -190,16 +201,24 @@ put_user(ReqData, State) ->
 %% @end
 -spec process_post(ReqData::tuple(), State::string()) -> {true, tuple(), string()}.
 process_post(ReqData, State) ->
-        case api_help:is_search(ReqData) of
-                false ->
-                        {UserJson,_,_} = api_help:json_handler(ReqData, State),
-                        case erlastic_search:index_doc(?INDEX, "user", UserJson) of
-                                {error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
-                                {ok,List} -> {true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
-                        end;
-                true ->
-                        process_search(ReqData,State, post)                        
-        end.
+    case api_help:is_search(ReqData) of
+        false ->
+            {UserJson,_,_} = api_help:json_handler(ReqData, State),
+			case api_help:do_only_fields_exist(UserJson,?ACCEPTEDFIELDSUSERS) of
+				false ->
+					{{halt,403}, wrq:set_resp_body("Unsupported field(s)", ReqData), State};
+				true ->
+					case erlastic_search:index_doc(?INDEX, "user", UserJson) of
+						{error, {Code, Body}} -> 
+							ErrorString = api_help:generate_error(Body, Code),
+                    		{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+                		{ok,List} -> 
+                    		{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
+					end
+            end;
+        true ->
+            process_search(ReqData,State, post)                        
+    end.
 
 
 %% @doc
@@ -209,33 +228,39 @@ process_post(ReqData, State) ->
 %% @end
 -spec get_user(ReqData::tuple(), State::string()) -> {list(), tuple(), string()}.
 get_user(ReqData, State) ->
-        case api_help:is_search(ReqData) of
-                false ->
-                        case id_from_path(ReqData) of
-                                undefined ->
-                                        % Get all users
-                                        case erlastic_search:search_limit(?INDEX,"user","*:*",2000) of
-                                                {error, Reason} -> 
-                                                        {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
-					        {ok,JsonStruct} ->
-						       FinalJson = lib_json:get_list_and_add_id(JsonStruct),
-						       {FinalJson, ReqData, State}  
-                                        end;
-                                Id ->
-				        %% Get specific user
-                                        case erlastic_search:get_doc(?INDEX, "user", Id) of
-                                                {error, Reason} ->
-                                                        {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
-                                                {ok,JsonStruct} ->
-						        FinalJson = lib_json:get_and_add_id(JsonStruct),
-						        {FinalJson, ReqData, State} 
-
-
-                                        end
-                        end;
-                true ->                        
-                        process_search(ReqData,State, get)                        
-        end.
+    case api_help:is_search(ReqData) of
+        false ->
+            case id_from_path(ReqData) of
+                undefined ->
+                    % Get all users
+                    case wrq:get_qs_value("size",ReqData) of 
+                        undefined ->
+                            Size = 100;
+                        SizeParam ->
+                            Size = list_to_integer(SizeParam)
+                    end,
+                    case erlastic_search:search_limit(?INDEX,"user","*:*",Size) of
+                        {error, {Code, Body}} -> 
+                            ErrorString = api_help:generate_error(Body, Code),
+                            {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+					    {ok,JsonStruct} ->
+						    FinalJson = lib_json:get_list_and_add_id(JsonStruct, users),
+						    {FinalJson, ReqData, State}  
+                    end;
+                Id ->
+				    %% Get specific user
+                    case erlastic_search:get_doc(?INDEX, "user", Id) of
+                        {error, {Code, Body}} -> 
+                            ErrorString = api_help:generate_error(Body, Code),
+                            {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+                        {ok,JsonStruct} ->
+                            FinalJson = lib_json:get_and_add_id(JsonStruct),
+                            {FinalJson, ReqData, State} 
+                    end
+            end;
+        true ->                        
+            process_search(ReqData,State, get)                        
+    end.
 
 
 
@@ -251,16 +276,21 @@ process_search(ReqData, State, post) ->
         {struct, JsonData} = mochijson2:decode(Json),
         Query = api_help:transform(JsonData),
         case erlastic_search:search_limit(?INDEX, "user", Query, 10) of
-                {error,Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
-                {ok,List} -> {true, wrq:set_resp_body(lib_json:encode(List),ReqData),State}
-
+            {error, {Code, Body}} -> 
+                ErrorString = api_help:generate_error(Body, Code),
+                {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+            {ok,List} -> 
+                {true, wrq:set_resp_body(lib_json:encode(List),ReqData),State}
         end;
 process_search(ReqData, State, get) ->
         TempQuery = wrq:req_qs(ReqData),
         TransformedQuery = api_help:transform(TempQuery),
         case erlastic_search:search_limit(?INDEX, "user", TransformedQuery, 10) of
-                {error,Reason} -> {"{\"error\": \""++ atom_to_list(Reason) ++ "\"}", ReqData, State};
-                {ok,List} -> {lib_json:encode(List),ReqData,State} % May need to convert
+            {error, {Code, Body}} -> 
+                ErrorString = api_help:generate_error(Body, Code),
+                {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+            {ok,List} -> 
+                {lib_json:encode(List),ReqData,State} % May need to convert
         end.
 
 
@@ -269,16 +299,16 @@ process_search(ReqData, State, get) ->
 
 %% @doc
 %% Function: id_from_path/2
-%% Purpose: Retrieves the if from the path.
+%% Purpose: Retrieves the id from the path.
 %% Returns: Id
 %% @end
 -spec id_from_path(string()) -> string().
 id_from_path(RD) ->
-        case wrq:path_info(id, RD) of
-                undefined ->
-                        case string:tokens(wrq:disp_path(RD), "/") of
-                                ["users", Id] -> Id;
-                                _ -> undefined
-                        end;
-                Id -> Id
-        end.
+    case wrq:path_info(id, RD) of
+        undefined ->
+            case string:tokens(wrq:disp_path(RD), "/") of
+                ["users", Id] -> Id;
+                _ -> undefined
+            end;
+        Id -> Id
+    end.

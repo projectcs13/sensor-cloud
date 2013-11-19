@@ -20,6 +20,61 @@
 
 
 %% @doc
+%% Function: generate_timpestamp/2
+%% Purpose: Used to create a timestamp valid in ES
+%%          from the input which should be the list
+%%          [Year,Mounth,Day,Hour,Minute,Day]
+%% Returns: The generated timestamp
+%%
+%% @end
+-spec generate_timestamp(DateList::list(),Count::integer()) -> string().
+
+generate_timestamp([],_) ->
+	".000";
+generate_timestamp([First|Rest],0) ->
+	case First < 10 of
+		true -> "0" ++ integer_to_list(First) ++ generate_timestamp(Rest,1);
+		false -> "" ++ integer_to_list(First) ++ generate_timestamp(Rest,1)
+	end;
+generate_timestamp([First|Rest],3) ->
+	case First < 10 of
+		true -> "T0" ++ integer_to_list(First) ++ generate_timestamp(Rest,4);
+		false -> "T" ++ integer_to_list(First) ++ generate_timestamp(Rest,4)
+	end;
+generate_timestamp([First|Rest],Count) when Count>3 ->
+	case First < 10 of
+		true -> ":0" ++ integer_to_list(First) ++ generate_timestamp(Rest,Count+1);
+		false -> ":" ++ integer_to_list(First) ++ generate_timestamp(Rest,Count+1)
+	end;
+generate_timestamp([First|Rest],Count) ->
+	case First < 10 of
+		true -> "-0" ++ integer_to_list(First) ++ generate_timestamp(Rest,Count+1);
+		false -> "-" ++ integer_to_list(First) ++ generate_timestamp(Rest,Count+1)
+	end.
+
+%% @doc
+%% Function: generate_date/2
+%% Purpose: Used to create a date valid in ES
+%%          from the input which should be the list
+%%          [Year,Mounth,Day]
+%% Returns: The generated timestamp
+%%
+%% @end
+-spec generate_date(DateList::list()) -> string().
+
+generate_date([First]) ->
+	case First < 10 of
+		true -> "0" ++ integer_to_list(First);
+		false -> "" ++ integer_to_list(First)
+	end;
+generate_date([First|Rest]) ->
+	case First < 10 of
+		true -> "0" ++ integer_to_list(First) ++ "-" ++ generate_date(Rest);
+		false -> "" ++ integer_to_list(First) ++ "-" ++ generate_date(Rest)
+	end.
+
+
+%% @doc
 %% Function: make_to_string/1
 %% Purpose: Used to convert JSON with binary data left to string
 %% Returns: Returns the string represented by the given list
@@ -112,11 +167,16 @@ create_update(Stream) ->
 -spec add_field(Stream::string(),FieldName::string(),FieldValue::term()) -> string().
 
 add_field(Stream,FieldName,FieldValue) ->
-	case is_integer(FieldValue) of
+	case is_list(FieldValue) of
 		true ->
-			string:substr(Stream,1,length(Stream)-1) ++ ",\"" ++ FieldName ++ "\":" ++ FieldValue ++ "}";
+			string:substr(Stream,1,length(Stream)-1) ++ ",\"" ++ FieldName ++ "\":\"" ++ FieldValue ++ "\"}";
 		false ->
-			string:substr(Stream,1,length(Stream)-1) ++ ",\"" ++ FieldName ++ "\":\"" ++ FieldValue ++ "\"}"
+			case is_integer(FieldValue) of
+				true ->
+					string:substr(Stream,1,length(Stream)-1) ++ ",\"" ++ FieldName ++ "\":" ++ integer_to_list(FieldValue) ++ "}";
+				false ->
+					string:substr(Stream,1,length(Stream)-1) ++ ",\"" ++ FieldName ++ "\":" ++ float_to_list(FieldValue,[{decimals,1}]) ++ "}"
+			end
 	end.
 			
 
@@ -340,3 +400,97 @@ convert_binary_to_string([First|Rest]) ->
 					 false -> [First] ++ convert_binary_to_string(Rest)
 				 end
 	end.
+
+%% @doc
+%% Function: do_any_field_exist/2
+%% Purpose: Used to check if a JSON contains any of the given fields
+%% Returns: True if at least one of the given fields exist, false otherwise
+%% @end
+-spec do_any_field_exist(Json::string(),FieldList::list()) -> boolean().
+
+do_any_field_exist(_Json,[]) ->
+		false;
+do_any_field_exist(Json,[First|Rest]) ->
+		case lib_json:get_field(Json, First) of
+			undefined ->
+				do_any_field_exist(Json,Rest);
+			_ ->
+				true
+		end.
+
+
+%% @doc
+%% Function: do_only_fields_exist/2
+%% Purpose: Used to check if a JSON contains only fields given in the list
+%% Returns: True if all fields are in the list, false otherwise
+%% @end
+-spec do_only_fields_exist(Json::string(),FieldList::list()) -> boolean().
+
+do_only_fields_exist(Json,List) ->
+	NumFields = count_fields(lib_json:to_string(Json)),
+	Values = lib_json:get_fields(Json, List),
+	NumCorrectFields = lists:foldl(fun(X, Sum) -> case X of 
+													  undefined -> Sum;
+													  _ -> Sum + 1
+												  end
+								   end, 0, Values),
+	NumFields == NumCorrectFields.
+
+%% @doc
+%% Function: count_fields/1
+%% Purpose: Used to return the number of fields in the given JSON
+%% Returns: The number of fields in the given JSON
+%% @end
+-spec count_fields(Json::string()) -> integer().
+
+count_fields(Json) ->
+	count_fields(Json,1).
+
+
+%% @doc
+%% Function: count_fields/2
+%% Purpose: Used to return the number of fields in the given JSON
+%% Returns: The number of fields in the given JSON
+%% @end
+-spec count_fields(Json::string(),Position::integer()) -> integer().
+
+count_fields(Json,Pos) ->
+	case Pos == length(Json) of
+		true -> 0;
+		false ->
+			case string:substr(Json, Pos, 2) of
+				"\":" ->
+					1 + count_fields(Json,Pos+1);
+				_ ->
+					case string:substr(Json, Pos, 3) of
+						"\" :" ->
+							1 + count_fields(Json,Pos+1);
+						_ ->
+							count_fields(Json,Pos+1)
+					end
+			end
+	end.
+
+%% @doc
+%% Purpose: generate an appropriate error string depending on the error code
+%%
+%% TODO: parse Body for more accurate response text
+%%
+-spec generate_error(JSONString::string(), integer()) -> string().
+
+generate_error(Body, ErrorCode) ->
+	ErrorString = integer_to_list(ErrorCode),
+	case ErrorCode of
+		404 -> Reason = "not found";
+		_ -> Reason = binary_to_list(Body)
+	end,
+	"Status " ++ ErrorString ++ "\nError: " ++ Reason.
+
+%% @doc
+%% Function: refresh/0
+%% Purpose: Help function to find refresh the sensorcloud index
+%% Returns: {ok/error, {{Version, Code, Reason}, Headers, Body}}
+%% FIX: This function relies on direct contact with elastic search at localhost:9200
+%% @end
+refresh() ->
+	httpc:request(post, {"http://localhost:9200/sensorcloud/_refresh", [],"", ""}, [], []).

@@ -5,7 +5,6 @@
 ################################################################################
 ERL := erl
 REBAR := ./rebar
-# DIALYZE_INCLUDE = -I lib/erlastic_search/include/ -I lib/webmachine/include/ -I lib/rabbitmq-erlang-client/include -I lib/erlson/include/
 ################################################################################
 
 
@@ -19,17 +18,15 @@ compile:
 	@$(REBAR) compile skip_deps=true
 
 ### get_libs will download and install all project libraries
+conf:
+	$(ERL) -pa ebin -s config -config config/engine.config
+
 get_libs:
 	@@$(REBAR) get-deps
 	@$(REBAR) compile
 	$(MAKE) -C lib/rabbitmq-server
 	$(MAKE) -C lib/rabbitmq-erlang-client
-
-# prep_dialyzer:
-# 	dialyzer --build_plt --apps kernel stdlib erts mnesia eunit
-
-# dialyze: 
-# 	dialyzer -pa ebin/ $(DIALYZE_INCLUDE) src/*.erl lib/erlson/ebin/
+	$(MAKE) -C lib/rErlang
 
 clean_emacs_vsn_files:
 	rm -rf *~
@@ -50,16 +47,20 @@ clean_emacs_vsn_files:
 
 ### Command: make
 ### Builds the entire project, excluding the dependencies.
-all: compile #dialyze
+all: compile
 
 ### Command: make install
 ### Downloads all dependencies and builds the entire project
-install: get_libs #prep_dialyzer
+install: get_libs conf
+	 cp -r lib/elasticsearch-servicewrapper/service lib/elasticsearch/bin/
+
 
 ### Command: make run
 ### Downloads all depenedencies, bulds entire project and runs the project.
 run: compile
-	$(ERL) -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname engine 
+	-export R_HOME="/usr/lib/R"
+	curl -XPUT localhost:9200/sensorcloud
+	$(ERL) -pa ebin/ lib/*/ebin/ lib/*/bin/ -boot start_sasl -s reloader -s engine -sname engine -config config/engine.config
 
 ### Command: make run_es
 ### Runs elastic search
@@ -70,32 +71,42 @@ run_es:
 ### Runs rabbitMQ server
 run_rabbit:
 	sudo lib/rabbitmq-server/scripts/rabbitmq-server
-
+	
 ### Command: make test
 ### Compile project resources (not libraries) and runs all eunit tests.
 test: compile
 	-@mkdir test-results
-	$(ERL) -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname engine -s test run
+	curl -XDELETE localhost:9200/sensorcloud
+	curl -XPUT localhost:9200/sensorcloud
+	$(ERL) -pa ebin/ lib/*/ebin/ lib/*/bin/ -boot start_sasl -s reloader -s engine -sname engine -s test run
 
 test_json: compile
 	-@mkdir test-results
-	$(ERL) -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname engine -eval 'test:run(lib_json)'
+	$(ERL) -pa ebin/ lib/*/ebin/ lib/*/bin/ -boot start_sasl -s reloader -s engine -sname engine -eval 'test:run(lib_json)'
 
-test_resource: compile
+test_resources: compile
 	-@mkdir test-results
-	$(ERL) -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname engine -eval 'test:run(resource)'
+	curl -XDELETE localhost:9200/sensorcloud
+	curl -XPUT localhost:9200/sensorcloud
+	$(ERL) -pa ebin/ lib/*/ebin/ lib/*/bin/ -boot start_sasl -s reloader -s engine -sname engine -eval 'test:run(resources)'
 
 test_streams: compile
 	-@mkdir test-results
-	$(ERL) -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname engine -eval 'test:run(streams)'
+	curl -XDELETE localhost:9200/sensorcloud
+	curl -XPUT localhost:9200/sensorcloud
+	$(ERL) -pa ebin/ lib/*/ebin/ lib/*/bin/ -boot start_sasl -s reloader -s engine -sname engine -eval 'test:run(streams)'
 
 test_suggest: compile
 	-@mkdir test-results
-	$(ERL) -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname engine -eval 'test:run(suggest)'
+	curl -XDELETE localhost:9200/sensorcloud
+	curl -XPUT localhost:9200/sensorcloud
+	$(ERL) -pa ebin/ lib/*/ebin/ lib/*/bin/ -boot start_sasl -s reloader -s engine -sname engine -eval 'test:run(suggest)'
 
 test_users: compile
 	-@mkdir test-results
-	$(ERL) -pa ebin/ lib/*/ebin/ -boot start_sasl -s reloader -s engine -sname engine -eval 'test:run(users)'
+	curl -XDELETE localhost:9200/sensorcloud
+	curl -XPUT localhost:9200/sensorcloud
+	$(ERL) -pa ebin/ lib/*/ebin/ lib/*/bin/ -boot start_sasl -s reloader -s engine -sname engine -eval 'test:run(users)'
 
 ### Command: make docs
 ### Genereats all of the documentation files
