@@ -166,13 +166,13 @@ process_post(ReqData, State) ->
             						{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 								{ok,_} ->
 									FieldsAdded = add_server_side_fields(UserAdded),
-									Final = suggest:add_stream_suggestion_fields(FieldsAdded),
-									case erlastic_search:index_doc(?INDEX, "stream", Final) of	
+									%Final = suggest:add_stream_suggestion_fields(FieldsAdded),
+									case erlastic_search:index_doc(?INDEX, "stream", FieldsAdded) of	
 										{error,{Code,Body}} ->
 											ErrorString = api_help:generate_error(Body, Code),
             								{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 										{ok,List} -> 
-											suggest:update_suggestion(UserAdded),
+											%suggest:update_suggestion(UserAdded),
 											{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
 									end
 							end
@@ -276,7 +276,7 @@ put_stream(ReqData, State) ->
 		{false,true} ->
 			NewJson = suggest:add_stream_suggestion_fields(Stream),
 			Update = api_help:create_update(NewJson),
-			suggest:update_stream(Stream, StreamId),
+			%suggest:update_stream(Stream, StreamId),
 			case api_help:update_doc(?INDEX, "stream", StreamId, Update) of 
 				{error, {Code, Body}} -> 
 					ErrorString = api_help:generate_error(Body, Code),
