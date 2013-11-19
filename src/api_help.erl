@@ -89,7 +89,7 @@ is_search(ReqData) ->
 %% @end
 -spec is_rank(ReqData::term()) -> boolean().
 is_rank(ReqData) ->
-	case string:str(wrq:disp_path(ReqData),"_rank") of
+	case string:str(wrq:path(ReqData),"_rank") of
 		0 ->
 			false;
 		_ ->
