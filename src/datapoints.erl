@@ -80,7 +80,7 @@ process_post(ReqData, State) ->
 						_ ->
 							TimeStampAdded = DatapointJson
 					end,
-					FinalJson = api_help:add_field(TimeStampAdded, "streamid", Id),
+					FinalJson = api_help:add_field(TimeStampAdded, "stream_id", Id),
 					case api_help:do_only_fields_exist(FinalJson,?ACCEPTEDFIELDSDATAPOINTS) of
 						false -> 
 							{{halt,403}, wrq:set_resp_body("Unsupported field(s)", ReqData), State};
@@ -140,7 +140,7 @@ get_datapoint(ReqData, State) ->
 	case api_help:is_search(ReqData) of
 		false ->
 			Id = id_from_path(ReqData),			
-			case erlastic_search:search_limit(?INDEX, "datapoint", "streamid:" ++ Id, Size) of
+			case erlastic_search:search_limit(?INDEX, "datapoint", "stream_id:" ++ Id, Size) of
 				{ok, Result} ->
 					EncodedResult = lib_json:encode(Result),
 					FinalJson = lib_json:get_list_and_add_id(Result, data),
@@ -196,7 +196,7 @@ process_search(ReqData, State, get) ->
     end,
 	case TempQuery of
 		[] ->   
-			case erlastic_search:search_limit(?INDEX, "datapoint","streamid:" ++ Id ++ "&sort=timestamp:desc", Size) of
+			case erlastic_search:search_limit(?INDEX, "datapoint","stream_id:" ++ Id ++ "&sort=timestamp:desc", Size) of
 				{error, {Code, Body}} -> 
     				ErrorString = api_help:generate_error(Body, Code),
     				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
@@ -205,7 +205,7 @@ process_search(ReqData, State, get) ->
 			       {FinalJson, ReqData, State}
 		 	end;
 		_ ->
-			TransformedQuery="streamid:" ++ Id ++ transform(TempQuery) ++ "&sort=timestamp:desc",
+			TransformedQuery="stream_id:" ++ Id ++ transform(TempQuery) ++ "&sort=timestamp:desc",
 			case erlastic_search:search_limit(?INDEX, "datapoint",TransformedQuery, Size) of
 				{error, {Code, Body}} -> 
     				ErrorString = api_help:generate_error(Body, Code),

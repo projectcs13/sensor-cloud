@@ -26,4 +26,4 @@
 -define(ACCEPTEDFIELDSRESOURCES, ["name","tags","model","description","manufacturer"]).
 
 %% Fields for data-points
--define(ACCEPTEDFIELDSDATAPOINTS, ["streamid","timestamp","value"]).
+-define(ACCEPTEDFIELDSDATAPOINTS, ["stream_id","timestamp","value"]).
