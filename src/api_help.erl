@@ -20,6 +20,61 @@
 
 
 %% @doc
+%% Function: generate_timpestamp/2
+%% Purpose: Used to create a timestamp valid in ES
+%%          from the input which should be the list
+%%          [Year,Mounth,Day,Hour,Minute,Day]
+%% Returns: The generated timestamp
+%%
+%% @end
+-spec generate_timestamp(DateList::list(),Count::integer()) -> string().
+
+generate_timestamp([],_) ->
+	".000";
+generate_timestamp([First|Rest],0) ->
+	case First < 10 of
+		true -> "0" ++ integer_to_list(First) ++ generate_timestamp(Rest,1);
+		false -> "" ++ integer_to_list(First) ++ generate_timestamp(Rest,1)
+	end;
+generate_timestamp([First|Rest],3) ->
+	case First < 10 of
+		true -> "T0" ++ integer_to_list(First) ++ generate_timestamp(Rest,4);
+		false -> "T" ++ integer_to_list(First) ++ generate_timestamp(Rest,4)
+	end;
+generate_timestamp([First|Rest],Count) when Count>3 ->
+	case First < 10 of
+		true -> ":0" ++ integer_to_list(First) ++ generate_timestamp(Rest,Count+1);
+		false -> ":" ++ integer_to_list(First) ++ generate_timestamp(Rest,Count+1)
+	end;
+generate_timestamp([First|Rest],Count) ->
+	case First < 10 of
+		true -> "-0" ++ integer_to_list(First) ++ generate_timestamp(Rest,Count+1);
+		false -> "-" ++ integer_to_list(First) ++ generate_timestamp(Rest,Count+1)
+	end.
+
+%% @doc
+%% Function: generate_date/2
+%% Purpose: Used to create a date valid in ES
+%%          from the input which should be the list
+%%          [Year,Mounth,Day]
+%% Returns: The generated timestamp
+%%
+%% @end
+-spec generate_date(DateList::list()) -> string().
+
+generate_date([First]) ->
+	case First < 10 of
+		true -> "0" ++ integer_to_list(First);
+		false -> "" ++ integer_to_list(First)
+	end;
+generate_date([First|Rest]) ->
+	case First < 10 of
+		true -> "0" ++ integer_to_list(First) ++ "-" ++ generate_date(Rest);
+		false -> "" ++ integer_to_list(First) ++ "-" ++ generate_date(Rest)
+	end.
+
+
+%% @doc
 %% Function: make_to_string/1
 %% Purpose: Used to convert JSON with binary data left to string
 %% Returns: Returns the string represented by the given list
@@ -435,6 +490,7 @@ generate_error(Body, ErrorCode) ->
 %% Function: refresh/0
 %% Purpose: Help function to find refresh the sensorcloud index
 %% Returns: {ok/error, {{Version, Code, Reason}, Headers, Body}}
+%% FIX: This function relies on direct contact with elastic search at localhost:9200
 %% @end
 refresh() ->
 	httpc:request(post, {"http://localhost:9200/sensorcloud/_refresh", [],"", ""}, [], []).

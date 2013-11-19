@@ -28,7 +28,7 @@ sinus_random_data(Amount,StreamId,Delay) ->
 	{A1,A2,A3} = now(),
 	random:seed(A1, A2, A3),
 	{{Year,Month,Day},{Hour,Minute,Second}} = calendar:local_time(),
-	TimeStamp = generate_timestamp([Year,Month,Day,Hour,Minute,Second],0),
+	TimeStamp = api_help:generate_timestamp([Year,Month,Day,Hour,Minute,Second],0),
 	Value = math:sin(Amount/10.0) + (random:uniform()/10.0),
 	UsedValue = float_to_list(Value,[{decimals,3}]),
 	%% Unsure if this is how the datapoints should look
@@ -38,28 +38,7 @@ sinus_random_data(Amount,StreamId,Delay) ->
 	sinus_random_data(Amount-1,StreamId,Delay).
 
 
-%% @doc
-%% Function: generate_timpestamp/2
-%% Purpose: Used to create a timestamp valid in ES
-%%          from the input which should be the list
-%%          [Year,Mounth,Day,Hour,Minute,Day]
-%% Returns: The generated timestamp
-%%
-%% @end
--spec generate_timestamp(DateList::list(),Count::integer()) -> string().
 
-generate_timestamp([],_) ->
-	[];
-generate_timestamp([First|Rest],3) ->
-	case First < 10 of
-		true -> "T0" ++ integer_to_list(First) ++ generate_timestamp(Rest,4);
-		false -> "T" ++ integer_to_list(First) ++ generate_timestamp(Rest,4)
-	end;
-generate_timestamp([First|Rest],Count) ->
-	case First < 10 of
-		true -> "0" ++ integer_to_list(First) ++ generate_timestamp(Rest,Count+1);
-		false -> "" ++ integer_to_list(First) ++ generate_timestamp(Rest,Count+1)
-	end.
 
 %% @doc
 %% Function: add_data/0
