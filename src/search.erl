@@ -10,7 +10,8 @@
                 allowed_methods/2,
                 content_types_accepted/2,
                 content_types_provided/2,
-                 process_post/2]).
+                 process_post/2,
+                 get_search/2]).
 
 -include("webmachine.hrl").
 -include_lib("erlastic_search.hrl").
@@ -40,6 +41,8 @@ allowed_methods(ReqData, State) ->
         case api_help:parse_path(wrq:path(ReqData)) of                
                 [{"_search"}] ->
                         {['POST','GET'], ReqData, State};
+                [{"_history"}] ->
+                        {['POST','GET'], ReqData, State};
                 [error] ->
                         {['POST','GET'], ReqData, State}
         end.
@@ -66,6 +69,26 @@ content_types_provided(ReqData, State) ->
 -spec content_types_accepted(ReqData::tuple(), State::string()) -> {list(), tuple(), string()}.
 content_types_accepted(ReqData, State) ->
         {[{"application/json", process_post}], ReqData, State}.
+
+
+get_search(ReqData, State) ->
+    case wrq:get_qs_value("size",ReqData) of 
+            undefined ->
+                NrValues = 25;
+            Values ->
+                {NrValues, _} = string:to_integer(Values)
+    end,
+    case wrq:get_qs_value("streamid",ReqData) of 
+            undefined ->
+                ErrorString = api_help:generate_error(<<"Invalid streamid">>, 405),
+                {{halt, 405}, wrq:set_resp_body(ErrorString, ReqData), State};
+            StreamIds ->
+                IdList = string:tokens(StreamIds, ","),
+                {get_history(IdList, NrValues, "{\"history\":[]}"), ReqData, State}
+    end.
+
+
+
 
 %% @doc
 %% Function: process_post/2
@@ -142,6 +165,41 @@ process_search_post(ReqData, State) ->
 %%                 {error,Reason} -> {{halt,Reason}, ReqData, State};
 %%                 {ok,List} -> {true,wrq:set_resp_body(json_encode(List),ReqData),State} % May need to convert
 %%         end.
+
+
+
+
+%% @doc
+%% Function: get_history/2
+%% Purpose: Gets the NrValues latest datapoints for each streamid that exists in list IdList
+%% Returns: JSON string that contains the data and streamid for each streamid in IdList
+%% @end
+get_history([], NrValues, Acc) ->
+    Acc;
+get_history([Head|Rest], NrValues, Acc) ->
+    case erlastic_search:search_limit(?INDEX, "datapoint","stream_id:" ++ Head ++ "&sort=timestamp:desc", NrValues) of
+        {error,{Code, Body}} ->
+                ErrorString = api_help:generate_error(Body, Code),
+                IdAndDataJson = "{\"id\":\""++Head++"\",\"data\":{\"error\": \""++ErrorString++"\"}";
+        {ok,JsonStruct} ->
+                IdAndDataJson = parse_datapoints(lib_json:get_field(JsonStruct, "hits.hits"),"{\"id\":\""++Head++"\",\"data\":[]}")  
+    end,
+    get_history(Rest, NrValues, lib_json:add_value(Acc,"history",IdAndDataJson)).
+
+
+%% @doc
+%% Function: parse_datapoints/2
+%% Purpose: Gets the NrValues latest datapoints for each streamid that exists in list IdList
+%% Returns: JSON string that contains the data and streamid for each streamid in IdList
+%% @end
+parse_datapoints([], FinalJson) ->
+    FinalJson;
+parse_datapoints([Head|Rest], FinalJson) ->
+    Datapoint = lib_json:rm_field(lib_json:get_field(Head, "_source"), "stream_id"),
+    parse_datapoints(Rest, lib_json:add_value(FinalJson,"data",Datapoint)).
+
+
+
 
 
 %% @doc
