@@ -33,10 +33,10 @@ allowed_methods(ReqData, State) ->
 	case api_help:parse_path(wrq:path(ReqData)) of
 		[{"resources"}] ->
 			{['POST','GET'], ReqData, State};
-		[{"resources", _ResourceID}] ->
-			{['GET', 'PUT', 'DELETE'], ReqData, State};
 		[{"resources", "_search" ++ _Query}] ->
 			{['GET', 'POST'], ReqData, State};
+		[{"resources", _ResourceID}] ->
+			{['GET', 'PUT', 'DELETE'], ReqData, State};
 		[error] ->
 			{[], ReqData, State}
 	end.
@@ -142,8 +142,8 @@ process_search_post(ReqData, State) ->
 	    FromParam ->
 	        From = FromParam
 	end,
-	FilteredJson = filter_json(Json, "*", From, Size),
-	case erlastic_search:search_json(#erls_params{},?INDEX, "resource", FilteredJson) of % Maybe wanna take more
+	%FilteredJson = filter_json(Json, "*", From, Size),
+	case erlastic_search:search_json(#erls_params{},?INDEX, "resource", Json) of % Maybe wanna take more
 		{error, {Code, Body}} -> 
             ErrorString = api_help:generate_error(Body, Code),
             {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
