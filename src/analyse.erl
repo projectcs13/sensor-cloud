@@ -23,10 +23,6 @@ allowed_methods(ReqData, State) ->
                          {['GET'], ReqData, State};
                 [{"users", _UserID}, {"streams", _StreamID}, {"_analyse"}] ->
                          {['GET'], ReqData, State};
-                [{"resources", _ResourceID}, {"streams", _StreamID}, {"_analyse"}] ->
-                         {['GET'], ReqData, State};
-                [{"users", _UserID}, {"resources", _ResourceID}, {"streams", _StreamID}, {"_analyse"}] ->
-                         {['GET'], ReqData, State};
                 [error] ->
                  {[], ReqData, State}
 end.

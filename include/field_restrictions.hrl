@@ -12,16 +12,18 @@
 %% Fields for streams
 -define(RESTRCITEDUPDATESTREAMS, ["quality","user_ranking","subscribers","last_update","creation_date","history_size"]).
 -define(RESTRCITEDCREATESTREAMS, ["quality","user_ranking","subscribers","last_update","creation_date","history_size"]).
--define(ACCEPTEDFIELDSSTREAMS, ["resource_id","name","tags","description","private","type","accuracy","min_val","max_val","quality","active","user_ranking","subscribers","last_updated","creation_date","history_size","location"]).
+-define(ACCEPTEDFIELDSSTREAMS, ["resource","name","tags","description","private","type","accuracy","min_val",
+								"max_val","quality","active","user_ranking","subscribers","last_update","creation_date",
+								"history_size","location","user_id","uri","polling_freq","uuid","unit"]).
 
 
 %% Fields for users
 -define(ACCEPTEDFIELDSUSERS, ["username","private"]).
 
 %% Fields for resources
--define(RESTRCITEDUPDATERESOURCES, ["creation_date"]).
--define(RESTRCITEDCREATERESOURCES, ["creation_date"]).
--define(ACCEPTEDFIELDSRESOURCES, ["user_id","name","tags","model","description","type","manufacturer","uri","polling_freq","creation_date","uuid"]).
+-define(RESTRCITEDUPDATERESOURCES, []).
+-define(RESTRCITEDCREATERESOURCES, []).
+-define(ACCEPTEDFIELDSRESOURCES, ["name","tags","model","description","manufacturer"]).
 
 %% Fields for data-points
--define(ACCEPTEDFIELDSDATAPOINTS, ["streamid","timestamp","value"]).
+-define(ACCEPTEDFIELDSDATAPOINTS, ["stream_id","timestamp","value"]).
