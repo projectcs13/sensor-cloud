@@ -70,25 +70,39 @@ content_types_provided(ReqData, State) ->
 content_types_accepted(ReqData, State) ->
         {[{"application/json", process_post}], ReqData, State}.
 
-
+%% @doc
+%% Function: get_search/2
+%% Purpose: Handles _history requests. With an input list of stream_ids seperated by ','
+%% it will return a proper json object that contains a list of jsonobjects that contain
+%% a stream_id and the last 'size' number of datapoints for that specific stream.
+%%
+%% It is run automatically for GET requests
+%%
+%% Returns: {Body, ReqData, State} || {{error, Reason}, ReqData, State}
+%%
+%% Side effects: Inserts a new User in the database (when for insertion)
+%% @end
+-spec get_search(ReqData::tuple(), State::string()) -> {string(), tuple(), string()}.
 get_search(ReqData, State) ->
-    case wrq:get_qs_value("size",ReqData) of 
-            undefined ->
-                NrValues = 25;
-            Values ->
-                {NrValues, _} = string:to_integer(Values)
-    end,
-    case wrq:get_qs_value("stream_id",ReqData) of 
-            undefined ->
-                ErrorString = api_help:generate_error(<<"Invalid stream_id">>, 405),
-                {{halt, 405}, wrq:set_resp_body(ErrorString, ReqData), State};
-            StreamIds ->
-                IdList = string:tokens(StreamIds, ","),
-                {get_history(IdList, NrValues, "{\"history\":[]}"), ReqData, State}
+    case api_help:is_search(ReqData) of
+        false -> 
+            case wrq:get_qs_value("size",ReqData) of 
+                    undefined ->
+                        NrValues = 25;
+                    Values ->
+                        {NrValues, _} = string:to_integer(Values)
+            end,
+            case wrq:get_qs_value("stream_id",ReqData) of 
+                    undefined ->
+                        ErrorString = api_help:generate_error(<<"Invalid stream_id">>, 405),
+                        {{halt, 405}, wrq:set_resp_body(ErrorString, ReqData), State};
+                    StreamIds ->
+                        IdList = string:tokens(StreamIds, ","),
+                        {get_history(IdList, NrValues, "{\"history\":[]}"), ReqData, State}
+            end;
+        true ->
+            {{halt, 501}, wrq:set_resp_body("Please use POST search instead.", ReqData), State}
     end.
-
-
-
 
 %% @doc
 %% Function: process_post/2
@@ -110,41 +124,40 @@ process_post(ReqData, State) ->
 %% successful and false otherwise.
 %% @end
 -spec process_search_post(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
-
 process_search_post(ReqData, State) ->
-        erlang:display("search with json request"),
-        case wrq:get_qs_value("size",ReqData) of 
-            undefined ->
-                Size = "10";
-            SizeParam ->
-                Size = SizeParam
-        end,
-		case wrq:get_qs_value("sort",ReqData) of
-            undefined ->
-                Sort = "user_ranking";
-            SortParam ->
-                Sort = SortParam
-        end,
-        case wrq:get_qs_value("from",ReqData) of
-            undefined ->
-                From = "0";
-            FromParam ->
-                From = FromParam
-        end,
-        {Json,_,_} = api_help:json_handler(ReqData,State),
-        FilteredJson = filter_json(Json, From, Size, Sort),
-        case erlastic_search:search_json(#erls_params{},?INDEX, "stream", FilteredJson) of % Maybe wanna take more
-                {error, Reason1} ->
-                        StreamSearch = {error, Reason1};
-                {ok,List1} ->
-                        StreamSearch = lib_json:encode(List1) % May need to convert
-        end,
-        case erlastic_search:search_json(#erls_params{},?INDEX, "user", lib_json:rm_field(FilteredJson, "sort")) of % Maybe wanna take more
-                {error, Reason2} ->
-                        UserSearch = {error, Reason2};
-                {ok,List2} -> 
-			UserSearch = lib_json:encode(List2) % May need to convert
-         end,
+    erlang:display("search with json request"),
+    case wrq:get_qs_value("size",ReqData) of 
+        undefined ->
+            Size = "10";
+        SizeParam ->
+            Size = SizeParam
+    end,
+	case wrq:get_qs_value("sort",ReqData) of
+        undefined ->
+            Sort = "user_ranking";
+        SortParam ->
+            Sort = SortParam
+    end,
+    case wrq:get_qs_value("from",ReqData) of
+        undefined ->
+            From = "0";
+        FromParam ->
+            From = FromParam
+    end,
+    {Json,_,_} = api_help:json_handler(ReqData,State),
+    FilteredJson = filter_json(Json, From, Size, Sort),
+    case erlastic_search:search_json(#erls_params{},?INDEX, "stream", FilteredJson) of % Maybe wanna take more
+            {error, Reason1} ->
+                    StreamSearch = {error, Reason1};
+            {ok,List1} ->
+                    StreamSearch = lib_json:encode(List1) % May need to convert
+    end,
+    case erlastic_search:search_json(#erls_params{},?INDEX, "user", lib_json:rm_field(FilteredJson, "sort")) of % Maybe wanna take more
+            {error, Reason2} ->
+                    UserSearch = {error, Reason2};
+            {ok,List2} -> 
+		UserSearch = lib_json:encode(List2) % May need to convert
+     end,
 	% check search-results for error
 	case StreamSearch of
 	    {error, {Body, Code}} ->
@@ -174,13 +187,13 @@ process_search_post(ReqData, State) ->
 %% Purpose: Gets the NrValues latest datapoints for each streamid that exists in list IdList
 %% Returns: JSON string that contains the data and streamid for each streamid in IdList
 %% @end
-get_history([], NrValues, Acc) ->
+get_history([], _NrValues, Acc) ->
     Acc;
 get_history([Head|Rest], NrValues, Acc) ->
     case erlastic_search:search_limit(?INDEX, "datapoint","stream_id:" ++ Head ++ "&sort=timestamp:desc", NrValues) of
         {error,{Code, Body}} ->
                 ErrorString = api_help:generate_error(Body, Code),
-                IdAndDataJson = "{\"id\":\""++Head++"\",\"data\":{\"error\": \""++ErrorString++"\"}";
+                IdAndDataJson = "{\"stream_id\":\""++Head++"\",\"data\":{\"error\": \""++ErrorString++"\"}";
         {ok,JsonStruct} ->
                 IdAndDataJson = parse_datapoints(lib_json:get_field(JsonStruct, "hits.hits"),"{\"stream_id\":\""++Head++"\",\"data\":[]}")  
     end,
