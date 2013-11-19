@@ -16,6 +16,7 @@
                 process_post/2]).
 
 -include("webmachine.hrl").
+-include_lib("erlastic_search.hrl").
 -include("field_restrictions.hrl").
 
 %% @doc
@@ -245,7 +246,9 @@ get_user(ReqData, State) ->
                         SizeParam ->
                             Size = list_to_integer(SizeParam)
                     end,
-                    case erlastic_search:search_limit(?INDEX,"user","*:*",Size) of
+					
+					Query = "{\"size\" :" ++ integer_to_list(Size) ++",\"query\" : {\"match_all\" : {}},\"filter\" : {\"bool\":{\"must_not\":{\"term\":{\"private\":\"true\"}}}}}",
+					case erlastic_search:search_json(#erls_params{},?INDEX, "user", Query) of
                         {error, {Code, Body}} -> 
                             ErrorString = api_help:generate_error(Body, Code),
                             {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
