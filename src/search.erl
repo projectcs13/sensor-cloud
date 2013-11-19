@@ -98,7 +98,7 @@ process_search_post(ReqData, State) ->
         end,
         case wrq:get_qs_value("sort",ReqData) of
             undefined ->
-                Sort = "user_ranking";
+                Sort = "user_ranking.average";
             SortParam ->
                 Sort = SortParam
         end,
