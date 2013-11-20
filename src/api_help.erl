@@ -244,7 +244,7 @@ transform([{Field,Value}|Rest],AddAnd) ->
 
 
 %% @doc
-%% Function: transform/2
+%% Function: make_term_query/1
 %% Purpose: Used to create a term query from the given query string
 %%          assumes that the query string is in the key:value&key:value ...
 %%          format
@@ -255,11 +255,12 @@ make_term_query(String) ->
 	"{\"" ++ make_inner_term_query(String) ++ "\"}".
 
 %% @doc
-%% Function: transform/2
+%% Function: make_inner_term_query/1
 %% Purpose: Used to create the inner part of the
 %%          term query json.
 %% Returns: The string the gives the inner part of the term query
 %% @end
+-spec make_inner_term_query(QueryString::string()) -> list().
 make_inner_term_query([]) ->
 	[];
 make_inner_term_query([First|Rest]) ->
