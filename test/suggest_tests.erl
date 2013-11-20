@@ -214,7 +214,8 @@ check_returned_code(Response, Code) ->
 post_request(URL, ContentType, Body) -> request(post, {URL, [], ContentType, Body}).
 
 put_request(URL, ContentType, Body) -> request(put, {URL, [], ContentType, Body}).
-get_request(URL)                     -> request(get,  {URL, []}).
+get_request(URL)                     -> 
+	request(get,  {URL, []}).
 
 request(Method, Request) ->
 	httpc:request(Method, Request, [], []).
