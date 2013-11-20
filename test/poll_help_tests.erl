@@ -37,98 +37,98 @@ init_test() ->
 
 
 %% @doc
-%% Function: get_resources_using_polling_test/0
-%% Purpose: Retrieves all resources from Elastic Search that are using polling.
+%% Function: get_streams_using_polling_test/0
+%% Purpose: Retrieves all streams from Elastic Search that are using polling.
 %% Returns: ok | {error, term()}.
 %% @end
--spec get_resources_using_polling_test() -> ok | {error, term()}.
-get_resources_using_polling_test() ->
+-spec get_streams_using_polling_test() -> ok | {error, term()}.
+get_streams_using_polling_test() ->
 	
-	%% Clear the resource type from all documents.
-	clear_resource_type(),
+	%% Clear the stream type from all documents.
+	clear_stream_type(),
 	
-	%% Test that should return the empty list, since no resources exists.
-	?assertMatch([], poll_help:get_resources_using_polling()),
+	%% Test that should return the empty list, since no streams exists.
+	?assertMatch([], poll_help:get_streams_using_polling()),
 	
 	%% Test that should return the epmty list, since
-    %% no resources exists that are using polling.
-	post_resource("Test Resource1", ""),
+    %% no streams exists that are using polling.
+	post_stream("Test Stream1", ""),
 	timer:sleep(1000),
-	?assertMatch([], poll_help:get_resources_using_polling()),
+	?assertMatch([], poll_help:get_streams_using_polling()),
 	
 	%% Test that should return a list of length one.
-	post_resource("Test Resource2", "127.0.0.1", 10),
+	post_stream("Test Stream2", "127.0.0.1", 10),
 	timer:sleep(1000),
-	?assertMatch(1, length(poll_help:get_resources_using_polling())),
+	?assertMatch(1, length(poll_help:get_streams_using_polling())),
 	
 	%% Test that should return a list of length two.
-	post_resource("Test Resource3", "127.0.0.2", 20),
+	post_stream("Test Stream3", "127.0.0.2", 20),
 	timer:sleep(1000),
-	?assertMatch(2, length(poll_help:get_resources_using_polling())),
+	?assertMatch(2, length(poll_help:get_streams_using_polling())),
 	
-	%% Clear all entered resources.
-	clear_resource_type().
+	%% Clear all entered streams.
+	clear_stream_type().
 
 
 
 
 %% @doc
-%% Function: json_to_record_resource_test/0
-%% Purpose: Transform a resources in json format to a resources
+%% Function: json_to_record_stream_test/0
+%% Purpose: Transform a streams in json format to a streams
 %%          in the form of the record #pollerInfo and to check it is
 %%          constructed correctly.
 %% Returns: ok | {error, term()}.
 %% @end
--spec json_to_record_resource_test() -> ok | {error, term()}.
-json_to_record_resource_test() ->
+-spec json_to_record_stream_test() -> ok | {error, term()}.
+json_to_record_stream_test() ->
 	
-	%% Clear the resource type from all documents.
-	clear_resource_type(),
+	%% Clear the stream type from all documents.
+	clear_stream_type(),
 	
-	%% Enter a resources with and without polling.
-    post_resource("Test Resource1", ""),
-	post_resource("Test Resource2", "127.0.0.1", 10),
+	%% Enter a streams with and without polling.
+    post_stream("Test stream1", ""),
+	post_stream("Test stream2", "127.0.0.1", 10),
 	timer:sleep(1000),
 	
-	%% Test to get the resource as json and transform it to a #pollerInfo.
-	ResourceJsonList = poll_help:get_resources_using_polling(),
-	ResourceJson = lists:nth(1, ResourceJsonList),
-	ResourceRecord = poll_help:json_to_record_resource(ResourceJson),
-	?assertEqual(true, is_record(ResourceRecord, pollerInfo)),
-	?assertEqual("Test Resource2", ResourceRecord#pollerInfo.name),
-	?assertEqual("127.0.0.1", ResourceRecord#pollerInfo.url),
-	?assertEqual(10, ResourceRecord#pollerInfo.frequency),
+	%% Test to get the stream as json and transform it to a #pollerInfo.
+	StreamJsonList = poll_help:get_streams_using_polling(),
+	StreamJson = lists:nth(1, StreamJsonList),
+	StreamRecord = poll_help:json_to_record_stream(StreamJson),
+	?assertEqual(true, is_record(StreamRecord, pollerInfo)),
+	?assertEqual("Test stream2", StreamRecord#pollerInfo.name),
+	?assertEqual("127.0.0.1", StreamRecord#pollerInfo.uri),
+	?assertEqual(10, StreamRecord#pollerInfo.frequency),
 	
-	%% Clear entered resources.
-	clear_resource_type(),
+	%% Clear entered streams.
+	clear_stream_type(),
 	
-	%% Enter resources that uses polling but have undefined fields.
-	post_resource("", "127.0.0.1"), %% undefined: name, frequency
+	%% Enter streams that uses polling but have undefined fields.
+	post_stream("", "127.0.0.1"), %% undefined: name, frequency
 	timer:sleep(1000),
-	List1 = poll_help:get_resources_using_polling(),
-	Rec1 = poll_help:json_to_record_resource(lists:nth(1, List1)),
+	List1 = poll_help:get_streams_using_polling(),
+	Rec1 = poll_help:json_to_record_stream(lists:nth(1, List1)),
 	?assertEqual(undefined, Rec1#pollerInfo.name),
-	?assertEqual("127.0.0.1", Rec1#pollerInfo.url),
+	?assertEqual("127.0.0.1", Rec1#pollerInfo.uri),
 	?assertEqual(undefined, Rec1#pollerInfo.frequency),
-	delete_resource_from_record(Rec1),
+	delete_stream_from_record(Rec1),
 	
-	post_resource("", "127.0.0.1", 10), %% undefined: name
+	post_stream("", "127.0.0.1", 10), %% undefined: name
 	timer:sleep(1000),
-	List2 = poll_help:get_resources_using_polling(),
-	Rec2 = poll_help:json_to_record_resource(lists:nth(1, List2)),
+	List2 = poll_help:get_streams_using_polling(),
+	Rec2 = poll_help:json_to_record_stream(lists:nth(1, List2)),
 	?assertEqual(undefined, Rec2#pollerInfo.name),
-	?assertEqual("127.0.0.1", Rec2#pollerInfo.url),
+	?assertEqual("127.0.0.1", Rec2#pollerInfo.uri),
 	?assertEqual(10, Rec2#pollerInfo.frequency),
-	delete_resource_from_record(Rec2),
+	delete_stream_from_record(Rec2),
 	
-	post_resource("Test", "127.0.0.1"), %% undefined: frequency
+	post_stream("Test", "127.0.0.1"), %% undefined: frequency
 	timer:sleep(1000),
-	List3 = poll_help:get_resources_using_polling(),
-	Rec3 = poll_help:json_to_record_resource(lists:nth(1, List3)),
+	List3 = poll_help:get_streams_using_polling(),
+	Rec3 = poll_help:json_to_record_stream(lists:nth(1, List3)),
 	?assertEqual("Test", Rec3#pollerInfo.name),
-	?assertEqual("127.0.0.1", Rec3#pollerInfo.url),
+	?assertEqual("127.0.0.1", Rec3#pollerInfo.uri),
 	?assertEqual(undefined, Rec3#pollerInfo.frequency),
-	delete_resource_from_record(Rec3).
+	delete_stream_from_record(Rec3).
 	
 	
 	
@@ -138,70 +138,68 @@ json_to_record_resource_test() ->
 
 
 %% @doc
-%% Function: json_to_record_resources_test/0
-%% Purpose: Transform a list of resources in json format to a list of resources
+%% Function: json_to_record_streams_test/0
+%% Purpose: Transform a list of streams in json format to a list of streams
 %%          in the form of #pollerInfo.
 %% Returns: ok | {error, term()}.
 %% @end
--spec json_to_record_resources_test() -> ok | {error, term()}.
-json_to_record_resources_test() ->
+-spec json_to_record_streams_test() -> ok | {error, term()}.
+json_to_record_streams_test() ->
 	
-	%% Clear the resource type from all documents.
-	clear_resource_type(),
+	%% Clear the stream type from all documents.
+	clear_stream_type(),
 	
-	%% Enter two resources with and one without polling.
-    post_resource("Test Resource1", ""),
-	post_resource("Test Resource2", "127.0.0.1", 10),
-	post_resource("Test Resource3", "127.0.0.2", 20),
+	%% Enter two streams with and one without polling.
+    post_stream("Test stream1", ""),
+	post_stream("Test stream2", "127.0.0.1", 10),
+	post_stream("Test stream3", "127.0.0.2", 20),
 	timer:sleep(1000),
 	
-	%% Test to get the resource list and transform it to a #pollerInfo list.
-	ResourceJsonList = poll_help:get_resources_using_polling(),
-	ResourceRecordList = poll_help:json_to_record_resources(ResourceJsonList),
-	Record1 = lists:nth(1, ResourceRecordList),
-	Record2 = lists:nth(2, ResourceRecordList),
-	?assertEqual(2, length(ResourceRecordList)),
+	%% Test to get the stream list and transform it to a #pollerInfo list.
+	StreamJsonList = poll_help:get_streams_using_polling(),
+	StreamRecordList = poll_help:json_to_record_streams(StreamJsonList),
+	Record1 = lists:nth(1, StreamRecordList),
+	Record2 = lists:nth(2, StreamRecordList),
+	?assertEqual(2, length(StreamRecordList)),
 	?assertEqual(true, is_record(Record1, pollerInfo)),
 	?assertEqual(true, is_record(Record2, pollerInfo)),
 	case Record1#pollerInfo.name of
-		"Test Resource2" ->
-			?assertEqual("127.0.0.1", Record1#pollerInfo.url),
+		"Test stream2" ->
+			?assertEqual("127.0.0.1", Record1#pollerInfo.uri),
 			?assertEqual(10, Record1#pollerInfo.frequency),
-			?assertEqual("Test Resource3", Record2#pollerInfo.name),
-			?assertEqual("127.0.0.2", Record2#pollerInfo.url),
+			?assertEqual("Test stream3", Record2#pollerInfo.name),
+			?assertEqual("127.0.0.2", Record2#pollerInfo.uri),
 			?assertEqual(20, Record2#pollerInfo.frequency);
-		"Test Resource3" ->
-			?assertEqual("127.0.0.2", Record1#pollerInfo.url),
+		"Test stream3" ->
+			?assertEqual("127.0.0.2", Record1#pollerInfo.uri),
 			?assertEqual(20, Record1#pollerInfo.frequency),
-			?assertEqual("Test Resource2", Record2#pollerInfo.name),
-			?assertEqual("127.0.0.1", Record2#pollerInfo.url),
+			?assertEqual("Test stream2", Record2#pollerInfo.name),
+			?assertEqual("127.0.0.1", Record2#pollerInfo.uri),
 			?assertEqual(10, Record2#pollerInfo.frequency);
 		_ ->
 			?assert(false)
 	end,
 	
-	%% Clear all entered resources.
-	clear_resource_type().
+	%% Clear all entered streams.
+	clear_stream_type().
 
 %% @doc
-%% Function: get_parsers_by_id_test/0
-%% Purpose: test poll_help:get_parsers_by_id_test/1 function
+%% Function: get_parser_by_id_test/0
+%% Purpose: test poll_help:get_parser_by_id_test/1 function
 %% Returns: ok | {error, term()}.
 %% @end
--spec get_parsers_by_id_test() -> atom() | {error, term()}.
-get_parsers_by_id_test() ->
+-spec get_parser_by_id_test() -> atom() | {error, term()}.
+get_parser_by_id_test() ->
 	
 	%% Clear all parsers stored in elasticsearch
 	clear_parser_type(),
 	api_help:refresh(),
 	
-	post_parser(1, 13, "application/json","streams/temperature/value"),
+	post_parser(1, "application/json","streams/temperature/value"),
 	api_help:refresh(),
-	ParserList = poll_help:get_parsers_by_id("1"),
-	Parser = lists:nth(1, ParserList),
-	?assertEqual(1, length(ParserList)),
-	?assertEqual(1, Parser#parser.resource_id),
-	?assertEqual(13, Parser#parser.stream_id),
+	Parser= poll_help:get_parser_by_id("1"),
+	?assertEqual(true, is_record(Parser, parser)),
+	?assertEqual(1, Parser#parser.stream_id),
 	?assertEqual("streams/temperature/value", Parser#parser.input_parser),
 	?assertEqual("application/json", Parser#parser.input_type),
 	
@@ -226,7 +224,7 @@ get_datapoint_test()->
 	Res1 = poll_help:get_datapoint(12),
 	?assertEqual(0, length(Res0)),
 	?assertEqual(1, length(Res1)),
-	?assertEqual(12, lib_json:get_field(lists:nth(1, Res1), "streamid")),
+	?assertEqual(12, lib_json:get_field(lists:nth(1, Res1), "stream_id")),
 	?assertEqual(13, lib_json:get_field(lists:nth(1, Res1), "value")),
 	
 	%% clear all datapoints stored in elasticsearch
@@ -250,7 +248,7 @@ post_datapoint_test()->
 	Res1 = poll_help:get_datapoint("11"),
 	?assertEqual(0, length(Res0)),
 	?assertEqual(1, length(Res1)),
-	?assertEqual("11", binary_to_list(lib_json:get_field(lists:nth(1, Res1), "streamid"))),
+	?assertEqual("11", binary_to_list(lib_json:get_field(lists:nth(1, Res1), "stream_id"))),
 	?assertEqual("101", binary_to_list(lib_json:get_field(lists:nth(1, Res1), "value"))),
 	
 	%% clear all datapoints stored in elasticsearch
@@ -261,18 +259,17 @@ post_datapoint_test()->
 %% ====================================================================
 
 
-
 %% @doc
-%% Function: clear_resource_type/0
-%% Purpose: Delete all the resource in elasticsearch.
+%% Function: clear_stream_type/0
+%% Purpose: Delete all the stream in elasticsearch.
 %% Returns: {ok, Result} | {ok, saved_to_file} | {error, Reason}.
 %% @end
--spec clear_resource_type() ->
+-spec clear_stream_type() ->
 		  {ok, term()}
 		| {ok, saved_to_file}
 		| {error, term()}.
-clear_resource_type() ->
-	httpc:request(delete, {?ES_ADDR ++ "/resource", []}, [], []).
+clear_stream_type() ->
+	httpc:request(delete, {?ES_ADDR ++ "/stream", []}, [], []).
 
 %% @doc
 %% Function: clear_datapoint_type/0
@@ -299,26 +296,26 @@ clear_parser_type() ->
 	httpc:request(delete, {?ES_ADDR ++ "/parser", []}, [], []).
 
 %% @doc
-%% Function: post_resource/3
-%% Purpose: Post a resource using the values provided, if 'Name' or 'Url' is
+%% Function: post_stream/3
+%% Purpose: Post a stream using the values provided, if 'Name' or 'Uri' is
 %%          empty they are ignored.
 %% Returns: {ok, Result} | {ok, saved_to_file} | {error, Reason}.
 %% @end
--spec post_resource(Name :: string(), Url :: string(), Freq :: integer()) ->
+-spec post_stream(Name :: string(), Url :: string(), Freq :: integer()) ->
 		  {ok, term()}
 		| {ok, saved_to_file}
 		| {error, term()}.
-post_resource(Name, Url, Freq) when is_integer(Freq) ->
+post_stream(Name, Uri, Freq) when is_integer(Freq) ->
 	N = case Name of
 			"" -> "";
 			_ -> ", \"name\" : \"" ++ Name ++ "\""
 		end,
-	U = case Url of
+	U = case Uri of
 			"" -> "";
-			_ -> ", \"url\" : \"" ++ Url ++ "\""
+			_ -> ", \"uri\" : \"" ++ Uri ++ "\""
 		end,
 	F = "\"polling_freq\" : " ++ integer_to_list(Freq),
-	httpc:request(post, {?ES_ADDR ++ "/resource", [],
+	httpc:request(post, {?ES_ADDR ++ "/stream", [],
 						 "application/json",
 						 "{" ++ F ++ U ++ N ++ "}"
 						},
@@ -334,7 +331,7 @@ post_resource(Name, Url, Freq) when is_integer(Freq) ->
 		| {ok, saved_to_file}
 		| {error, term()}.
 post_datapoint(StreamId, Value) when is_integer(StreamId) ->
-	SId = "\"streamid\":" ++ integer_to_list(StreamId) ++ "",
+	SId = "\"stream_id\":" ++ integer_to_list(StreamId) ++ "",
 	case is_integer(Value) of
 		true->
 			Va = integer_to_list(Value);
@@ -369,11 +366,11 @@ post_datapoint(StreamId, Value) when is_integer(StreamId) ->
 %%          empty they are ignored.
 %% Returns: {ok, Result} | {ok, saved_to_file} | {error, Reason}.
 %% @end
--spec post_parser(ResourceId :: integer(), StreamId :: integer(), InputType :: string(), InputParser :: string()) ->
+-spec post_parser(StreamId :: integer(), InputType :: string(), InputParser :: string()) ->
 		  {ok, term()}
 		| {ok, saved_to_file}
 		| {error, term()}.
-post_parser(ResourceId, StreamId, InputType, InputParser) when is_integer(ResourceId), is_integer(StreamId)->
+post_parser(StreamId, InputType, InputParser) when is_integer(StreamId)->
 	It = case InputType of
 			 "" -> "";
 			 _ -> ", \"input_type\":\"" ++ InputType ++ "\""
@@ -382,54 +379,53 @@ post_parser(ResourceId, StreamId, InputType, InputParser) when is_integer(Resour
 			 "" -> "";
 			 _ -> ", \"input_parser\":\"" ++ InputParser ++ "\""
 		 end,
-	Ri = integer_to_list(ResourceId),
 	Si = integer_to_list(StreamId),
 	{ok, Res} = httpc:request(post, {?ES_ADDR ++ "/parser", [],
 						 "application/json",
-						 "{\"resource_id\":"++Ri++", \"stream_id\":"++Si++It++Ip++"}"
+						 "{\"stream_id\":"++Si++It++Ip++"}"
 						}, [],[]).
 
 %% @doc
-%% Function: post_resource/2
-%% Purpose: Post a resource using the values provided, if 'Name' or 'Url' is
+%% Function: post_stream/2
+%% Purpose: Post a stream using the values provided, if 'Name' or 'Uri' is
 %%          empty they are ignored.
 %% Returns: {ok, Result} | {ok, saved_to_file} | {error, Reason}.
 %% @end
--spec post_resource(Name :: string(), Url :: string()) ->
+-spec post_stream(Name :: string(), Uri :: string()) ->
 		  {ok, term()}
 		| {ok, saved_to_file}
 		| {error, term()}.
-post_resource("", "") ->
-	httpc:request(post, {?ES_ADDR ++ "/resource", [],
+post_stream("", "") ->
+	httpc:request(post, {?ES_ADDR ++ "/stream", [],
 						 "application/json",
 						 "{}"
 						}, [], []);
-post_resource(Name, "") ->
-	httpc:request(post, {?ES_ADDR ++ "/resource", [],
+post_stream(Name, "") ->
+	httpc:request(post, {?ES_ADDR ++ "/stream", [],
 						 "application/json",
 						 "{\"name\" : \"" ++ Name ++ "\" }"
 						}, [], []);
-post_resource("", Url) ->
-	httpc:request(post, {?ES_ADDR ++ "/resource", [],
+post_stream("", Uri) ->
+	httpc:request(post, {?ES_ADDR ++ "/stream", [],
 						 "application/json",
-						 "{\"url\" : \"" ++ Url ++ "\" }"
+						 "{\"uri\" : \"" ++ Uri ++ "\" }"
 						}, [], []);
-post_resource(Name, Url) ->
-	httpc:request(post, {?ES_ADDR ++ "/resource", [],
+post_stream(Name, Uri) ->
+	httpc:request(post, {?ES_ADDR ++ "/stream", [],
 						 "application/json",
 						 "{\"name\" : \"" ++ Name ++ "\"" ++
-							 ", \"url\" : \"" ++ Url ++ "\" }"
+							 ", \"uri\" : \"" ++ Uri ++ "\" }"
 						}, [], []).
 
 
 %% @doc
-%% Function: delete_resource_from_record/1
-%% Purpose: Delete the specified resource from the resource type in ES.
+%% Function: delete_stream_from_record/1
+%% Purpose: Delete the specified stream from the stream type in ES.
 %% Returns: {ok, Result} | {ok, saved_to_file} | {error, Reason}.
 %% @end
-delete_resource_from_record(Record) when is_record(Record, pollerInfo) ->
-	Id = Record#pollerInfo.resourceid,
-	httpc:request(delete, {?ES_ADDR ++ "/resource/" ++ Id, []}, [], []).
+delete_stream_from_record(Record) when is_record(Record, pollerInfo) ->
+	Id = Record#pollerInfo.stream_id,
+	httpc:request(delete, {?ES_ADDR ++ "/stream/" ++ Id, []}, [], []).
 
 
 

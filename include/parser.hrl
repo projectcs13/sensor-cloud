@@ -7,7 +7,6 @@
 %% input_type is the datatype to which this datatype is designed.
 %% for instance, application/json
 
--record(parser, {resource_id,
-				 stream_id,
+-record(parser, {stream_id,
 				 input_parser,
 				 input_type}).

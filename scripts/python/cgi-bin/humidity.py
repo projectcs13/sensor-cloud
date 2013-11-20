@@ -10,7 +10,6 @@ print """\
 {"resource": "polling-resource", 
 	"streams": 
 		{ 
-			"temperature": {"value": %f, "timestamp": "%s"}, 
 			"humidity": {"value": %f, "timestamp": "%s"}
 		} 
 	}

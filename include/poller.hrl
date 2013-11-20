@@ -1,8 +1,8 @@
 %%here comes the definition of the structure of poller`s information
 
--record(pollerInfo, {resourceid,
+-record(pollerInfo, {stream_id,
 					 name,
-					 url,
+					 uri,
 					 frequency,
 					 pid}).
 

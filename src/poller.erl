@@ -47,37 +47,35 @@ init(State)->
 %% @end
 -spec handle_call(any(), tuple(), tuple()) -> {reply, any(), tuple()}.
 handle_call({rebuild}, _Form, State)->
-	ResourceId = State#state.resourceid,
-	Url = State#state.url,
+	StreamId = State#state.stream_id,
+	Url = State#state.uri,
 	%%to rebuild the poller 
-	%%extract the url from the datastore according to resource id
-	%%get the pasers from the datastore
+	%%extract the uri from the datastore according to stream id
+	%%get the paser from the datastore
 
-	%%I let each poller interact directly with the erlasticsearch module, not sure it is ok.
-	case erlastic_search:get_doc(?ES_INDEX, "resource", ResourceId) of 
+	case erlastic_search:get_doc(?ES_INDEX, "stream", StreamId) of 
 		{error,Reason} -> 
-			erlang:display("Failed to retrieve the resource according to resource`s id"),
+			erlang:display("Failed to retrieve the stream according to stream`s id"),
 			erlang:display("The error reason: "++Reason),
 			
 			{reply, {error, Reason}, State};
 		{ok,JsonStruct} ->
 		    FinalJson = lib_json:get_and_add_id(JsonStruct),
 			
-			Parsers = poll_help:get_parsers_by_id(ResourceId), %% return a list of parsers [#parser, ...]
-			case Parsers of
+			Parser = poll_help:get_parser_by_id(StreamId), %% return a list of parsers [#parser, ...]
+			case Parser of
 				{error, ErrMsg} ->
-					erlang:display("parsers not found"),
 					{reply, {error, ErrMsg}, State};
 				_ ->
-					NewUrl = lib_json:get_field(FinalJson, "url"),
-					case is_binary(NewUrl) of
+					NewUri = lib_json:get_field(FinalJson, "uri"),
+					case is_binary(NewUri) of
 						false->
-							FinalUrl = NewUrl;
+							FinalUri = NewUri;
 						_ ->
-							FinalUrl = binary_to_list(NewUrl)
+							FinalUri = binary_to_list(NewUri)
 					end,			
 					%% notify the supervisor to refresh its records
-					{reply, {update, ResourceId, FinalUrl}, #state{resourceid=ResourceId, url=FinalUrl, parserslist=Parsers}}
+					{reply, {update, StreamId, FinalUri}, #state{stream_id=StreamId, uri=FinalUri, parser=Parser}}
 			end
 	end;
 handle_call({check_info}, _Form, State)->
@@ -91,23 +89,22 @@ handle_call({check_info}, _Form, State)->
 %% @end
 -spec handle_info(any(), tuple()) -> {noreply, tuple()}.
 handle_info({probe}, State)->
-	ResourceId = State#state.resourceid,
-	ParsersList = State#state.parserslist,
-	Url = State#state.url,
+	StreamId = State#state.stream_id,
+	Parser = State#state.parser,
+	Uri = State#state.uri,
 	
 	%%communicate with external resources
 	%%http://userprimary.net/posts/2009/04/04/exploring-erlangs-http-client/
 	
-	case httpc:request(get, {Url, [{"User-Agent", (?UA++ResourceId)}]}, [], []) of
+	case httpc:request(get, {Uri, [{"User-Agent", (?UA++StreamId)}]}, [], []) of
 		{ok, {{HttpVer, Code, Msg}, Headers, Body}}->
 			case Code==200 of
 				true->
 					case check_header(Headers) of
 						"application/json" ->
-							parser:applyParser(ParsersList, Body, "application/json");
-						"no content type" ->
-							%%error
-							erlang:display("no content type is offered in the response");
+							parser:parseJson(Parser, Body);
+						"plain/text" ->
+							parser:parseText(Parser, Body);
 						_ ->
 							%%the other options
 								erlang:display("other content type")
@@ -132,8 +129,8 @@ handle_info({probe}, State)->
 %% @end
 -spec terminate(tuple(), tuple()) -> atom | tuple().
 terminate(_T, State)->
-	Url = State#state.url,
-	erlang:display("the poller for "++Url++" stops working!"),
+	Uri = State#state.uri,
+	erlang:display("the poller for "++Uri++" stops working!"),
 	application:stop(inets).
 
 %% ====================================================================

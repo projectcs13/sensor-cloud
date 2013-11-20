@@ -17,54 +17,7 @@
 %% ====================================================================
 %% API functions
 %% ====================================================================
--export([applyParser/3]).
-
-%% @doc
-%% Function: applyParser/3
-%% Purpose: used relative parsers to extract the values we want from the data. In the current design, the datapoint 
-%% is a list of values, we care more on the values than the keys. ParsersList contains the regular expressions used to 
-%% parse the different data. 
-%% Returns: ok | {error, ErrMsg}
-%% @end
--spec applyParser(list(),any() ,string()) -> ok | {error, string()}.
-applyParser(ParsersList, Data, ContentType) -> 
-	Parsers = get_parsers_with_content_type(ContentType, ParsersList, []),
-	
-	%% only for testing
-	%% erlang:display("the length of appropriate parsers: "++integer_to_list(length(Parsers))),
-	
-	case Parsers == [] of
-		false -> 
-				doParsing(ParsersList, Data, ContentType);
-		_ -> %%the parsers for this type do not exist.
-				{error, "the parsers for this type do not exist"}
-	end.
-
-
-
-%% ====================================================================
-%% Internal functions
-%% ====================================================================
-
-%% @doc
-%% Function: processParser/2
-%% Purpose: transformat the format of the parser
-%% Example: ["streams","temperature","value"] => "streams.temperature.value" 
-%% Returns: string()
-%% @end
--spec processParser(list(string()), list(string())) -> list(string()).
-processParser([Item|Tail], Res)->
-	case Item=="/" of
-		true->
-			processParser(Tail, Res);
-		_ ->
-			case Tail of
-				[]->
-					Res++Item;
-				_ ->
-					processParser(Tail, Res++Item++".")
-			end
-	end.
+-export([parseJson/2, parseText/2]).
 
 %% @doc
 %% Function: parseJson/2
@@ -76,7 +29,6 @@ processParser([Item|Tail], Res)->
 parseJson(Parser, Data) ->
 
 	%%extract the data from the coming data
-	ResourceId = Parser#parser.resource_id,
 	StreamId = Parser#parser.stream_id,
 	InputType = Parser#parser.input_type,
 	InputParser = Parser#parser.input_parser,
@@ -123,7 +75,7 @@ parseJson(Parser, Data) ->
 						   {error, Reason};
 		{ok,List} -> 
 			%% only for testing
-			%% erlang:display("the final data which is inserted into the database: "++FinalJson),
+			erlang:display("the final data which is inserted into the database: "++FinalJson),
 			
 			ok
 	end.
@@ -140,48 +92,29 @@ parseText(Parser, Data) ->
 	%% return the status of the transaction, ok or {error, ErrMsg}
 	ok.
 
-%% @doc
-%% Function: doParsing/3
-%% Purpose: call parse function using the patterns contained in ParsersList to parse the data.
-%% Returns: ok | {error, ErrMsg}
-%% Side effects: Stores the newly parsed data points in the DB
-%% @end
--spec doParsing(list(), any(), string()) -> ok | {error, string()}.
-doParsing([], Data, ContentType) -> ok;
-doParsing([Parser|ParsersList], Data, ContentType) ->
-	case ContentType of
-		"application/json"->
-			TempRes = parseJson(Parser, Data),
-			case TempRes of
-				ok ->
-					doParsing(ParsersList, Data, ContentType);
-				{error, ErrMsg} ->
-					%%parsing fails
-					TempRes
-			end;
-		"plain/text"->
-			TempRes = parseText(Parser, Data),
-			case TempRes of
-				ok ->
-					doParsing(ParsersList, Data, ContentType);
-				{error, ErrMsg} ->
-					%%parsing fails
-					TempRes
-			end;
-		_ ->
-			%%error the content`s type doesn`t exist
-			{error, "the content`s type doesn`t exist"}
-	end.
+
+
+
+%% ====================================================================
+%% Internal functions
+%% ====================================================================
 
 %% @doc
-%% Function: get_parsers_with_content_type/3
-%% Purpose: find relative patterns for the specific content type.
-%% Returns: The patterns suitable for the current content type
+%% Function: processParser/2
+%% Purpose: transformat the format of the parser
+%% Example: ["streams","temperature","value"] => "streams.temperature.value" 
+%% Returns: string()
 %% @end
--spec get_parsers_with_content_type(string(), list(), list()) -> list().
-get_parsers_with_content_type(_Content_type, [], L) -> L;
-get_parsers_with_content_type(Content_type, [Parser|Parsers], L) ->
-	case Parser#parser.input_type == Content_type of
-		true -> get_parsers_with_content_type(Content_type, Parsers, [Parser|L]);
-		_ -> get_parsers_with_content_type(Content_type, Parsers, L)
+-spec processParser(list(string()), list(string())) -> list(string()).
+processParser([Item|Tail], Res)->
+	case Item=="/" of
+		true->
+			processParser(Tail, Res);
+		_ ->
+			case Tail of
+				[]->
+					Res++Item;
+				_ ->
+					processParser(Tail, Res++Item++".")
+			end
 	end.

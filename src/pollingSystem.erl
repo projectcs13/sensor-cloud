@@ -66,25 +66,25 @@ handle_info({print, Message}, State)->
 %% @doc
 %% Function: handle_cast/2
 %% Purpose: handle asynchronous call of gen_server, accepts two parameters: message of the call and the old state of gen_server.
-%%			can be called via: gen_server:cast(polling_supervisor, {rebuild_poller, (resource_id)}).
+%%			can be called via: gen_server:cast(polling_supervisor, {rebuild_poller, (stream_id)}).
 %% Returns: {noreply, NewState}
 %% Side effects: create new poller and send message to specific poller.
 %% @end
 -spec handle_cast(any(), any()) -> tuple().
-handle_cast({create_poller, #pollerInfo{resourceid = ResourceId, name = ResourceName, url = Url, frequency = Frequency}}, PollersInfo)->
+handle_cast({create_poller, #pollerInfo{stream_id = StreamId, name = StreamName, uri = Uri, frequency = Frequency}}, PollersInfo)->
 	%% erlang:display("receive cast: {create_poller, pollerInfo}"),
 	
-	Parsers = poll_help:get_parsers_by_id(ResourceId),
+	Parser = poll_help:get_parser_by_id(StreamId),
 	
-	{ok, Pid}=supervisor:start_child(polling_monitor, [#state{resourceid=ResourceId, url=Url, parserslist=Parsers}]),
-	Record = #pollerInfo{resourceid=ResourceId, name=ResourceName, url=Url, frequency=Frequency, pid=Pid},
+	{ok, Pid}=supervisor:start_child(polling_monitor, [#state{stream_id=StreamId, uri=Uri, parser=Parser}]),
+	Record = #pollerInfo{stream_id=StreamId, name=StreamName, uri=Uri, frequency=Frequency, pid=Pid},
 	%%use timer library to create scheduler for this poller
 	timer:start(),
 	timer:send_interval(Frequency, Pid, {probe}),
 	{noreply, [Record|PollersInfo]};
-handle_cast({terminate, ResourceId}, PollersInfo)->
+handle_cast({terminate, StreamId}, PollersInfo)->
 	%% erlang:display("receive cast: {terminate, ResourceId}"),
-	Poller = find_poller_by_id(ResourceId, PollersInfo),
+	Poller = find_poller_by_id(StreamId, PollersInfo),
 	case Poller of
 		{error, ErrMsg}->
 			erlang:display(ErrMsg),
@@ -92,42 +92,42 @@ handle_cast({terminate, ResourceId}, PollersInfo)->
 		_ ->
 			supervisor:terminate_child(polling_monitor, Poller#pollerInfo.pid),
 			supervisor:delete_child(polling_monitor, Poller#pollerInfo.pid),
-			{noreply, delete_info(PollersInfo, ResourceId)}
+			{noreply, delete_info(PollersInfo, StreamId)}
 	end;
-handle_cast({rebuild, ResourceId}, PollersInfo)->
+handle_cast({rebuild, StreamId}, PollersInfo)->
 	%% erlang:display("receive cast: {rebuild, ResourceId}"),
 	
-	Poller = find_poller_by_id(ResourceId, PollersInfo),
+	Poller = find_poller_by_id(StreamId, PollersInfo),
 	case Poller of
 		{error, ErrMessage} -> 
 			erlang:display("the error in finding poller: " ++ ErrMessage),
 			NewPollersInfo = PollersInfo;
 		_ ->
-			{update, ResourceId, NewUrl} = gen_server:call(Poller#pollerInfo.pid, {rebuild}),
+			{update, StreamId, NewUri} = gen_server:call(Poller#pollerInfo.pid, {rebuild}),
 			%%change the url of the poller information stored
-			NewPollersInfo = update_info(PollersInfo, ResourceId, NewUrl)
+			NewPollersInfo = update_info(PollersInfo, StreamId, NewUri)
 	end,
 	{noreply, NewPollersInfo};
 handle_cast({add_new_poller, Poller}, PollersInfo)->
 	%% erlang:display("receive cast: {add_new_poller, Poller}"),
 	{noreply, [Poller|PollersInfo]};
-handle_cast({update, ResourceId, NewUrl}, PollersInfo)->
+handle_cast({update, StreamId, NewUri}, PollersInfo)->
 	%% erlang:display("receive cast: {update, ResourceId, NewUrl}"),
-	{noreply, update_info(PollersInfo, ResourceId, NewUrl)}.
+	{noreply, update_info(PollersInfo, StreamId, NewUri)}.
 	
 %% @doc
 %% Function: handle_call/2
-%% Purpose: init function used to generate the supervisor process, pollingBoss supervisor, and create all pollers.
+%% Purpose: init function used to generate the supervisor process, polling monitor, and create all pollers.
 %% Returns: {reply, (reply_message), (new_state_of_gen_server)}
-%% Side effects: creates pollers for specific resource
+%% Side effects: creates pollers for specific stream
 %% @end
 -spec handle_call(atom(), tuple(), any()) -> tuple().
 handle_call(create_pollers, _Form, State)->
 	%% erlang:display("receive request: create_pollers"),
-	%%extract all the resources data from the database
+	%%extract all the streams data from the database
 	%%and store the information into specific data structure
 	
-	PollerList = poll_help:json_to_record_resources(poll_help:get_resources_using_polling()),
+	PollerList = poll_help:json_to_record_streams(poll_help:get_streams_using_polling()),
 
 	create_poller_for_each(PollerList),
 	{reply, ok, State}.
@@ -163,26 +163,26 @@ create_poller_for_each([PollerInfo|PollerInfoList])->
 %% Returns: #pollerInfo | {error, ErrMsg}
 %% @end
 -spec find_poller_by_id(integer(), list(tuple())) -> term() | {error, string()}.
-find_poller_by_id(_ResourceId, []) -> {error, "id doesn`t exist"};
-find_poller_by_id(ResourceId, [Poller|Tail]) ->
-	case Poller#pollerInfo.resourceid == ResourceId of
+find_poller_by_id(_StreamId, []) -> {error, "id doesn`t exist"};
+find_poller_by_id(StreamId, [Poller|Tail]) ->
+	case Poller#pollerInfo.stream_id == StreamId of
 		true -> Poller;
-		_ -> find_poller_by_id(ResourceId, Tail)
+		_ -> find_poller_by_id(StreamId, Tail)
 	end.
 
 %% @doc
 %% Function: delete_info/2
-%% Purpose: delete a resource record with the resource`s id
+%% Purpose: delete a stream record with the stream`s id
 %% Returns: NewPollersRecordList | []
 %% @end
 -spec delete_info(list(tuple()), integer()) -> list().
 delete_info([], _)->[];
-delete_info([Poller|Tail], ResourceId)->
-	case Poller#pollerInfo.resourceid == ResourceId of
+delete_info([Poller|Tail], StreamId)->
+	case Poller#pollerInfo.stream_id == StreamId of
 		true->
 			Tail;
 		_->
-			[Poller|delete_info(Tail, ResourceId)]
+			[Poller|delete_info(Tail, StreamId)]
 	end.
 
 %% @doc
@@ -192,11 +192,11 @@ delete_info([Poller|Tail], ResourceId)->
 %% @end
 -spec update_info(list(tuple()), integer(), string()) -> list().
 update_info([], _, _) -> [];
-update_info([Poller|Tail], ResourceId, NewUrl) ->
-	case Poller#pollerInfo.resourceid == ResourceId of
+update_info([Poller|Tail], StreamId, NewUri) ->
+	case Poller#pollerInfo.stream_id == StreamId of
 		true->
-			[Poller#pollerInfo{url = NewUrl} | Tail];
+			[Poller#pollerInfo{uri = NewUri} | Tail];
 		_ ->
-			[Poller | update_info(Tail, ResourceId, NewUrl)]
+			[Poller | update_info(Tail, StreamId, NewUri)]
 	end.
 

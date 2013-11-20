@@ -17,10 +17,10 @@
 -include("poller.hrl").
 -include("parser.hrl").
 
--export([get_resources_using_polling/0,
-		 json_to_record_resources/1,
-		 json_to_record_resource/1,
-		 get_parsers_by_id/1,
+-export([get_streams_using_polling/0,
+		 json_to_record_streams/1,
+		 json_to_record_stream/1,
+		 get_parser_by_id/1,
 		 post_datapoint/2,
 		 get_datapoint/1]).
 
@@ -44,7 +44,7 @@ get_datapoint(StreamId)->
 		_->
 			Id = StreamId
 	end,
-	case erlastic_search:search_limit(?ES_INDEX, "datapoint", "streamid:" ++ Id, 100) of
+	case erlastic_search:search_limit(?ES_INDEX, "datapoint", "stream_id:" ++ Id, 100) of
 		{ok, Result} ->
 			FinalJson = lib_json:get_list_and_add_id(Result, data),
 			lib_json:get_field(FinalJson, "data");
@@ -63,9 +63,9 @@ get_datapoint(StreamId)->
 post_datapoint(StreamId, Value)->
 	case is_integer(StreamId) of
 		true->
-			FieldValue1 = {"streamid",integer_to_binary(StreamId)};
+			FieldValue1 = {"stream_id",integer_to_binary(StreamId)};
 		_ ->
-			FieldValue1 = {"streamid",list_to_binary(StreamId)}
+			FieldValue1 = {"stream_id",list_to_binary(StreamId)}
 	end,
 	case is_integer(Value) of
 		true->
@@ -99,82 +99,91 @@ post_datapoint(StreamId, Value)->
 	end.
 
 %% @doc
-%% Function: get_parsers_by_id/1
-%% Purpose: get parsers list according to specific resource id 
-%% Returns: {error, ErrMsg} | [#parser .....]
+%% Function: get_parser_by_id/1
+%% Purpose: get parser according to specific stream id 
+%% Returns: {error, ErrMsg} | #parser
 %% @end
--spec get_parsers_by_id(string()) -> tuple() | list().
-get_parsers_by_id(ResourceId)->
-	case erlastic_search:search_limit(?ES_INDEX, "parser", "resource_id:" ++ ResourceId, 100) of
+-spec get_parser_by_id(string()) -> tuple() | tuple().
+get_parser_by_id(StreamId)->
+	case erlastic_search:search_limit(?ES_INDEX, "parser", "stream_id:" ++ StreamId, 100) of
 		{ok, Result} ->
 			EncodedResult = lib_json:encode(Result),
 			case re:run(EncodedResult, "\"max_score\":null", [{capture, first, list}]) of
-				{match, _} -> {error, "parsers not found"};
+				{match, _} -> {error, "the parser not found"};
 				nomatch -> FinalJsonList = lib_json:get_field(lib_json:get_list_and_add_id(Result), "hits"),
-						   
-						   %%transform this json list to record list
-						   jsonToRecord(FinalJsonList, [])
+						   case length(FinalJsonList) of
+							   1 ->
+								   Item = lists:nth(1, FinalJsonList),
+								   #parser{stream_id = lib_json:get_field(Item, "stream_id"),
+				  						input_parser = binary_to_list(lib_json:get_field(Item, "input_parser")),
+				  						input_type = binary_to_list(lib_json:get_field(Item, "input_type"))
+										 };
+							   _ ->
+								   erlang:display("multiple parsers exist for this stream id"),
+								   {error, "multiple parsers exit for this stream id"}
+						   end
+						   %% transform this json list to record list
+						   %% jsonToRecord(FinalJsonList, [])
 			end;
 		_ ->
-			erlang:display("an error happens: parsers not found"),
+			erlang:display("an error happens: the parser not found"),
 			{error, "parsers not found!!"}
 	end. 
 
 %% @doc
-%% Function: get_resources_using_polling/0
-%% Purpose: Retrieves all resources from Elastic Search that are using polling.
-%% Returns: [] | [Resource, ... ] | {error, Reason}.
+%% Function: get_streams_using_polling/0
+%% Purpose: Retrieves all streams from Elastic Search that are using polling.
+%% Returns: [] | [Stream, ... ] | {error, Reason}.
 %% @end
--spec get_resources_using_polling() -> [] | [string()] | {error, term()}.
-get_resources_using_polling() ->
-	%% TODO : Post a query to ES to retrieve resources that have a polling-URL.
-
+-spec get_streams_using_polling() -> [] | [string()] | {error, term()}.
+get_streams_using_polling() ->
 	JsonQuery = "{\"query\" : {\"filtered\" : " ++
-					"{ \"filter\" : {\"exists\" : {\"field\" : \"url\"}}}}}",
+					"{ \"filter\" : {\"exists\" : {\"field\" : \"uri\"}}}}}",
 	
 	case erlastic_search:search_json(#erls_params{},
 									 ?ES_INDEX,
-									 "resource",
+									 "stream",
 									 JsonQuery) of
 		{error, Reason} -> {error, Reason};
 		{ok, Result} ->
 			lib_json:get_field(Result, "hits.hits")
 	end.
+	
 
 
 
 %% @doc
-%% Function: json_to_record_resources/1
-%% Purpose: Converts a list of resource Jsons to a list of pollerInfo records
-%% Returns: [] | [Resource, ...]
+%% Function: json_to_record_streams/1
+%% Purpose: Converts a list of stream Jsons to a list of pollerInfo records
+%% Returns: [] | [Stream, ...]
 %% @end
--spec json_to_record_resources([json()]) -> [] | [record()].
-json_to_record_resources([]) -> [];
-json_to_record_resources([H|T]) ->
-	[json_to_record_resource(H) | json_to_record_resources(T)].
+-spec json_to_record_streams([json()]) -> [] | [record()].
+json_to_record_streams([]) -> [];
+json_to_record_streams([H|T]) ->
+	[json_to_record_stream(H) | json_to_record_streams(T)].
 
 
 
 
 %% @doc
-%% Function: json_to_record_resource/1
-%% Purpose: Converts a resource Json to a pollerInfo record
-%% Returns: Resource
+%% Function: json_to_record_stream/1
+%% Purpose: Converts a stream Json to a pollerInfo record
+%% Returns: #pollerInfo{}
 %% @end
--spec json_to_record_resource(Resource::json()) -> record().
-json_to_record_resource(Resource) ->
-	Name = case lib_json:get_field(Resource, "_source.name") of
+-spec json_to_record_stream(Stream::json()) -> record().
+json_to_record_stream(Stream) ->
+	Name = case lib_json:get_field(Stream, "_source.name") of
 			   undefined -> undefined;
 			   N -> binary_to_list(N)
 		   end,
-	Url = case lib_json:get_field(Resource, "_source.url") of
+	Uri = case lib_json:get_field(Stream, "_source.uri") of
 			  undefined -> undefined;
 			  U -> binary_to_list(U)
 		  end,
-	#pollerInfo{resourceid = binary_to_list(lib_json:get_field(Resource, "_id")),
+	#pollerInfo{stream_id = binary_to_list(lib_json:get_field(Stream, "_id")),
 				name = Name,
-				url = Url,
-				frequency = lib_json:get_field(Resource, "_source.polling_freq")}.
+				uri = Uri,
+				frequency = lib_json:get_field(Stream, "_source.polling_freq")}.
 
 
 %% ====================================================================
@@ -191,8 +200,7 @@ json_to_record_resource(Resource) ->
 jsonToRecord([], Res)->
 	Res;
 jsonToRecord([Item|Tail], Res)->
-	Tmp = #parser{resource_id = lib_json:get_field(Item, "resource_id"),
-				  stream_id = lib_json:get_field(Item, "stream_id"),
+	Tmp = #parser{stream_id = lib_json:get_field(Item, "stream_id"),
 				  input_parser = binary_to_list(lib_json:get_field(Item, "input_parser")),
 				  input_type = binary_to_list(lib_json:get_field(Item, "input_type"))
 				 },
