@@ -18,8 +18,8 @@ compile:
 	@$(REBAR) compile skip_deps=true
 
 ### get_libs will download and install all project libraries
-conf:
-	$(ERL) -pa ebin -s config -config config/engine.config
+conf: compile
+	$(ERL) -pa ebin/ lib/*/ebin/ lib/*/bin/ -s engine -s config -config config/engine.config
 
 get_libs:
 	@@$(REBAR) get-deps
