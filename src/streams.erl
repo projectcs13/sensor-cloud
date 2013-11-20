@@ -318,14 +318,16 @@ get_stream(ReqData, State) ->
 							UserQuery = [],
 							UserDef = false;
 						UserId ->
-							UserQuery = "user_id:" ++ UserId,
+							UserQuery = "\"user_id\":\"" ++ UserId ++ "\"",
 							UserDef = true
 					end,
 					case UserDef of
-						true -> Query = UserQuery;
-						false -> Query = "*"
-					end,
-					case erlastic_search:search_limit(?INDEX, "stream", Query,Size) of % Maybe wanna take more
+						true -> 
+							Query = "{\"size\" :" ++ integer_to_list(Size) ++",\"query\" : {\"term\" : {" ++ UserQuery ++ "}}}";
+						false -> 
+							Query = "{\"size\" :" ++ integer_to_list(Size) ++",\"query\" : {\"match_all\" : {}},\"filter\" : {\"bool\":{\"must_not\":{\"term\":{\"private\":\"true\"}}}}}"
+					end,  
+					case erlastic_search:search_json(#erls_params{},?INDEX, "stream", Query) of % Maybe wanna take more
 						{error, {Code, Body}} -> 
             				ErrorString = api_help:generate_error(Body, Code),
             				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
