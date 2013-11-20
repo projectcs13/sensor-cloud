@@ -11,6 +11,7 @@
 %% Runs the configuration mechanism for the entire project. Sets proper configuration 
 %% for configuration files in libraries.
 %% @end
+-spec start() -> no_return_value.
 start() ->
     case engine_config_check() of
 	ok ->
@@ -54,6 +55,7 @@ start() ->
 %% @doc
 %% Check validity of the projects config file. Make sure that all environment variables is loaded.
 %% @end
+-spec engine_config_check() -> ok | error.
 engine_config_check() ->
     case file:get_cwd() of
 	{ok, CWD} ->
@@ -62,6 +64,8 @@ engine_config_check() ->
 		{ok, Fd} ->
 		    case io:scan_erl_exprs(Fd, "") of
 			{ok, List, _EndLine} ->
+			    %% The use of io:scan_erl_exprs produces a list where I can just filter out
+			    %% most of the terms.
 			    Fun = fun({',',_},Acc) -> 
 					  Acc;
 				     ({'{',_},Acc) ->
@@ -167,7 +171,7 @@ rabbitmq_config_check() ->
 engine_and_nodejs_config() ->
     {ok, CWD} = file:get_cwd(),
     File = CWD ++ "/sensec.sh",
-    Lines = read_file_lines(File),
+    Lines = lib_file:read_file_lines(File),
     NewLines = [case X of
 		    OldLine = "LOG_DIR"++_Line ->
 			case application:get_env(engine, engine_log_dir) of
@@ -175,7 +179,7 @@ engine_and_nodejs_config() ->
 				?DEBUG("Application log dir not defined. Using default value."),
 				OldLine;
 			    {ok, Value} ->
-				ensure_dir(Value),
+				lib_file:ensure_dir_exists(Value),
 				"LOG_DIR=" ++ Value ++ "\n"
 			end;
 		    OldLine = "LOG_JS_DIR"++_Line ->
@@ -184,7 +188,7 @@ engine_and_nodejs_config() ->
 				?DEBUG("NodeJS log dir not defined. Using default value."),
 				OldLine;
 			    {ok, Value} ->
-				ensure_dir(Value),
+				lib_file:ensure_dir_exists(Value),
 				"LOG_JS_DIR=" ++ Value ++ "\n"
 			end;
 		    X ->
@@ -194,7 +198,7 @@ engine_and_nodejs_config() ->
 	Lines ->
 	    ok; %% Nothing in the configuration file was changed so we don't write to the file
 	_ ->
-	    write_lines(File, NewLines)
+	    lib_file:write_file_lines(File, NewLines)
     end,
     ?DEBUG("Finished configuring application config options").
 
@@ -206,7 +210,7 @@ engine_and_nodejs_config() ->
 elastic_search_config() ->
     {ok, CWD} = file:get_cwd(),
     File = CWD ++ "/lib/elasticsearch/config/elasticsearch.yml",
-    Lines = read_file_lines(File),
+    Lines = lib_file:read_file_lines(File),
     FunStrip = fun(X) -> NoComment = string:strip(X, left, $#),
 			 string:strip(NoComment, left) 
 	       end, 
@@ -250,7 +254,7 @@ elastic_search_config() ->
 					  ["path.data: " ++ Value2 ++ "\n"|Acc]
 				  end;
 			      false ->
-				  ensure_dir(Value),
+				  lib_file:ensure_dir_exists(Value),
 				  [DataLine1|Acc]
 			  end
 		  end;
@@ -260,7 +264,7 @@ elastic_search_config() ->
 			  ?DEBUG("Elastic search log directory option not defined. Using default value."),
 			  [OldLine|Acc];
 		      {ok, Value} ->
-			  ensure_dir(Value),
+			  lib_file:ensure_dir_exists(Value),
 			  ["path.logs: " ++ Value ++ "\n"|Acc]
 		  end;
 	     (OldLine = "cluster.name"++_Line, Acc) ->
@@ -285,7 +289,7 @@ elastic_search_config() ->
 	Lines ->
 	    ok; %% Nothing in the configuration file was changed so we don't write to the file
 	_ ->
-	    write_lines(File, NewLines)
+	    lib_file:write_file_lines(File, NewLines)
     end,
     ?DEBUG("Finished configuring elastic_search config options").
 
@@ -297,7 +301,7 @@ elastic_search_config() ->
 erlastic_search_config() ->
     {ok, CWD} = file:get_cwd(),
     File = CWD ++ "/lib/erlastic_search/include/erlastic_search.hrl",
-    Lines = read_file_lines(File),
+    Lines = lib_file:read_file_lines(File),
     FunStrip = fun(X) -> string:strip(X, left) end, 
     %% Take away comment characters & spaces from the beginning of the line
     StrippedLines = [FunStrip(X) || X <- Lines],
@@ -316,7 +320,7 @@ erlastic_search_config() ->
 				?DEBUG("Elastic search port option not defined. Using default value."),
 				OldLine;
 			    {ok, Value} ->
-				"port = \""++ integer_to_list(Value) ++ "\":: integer(),\n"
+				"port = "++ integer_to_list(Value) ++ " :: integer(),\n"
 			end;
 		    X ->
 			X
@@ -325,7 +329,7 @@ erlastic_search_config() ->
 	Lines ->
 	    ok; %% Nothing in the configuration file was changed so we don't write to the file
 	_ ->
-	    write_lines(File, NewLines)
+	    lib_file:write_file_lines(File, NewLines)
     end,
     ?DEBUG("Finished configuring erlastic_search config options").
 
@@ -337,7 +341,7 @@ erlastic_search_config() ->
 rabbit_mq_config() ->
     {ok, CWD} = file:get_cwd(),
     File = CWD ++ "/lib/rabbitmq-server/scripts/rabbitmq-defaults",
-    Lines = read_file_lines(File),
+    Lines = lib_file:read_file_lines(File),
     FunStrip = fun(X) -> string:strip(X, left) 
 	       end, 
     %% Take away comment characters & spaces from the beginning of the line
@@ -349,7 +353,7 @@ rabbit_mq_config() ->
 				?DEBUG("RabbitMQ log directory option not defined. Using default value."),
 				OldLine;
 			    {ok, Value} ->
-				ensure_dir(Value),
+				lib_file:ensure_dir_exists(Value),
 				"LOG_BASE=" ++ Value ++ "\n"
 			end;
 		    X ->
@@ -359,7 +363,7 @@ rabbit_mq_config() ->
 	Lines ->
 	    ok; %% Nothing in the configuration file was changed so we don't write to the file
 	_ ->
-	    write_lines(File, NewLines)
+	    lib_file:write_file_lines(File, NewLines)
     end, 
     ?DEBUG("Finished configuring rabbit_mq config options").
 
@@ -371,71 +375,3 @@ pair([], Acc) ->
     lists:reverse(Acc);
 pair([A, B| Tl], Acc) ->
     pair(Tl, [{A,B} | Acc]).
-
-
-ensure_dir(AbsoluteDir = "/"++_Dir) ->
-    User = os:cmd("echo $USER")--"\n",
-    case User of
-	"root" ->
-	    os:cmd("mkdir -p "++AbsoluteDir);
-	User ->
-	    case re:run("^/home/"++User, AbsoluteDir, [{capture, none}]) of
-		nomatch ->
-		    case file:list_dir(AbsoluteDir) of
-			{ok, _FileList} ->
-			    ?DEBUG("Config option set to directory '" ++ AbsoluteDir++ "'.");
-			{error, _Reason} ->
-			    ?DEBUG("Non existing directory '" 
-				   ++ AbsoluteDir 
-				   ++ "' and cannot create directory without sudo rights. Rerun with sudo access")
-		    end;
-		match ->
-		    os:cmd("mkdir -p " ++ AbsoluteDir)
-	    end
-    end;
-ensure_dir(RelativeDir) ->    
-    os:cmd("mkdir -p " ++ RelativeDir).
-
-
-
-
-%% @doc
-%% Read all lines from a file.
-%% @end
--spec read_file_lines(File::string()) -> [string()] | error.
-read_file_lines(File) ->
-    case file:open(File, [read]) of
-	{ok, Fd} ->
-	    Lines = read_file_lines(Fd, []),
-	    file:close(Fd),
-	    Lines;
-	_ ->
-	    ?ERROR("Unable to open file: "++File),
-	    error
-    end.
-
-%% @doc
-%% Read all lines from a file. Used by read_file_lines/1
-%% @end
--spec read_file_lines(Fd::pid(), Acc::list()) -> [string()].
-read_file_lines(Fd, Acc) ->
-    case file:read_line(Fd) of
-	eof ->
-	    lists:reverse(Acc);
-	{ok, Line} ->
-	    read_file_lines(Fd, [Line | Acc])
-    end.
-
-%% @doc
-%% Writes all lines from a file. If the file exists then all of the old content is removed and Lines will be inserted instead.
-%% @end
--spec write_lines(Fd::pid(), Lines::[string()]) -> ok | error.
-write_lines(File, Lines) ->
-    case file:open(File, [write]) of
-	{ok, Fd} ->
-	    file:write(Fd, Lines),
-	    file:close(Fd);
-	_ ->
-	    ?ERROR("Unable to open file: "++File),
-	    error
-    end.
