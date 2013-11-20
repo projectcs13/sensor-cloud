@@ -7,15 +7,17 @@
 
 -module(users).
 -export([init/1,
-                allowed_methods/2,
-                content_types_accepted/2,
-                content_types_provided/2,
-                delete_resource/2,
-                put_user/2,
-                get_user/2,
-                process_post/2]).
+		 allowed_methods/2,
+         content_types_accepted/2,
+         content_types_provided/2,
+         delete_resource/2,
+         put_user/2,
+         get_user/2,
+         process_post/2,
+		 delete_streams_with_user_id/1]).
 
 -include("webmachine.hrl").
+-include_lib("erlastic_search.hrl").
 -include("field_restrictions.hrl").
 
 %% @doc
@@ -246,7 +248,9 @@ get_user(ReqData, State) ->
                         SizeParam ->
                             Size = list_to_integer(SizeParam)
                     end,
-                    case erlastic_search:search_limit(?INDEX,"user","*:*",Size) of
+					
+					Query = "{\"size\" :" ++ integer_to_list(Size) ++",\"query\" : {\"match_all\" : {}},\"filter\" : {\"bool\":{\"must_not\":{\"term\":{\"private\":\"true\"}}}}}",
+					case erlastic_search:search_json(#erls_params{},?INDEX, "user", Query) of
                         {error, {Code, Body}} -> 
                             ErrorString = api_help:generate_error(Body, Code),
                             {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
@@ -281,7 +285,7 @@ get_user(ReqData, State) ->
 process_search(ReqData, State, post) ->
         {Json,_,_} = api_help:json_handler(ReqData,State),
         {struct, JsonData} = mochijson2:decode(Json),
-        Query = api_help:transform(JsonData),
+		Query = api_help:transform(JsonData),
         case erlastic_search:search_limit(?INDEX, "user", Query, 10) of
             {error, {Code, Body}} -> 
                 ErrorString = api_help:generate_error(Body, Code),

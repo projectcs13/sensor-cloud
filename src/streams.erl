@@ -45,7 +45,7 @@ allowed_methods(ReqData, State) ->
 		[{"streams"}] ->
 			{['POST', 'GET'], ReqData, State}; 
 		[{"users", _UserID}, {"streams"}] ->
-			{['POST', 'GET'], ReqData, State};
+			{['POST', 'GET', 'DELETE'], ReqData, State};
 		[{"streams", _StreamID}] ->
 			{['GET', 'PUT', 'DELETE'], ReqData, State};
 		[{"users", _UserID}, {"streams", _StreamID}] ->
@@ -91,18 +91,29 @@ content_types_accepted(ReqData, State) ->
 -spec delete_resource(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 
 delete_resource(ReqData, State) ->
-	Id = proplists:get_value('stream', wrq:path_info(ReqData)),
-	case delete_data_points_with_stream_id(Id) of 
-		{error, {Code, Body}} -> 
-            ErrorString = api_help:generate_error(Body, Code),
-            {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-		{ok} ->
-			case erlastic_search:delete_doc(?INDEX,"stream", Id) of
+	case proplists:get_value('user', wrq:path_info(ReqData)) of
+		undefined ->
+			Id = proplists:get_value('stream', wrq:path_info(ReqData)),
+			case delete_data_points_with_stream_id(Id) of 
+				{error, {Code, Body}} -> 
+					ErrorString = api_help:generate_error(Body, Code),
+            		{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+				{ok} ->
+					case erlastic_search:delete_doc(?INDEX,"stream", Id) of
+						{error, {Code, Body}} -> 
+							ErrorString = api_help:generate_error(Body, Code),
+							{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+						{ok,List} -> 
+			 				{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
+					end
+			end;
+		UserId ->
+			case users:delete_streams_with_user_id(UserId) of
 				{error, {Code, Body}} -> 
 					ErrorString = api_help:generate_error(Body, Code),
 					{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-				{ok,List} -> 
-			 		{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
+				{ok} ->
+					{true,wrq:set_resp_body("{\"message\":\"All streams with user_id:" ++UserId++" are now deleted\"}",ReqData),State}
 			end
 	end.
 
@@ -395,14 +406,16 @@ get_stream(ReqData, State) ->
 							UserQuery = [],
 							UserDef = false;
 						UserId ->
-							UserQuery = "user_id:" ++ UserId,
+							UserQuery = "\"user_id\":\"" ++ UserId ++ "\"",
 							UserDef = true
 					end,
 					case UserDef of
-						true -> Query = UserQuery;
-						false -> Query = "*"
-					end,
-					case erlastic_search:search_limit(?INDEX, "stream", Query,Size) of % Maybe wanna take more
+						true -> 
+							Query = "{\"size\" :" ++ integer_to_list(Size) ++",\"query\" : {\"term\" : {" ++ UserQuery ++ "}}}";
+						false -> 
+							Query = "{\"size\" :" ++ integer_to_list(Size) ++",\"query\" : {\"match_all\" : {}},\"filter\" : {\"bool\":{\"must_not\":{\"term\":{\"private\":\"true\"}}}}}"
+					end,  
+					case erlastic_search:search_json(#erls_params{},?INDEX, "stream", Query) of % Maybe wanna take more
 						{error, {Code, Body}} -> 
             				ErrorString = api_help:generate_error(Body, Code),
             				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
