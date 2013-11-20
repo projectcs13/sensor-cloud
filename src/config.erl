@@ -170,7 +170,7 @@ rabbitmq_config_check() ->
 -spec engine_and_nodejs_config() -> ok.
 engine_and_nodejs_config() ->
     {ok, CWD} = file:get_cwd(),
-    File = CWD ++ "/sensec.sh",
+    File = CWD ++ "/scripts/sensec.sh",
     Lines = lib_file:read_file_lines(File),
     NewLines = [case X of
 		    OldLine = "LOG_DIR"++_Line ->
