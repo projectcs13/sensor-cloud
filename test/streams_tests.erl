@@ -272,7 +272,26 @@ add_unsupported_field_test() ->
 	{ok, {{_Version5, 200, _ReasonPhrase5}, _Headers5, _Body5}} = httpc:request(delete, {"http://localhost:8000/users/" ++ lib_json:to_string(UserId), []}, [], []).
 
 
-
+%% @doc
+%% Function: dont_get_private_streams_test/0
+%% Purpose: Test private streams are not listed unless user_id is given
+%% Returns: ok | {error, term()}
+%% @end
+-spec dont_get_private_streams_test() -> ok | {error, term()}.
+dont_get_private_streams_test() ->
+	{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} = httpc:request(post, {"http://localhost:8000/users", [], "application/json", "{\"username\":\"test\"}"}, [], []),
+	UserId = lib_json:get_field(Body,"_id"),
+	api_help:refresh(),
+	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [], "application/json", "{\"name\":\"Private\",\"user_id\" : \"" ++ lib_json:to_string(UserId) ++ "\",\"private\":\"true\"}"}, [], []),
+	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/streams", [], "application/json", "{\"name\":\"Public\",\"user_id\" : \"" ++ lib_json:to_string(UserId) ++ "\",\"private\":\"false\"}"}, [], []),
+	api_help:refresh(),
+	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(get, {"http://localhost:8000/streams", []}, [], []),
+	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(get, {"http://localhost:8000/users/" ++ lib_json:to_string(UserId) ++ "/streams", []}, [], []),
+	{ok, {{_Version5, 200, _ReasonPhrase5}, _Headers5, _Body5}} = httpc:request(delete, {"http://localhost:8000/users/" ++ lib_json:to_string(UserId), []}, [], []),
+	
+	?assertEqual(true,lib_json:field_value_exists(Body3,"streams[*].private", <<"false">>)),
+	?assertEqual(true,lib_json:field_value_exists(Body4,"streams[*].private", <<"true">>)).
+	
 %% @doc
 %% Function: generate_date/2
 %% Purpose: Used to create a date valid in ES
