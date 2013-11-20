@@ -181,8 +181,6 @@ text_autocompletion_test() ->
 	{ok, {{_Version0, 200, _ReasonPhrase0}, _Headers0, Body0}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"name\" : \"search\",\"resource_id\" : \""++lib_json:to_string(Id)++"\", \"private\" : \"false\", \"tags\":\"test_auto_tag\"}"}, [], []),
 	api_help:refresh(),
 	
-	%% os:cmd("lsof | wc -"),
-	
 	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"name\" : \"search\",\"resource_id\" : \""++lib_json:to_string(Id)++"\", \"private\" : \"false\", \"tags\":\"test_auto_tag\"}"}, [], []),
 	timer:sleep(1000),
 	Response2 = get_request(?SUGGEST_URL++"model/"++"testauto"),

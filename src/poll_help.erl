@@ -61,23 +61,23 @@ get_datapoint(StreamId)->
 %% @end
 -spec post_datapoint(integer()|string(), any()) -> atom() | tuple().
 post_datapoint(StreamId, Value)->
-	case is_integer(StreamId) of
-		true->
-			FieldValue1 = {"stream_id",integer_to_binary(StreamId)};
-		_ ->
-			FieldValue1 = {"stream_id",list_to_binary(StreamId)}
-	end,
-	case is_integer(Value) of
-		true->
-			FieldValue2 = {"value",integer_to_binary(Value)};
-		_->
-			case is_float(Value) of
-				true->
-					FieldValue2 = {"value",float_to_binary(Value)};
-				_ ->
-					FieldValue2 = {"value",list_to_binary(Value)}
-			end
-	end,
+	FieldValue1 =  case is_integer(StreamId) of
+						true->
+							{"stream_id",integer_to_binary(StreamId)};
+						_ ->
+							{"stream_id",list_to_binary(StreamId)}
+					end,
+	FieldValue2 = case is_integer(Value) of
+						true->
+							{"value",integer_to_binary(Value)};
+						_->
+							case is_float(Value) of
+								true->
+									{"value",float_to_binary(Value)};
+								_ ->
+									{"value",list_to_binary(Value)}
+							end
+					end,
 	{{Year, Month, Day}, {Hour, Minutes, Seconds}} = calendar:now_to_universal_time(os:timestamp()),
 	
 	StrYear = integer_to_list(Year),

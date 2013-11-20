@@ -75,7 +75,7 @@ parseJson(Parser, Data) ->
 						   {error, Reason};
 		{ok,List} -> 
 			%% only for testing
-			erlang:display("the final data which is inserted into the database: "++FinalJson),
+			%% erlang:display("the final data which is inserted into the database: "++FinalJson),
 			
 			ok
 	end.
