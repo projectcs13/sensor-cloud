@@ -1,4 +1,4 @@
-%% Author: Tomas Sävström <tosa7943@student.uu.se>
+%% Author: Tomas Sï¿½vstrï¿½m <tosa7943@student.uu.se>
 %% [www.csproj13.student.it.uu.se]
 %% == api include file ==
 %% Includes defenitions of what fields are accteded and what fields are restricted, 
@@ -21,7 +21,7 @@
 %% Fields for resources
 -define(RESTRCITEDUPDATERESOURCES, ["creation_date"]).
 -define(RESTRCITEDCREATERESOURCES, ["creation_date"]).
--define(ACCEPTEDFIELDSRESOURCES, ["user_id","name","tags","model","description","type","manufacturer","uri","polling_freq","creation_date","uuid"]).
+-define(ACCEPTEDFIELDSRESOURCES, ["user_id","name","tags","model","description","type","manufacturer","uri","polling_freq","creation_date","uuid","active","location"]).
 
 %% Fields for data-points
--define(ACCEPTEDFIELDSDATAPOINTS, ["streamid","timestamp","value"]).
+-define(ACCEPTEDFIELDSDATAPOINTS, ["stream_id","timestamp","value"]).

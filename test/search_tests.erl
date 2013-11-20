@@ -1,4 +1,4 @@
-%% @author Jose Arias
+%% @author Jose Arias, Andreas Moregård Haubenwaller
 %% [www.csproj13.student.it.uu.se]
 %% @version 1.0
 %% @copyright [Copyright information]
@@ -24,6 +24,17 @@
 
 init_test() ->
     inets:start().
+
+%% @doc
+%% Function: get_search_test/0
+%% Purpose: Test the get_search function by doing some HTTP requests
+%% Returns: ok | {error, term()}
+%% @end
+get_search_test() ->
+    {ok, {{_Version1, 405, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(get, {"http://localhost:8000/_history", []}, [], []),
+    {ok, {{_Version2, 501, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(get, {"http://localhost:8000/_search", []}, [], []),
+    {ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(get, {"http://localhost:8000/_history?stream_id=id_that_doesnt_exist", []}, [], []),
+    ?assertEqual([],lib_json:get_field(Body3,"history[0].data")).
 
 
 

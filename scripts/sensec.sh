@@ -1,7 +1,7 @@
 #!/bin/bash
 dir=`dirname $0`
 #Specify project home directory.
-HOME_PATH=`cd  $dir;pwd`
+HOME_PATH=`cd $dir;cd ..;pwd`
 LOG_DIR=$HOME_PATH/priv/logs
 LOG_JS_DIR=$LOG_DIR
 
