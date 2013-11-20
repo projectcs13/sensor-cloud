@@ -254,15 +254,3 @@ filter_json(Json, From, Size, Sort) ->
 	",\"sort\" : " ++UseSort++
 	",\"query\" : {\"filtered\" : "++NewJson++
 	",\"filter\" : {\"bool\" : {\"must_not\" : {\"term\" : {\"private\" : \"true\"}}}}}}}".
-
-    %% Started creating the above Json with lib_json, but it is alot more work...
-    %EmptyJson = "{}",
-    %FromAttribute = {from, list_to_binary(From)},
-    %SizeAttribute = {size, list_to_binary(Size)},
-    %SortAttribute = {sort, list_to_binary(Sort)},
-    %lib_json:add_values(EmptyJson, [FromAttribute, SizeAttribute, SortAttribute]),
-    %FilteredAttribute = {filtered, "{}"},
-    %PrivateAttribute = {private, list_to_binary("false")},
-    %TermAttribute = {term, "{}")},
-    %FilteredJson = lib_json:add_value(EmptyJson, "filtered", list_to_binary(Sort)),
-
