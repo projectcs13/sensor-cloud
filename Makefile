@@ -5,6 +5,9 @@
 ################################################################################
 ERL := erl
 REBAR := ./rebar
+ERL_CONFIG := -config config/engine.config
+ERL_BOOT := -boot start_sasl -s reloader -s engine
+ERL_PA_FOLDERS := -pa ebin/ lib/*/ebin/ lib/*/bin/
 ################################################################################
 
 
@@ -19,7 +22,7 @@ compile:
 
 ### get_libs will download and install all project libraries
 conf: compile
-	$(ERL) -pa ebin/ lib/*/ebin/ lib/*/bin/ -s engine -s config -config config/engine.config
+	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) -s engine -s config
 
 get_libs:
 	@@$(REBAR) get-deps
@@ -60,7 +63,7 @@ install: get_libs conf
 run: compile
 	-export R_HOME="/usr/lib/R"
 	curl -XPUT localhost:9200/sensorcloud
-	$(ERL) -pa ebin/ lib/*/ebin/ lib/*/bin/ -boot start_sasl -s reloader -s engine -sname engine -config config/engine.config
+	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine
 
 ### Command: make run_es
 ### Runs elastic search
@@ -71,42 +74,42 @@ run_es:
 ### Runs rabbitMQ server
 run_rabbit:
 	sudo lib/rabbitmq-server/scripts/rabbitmq-server
-	
+
 ### Command: make test
 ### Compile project resources (not libraries) and runs all eunit tests.
 test: compile
 	-@mkdir test-results
 	curl -XDELETE localhost:9200/sensorcloud
 	curl -XPUT localhost:9200/sensorcloud
-	$(ERL) -pa ebin/ lib/*/ebin/ lib/*/bin/ -boot start_sasl -s reloader -s engine -sname engine -s test run
+	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -s test run
 
 test_json: compile
 	-@mkdir test-results
-	$(ERL) -pa ebin/ lib/*/ebin/ lib/*/bin/ -boot start_sasl -s reloader -s engine -sname engine -eval 'test:run(lib_json)'
+	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -eval 'test:run(lib_json)'
 
 test_resources: compile
 	-@mkdir test-results
 	curl -XDELETE localhost:9200/sensorcloud
 	curl -XPUT localhost:9200/sensorcloud
-	$(ERL) -pa ebin/ lib/*/ebin/ lib/*/bin/ -boot start_sasl -s reloader -s engine -sname engine -eval 'test:run(resources)'
+	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -eval 'test:run(resources)'
 
 test_streams: compile
 	-@mkdir test-results
 	curl -XDELETE localhost:9200/sensorcloud
 	curl -XPUT localhost:9200/sensorcloud
-	$(ERL) -pa ebin/ lib/*/ebin/ lib/*/bin/ -boot start_sasl -s reloader -s engine -sname engine -eval 'test:run(streams)'
+	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -eval 'test:run(streams)'
 
 test_suggest: compile
 	-@mkdir test-results
 	curl -XDELETE localhost:9200/sensorcloud
 	curl -XPUT localhost:9200/sensorcloud
-	$(ERL) -pa ebin/ lib/*/ebin/ lib/*/bin/ -boot start_sasl -s reloader -s engine -sname engine -eval 'test:run(suggest)'
+	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -eval 'test:run(suggest)'
 
 test_users: compile
 	-@mkdir test-results
 	curl -XDELETE localhost:9200/sensorcloud
 	curl -XPUT localhost:9200/sensorcloud
-	$(ERL) -pa ebin/ lib/*/ebin/ lib/*/bin/ -boot start_sasl -s reloader -s engine -sname engine -eval 'test:run(users)'
+	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -eval 'test:run(users)'
 
 ### Command: make docs
 ### Genereats all of the documentation files
