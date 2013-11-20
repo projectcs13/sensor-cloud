@@ -511,3 +511,25 @@ get_webmachine_url() ->
 			"http://localhost:8000"
 	end.
 
+%% @doc
+%% Returns the URL of Elastic Search
+%%
+%% @end
+-spec get_elastic_search_url() -> string().
+get_elastic_search_url() ->
+    Port = case application:get_env(engine, es_port) of
+	       {ok, Value} ->
+		   Value;
+	       undefined ->
+		   9200
+	   end,
+    Ip = case application:get_env(engine, es_ip) of
+	       {ok, Value} ->
+		   Value;
+	       undefined ->
+		   "localhost"
+	 end,
+    "http://"++Ip++":"++integer_to_list(Port)
+    
+
+
