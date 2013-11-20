@@ -123,6 +123,7 @@ update_resource_test() ->
 	?assertEqual(<<"test2">>, lib_json:get_field_value(Body2, "suggestions[0].payload.streams[*].tags",<<"test2">>)),
 	{ok, {{_Version21, 200, _ReasonPhrase21}, _Headers21, _Body21}} = httpc:request(put, {"http://localhost:8000/resources/"++lib_json:to_string(Id), [],"application/json", "{\"model\" : \"testupdate\",\"tags\" : \"newtag\"}"}, [], []),
 	api_help:refresh(),
+	timer:sleep(1000),
 	{ok, {_, _ ,Body3}} = get_request(?SUGGEST_URL++"testupdate"),
 	?assertEqual(<<"newtag">>,lib_json:get_field(Body3, "suggestions[0].payload.tags")),
 	?assertEqual(true, lib_json:field_value_exists(Body3, "suggestions[0].payload.streams[*].tags",<<"test_tag">>)),
