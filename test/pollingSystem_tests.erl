@@ -148,10 +148,14 @@ rebuild_system_test()->
 
 	%% testing rebuild
 	clear_stream_type(),
+	clear_parser_type(),
 	api_help:refresh(),
 	
     post_stream_with_id(1, "test2", ?POLL_ADD2, 1000, "application/json"),
 	post_stream_with_id(2, "test1", ?POLL_ADD, 1300, "application/json"),
+	
+	post_parser(2, "application/json","streams/temperature/value"),
+	post_parser(1, "application/json","streams/humidity/value"),
 	
 	api_help:refresh(),
 	gen_server:cast(polling_supervisor, {rebuild, "1"}),
@@ -190,12 +194,18 @@ rebuild_system_test()->
 	erlang:display("!!!!!!!!!!!!!!!!!"),
 
 	clear_stream_type(),
+	clear_parser_type(),
 	api_help:refresh(),
 	post_stream_with_id(1, "test", ?POLL_ADD, 1000, "application/json"),
 	post_stream_with_id(2, "test2", ?POLL_ADD2, 1300, "application/json"),
+	
+	post_parser(1, "application/json","streams/temperature/value"),
+	post_parser(2, "application/json","streams/humidity/value"),
+	
 	api_help:refresh(),
 	gen_server:cast(polling_supervisor, {rebuild, "1"}),
 	gen_server:cast(polling_supervisor, {rebuild, "2"}),
+	timer:sleep(1000),
 	
 	ChildrenList2 = supervisor:which_children(polling_monitor),
 	?assertEqual(2, length(ChildrenList2)),

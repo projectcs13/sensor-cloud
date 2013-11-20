@@ -4,6 +4,7 @@
 					 name,
 					 uri,
 					 frequency,
-					 pid}).
+					 pid,
+					 timer_ref}).
 
 

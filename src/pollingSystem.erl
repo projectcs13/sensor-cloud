@@ -55,8 +55,7 @@ init(_)->
 %% Function: handle_info/2
 %% Purpose: handle the messages` processing of the gen_server, accepts two parameters: message and the old state of gen_server.
 %%			could be called by: polling_supervisor!{message}
-%% Returns: {noreply, NewState}
-%% Side effects: send message to specific poller and update the state of gen_server.
+%% Returns: {noreply, State}
 %% @end
 -spec handle_info(any(), any()) -> tuple().
 handle_info({print, Message}, State)->
@@ -77,10 +76,10 @@ handle_cast({create_poller, #pollerInfo{stream_id = StreamId, name = StreamName,
 	Parser = poll_help:get_parser_by_id(StreamId),
 	
 	{ok, Pid}=supervisor:start_child(polling_monitor, [#state{stream_id=StreamId, uri=Uri, parser=Parser}]),
-	Record = #pollerInfo{stream_id=StreamId, name=StreamName, uri=Uri, frequency=Frequency, pid=Pid},
 	%%use timer library to create scheduler for this poller
 	timer:start(),
-	timer:send_interval(Frequency, Pid, {probe}),
+	{ok, TRef} = timer:send_interval(Frequency, Pid, {probe}),
+	Record = #pollerInfo{stream_id=StreamId, name=StreamName, uri=Uri, frequency=Frequency, pid=Pid, timer_ref=TRef},
 	{noreply, [Record|PollersInfo]};
 handle_cast({terminate, StreamId}, PollersInfo)->
 	%% erlang:display("receive cast: {terminate, ResourceId}"),
@@ -103,17 +102,13 @@ handle_cast({rebuild, StreamId}, PollersInfo)->
 			erlang:display("the error in finding poller: " ++ ErrMessage),
 			NewPollersInfo = PollersInfo;
 		_ ->
-			{update, StreamId, NewUri} = gen_server:call(Poller#pollerInfo.pid, {rebuild}),
+			{update, StreamId, NewUri, NewFreq} = gen_server:call(Poller#pollerInfo.pid, {rebuild}),
+			{ok,  cancel} = timer:cancel(Poller#pollerInfo.timer_ref),
+			{ok, NewTRef} = timer:send_interval(NewFreq, Poller#pollerInfo.pid, {probe}), 
 			%%change the url of the poller information stored
-			NewPollersInfo = update_info(PollersInfo, StreamId, NewUri)
+			NewPollersInfo = update_info(PollersInfo, StreamId, NewUri, NewTRef)
 	end,
-	{noreply, NewPollersInfo};
-handle_cast({add_new_poller, Poller}, PollersInfo)->
-	%% erlang:display("receive cast: {add_new_poller, Poller}"),
-	{noreply, [Poller|PollersInfo]};
-handle_cast({update, StreamId, NewUri}, PollersInfo)->
-	%% erlang:display("receive cast: {update, ResourceId, NewUrl}"),
-	{noreply, update_info(PollersInfo, StreamId, NewUri)}.
+	{noreply, NewPollersInfo}.
 	
 %% @doc
 %% Function: handle_call/2
@@ -186,17 +181,17 @@ delete_info([Poller|Tail], StreamId)->
 	end.
 
 %% @doc
-%% Function: update_info/3
+%% Function: update_info/4
 %% Purpose: after poller done its rebuild, supervisor uses this function to update its pollers` info store.
 %% Returns: NewPollersRecordList | []
 %% @end
--spec update_info(list(tuple()), integer(), string()) -> list().
-update_info([], _, _) -> [];
-update_info([Poller|Tail], StreamId, NewUri) ->
+-spec update_info(list(tuple()), integer(), string(), integer()) -> list().
+update_info([], _, _, _) -> [];
+update_info([Poller|Tail], StreamId, NewUri, NewTRef) ->
 	case Poller#pollerInfo.stream_id == StreamId of
 		true->
-			[Poller#pollerInfo{uri = NewUri} | Tail];
+			[Poller#pollerInfo{uri = NewUri, timer_ref = NewTRef} | Tail];
 		_ ->
-			[Poller | update_info(Tail, StreamId, NewUri)]
+			[Poller | update_info(Tail, StreamId, NewUri, NewTRef)]
 	end.
 

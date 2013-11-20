@@ -212,6 +212,10 @@ add_stream_suggestion_fields(Stream) ->
 %% @end
 -spec update_suggestion(Stream::json()) -> ok.
 update_suggestion(Stream) ->
+	
+	%% only for testing
+	erlang:display("run function: update_suggestion/1"),
+	
 	ResourceId = lib_json:get_field(Stream, "resource_id"),
 	case erlastic_search:search(?INDEX, "suggestion", "resource_id:"++ lib_json:to_string(ResourceId)) of
 		{error, _} -> erlang:display("ERROR");
@@ -238,7 +242,9 @@ update_suggestion(Stream) ->
 					Final = api_help:create_update(NewSugg),
 					case api_help:update_doc(?INDEX, "suggestion", Id, Final) of 
 						{error, _Reason} -> erlang:display("not updated");
-						{ok, _Json} -> ok 
+						{ok, _Json} -> 
+							erlang:display("succeed updating the suggestion!!"),
+							ok 
 					end;
 				_ -> 
 					erlang:display("No suggestion exists for that resource")

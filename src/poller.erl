@@ -68,6 +68,7 @@ handle_call({rebuild}, _Form, State)->
 					{reply, {error, ErrMsg}, State};
 				_ ->
 					NewUri = lib_json:get_field(FinalJson, "uri"),
+					NewFreq = lib_json:get_field(FinalJson, "polling_freq"),
 					case is_binary(NewUri) of
 						false->
 							FinalUri = NewUri;
@@ -75,7 +76,7 @@ handle_call({rebuild}, _Form, State)->
 							FinalUri = binary_to_list(NewUri)
 					end,			
 					%% notify the supervisor to refresh its records
-					{reply, {update, StreamId, FinalUri}, #state{stream_id=StreamId, uri=FinalUri, parser=Parser}}
+					{reply, {update, StreamId, FinalUri, NewFreq}, #state{stream_id=StreamId, uri=FinalUri, parser=Parser}}
 			end
 	end;
 handle_call({check_info}, _Form, State)->

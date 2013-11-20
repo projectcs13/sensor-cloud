@@ -40,21 +40,21 @@ parseJson(Parser, Data) ->
 	%%insert the data as a new datapoint into the database
 	%%since we need more time to investigate how to handle timestamp
 	%%so currently we only consider the time when we receive the datapackage
-	case is_integer(StreamId) of
+	FieldValue1 = case is_integer(StreamId) of
+					true->	
+						{"stream_id",integer_to_binary(StreamId)};
+					_ ->
+						{"stream_id",list_to_binary(StreamId)}
+				  end,
+	FieldValue2 = case is_integer(Res) of
 		true->
-			FieldValue1 = {"stream_id",integer_to_binary(StreamId)};
-		_ ->
-			FieldValue1 = {"stream_id",list_to_binary(StreamId)}
-	end,
-	case is_integer(Res) of
-		true->
-			FieldValue2 = {"value",integer_to_binary(Res)};
+			{"value",integer_to_binary(Res)};
 		_->
 			case is_float(Res) of
 				true->
-					FieldValue2 = {"value",float_to_binary(Res)};
+					{"value",float_to_binary(Res)};
 				_ ->
-					FieldValue2 = {"value",list_to_binary(Res)}
+					{"value",list_to_binary(Res)}
 			end
 	end,
 	{{Year, Month, Day}, {Hour, Minutes, Seconds}} = calendar:now_to_universal_time(os:timestamp()),
