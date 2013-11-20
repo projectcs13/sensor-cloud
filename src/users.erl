@@ -7,13 +7,14 @@
 
 -module(users).
 -export([init/1,
-                allowed_methods/2,
-                content_types_accepted/2,
-                content_types_provided/2,
-                delete_resource/2,
-                put_user/2,
-                get_user/2,
-                process_post/2]).
+		 allowed_methods/2,
+         content_types_accepted/2,
+         content_types_provided/2,
+         delete_resource/2,
+         put_user/2,
+         get_user/2,
+         process_post/2,
+		 delete_streams_with_user_id/1]).
 
 -include("webmachine.hrl").
 -include_lib("erlastic_search.hrl").

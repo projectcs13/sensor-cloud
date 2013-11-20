@@ -43,7 +43,7 @@ allowed_methods(ReqData, State) ->
 		[{"streams"}] ->
 			{['POST', 'GET'], ReqData, State}; 
 		[{"users", _UserID}, {"streams"}] ->
-			{['POST', 'GET'], ReqData, State};
+			{['POST', 'GET', 'DELETE'], ReqData, State};
 		[{"streams", _StreamID}] ->
 			{['GET', 'PUT', 'DELETE'], ReqData, State};
 		[{"users", _UserID}, {"streams", _StreamID}] ->
@@ -89,18 +89,29 @@ content_types_accepted(ReqData, State) ->
 -spec delete_resource(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 
 delete_resource(ReqData, State) ->
-	Id = proplists:get_value('stream', wrq:path_info(ReqData)),
-	case delete_data_points_with_stream_id(Id) of 
-		{error, {Code, Body}} -> 
-            ErrorString = api_help:generate_error(Body, Code),
-            {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-		{ok} ->
-			case erlastic_search:delete_doc(?INDEX,"stream", Id) of
+	case proplists:get_value('user', wrq:path_info(ReqData)) of
+		undefined ->
+			Id = proplists:get_value('stream', wrq:path_info(ReqData)),
+			case delete_data_points_with_stream_id(Id) of 
+				{error, {Code, Body}} -> 
+					ErrorString = api_help:generate_error(Body, Code),
+            		{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+				{ok} ->
+					case erlastic_search:delete_doc(?INDEX,"stream", Id) of
+						{error, {Code, Body}} -> 
+							ErrorString = api_help:generate_error(Body, Code),
+							{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+						{ok,List} -> 
+			 				{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
+					end
+			end;
+		UserId ->
+			case users:delete_streams_with_user_id(UserId) of
 				{error, {Code, Body}} -> 
 					ErrorString = api_help:generate_error(Body, Code),
 					{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-				{ok,List} -> 
-			 		{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
+				{ok} ->
+					{true,wrq:set_resp_body("{\"message\":\"All streams with user_id:" ++UserId++" are now deleted\"}",ReqData),State}
 			end
 	end.
 
