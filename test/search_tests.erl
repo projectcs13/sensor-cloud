@@ -14,6 +14,7 @@
 -export([]).
 
 -define(WEBMACHINE_URL, api_help:get_webmachine_url()).
+-define(ELASTIC_SEARCH_URL, api_help:get_webmachine_url()).
 
 %% @doc
 %% Function: inti_test/0
@@ -66,5 +67,5 @@ process_search_post_test() ->
 %% Returns: {ok/error, {{Version, Code, Reason}, Headers, Body}}
 %% @end
 refresh() ->
-	httpc:request(post, {"http://localhost:9200/sensorcloud/_refresh", [],"", ""}, [], []).
+	httpc:request(post, {?ELASTIC_SEARCH_URL++"/sensorcloud/_refresh", [],"", ""}, [], []).
 
