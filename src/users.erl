@@ -214,7 +214,8 @@ process_post(ReqData, State) ->
 				false ->
 					{{halt,403}, wrq:set_resp_body("Unsupported field(s)", ReqData), State};
 				true ->
-					case erlastic_search:index_doc(?INDEX, "user", UserJson) of
+                    FieldsAdded = add_server_side_fields(UserJson),
+					case erlastic_search:index_doc(?INDEX, "user", FieldsAdded) of
 						{error, {Code, Body}} -> 
 							ErrorString = api_help:generate_error(Body, Code),
                     		{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
@@ -318,3 +319,15 @@ id_from_path(RD) ->
             end;
         Id -> Id
     end.
+
+%% @doc
+%% Function: add_server_side_fields/1
+%% Purpose: Used to add all the fields that should be added server side
+%% Returns: The new json with the fields added
+%% @end
+-spec add_server_side_fields(Json::string()) -> string().
+
+add_server_side_fields(Json) ->
+
+        lib_json:add_values(Json,[
+            {rankings, "[]"}]).

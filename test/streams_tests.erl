@@ -248,7 +248,7 @@ server_side_creation_test() ->
 	?assertEqual(true,lib_json:get_field(Body2,"quality") =/= undefined),
 	?assertEqual(true,lib_json:get_field(Body2,"user_ranking") =/= undefined),
 	?assertEqual(true,lib_json:get_field(Body2,"subscribers") =/= undefined),
-	?assertEqual(true,lib_json:get_field(Body2,"last_update") =/= undefined),
+	?assertEqual(true,lib_json:get_field(Body2,"last_updated") =/= undefined),
 	?assertEqual(true,lib_json:get_field(Body2,"creation_date") =/= undefined),
 	?assertEqual(true,lib_json:get_field(Body2,"history_size") =/= undefined).
 
@@ -265,11 +265,12 @@ server_side_creation_test() ->
 -spec ranking_stream_test() -> ok | {error, term()}.
 
 ranking_stream_test() ->
-		{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [], "application/json", "{\"name\" : \"test0001\",\"resource_id\" : \"asdascvsr213sda\"}"}, [], []),
-		DocId1 = lib_json:get_field(Body1,"_id"),
-		refresh(),
-		{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/users", [], "application/json", "{\"name\" : \"RandomUser\",\"rankings\" : [  ]}"}, [], []),
+
+		{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/users", [], "application/json", "{\"username\" : \"RandomUser\"}"}, [], []),
 		DocId2 = lib_json:get_field(Body2,"_id"),
+		{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [], "application/json", "{\"name\" : \"test0001\",\"user_id\" : \"" ++ lib_json:to_string(DocId2) ++ "\"}"}, [], []),
+		DocId1 = lib_json:get_field(Body1,"_id"),
+		api_help:refresh(),
 
 		{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(put, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId1)++ "/_rank?user_id=" ++ lib_json:to_string(DocId2) ++ "&ranking=5.0",[], "application/json", "{}"}, [], []),
 		{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(get, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId1), []}, [], []),
@@ -277,23 +278,23 @@ ranking_stream_test() ->
 		?assertEqual(5.0,lib_json:get_field(Body4,"user_ranking.average")),
 		?assertEqual(1,lib_json:get_field(Body4,"user_ranking.nr_rankings")),
 
-		{ok, {{_Version5, 200, _ReasonPhrase5}, _Headers5, Body5}} = httpc:request(post, {"http://localhost:8000/users", [], "application/json", "{\"name\" : \"RandomUser2\",\"rankings\" : [  ]}"}, [], []),
+		{ok, {{_Version5, 200, _ReasonPhrase5}, _Headers5, Body5}} = httpc:request(post, {"http://localhost:8000/users", [], "application/json", "{\"username\" : \"RandomUser2\"}"}, [], []),
 		DocId3 = lib_json:get_field(Body5,"_id"),
-		{ok, {{_Version6, 200, _ReasonPhrase6}, _Headers6, Body6}} = httpc:request(put, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId1)++ "/_rank?user_id=" ++ lib_json:to_string(DocId3) ++ "&ranking=3.0", []}, [], []),
+		{ok, {{_Version6, 200, _ReasonPhrase6}, _Headers6, Body6}} = httpc:request(put, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId1)++ "/_rank?user_id=" ++ lib_json:to_string(DocId3) ++ "&ranking=3.0",[], "application/json", "{}"}, [], []),
 		{ok, {{_Version7, 200, _ReasonPhrase7}, _Headers7, Body7}} = httpc:request(get, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId1), []}, [], []),
 
 		?assertEqual(4.0,lib_json:get_field(Body7,"user_ranking.average")),
 		?assertEqual(2,lib_json:get_field(Body7,"user_ranking.nr_rankings")),
 
-		{ok, {{_Version8, 200, _ReasonPhrase8}, _Headers8, Body8}} = httpc:request(put, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId1)++ "/_rank?user_id=" ++ lib_json:to_string(DocId2) ++ "&ranking=2.0", []}, [], []),
+		{ok, {{_Version8, 200, _ReasonPhrase8}, _Headers8, Body8}} = httpc:request(put, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId1)++ "/_rank?user_id=" ++ lib_json:to_string(DocId2) ++ "&ranking=2.0",[], "application/json", "{}"}, [], []),
 		{ok, {{_Version9, 200, _ReasonPhrase9}, _Headers9, Body9}} = httpc:request(get, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId1), []}, [], []),
 
 		?assertEqual(2.5,lib_json:get_field(Body9,"user_ranking.average")),
 		?assertEqual(2,lib_json:get_field(Body9,"user_ranking.nr_rankings")),
 
-	    {ok, {{_Version10, 409, _ReasonPhrase10}, _Headers10, Body10}} = httpc:request(put, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId1)++ "/_rank?user_id=" ++ lib_json:to_string(DocId2) ++ "&ranking=112.0", []}, [], []),
-	    {ok, {{_Version11, 409, _ReasonPhrase11}, _Headers11, Body11}} = httpc:request(put, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId1)++ "/_rank?user_id=" ++ lib_json:to_string(DocId2) ++ "&ranking=-12.0", []}, [], []),
-	   	{ok, {{_Version12, 409, _ReasonPhrase12}, _Headers12, Body12}} = httpc:request(put, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId1)++ "/_rank?user_id=a" ++ lib_json:to_string(DocId2) ++ "&ranking=12.0", []}, [], []),
+	    {ok, {{_Version10, 409, _ReasonPhrase10}, _Headers10, Body10}} = httpc:request(put, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId1)++ "/_rank?user_id=" ++ lib_json:to_string(DocId2) ++ "&ranking=112.0",[], "application/json", "{}"}, [], []),
+	    {ok, {{_Version11, 409, _ReasonPhrase11}, _Headers11, Body11}} = httpc:request(put, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId1)++ "/_rank?user_id=" ++ lib_json:to_string(DocId2) ++ "&ranking=-12.0",[], "application/json", "{}"}, [], []),
+	   	{ok, {{_Version12, 404, _ReasonPhrase12}, _Headers12, Body12}} = httpc:request(put, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId1)++ "/_rank?user_id=a" ++ lib_json:to_string(DocId2) ++ "&ranking=12.0",[], "application/json", "{}"}, [], []),
 
 		{ok, {{_Version13, 200, _ReasonPhrase13}, _Headers13, _Body13}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId1), []}, [], []),
 		{ok, {{_Version14, 200, _ReasonPhrase14}, _Headers14, Body14}} = httpc:request(delete, {"http://localhost:8000/users/" ++ lib_json:to_string(DocId2), []}, [], []),

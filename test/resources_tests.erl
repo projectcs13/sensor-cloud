@@ -31,12 +31,12 @@ init_test() ->
 %% Side effects: creates documents in elasticsearch
 %% @end
 process_search_post_test() ->
-        {ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/resources", [],"application/json", "{\"name\" : \"search\"}"}, [], []),
+        {ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/resources", [],"application/json", "{\"tags\" : \"search\"}"}, [], []),
         DocId1 = lib_json:get_field(Body1,"_id"),
         ?assertEqual(true,lib_json:get_field(Body1,"ok")),        
         api_help:refresh(),
-        {ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(post, {"http://localhost:8000/resources/_search", [],"application/json", "{\"query\":{\"match\":{\"name\":\"search\"}}}"}, [], []),
-        {ok, {{_Version3, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(post, {"http://localhost:8000/resources/_search", [],"application/json", "{\"query\":{\"match\":{\"name\":\"aaaaaa\"}}}"}, [], []),
+        {ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(post, {"http://localhost:8000/resources/_search", [],"application/json", "{\"query\":{\"match\":{\"tags\":\"search\"}}}"}, [], []),
+        {ok, {{_Version3, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(post, {"http://localhost:8000/resources/_search", [],"application/json", "{\"query\":{\"match\":{\"tags\":\"aaaaaa\"}}}"}, [], []),
         {ok, {{_Version8, 200, _ReasonPhrase5}, _Headers5, _Body5}} = httpc:request(delete, {"http://localhost:8000/resources/" ++ lib_json:to_string(DocId1), []}, [], []),
         ?assertEqual(true,lib_json:get_field(Body3,"hits.total") >= 1),
         ?assertEqual(true,lib_json:get_field(Body4,"hits.total") >= 0).   

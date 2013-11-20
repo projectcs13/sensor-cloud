@@ -288,6 +288,7 @@ put_stream(ReqData, State) ->
 						{ok,List} -> 
 							{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
 					end
+			end;
 		true ->
 			erlang:display("IN RANK!"),
 			StreamId = proplists:get_value('stream', wrq:path_info(ReqData)),
@@ -327,10 +328,8 @@ put_stream(ReqData, State) ->
 	            			{ok,List} ->
 	            				case lib_json:get_field(List, "_source.rankings") of
 	            					undefined ->
-	            						erlang:display("UPDATING RANK IN STREAM1"), 
 	            						change_ranking(StreamId, Rank),
 	            						UpdateJson = "{\"script\" : \"ctx._source.rankings += ranking\",\"params\":{\"ranking\":{ \"rank\":"++ float_to_list(Rank) ++",\"stream_id\":\""++StreamId++"\"}}}",
-	            						erlang:display("CREATING NEW RANKING IN USER"), 
 	            						case api_help:update_doc(?INDEX, "user", User, UpdateJson, []) of
 											{error, {Code, Body}} ->
 					            				ErrorString = api_help:generate_error(Body, Code),
@@ -338,13 +337,10 @@ put_stream(ReqData, State) ->
 					            			{ok, List2} -> {true,wrq:set_resp_body(lib_json:encode(List2),ReqData),State}
 					            		end;
 	            					RankingList ->
-	            						erlang:display(RankingList),
 	            						case find_ranking(StreamId, RankingList, Rank, []) of
 	            							not_found ->
-	            								erlang:display("UPDATING RANK IN STREAM2"), 
 	            								change_ranking(StreamId, Rank),
 	            								UpdateJson = "{\"script\" : \"ctx._source.rankings += ranking\",\"params\":{\"ranking\":{ \"rank\":"++ float_to_list(Rank) ++",\"stream_id\":\""++StreamId++"\"}}}",
-	            								erlang:display("CREATING NEW RANKING IN USER"), 
 		            							case api_help:update_doc(?INDEX, "user", User, UpdateJson,[]) of
 													{error, {Code, Body}} ->
 						            					ErrorString = api_help:generate_error(Body, Code),
@@ -354,7 +350,6 @@ put_stream(ReqData, State) ->
 	            							{OldRank, ChangedRankingList} ->
 	                							change_ranking(StreamId, Rank, OldRank),
 	                							UpdateJson = api_help:create_update(lib_json:set_attr("rankings", ChangedRankingList)),
-	                							erlang:display(UpdateJson), 
 	            								case api_help:update_doc(?INDEX, "user", User, UpdateJson,[]) of
 													{error, {Code, Body}} ->
 						            					ErrorString = api_help:generate_error(Body, Code),
@@ -481,7 +476,6 @@ find_ranking(StreamId, Rankings, NewRank, List) when is_list(StreamId) ->
 find_ranking(StreamId, [], NewRank, List) ->
 	not_found;
 find_ranking(StreamId, [Head|Rest], NewRank ,List) ->
-	erlang:display(StreamId),
 	case lib_json:get_field(Head, "stream_id") of 
 		StreamId ->
 			OldRank = lib_json:get_field(Head, "rank"),
@@ -503,13 +497,8 @@ find_ranking(StreamId, [Head|Rest], NewRank ,List) ->
 
 change_ranking(StreamId, NewValue) ->
 	case erlastic_search:get_doc(?INDEX, "stream", StreamId) of 
-		{error, {Code, Body}} -> {error, {Code, Body}},
-								erlang:display("bbbbbb");
-
+		{error, {Code, Body}} -> {error, {Code, Body}};
 		{ok,JsonStruct} -> 	 
-				erlang:display(JsonStruct),
-						erlang:display("aaaaa"),
-
 		erlang:display(lib_json:get_field(JsonStruct, "_source.user_ranking.average")),
 				OldRanking = float(lib_json:get_field(JsonStruct, "_source.user_ranking.average")),
 				NumberOfRankings = lib_json:get_field(JsonStruct, "_source.user_ranking.nr_rankings"),
@@ -606,8 +595,6 @@ add_server_side_fields(Json) ->
 	Date = api_help:generate_date([Year,Month,Day]),
 
 	Time = api_help:generate_timestamp([Year,Month,Day,Hour,Min,Sec],0),
-
-
 
 		lib_json:add_values(Json,[
 			{creation_date, list_to_binary(Date)},
