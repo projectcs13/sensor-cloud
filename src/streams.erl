@@ -119,7 +119,7 @@ delete_resource(ReqData, State) ->
 -spec delete_data_points_with_stream_id(Id::string() | binary()) -> term().
 
 delete_data_points_with_stream_id(Id) when is_binary(Id) ->
-	{ok, {{_Version, Code, _ReasonPhrase}, _Headers, Body}} = httpc:request(delete, {"http://localhost:9200/sensorcloud/datapoint/_query?q=streamid:" ++ binary_to_list(Id), []}, [], []),
+	{ok, {{_Version, Code, _ReasonPhrase}, _Headers, Body}} = httpc:request(delete, {"http://localhost:9200/sensorcloud/datapoint/_query?q=stream_id:" ++ binary_to_list(Id), []}, [], []),
 	case Code of
 		200 ->
 			{ok};
@@ -127,7 +127,7 @@ delete_data_points_with_stream_id(Id) when is_binary(Id) ->
 			{error,{Code, Body}}
 	end;
 delete_data_points_with_stream_id(Id) ->
-	{ok, {{_Version, Code, _ReasonPhrase}, _Headers, Body}} = httpc:request(delete, {"http://localhost:9200/sensorcloud/datapoint/_query?q=streamid:" ++ Id, []}, [], []),
+	{ok, {{_Version, Code, _ReasonPhrase}, _Headers, Body}} = httpc:request(delete, {"http://localhost:9200/sensorcloud/datapoint/_query?q=stream_id:" ++ Id, []}, [], []),
 	case Code of
 		200 ->
 			{ok};
@@ -174,7 +174,9 @@ process_post(ReqData, State) ->
 									FieldsAdded = add_server_side_fields(ResAdded),
 									Final = suggest:add_stream_suggestion_fields(FieldsAdded),
 									case erlastic_search:index_doc(?INDEX, "stream", Final) of	
-										{error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
+										{error,{Code,Body}} ->
+											ErrorString = api_help:generate_error(Body, Code),
+            										{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 										{ok,List} -> 
 											suggest:update_suggestion(ResAdded),
 											{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
@@ -291,7 +293,8 @@ put_stream(ReqData, State) ->
 		{false,false} ->
 			{{halt,403}, wrq:set_resp_body("Unsupported field(s)", ReqData), State};
 		{false,true} ->
-			Update = api_help:create_update(Stream),
+			NewJson = suggest:add_stream_suggestion_fields(Stream),
+			Update = api_help:create_update(NewJson),
 			suggest:update_stream(Stream, StreamId),
 			case api_help:update_doc(?INDEX, "stream", StreamId, Update) of 
 				{error, {Code, Body}} -> 
@@ -379,7 +382,7 @@ get_stream(ReqData, State) ->
 %% @end
 filter_json(Json) ->
         NewJson = string:sub_string(Json,1,string:len(Json)-1),
-        "{\"query\":{\"filtered\":"++NewJson++",\"filter\":{\"bool\":{\"must\":{\"term\":{\"private\":\"false\"}}}}}}}".
+        "{\"query\":{\"filtered\":"++NewJson++",\"filter\":{\"bool\":{\"must_not\":{\"term\":{\"private\":\"true\"}}}}}}}".
 
 %% @doc
 %% Function: filter_json/2
@@ -388,7 +391,7 @@ filter_json(Json) ->
 %% @end
 filter_json(Json,ResourceQuery) ->
         NewJson = string:sub_string(Json,1,string:len(Json)-1),
-        "{\"query\":{\"filtered\":"++NewJson++",\"filter\":{\"bool\":{\"must\":[{\"term\":{\"private\":\"false\"}},{\"term\":{"++ResourceQuery++"}}]}}}}}".
+        "{\"query\":{\"filtered\":"++NewJson++",\"filter\":{\"bool\":{\"must_not\":[{\"term\":{\"private\":\"true\"}},{\"term\":{"++ResourceQuery++"}}]}}}}}".
 
 
 
@@ -399,7 +402,7 @@ filter_json(Json,ResourceQuery) ->
 %% @end
 filter_json(Json, From, Size) ->
         NewJson = string:sub_string(Json,1,string:len(Json)-1),
-        "{\"from\" : "++From++", \"size\" : "++Size++", \"query\":{\"filtered\":"++NewJson++",\"filter\":{\"bool\":{\"must\":{\"term\":{\"private\":\"false\"}}}}}}}".
+        "{\"from\" : "++From++", \"size\" : "++Size++", \"query\":{\"filtered\":"++NewJson++",\"filter\":{\"bool\":{\"must_not\":{\"term\":{\"private\":\"true\"}}}}}}}".
 
 
 %% @doc
@@ -409,52 +412,10 @@ filter_json(Json, From, Size) ->
 %% @end
 filter_json(Json, ResourceQuery, From, Size) ->
          NewJson = string:sub_string(Json,1,string:len(Json)-1),
-        "{\"from\" : "++From++", \"size\" : "++Size++", \"query\":{\"filtered\":"++NewJson++",\"filter\":{\"bool\":{\"must\":[{\"term\":{\"private\":\"false\"}},{\"term\":{"++ResourceQuery++"}}]}}}}}".
+        "{\"from\" : "++From++", \"size\" : "++Size++", \"query\":{\"filtered\":"++NewJson++",\"filter\":{\"bool\":{\"must_not\":[{\"term\":{\"private\":\"true\"}},{\"term\":{"++ResourceQuery++"}}]}}}}}".
 
 
-%% @doc
-%% Function: generate_date/2
-%% Purpose: Used to create a date valid in ES
-%%          from the input which should be the list
-%%          [Year,Mounth,Day]
-%% Returns: The generated timestamp
-%%
-%% @end
--spec generate_date(DateList::list()) -> string().
 
-generate_date([First]) ->
-	case First < 10 of
-		true -> "0" ++ integer_to_list(First);
-		false -> "" ++ integer_to_list(First)
-	end;
-generate_date([First|Rest]) ->
-	case First < 10 of
-		true -> "0" ++ integer_to_list(First) ++ "-" ++ generate_date(Rest);
-		false -> "" ++ integer_to_list(First) ++ "-" ++ generate_date(Rest)
-	end.
-
-%% @doc
-%% Function: generate_timpestamp/2
-%% Purpose: Used to create a timestamp valid in ES
-%% from the input which should be the list
-%% [Year,Mounth,Day,Hour,Minute,Day]
-%% Returns: The generated timestamp
-%%
-%% @end
--spec generate_timestamp(DateList::list(),Count::integer()) -> string().
-
-generate_timestamp([],_) ->
-        [];
-generate_timestamp([First|Rest],3) ->
-        case First < 10 of
-                true -> "T0" ++ integer_to_list(First) ++ generate_timestamp(Rest,4);
-                false -> "T" ++ integer_to_list(First) ++ generate_timestamp(Rest,4)
-        end;
-generate_timestamp([First|Rest],Count) ->
-        case First < 10 of
-                true -> "0" ++ integer_to_list(First) ++ generate_timestamp(Rest,Count+1);
-                false -> "" ++ integer_to_list(First) ++ generate_timestamp(Rest,Count+1)
-        end.
 		
 		
 %% @doc
@@ -466,9 +427,9 @@ generate_timestamp([First|Rest],Count) ->
 
 add_server_side_fields(Json) ->
 	{{Year,Month,Day},{Hour,Min,Sec}} = calendar:local_time(),
-	Date = generate_date([Year,Month,Day]),
+	Date = api_help:generate_date([Year,Month,Day]),
 	DateAdded = api_help:add_field(Json,"creation_date",Date),
-	Time = generate_timestamp([Year,Month,Day,Hour,Min,Sec],0) ++ ".000",
+	Time = api_help:generate_timestamp([Year,Month,Day,Hour,Min,Sec],0),
 	UpdateAdded = api_help:add_field(DateAdded,"last_update",Time),
 	QualityAdded = api_help:add_field(UpdateAdded,"quality",1.0),
 	UserRankingAdded = api_help:add_field(QualityAdded,"user_ranking",1.0),

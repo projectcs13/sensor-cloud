@@ -1,0 +1,9 @@
+
+{
+  "name": "required-deps",
+  "description":"Installs the necessary dependencies for running receive.js",
+  "dependencies": {
+    "socket.io": "*",
+	"rabbit.js": "*"
+  }
+}

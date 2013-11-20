@@ -180,7 +180,7 @@ process_post(ReqData, State) ->
 					{{halt,403}, wrq:set_resp_body("Unsupported field(s)", ReqData), State};
 				{false,true} ->
 					{{Year,Month,Day},_} = calendar:local_time(),
-					Date = generate_date([Year,Month,Day]),
+					Date = api_help:generate_date([Year,Month,Day]),
 					DateAdded = api_help:add_field(Resource,"creation_date",Date),
 					FinalResource = suggest:add_resource_suggestion_fields(DateAdded),
 					case erlastic_search:index_doc(?INDEX,"resource",FinalResource) of 
@@ -259,7 +259,8 @@ put_resource(ReqData, State) ->
 				{false,false} ->
 					{{halt,403}, wrq:set_resp_body("Unsupported field(s)", ReqData), State};
 				{false,true} ->
-					Update = api_help:create_update(UserJson),
+					NewJson = suggest:add_resource_suggestion_fields(UserJson),
+					Update = api_help:create_update(NewJson),
 					case api_help:update_doc(?INDEX,"resource", Id, Update) of 
 						{error, {Code, Body}} -> 
 							ErrorString = api_help:generate_error(Body, Code),
@@ -382,24 +383,4 @@ filter_json(Json, UserQuery, From, Size) ->
 
 
 
-%% @doc
-%% Function: generate_date/2
-%% Purpose: Used to create a date valid in ES
-%% from the input which should be the list
-%% [Year,Mounth,Day]
-%% Returns: The generated timestamp
-%%
-%% @end
--spec generate_date(DateList::list()) -> string().
-
-generate_date([First]) ->
-	case First < 10 of
-		true -> "0" ++ integer_to_list(First);
-		false -> "" ++ integer_to_list(First)
-	end;
-generate_date([First|Rest]) ->
-	case First < 10 of
-		true -> "0" ++ integer_to_list(First) ++ "-" ++ generate_date(Rest);
-		false -> "" ++ integer_to_list(First) ++ "-" ++ generate_date(Rest)
-	end.
 
