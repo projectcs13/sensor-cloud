@@ -495,3 +495,19 @@ generate_error(Body, ErrorCode) ->
 %% @end
 refresh() ->
 	httpc:request(post, {"http://localhost:9200/sensorcloud/_refresh", [],"", ""}, [], []).
+
+
+
+%% @doc
+%% Returns the URL of webmachine
+%%
+%% @end
+-spec get_webmachine_url() -> string().
+get_webmachine_url() ->
+	case application:get_env(engine, webmachine_port) of
+		{ok, Value} ->
+			"http://localhost:"++integer_to_list(Value);
+		undefined ->
+			"http://localhost:8000"
+	end.
+
