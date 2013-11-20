@@ -7,13 +7,14 @@
 
 -module(users).
 -export([init/1,
-                allowed_methods/2,
-                content_types_accepted/2,
-                content_types_provided/2,
-                delete_resource/2,
-                put_user/2,
-                get_user/2,
-                process_post/2]).
+		 allowed_methods/2,
+         content_types_accepted/2,
+         content_types_provided/2,
+         delete_resource/2,
+         put_user/2,
+         get_user/2,
+         process_post/2,
+		 delete_streams_with_user_id/1]).
 
 -include("webmachine.hrl").
 -include_lib("erlastic_search.hrl").
@@ -283,7 +284,7 @@ get_user(ReqData, State) ->
 process_search(ReqData, State, post) ->
         {Json,_,_} = api_help:json_handler(ReqData,State),
         {struct, JsonData} = mochijson2:decode(Json),
-        Query = api_help:transform(JsonData),
+		Query = api_help:transform(JsonData),
         case erlastic_search:search_limit(?INDEX, "user", Query, 10) of
             {error, {Code, Body}} -> 
                 ErrorString = api_help:generate_error(Body, Code),
