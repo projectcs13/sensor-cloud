@@ -7,14 +7,11 @@
 %%%-------------------------------------------------------------------
 -module(resources).
 -export([init/1, allowed_methods/2, content_types_provided/2, content_types_accepted/2,
-		 delete_resource/2, process_post/2, put_resource/2, get_resource/2, delete_streams_with_resource_id/1]).
+		 delete_resource/2, process_post/2, put_resource/2, get_resource/2]).
 
 -include_lib("webmachine.hrl").
 -include_lib("erlastic_search.hrl").
-
--define(INDEX, "sensorcloud").
--define(RESTRCITEDUPDATE, ["user_id","type","accuracy","manufacturer","uri","creation_date"]).
--define(RESTRCITEDCREATE, ["creation_date"]).
+-include("field_restrictions.hrl").
 
 %% @doc
 %% Function: init/1
@@ -34,15 +31,11 @@ init([]) ->
 -spec allowed_methods(ReqData::tuple(), State::string()) -> {list(), tuple(), string()}.
 allowed_methods(ReqData, State) ->
 	case api_help:parse_path(wrq:path(ReqData)) of
-		[ {"resources"}] ->
-			{['POST'], ReqData, State};
-		[ {"resources", _ResourceID}] ->
-			{['GET', 'PUT', 'DELETE'], ReqData, State};
-		[{"users", _UserID}, {"resources"}] ->
-			{['GET','POST'], ReqData, State};
-		[{"users", _UserID}, {"resources", "_search" ++ _Query}] ->
+		[{"resources"}] ->
+			{['POST','GET'], ReqData, State};
+		[{"resources", "_search" ++ _Query}] ->
 			{['GET', 'POST'], ReqData, State};
-		[{"users", _UserID}, {"resources", _ResourceID}] ->
+		[{"resources", _ResourceID}] ->
 			{['GET', 'PUT', 'DELETE'], ReqData, State};
 		[error] ->
 			{[], ReqData, State}
@@ -82,77 +75,12 @@ content_types_accepted(ReqData, State) ->
 delete_resource(ReqData, State) ->
 	Id = proplists:get_value('resourceid', wrq:path_info(ReqData)),
 	%% TODO Authentication
-	case delete_streams_with_resource_id(Id) of
+	case erlastic_search:delete_doc(?INDEX,"resource", Id) of
 		{error, {Code, Body}} -> 
-            ErrorString = api_help:generate_error(Body, Code),
+			ErrorString = api_help:generate_error(Body, Code),
             {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-		{ok} ->
-			case erlastic_search:delete_doc(?INDEX,"resource", Id) of
-				{error, {Code, Body}} -> 
-            		ErrorString = api_help:generate_error(Body, Code),
-            		{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-				{ok,List} -> 
-					{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
-			end
-	end.
-
-%% @doc
-%% Function: delete_streams_with_resource_id/1
-%% Purpose: Deletes the first 500 streams associated with the given resourceid
-%% Returns:  ERROR = {error,Errorcode}
-%%			 OK = {ok}
-%% @end
--spec delete_streams_with_resource_id(Id::string()) -> term().
-
-delete_streams_with_resource_id(Id) ->
-	Query = "resource_id:" ++ Id, 
-	case erlastic_search:search_limit(?INDEX, "stream", Query,500) of
-		{error,Reason} -> 
-			{error,Reason};
 		{ok,List} -> 
-			case get_streams(List) of
-				[] -> {ok};
-				Streams ->
-					case delete_streams(Streams) of
-						{error,Reason} -> {error, Reason};
-						{ok} -> {ok}
-					end
-			end
-	end.
-
-%% @doc
-%% Function: get_streams/1
-%% Purpose: get a list of ids of a list of JSON objects
-%% Returns:  a list with the ids of the JSON objects given
-%% @end
--spec get_streams(JSON::string()) -> list().
-
-get_streams(JSON) when is_tuple(JSON)->
-	Result = lib_json:get_field(JSON, "hits.hits"),
-	get_streams(Result);
-get_streams(undefined) ->
-	[];
-get_streams([]) ->
-	[];
-get_streams([JSON | Tl]) ->
-	case lib_json:get_field(JSON, "_id") of
-		undefined -> [];
-		Id -> [Id] ++ get_streams(Tl)
-	end.
-
-
-
-%% @doc
-%% Function: delete_streams/1
-%% Purpose: Deletes all streams in the given list, the list elements are streamIds as binaries
-%% Returns:  ok, or {{error,_Reason}, StreamId, Rest} where StreamId is the binary Id of the stream for which deletion failed
-%% @end
-
-delete_streams([]) -> {ok};
-delete_streams([StreamId|Rest]) ->
-	case erlastic_search:delete_doc(?INDEX, "stream", StreamId) of 
-		{error,Reason} -> {error,Reason};
-		{ok,_List} -> delete_streams(Rest)
+			{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
 	end.
 
 %% @doc
@@ -167,21 +95,20 @@ process_post(ReqData, State) ->
 	case IsSearch of 
 		false ->
 			% Create
-
 			{Resource,_,_} = api_help:json_handler(ReqData,State),
-			case do_any_field_exist(Resource,?RESTRCITEDCREATE) of
-				true ->
-					ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDCREATE),
+			case {api_help:do_any_field_exist(Resource,?RESTRCITEDCREATERESOURCES),api_help:do_only_fields_exist(Resource,?ACCEPTEDFIELDSRESOURCES)} of
+				{true,_} ->
+					ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDCREATERESOURCES),
 					ResFields2 = string:sub_string(ResFields1, 1, length(ResFields1)-2),
 					{{halt,409}, wrq:set_resp_body("{\"error\":\"Error caused by restricted field in document, these fields are restricted : " ++ ResFields2 ++"\"}", ReqData), State};
-				false ->
-					{{Year,Month,Day},_} = calendar:local_time(),
-					Date = generate_date([Year,Month,Day]),
-					DateAdded = api_help:add_field(Resource,"creation_date",Date),
-					case erlastic_search:index_doc(?INDEX,"resource",DateAdded) of 
-				{error, {Code, Body}} -> 
-            		ErrorString = api_help:generate_error(Body, Code),
-            		{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+				{false,false} ->
+					{{halt,403}, wrq:set_resp_body("Unsupported field(s)", ReqData), State};
+				{false,true} ->
+					FinalResource = suggest:add_resource_suggestion_fields(Resource),
+					case erlastic_search:index_doc(?INDEX,"resource",FinalResource) of 
+						{error, {Code, Body}} -> 
+							ErrorString = api_help:generate_error(Body, Code),
+							{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 						{ok, Json} -> 
 							ResourceId = lib_json:get_field(Json, "_id"),
 							suggest:add_suggestion(Resource, ResourceId),
@@ -203,30 +130,25 @@ process_post(ReqData, State) ->
 
 process_search_post(ReqData, State) ->
 	{Json,_,_} = api_help:json_handler(ReqData,State),
-	case proplists:get_value('userid', wrq:path_info(ReqData)) of
+	case wrq:get_qs_value("size",ReqData) of 
 		undefined ->
-			{{halt,405}, ReqData, State};
-		UserId ->
-			case wrq:get_qs_value("size",ReqData) of 
-	            undefined ->
-	                Size = "10";
-	            SizeParam ->
-	                Size = SizeParam
-	        end,
-	        case wrq:get_qs_value("from",ReqData) of
-	            undefined ->
-	                From = "0";
-	            FromParam ->
-	                From = FromParam
-	        end,
-			UserQuery = "\"user_id\":" ++ UserId,
-			FilteredJson = filter_json(Json, UserQuery, From, Size),
-			case erlastic_search:search_json(#erls_params{},?INDEX, "resource", FilteredJson) of % Maybe wanna take more
-				{error, {Code, Body}} -> 
-            		ErrorString = api_help:generate_error(Body, Code),
-            		{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-				{ok,List} -> {true,wrq:set_resp_body(lib_json:encode(List),ReqData),State} % May need to convert
-			end
+			Size = "10";
+	    SizeParam ->
+	        Size = SizeParam
+	end,
+	case wrq:get_qs_value("from",ReqData) of
+	    undefined ->
+	        From = "0";
+	    FromParam ->
+	        From = FromParam
+	end,
+	%FilteredJson = filter_json(Json, "*", From, Size),
+	case erlastic_search:search_json(#erls_params{},?INDEX, "resource", Json) of % Maybe wanna take more
+		{error, {Code, Body}} -> 
+            ErrorString = api_help:generate_error(Body, Code),
+            {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+		{ok,List} -> 
+			{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State} % May need to convert
 	end.
 
 
@@ -246,17 +168,20 @@ put_resource(ReqData, State) ->
             {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 		{ok, _} ->
 			{UserJson,_,_} = api_help:json_handler(ReqData, State),
-			case do_any_field_exist(UserJson,?RESTRCITEDUPDATE) of
-				true ->
-					ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDUPDATE),
+			case {api_help:do_any_field_exist(UserJson,?RESTRCITEDUPDATERESOURCES),api_help:do_only_fields_exist(UserJson,?ACCEPTEDFIELDSRESOURCES)} of
+				{true,_} ->
+					ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDUPDATERESOURCES),
 					ResFields2 = string:sub_string(ResFields1, 1, length(ResFields1)-2),
 					{{halt,409}, wrq:set_resp_body("{\"error\":\"Error caused by restricted field in document, these fields are restricted : " ++ ResFields2 ++"\"}", ReqData), State};
-				false ->
-					Update = api_help:create_update(UserJson),
+				{false,false} ->
+					{{halt,403}, wrq:set_resp_body("Unsupported field(s)", ReqData), State};
+				{false,true} ->
+					NewJson = suggest:add_resource_suggestion_fields(UserJson),
+					Update = api_help:create_update(NewJson),
 					case api_help:update_doc(?INDEX,"resource", Id, Update) of 
-				{error, {Code, Body}} -> 
-            		ErrorString = api_help:generate_error(Body, Code),
-            		{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+						{error, {Code, Body}} -> 
+							ErrorString = api_help:generate_error(Body, Code),
+							{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 						{ok,List} -> 
 							suggest:update_resource(UserJson, Id),
 							{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
@@ -283,13 +208,7 @@ get_resource(ReqData, State) ->
 			            SizeParam ->
 			                Size = list_to_integer(SizeParam)
 			        end,
-					case proplists:get_value('userid', wrq:path_info(ReqData)) of
-						undefined ->
-							Query = [];
-						UserId ->
-							Query = "user_id:" ++ UserId
-					end,
-					case erlastic_search:search_limit(?INDEX, "resource", Query, Size) of % Maybe wanna take more
+					case erlastic_search:search_limit(?INDEX, "resource", "*", Size) of % Maybe wanna take more
 						{error, {Code, Body}} -> 
             				ErrorString = api_help:generate_error(Body, Code),
             				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
@@ -375,42 +294,4 @@ filter_json(Json, UserQuery, From, Size) ->
 
 
 
-%% @doc
-%% Function: generate_date/2
-%% Purpose: Used to create a date valid in ES
-%% from the input which should be the list
-%% [Year,Mounth,Day]
-%% Returns: The generated timestamp
-%%
-%% @end
--spec generate_date(DateList::list()) -> string().
-
-generate_date([First]) ->
-	case First < 10 of
-		true -> "0" ++ integer_to_list(First);
-		false -> "" ++ integer_to_list(First)
-	end;
-generate_date([First|Rest]) ->
-	case First < 10 of
-		true -> "0" ++ integer_to_list(First) ++ "-" ++ generate_date(Rest);
-		false -> "" ++ integer_to_list(First) ++ "-" ++ generate_date(Rest)
-	end.
-
-		
-%% @doc
-%% Function: do_any_field_exist/2
-%% Purpose: Used to check if a JSON contains any of the given fields
-%% Returns: True if at least one of the given fields exist, false otherwise
-%% @end
--spec do_any_field_exist(Json::string(),FieldList::list()) -> boolean().
-
-do_any_field_exist(_Json,[]) ->
-		false;
-do_any_field_exist(Json,[First|Rest]) ->
-		case lib_json:get_field(Json, First) of
-			undefined ->
-				do_any_field_exist(Json,Rest);
-			_ ->
-				true
-		end.
 

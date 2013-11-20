@@ -13,7 +13,9 @@
 	add_suggestion/2,
 	update_suggestion/1,
 	update_stream/2,
-	update_resource/2
+	update_resource/2,
+	add_resource_suggestion_fields/1,
+	add_stream_suggestion_fields/1
 	]).
 
 
@@ -38,6 +40,8 @@ init([]) ->
 -spec allowed_methods(ReqData::term(),State::term()) -> {list(), term(), term()}.
 allowed_methods(ReqData, State) ->
 	case api_help:parse_path(wrq:path(ReqData)) of
+		[{"suggest", _Field} , {_Term}] ->
+			{['GET'], ReqData, State}; 
 		[{"suggest", _Term}] ->
 			{['GET'], ReqData, State}; 
 		[error] ->
@@ -57,38 +61,58 @@ content_types_provided(ReqData, State) ->
 
 
 %% @doc
+%% Handles suggestion request.
+%%
+%% Case 1:
 %% Handles GET requests for suggestions by giving the term.(model). It returns only one suggestion,
 %% the one with the highest score.
 %%
 %% Example URL: localhost:8000/suggest/my_model 
+%%
+%% Case 2:
+%% Handles GET request for text autocompletion.
+%%
+%% Example URL: localhost:8000/suggest/my_field/my_text?size=5 
 %% @end
 -spec get_suggestion(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 get_suggestion(ReqData, State) ->
+	case wrq:get_qs_value("size",ReqData) of 
+		undefined ->
+			Size = "1";
+		SizeParam ->
+			Size = SizeParam
+	end,
+	case proplists:get_value('field', wrq:path_info(ReqData)) of
+		undefined ->
+			Field = "suggest";
+		FieldParam ->
+			Field = FieldParam ++ "_suggest"
+	end,
 	case proplists:get_value('term', wrq:path_info(ReqData)) of
 		undefined ->
 			{{halt, 400}, ReqData, State};
 		Term ->
-			%forms the query
 			Query = "{                   
 					\"testsuggest\" : {     
 						\"text\" : \""++Term++"\",
 						\"completion\" : {                    
-						\"field\" : \"suggest\",
-								\"size\" : 1            
+						\"field\" : \""++Field++"\",
+								\"size\" : "++ Size ++"            
 						}                                                   
 					}                                      
 				}",
 			case erlastic_search:suggest(?INDEX, Query) of	
 				{error, {Code, Body}} -> 
-    				ErrorString = api_help:generate_error(Body, Code),
-    				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+					ErrorString = api_help:generate_error(Body, Code),
+					{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 				{ok,List} -> 
 					EncodedList = lib_json:encode(List),
 					case re:run(EncodedList, "\"options\":\\[\\]", [{capture, first, list}]) of
 						{match, _} -> 
 							{{halt,404},ReqData, State};
-						_->
-							{lib_json:encode(List),ReqData, State}
+						_-> 
+							Output = lib_json:set_attr("suggestions",lib_json:get_field(List, "testsuggest[0].options")), 
+							{lib_json:encode(Output),ReqData, State}
 					end
 			end
 	end.
@@ -130,6 +154,55 @@ add_suggestion(Resource, ResourceId) ->
 				{ok, _} -> 	ok
 			end
 	end.
+
+
+%% @doc
+%% When inserting or updating a resource, it generates the suggest fields
+%% @end
+add_resource_suggestion_fields(Resource) ->
+	case lib_json:get_field(Resource,"manufacturer") of
+		undefined ->
+			Temp1 = Resource;
+		Manufacturer ->
+			Temp1 = lib_json:add_value(Resource, "manufacturer_suggest", Manufacturer)
+	end,
+	case lib_json:get_field(Resource,"model") of
+		undefined ->
+			Temp2 = Temp1;
+		Model ->
+			Temp2 = lib_json:add_value(Temp1, "model_suggest", Model)
+	end,
+	case lib_json:get_field(Resource,"tags") of
+		undefined ->
+			Temp3 = Temp2;
+		Tags ->
+			Temp3 = lib_json:add_value(Temp2, "tags_suggest", Tags)
+	end,
+	Temp3.
+
+%% @doc
+%% When inserting or updating a stream, it generates the suggest fields
+%% @end
+add_stream_suggestion_fields(Stream) ->
+	case lib_json:get_field(Stream,"name") of
+		undefined ->
+			Temp1 = Stream;
+		Name ->
+			Temp1 = lib_json:add_value(Stream, "name_suggest", Name)
+	end,
+	case lib_json:get_field(Stream,"type") of
+		undefined ->
+			Temp2 = Temp1;
+		Type ->
+			Temp2 = lib_json:add_value(Temp1, "type_suggest", Type)
+	end,
+	case lib_json:get_field(Stream,"tags") of
+		undefined ->
+			Temp3 = Temp2;
+		Tags ->
+			Temp3 = lib_json:add_value(Temp2, "tags_suggest", Tags)
+	end,
+	Temp3.
 
 
 %% @doc

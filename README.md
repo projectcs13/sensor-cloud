@@ -17,6 +17,10 @@ Welcome to the "Project CS 2013" project
 1. Download and compile the dependencies, and compile the project sources
 
         make install
+        
+2. Start Elastic Search server
+
+        make run_es
 
 2. Run the tests
 

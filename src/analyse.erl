@@ -23,10 +23,6 @@ allowed_methods(ReqData, State) ->
                          {['GET'], ReqData, State};
                 [{"users", _UserID}, {"streams", _StreamID}, {"_analyse"}] ->
                          {['GET'], ReqData, State};
-                [{"resources", _ResourceID}, {"streams", _StreamID}, {"_analyse"}] ->
-                         {['GET'], ReqData, State};
-                [{"users", _UserID}, {"resources", _ResourceID}, {"streams", _StreamID}, {"_analyse"}] ->
-                         {['GET'], ReqData, State};
                 [error] ->
                  {[], ReqData, State}
 end.
@@ -70,7 +66,7 @@ get_analysis(ReqData, State) ->
             % Get specific stream
             % @TODO: Make sure data is sorted by timestamp!!!!!
                     
-            case erlastic_search:search_limit(?INDEX, "datapoint","streamid:" ++ StreamId ++ "&sort=timestamp:desc", 50) of
+            case erlastic_search:search_limit(?INDEX, "datapoint","stream_id:" ++ StreamId ++ "&sort=timestamp:desc", 50) of
             %case erlastic_search:search_json(#erls_params{}, ?INDEX, "datapoint", create_json(StreamId), []) of
                     {error,{Code, Body}} ->
                             ErrorString = api_help:generate_error(Body, Code),
@@ -82,7 +78,7 @@ get_analysis(ReqData, State) ->
 
 
 create_json(StreamId) ->
-        "{ \"sort\" : [{ \"timestamp\" : {\"order\" : \"asc\"}}], \"query\" : { \"term\" : { \"streamid\" : \""++ StreamId ++ "\" }}}".
+        "{ \"sort\" : [{ \"timestamp\" : {\"order\" : \"asc\"}}], \"query\" : { \"term\" : { \"stream_id\" : \""++ StreamId ++ "\" }}}".
 
 
 
