@@ -23,9 +23,12 @@ compile:
 ### get_libs will download and install all project libraries
 conf: compile
 	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) -s engine -s config
+	make compile_libs
 
 get_libs:
 	@@$(REBAR) get-deps
+
+compile_libs:
 	@$(REBAR) compile
 	$(MAKE) -C lib/rabbitmq-server
 	$(MAKE) -C lib/rabbitmq-erlang-client
@@ -54,7 +57,7 @@ all: compile
 
 ### Command: make install
 ### Downloads all dependencies and builds the entire project
-install: get_libs conf
+install: get_libs compile_libs conf
 	 cp -r lib/elasticsearch-servicewrapper/service lib/elasticsearch/bin/
 
 

@@ -160,7 +160,15 @@ rabbitmq_config_check() ->
 	{ok, _FileInfo} ->
 	    ok;
 	{error, _Error} ->	    
-	    ?ERROR("RabbitMQ config file NOT FOUND"),
+	    ?ERROR("RabbitMQ server config file NOT FOUND"),
+	    error
+    end,
+    File2 = CWD ++ "/lib/rabbitmq-erlang-client/include/amqp_client.hrl",
+    case file:read_file_info(File2) of
+	{ok, _FileInfo2} ->
+	    ok;
+	{error, _Error2} ->	    
+	    ?ERROR("RabbitMQ erlang client config file NOT FOUND"),
 	    error
     end.
 
@@ -342,8 +350,7 @@ rabbit_mq_config() ->
     {ok, CWD} = file:get_cwd(),
     File = CWD ++ "/lib/rabbitmq-server/scripts/rabbitmq-defaults",
     Lines = lib_file:read_file_lines(File),
-    FunStrip = fun(X) -> string:strip(X, left) 
-	       end, 
+    FunStrip = fun(X) -> string:strip(X, left) end, 
     %% Take away comment characters & spaces from the beginning of the line
     StrippedLines = [FunStrip(X) || X <- Lines],
     NewLines = [case X of
@@ -365,7 +372,54 @@ rabbit_mq_config() ->
 	_ ->
 	    lib_file:write_file_lines(File, NewLines)
     end, 
-    ?DEBUG("Finished configuring rabbit_mq config options").
+    ?DEBUG("Finished configuring rabbit_mq server config options"),
+    
+
+    File2 = CWD ++ "/lib/rabbitmq-erlang-client/include/amqp_client.hrl",
+    Lines2 = lib_file:read_file_lines(File2),
+    %% Take away comment characters & spaces from the beginning of the line
+    StrippedLines2 = [FunStrip(X) || X <- Lines2],
+    Fun = fun(OldLine = "port"++_Line, Acc) ->
+		  DefaultPort = "port = 5672,\n",
+		  case application:get_env(engine, rabbit_mq_port) of
+		      undefined ->
+			  ?DEBUG("RabbitMQ Server port option not defined. Using default value."),
+			  [DefaultPort|Acc];
+		      {ok, Value} ->
+			  DataLine = "port = " ++ integer_to_list(Value) ++ ",\n",
+			  case lists:member(DataLine, Acc) orelse lists:member(DefaultPort, Acc) of
+			      true ->
+				  [OldLine|Acc];
+			      false ->
+				  [DataLine|Acc]
+			  end
+		  end;
+	     (OldLine = "host"++_Line, Acc) ->
+		  DefaultHost = "host = \"localhost\",\n",
+		  case application:get_env(engine, rabbit_mq_ip) of
+		      undefined ->
+			  ?DEBUG("RabbitMQ Server ip option not defined. Using default value."),
+			  [DefaultHost|Acc];
+		      {ok, Value} ->
+			  DataLine = "host = \"" ++ Value ++ "\",\n",
+			  case lists:member(DataLine, Acc) orelse lists:member(DefaultHost, Acc) of
+			      true ->
+				  [OldLine|Acc];
+			      false ->
+				  [DataLine|Acc]
+			  end
+		  end;
+	     (Line, Acc) ->
+		  [Line|Acc]
+	  end,
+    NewLines2 = lists:reverse(lists:foldl(Fun, [], StrippedLines2)),
+    case NewLines2 of
+	Lines2 ->
+	    ok; %% Nothing in the configuration file was changed so we don't write to the file
+	_ ->
+	    lib_file:write_file_lines(File2, NewLines2)
+    end, 
+    ?DEBUG("Finished configuring rabbit_mq erlang client config options").
 
 
 

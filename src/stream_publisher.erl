@@ -22,7 +22,7 @@
 
 main(Argv) ->
     {ok, Connection} =
-        amqp_connection:start(#amqp_params_network{host = "localhost", port = 5672}),
+        amqp_connection:start(#amqp_params_network{}),
     {ok, Channel} = amqp_connection:open_channel(Connection),
 
     amqp_channel:call(Channel, #'exchange.declare'{exchange = <<"topic_logs">>,
