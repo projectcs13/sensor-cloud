@@ -89,9 +89,16 @@ content_types_accepted(ReqData, State) ->
 -spec delete_resource(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 
 delete_resource(ReqData, State) ->
-	case proplists:get_value('user', wrq:path_info(ReqData)) of
-		undefined ->
-			Id = proplists:get_value('stream', wrq:path_info(ReqData)),
+	case {proplists:get_value('user', wrq:path_info(ReqData)),proplists:get_value('stream', wrq:path_info(ReqData))} of
+		{UserId,undefined} ->
+			case users:delete_streams_with_user_id(UserId) of
+				{error, {Code, Body}} -> 
+					ErrorString = api_help:generate_error(Body, Code),
+					{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+				{ok} ->
+					{true,wrq:set_resp_body("{\"message\":\"All streams with user_id:" ++UserId++" are now deleted\"}",ReqData),State}
+			end;
+		{_,Id} ->
 			case delete_data_points_with_stream_id(Id) of 
 				{error, {Code, Body}} -> 
 					ErrorString = api_help:generate_error(Body, Code),
@@ -104,14 +111,6 @@ delete_resource(ReqData, State) ->
 						{ok,List} -> 
 			 				{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
 					end
-			end;
-		UserId ->
-			case users:delete_streams_with_user_id(UserId) of
-				{error, {Code, Body}} -> 
-					ErrorString = api_help:generate_error(Body, Code),
-					{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-				{ok} ->
-					{true,wrq:set_resp_body("{\"message\":\"All streams with user_id:" ++UserId++" are now deleted\"}",ReqData),State}
 			end
 	end.
 
