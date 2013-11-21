@@ -13,7 +13,7 @@
 		 delete_resource/2, process_post/2, put_stream/2, get_stream/2,delete_data_points_with_stream_id/1]).
 
 
--define(ELASTIC_SEARCH_URL, api_help:get_webmachine_url()).
+-define(ELASTIC_SEARCH_URL, api_help:get_elastic_search_url()).
 -include_lib("erlastic_search.hrl").
 -include("webmachine.hrl").
 -include("field_restrictions.hrl").
