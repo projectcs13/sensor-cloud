@@ -288,8 +288,9 @@ put_stream(ReqData, State) ->
 				{false,false} ->
 					{{halt,403}, wrq:set_resp_body("Unsupported field(s)", ReqData), State};
 				{false,true} ->
-					NewJson = suggest:add_stream_suggestion_fields(Stream),
-					Update = api_help:create_update(NewJson),
+					%NewJson = suggest:add_stream_suggestion_fields(Stream),
+					%Update = api_help:create_update(NewJson),
+					Update = api_help:create_update(Stream),
 					%suggest:update_stream(Stream, StreamId),
 					case api_help:update_doc(?INDEX, "stream", StreamId, Update) of 
 						{error, {Code, Body}} -> 
