@@ -9,7 +9,7 @@
 -export([run/0, run/1]).
 
 -define(WEBMACHINE_URL, api_help:get_webmachine_url()).
--define(RESOURCE_URL, ?WEBMACHINE_URL++/resources/").
+-define(RESOURCE_URL, ?WEBMACHINE_URL++"/resources/").
 %% @doc
 %% Function: run/0
 %% Purpose: Wrapper function for testing in order to be able to return a 
