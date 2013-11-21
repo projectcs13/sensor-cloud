@@ -99,7 +99,7 @@ update_stream_fields_test() ->
 	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(get, {"http://localhost:8000/streams/" ++ lib_json:to_string(StreamId) ++ "/data", []}, [], []),
 	{ok, {{_Version5, 200, _ReasonPhrase5}, _Headers5, _Body5}} = httpc:request(delete, {"http://localhost:8000/users/" ++ lib_json:to_string(UserId), []}, [], []),
 	ObjectList = lib_json:get_field(Body4,"data"),
-    ?assertEqual(lib_json:get_field(Body3,"last_update"), lib_json:get_field(lists:nth(1,ObjectList),"timestamp")),
+    ?assertEqual(lib_json:get_field(Body3,"last_updated"), lib_json:get_field(lists:nth(1,ObjectList),"timestamp")),
 	?assertEqual(lib_json:get_field(Body3,"history_size"),1).
 	
 %% @doc
