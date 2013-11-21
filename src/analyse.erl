@@ -146,18 +146,22 @@ forecast(Json) ->
 %% @end        
 -spec forecast(JSON::string(), Nr::integer()) -> JSON::string().
 forecast(Json, Nr) ->
-        Values = get_time_series(Json),
-        Number = lists:flatten(io_lib:format("~p", [Nr])),
-        eri:eval("V <- " ++ Values),
-        eri:eval("A <- auto.arima(V)"),
-        eri:eval("pred <- forecast(A, "++ Number ++ ")"),
-        {ok, _, Mean} = eri:eval("data.frame(c(pred$mean))[[1]]"),
-        {ok, _, Lo80} = eri:eval("head(data.frame(c(pred$lower))[[1]], " ++ Number ++")"),
-        {ok, _, Hi80} = eri:eval("head(data.frame(c(pred$upper))[[1]], " ++ Number ++")"),
-        {ok, _, Lo95} = eri:eval("tail(data.frame(c(pred$lower))[[1]], " ++ Number ++")"),
-        {ok, _, Hi95} = eri:eval("tail(data.frame(c(pred$upper))[[1]], " ++ Number ++")"),
-        %eri:eval("rm(list = ls())"),
-        start_format_result({Mean, Lo80, Hi80, Lo95, Hi95}).
+    case get_time_series(Json) of
+        no_values ->
+            "{\"predictions\": []}";
+        Values ->
+            Number = lists:flatten(io_lib:format("~p", [Nr])),
+            eri:eval("V <- " ++ Values),
+            eri:eval("A <- auto.arima(V)"),
+            eri:eval("pred <- forecast(A, "++ Number ++ ")"),
+            {ok, _, Mean} = eri:eval("data.frame(c(pred$mean))[[1]]"),
+            {ok, _, Lo80} = eri:eval("head(data.frame(c(pred$lower))[[1]], " ++ Number ++")"),
+            {ok, _, Hi80} = eri:eval("head(data.frame(c(pred$upper))[[1]], " ++ Number ++")"),
+            {ok, _, Lo95} = eri:eval("tail(data.frame(c(pred$lower))[[1]], " ++ Number ++")"),
+            {ok, _, Hi95} = eri:eval("tail(data.frame(c(pred$upper))[[1]], " ++ Number ++")"),
+            %eri:eval("rm(list = ls())"),
+            start_format_result({Mean, Lo80, Hi80, Lo95, Hi95})
+    end.
 
 
 %% @doc
@@ -245,15 +249,15 @@ get_times(List, {End}) -> {binary_to_list(lists:last(List)), binary_to_list(End)
 %% Returns: String with complete forecast command for R
 %% @end        
 -spec get_values_string(Values::string()) -> string().
-get_values_string([]) -> "c()";
-get_values_string([Head | Tail]) -> get_values_string_(Tail, lists:flatten(io_lib:format("~p)", [Head]))).
+get_values_string([]) -> no_values;
+get_values_string([Head | Tail]) -> get_values_string(Tail, lists:flatten(io_lib:format("~p)", [Head]))).
 
 
 %% @doc
-%% Function: get_values_string_/1
+%% Function: get_values_string_/2
 %% Purpose: Get a string with values formatted as an R command (to create an equivalent list in R)
 %% Returns: A string with all the values in the argument
 %% @end        
--spec get_values_string_(Values::list(), string()) -> string().
-get_values_string_([], S) -> "c("++S;
-get_values_string_([Head | Tail], S) -> get_values_string_(Tail, lists:flatten(io_lib:format("~p, ", [Head]))++S).
+-spec get_values_string(Values::list(), string()) -> string().
+get_values_string([], S) -> "c("++S;
+get_values_string([Head | Tail], S) -> get_values_string(Tail, lists:flatten(io_lib:format("~p, ", [Head]))++S).
