@@ -1,4 +1,4 @@
-%% @author Tomas Sävström <tosa7943@student.uu.se>
+%% @author Tomas Sävström <tosa7943@student.uu.se>, Li Hao <hali2222@student.uu.se>
 %%   [www.csproj13.student.it.uu.se]
 %% @version 1.0
 %% @copyright [Copyright information]
@@ -38,6 +38,8 @@ allowed_methods(ReqData, State) ->
 	case api_help:parse_path(wrq:path(ReqData)) of
 		[{"streams", _StreamID}, {"_rank"}] ->
 			{['PUT'], ReqData, State};
+		[{"streams", _StreamID}, {"parser"}] ->
+			{['PUT', 'GET'], ReqData, State};
 		[{"streams", "_search"}] ->
 			{['POST', 'GET'], ReqData, State};
 		[{"users", _UserID}, {"streams","_search"}] ->
@@ -178,14 +180,31 @@ process_post(ReqData, State) ->
             %						{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 			%					{ok,_} ->
 									FieldsAdded = add_server_side_fields(UserAdded),
+									FieldsAdded2 = lib_json:rm_field(FieldsAdded, "parser"),
 									%Final = suggest:add_stream_suggestion_fields(FieldsAdded),
-									case erlastic_search:index_doc(?INDEX, "stream", FieldsAdded) of	
+									case erlastic_search:index_doc(?INDEX, "stream", FieldsAdded2) of	
 										{error,{Code,Body}} ->
 											ErrorString = api_help:generate_error(Body, Code),
             								{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 										{ok,List} -> 
 											%suggest:update_suggestion(UserAdded),
-											{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
+											{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State},
+											
+											
+											%% changed by lihao to add post the parser to elasticsearch
+											Input_parser = lib_json:get_field(FieldsAdded, "parser"),
+											Input_type = lib_json:get_field(FieldsAdded, "type"),
+											Stream_id = lib_json:get_field(FieldsAdded, lib_json:get_field(List, "_id")),
+											Parser = "{\"stream_id\":"++Stream_id++", \"input_parser\":\""++Input_parser++"\", \"input_type\":\""++Input_type++"\"}",
+											%% since every stream has only id, so it is fine to name parser using parser_++(stream_id)
+											case erlastic_search:index_doc_with_id(?INDEX, "parser", "parser_"++Stream_id,Parser) of
+												{error, {Code2, Body2}}->
+													ErrorString = api_help:generate_error(Body2, Code2),
+													{{halt, Code2}, wrq:set_resp_body(ErrorString, ReqData), State};
+												{ok, List2}->
+													{true, wrq:set_resp_body(lib_json:encode(List2), ReqData), State}
+											end
+											%% change ends
 									end
 			%				end
 					end
@@ -278,27 +297,50 @@ process_search_get(ReqData, State) ->
 put_stream(ReqData, State) ->
 	case api_help:is_rank(ReqData) of
 		false ->
-			StreamId = proplists:get_value('stream', wrq:path_info(ReqData)),
-			{Stream,_,_} = api_help:json_handler(ReqData,State),
-			case {api_help:do_any_field_exist(Stream,?RESTRCITEDUPDATESTREAMS),api_help:do_only_fields_exist(Stream,?ACCEPTEDFIELDSSTREAMS)} of
-				{true,_} -> 
-					ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDUPDATESTREAMS),
-					ResFields2 = string:sub_string(ResFields1, 1, length(ResFields1)-2),
-					{{halt,409}, wrq:set_resp_body("{\"error\":\"Error caused by restricted field in document, these fields are restricted : " ++ ResFields2 ++"\"}", ReqData), State};
-				{false,false} ->
-					{{halt,403}, wrq:set_resp_body("Unsupported field(s)", ReqData), State};
-				{false,true} ->
-					NewJson = suggest:add_stream_suggestion_fields(Stream),
-					Update = api_help:create_update(NewJson),
-					%suggest:update_stream(Stream, StreamId),
-					case api_help:update_doc(?INDEX, "stream", StreamId, Update) of 
-						{error, {Code, Body}} -> 
-							ErrorString = api_help:generate_error(Body, Code),
-		            		{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-						{ok,List} -> 
-							{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
+			
+			%% changed by lihao to update the parser
+			case api_help:is_parser(ReqData) of
+				true->
+					%% only update the parser
+					{Parser, _, _} = api_help:json_handler(ReqData, State),
+					StreamId = lib_json:get_field(Parser, "stream_id"),
+					NewParser = api_help:create_update(Parser),
+					ReqPathParser = ?INDEX ++ [$/ | "parser"] ++ [$/ | ("parser_"++StreamId) ] ++ "/_update",
+    				erls_resource:post(#erls_params{}, ReqPathParser, [], [], NewParser, []);
+				false->
+					StreamId = proplists:get_value('stream', wrq:path_info(ReqData)),
+					{Stream,_,_} = api_help:json_handler(ReqData,State),
+					case {api_help:do_any_field_exist(Stream,?RESTRCITEDUPDATESTREAMS),api_help:do_only_fields_exist(Stream,?ACCEPTEDFIELDSSTREAMS)} of
+						{true,_} -> 
+							ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDUPDATESTREAMS),
+							ResFields2 = string:sub_string(ResFields1, 1, length(ResFields1)-2),
+							{{halt,409}, wrq:set_resp_body("{\"error\":\"Error caused by restricted field in document, these fields are restricted : " ++ ResFields2 ++"\"}", ReqData), State};
+						{false,false} ->
+							{{halt,403}, wrq:set_resp_body("Unsupported field(s)", ReqData), State};
+						{false,true} ->
+							NewJson = suggest:add_stream_suggestion_fields(Stream),
+							NewJson2 = lib_json:rm_field(NewJson, "parser"),
+							Update = api_help:create_update(NewJson2),
+							%suggest:update_stream(Stream, StreamId),
+							case api_help:update_doc(?INDEX, "stream", StreamId, Update) of 
+								{error, {Code, Body}} -> 
+									ErrorString = api_help:generate_error(Body, Code),
+				            		{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+								{ok,List} -> 
+									{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
+							end,
+					
+							%% update the parser
+							NewParser = lib_json:get_field(NewJson, "parser"),
+							NewType = lib_json:get_field(NewJson, "type"),
+							NewParserJson = "{\"stream_id\":"++StreamId++", \"input_parser\":"++NewParser++", \"input_type\":"++NewType++"}",
+							ParserUpdate = api_help:create_update(NewParserJson),
+    						ReqPathParser = ?INDEX ++ [$/ | "parser"] ++ [$/ | ("parser_"++StreamId) ] ++ "/_update",
+    						erls_resource:post(#erls_params{}, ReqPathParser, [], [], ParserUpdate, [])
 					end
 			end;
+		
+			%% change ends 
 		true ->
 			erlang:display("IN RANK!"),
 			StreamId = proplists:get_value('stream', wrq:path_info(ReqData)),

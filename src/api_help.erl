@@ -1,4 +1,4 @@
-%% @author Tomas Sävström <tosa7943@student.uu.se>
+%% @author Tomas Sävström <tosa7943@student.uu.se>, Li Hao <hali2222@student.uu.se>
 %%   [www.csproj13.student.it.uu.se]
 %% @version 1.0
 %% @copyright [Copyright information]
@@ -145,6 +145,20 @@ is_search(ReqData) ->
 -spec is_rank(ReqData::term()) -> boolean().
 is_rank(ReqData) ->
 	case string:str(wrq:path(ReqData),"_rank") of
+		0 ->
+			false;
+		_ ->
+			true
+	end.
+
+%% @doc
+%% Function: is_parser/1
+%% Purpose: Used to decide if the URI specifie a parser request
+%% Returns: True if URI specifies a parser request, false otherwise
+%% @end
+-spec is_parser(ReqData::term()) -> boolean().
+is_parser(ReqData) ->
+	case string:str(wrq:path(ReqData),"parser") of
 		0 ->
 			false;
 		_ ->

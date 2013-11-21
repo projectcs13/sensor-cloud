@@ -1,4 +1,4 @@
-%% Author: Tomas Sävström <tosa7943@student.uu.se>
+%% Author: Tomas Sävström <tosa7943@student.uu.se>, Li Hao <hali2222@student.uu.se>
 %% [www.csproj13.student.it.uu.se]
 %% == api include file ==
 %% Includes defenitions of what fields are accteded and what fields are restricted, 
@@ -14,7 +14,7 @@
 -define(RESTRCITEDCREATESTREAMS, ["quality","user_ranking","subscribers","last_update","creation_date","history_size"]).
 -define(ACCEPTEDFIELDSSTREAMS, ["resource","name","tags","description","private","type","accuracy","min_val",
 								"max_val","quality","active","user_ranking","subscribers","last_update","creation_date",
-								"history_size","location","user_id","uri","polling_freq","uuid","unit"]).
+								"history_size","location","user_id","uri","polling_freq","uuid","unit","parser"]).
 
 
 %% Fields for users
