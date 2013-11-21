@@ -563,7 +563,7 @@ add_server_side_fields(Json) ->
 			{user_ranking, "{}"},
 			{"user_ranking.average", 0.0},
 			{"user_ranking.nr_rankings", 0},
-			{active, "true"}]),
+			{active, true}]),
 	erlang:display(JSON),
 	JSON.
 
