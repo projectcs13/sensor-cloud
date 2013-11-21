@@ -494,7 +494,7 @@ generate_error(Body, ErrorCode) ->
 %% FIX: This function relies on direct contact with elastic search at localhost:9200
 %% @end
 refresh() ->
-	httpc:request(post, {"http://localhost:9200/sensorcloud/_refresh", [],"", ""}, [], []).
+	httpc:request(post, {get_elastic_search_url()++"/sensorcloud/_refresh", [],"", ""}, [], []).
 
 
 
