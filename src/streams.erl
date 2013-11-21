@@ -36,6 +36,8 @@ init([]) ->
 
 allowed_methods(ReqData, State) ->
 	case api_help:parse_path(wrq:path(ReqData)) of
+		[{"streams", _StreamID}, {"_rank"}] ->
+			{['PUT'], ReqData, State};
 		[{"streams", "_search"}] ->
 			{['POST', 'GET'], ReqData, State};
 		[{"users", _UserID}, {"streams","_search"}] ->
@@ -275,26 +277,101 @@ process_search_get(ReqData, State) ->
 -spec put_stream(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 
 put_stream(ReqData, State) ->
-	StreamId = proplists:get_value('stream', wrq:path_info(ReqData)),
-	{Stream,_,_} = api_help:json_handler(ReqData,State),
-	case {api_help:do_any_field_exist(Stream,?RESTRCITEDUPDATESTREAMS),api_help:do_only_fields_exist(Stream,?ACCEPTEDFIELDSSTREAMS)} of
-		{true,_} -> 
-			ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDUPDATESTREAMS),
-			ResFields2 = string:sub_string(ResFields1, 1, length(ResFields1)-2),
-			{{halt,409}, wrq:set_resp_body("{\"error\":\"Error caused by restricted field in document, these fields are restricted : " ++ ResFields2 ++"\"}", ReqData), State};
-		{false,false} ->
-			{{halt,403}, wrq:set_resp_body("Unsupported field(s)", ReqData), State};
-		{false,true} ->
-			NewJson = suggest:add_stream_suggestion_fields(Stream),
-			Update = api_help:create_update(NewJson),
-			%suggest:update_stream(Stream, StreamId),
-			case api_help:update_doc(?INDEX, "stream", StreamId, Update) of 
-				{error, {Code, Body}} -> 
-					ErrorString = api_help:generate_error(Body, Code),
-            		{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-				{ok,List} -> 
-					{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
-			end
+	case api_help:is_rank(ReqData) of
+		false ->
+			StreamId = proplists:get_value('stream', wrq:path_info(ReqData)),
+			{Stream,_,_} = api_help:json_handler(ReqData,State),
+			case {api_help:do_any_field_exist(Stream,?RESTRCITEDUPDATESTREAMS),api_help:do_only_fields_exist(Stream,?ACCEPTEDFIELDSSTREAMS)} of
+				{true,_} -> 
+					ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDUPDATESTREAMS),
+					ResFields2 = string:sub_string(ResFields1, 1, length(ResFields1)-2),
+					{{halt,409}, wrq:set_resp_body("{\"error\":\"Error caused by restricted field in document, these fields are restricted : " ++ ResFields2 ++"\"}", ReqData), State};
+				{false,false} ->
+					{{halt,403}, wrq:set_resp_body("Unsupported field(s)", ReqData), State};
+				{false,true} ->
+					NewJson = suggest:add_stream_suggestion_fields(Stream),
+					Update = api_help:create_update(NewJson),
+					%suggest:update_stream(Stream, StreamId),
+					case api_help:update_doc(?INDEX, "stream", StreamId, Update) of 
+						{error, {Code, Body}} -> 
+							ErrorString = api_help:generate_error(Body, Code),
+		            		{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+						{ok,List} -> 
+							{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
+					end
+			end;
+		true ->
+			erlang:display("IN RANK!"),
+			StreamId = proplists:get_value('stream', wrq:path_info(ReqData)),
+			case wrq:get_qs_value("ranking",ReqData) of 
+				undefined ->
+                	Rank = {error, {<<"{\"error\":\"Error, incorrect or no ranking specified.\"}">>, 409}};
+				Ranking ->
+					
+					case string:to_float(Ranking) of
+						{Number,_} when (Number >= 0.0) and (Number =< 100.0) ->
+							Rank = Number;
+	 					_ -> 
+                			Rank = {error, {<<"{\"error\":\"Error, incorrect or no ranking specified.\"}">>, 409}}
+                	end
+        	end,
+        	case wrq:get_qs_value("user_id",ReqData) of 
+            undefined ->
+                User = {error, {<<"{\"error\":\"Error, no user specified.\"}">>, 409}};
+            UserId ->
+                User = UserId
+        	end,
+        	case Rank of
+        		{error, {Body, Code}} ->
+        			ErrorString = api_help:generate_error(Body, Code),
+        			{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+        		_ -> 
+	        		case User of
+	          			{error, {Body, Code}} ->
+	            			ErrorString = api_help:generate_error(Body, Code),
+	            			{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+	          			_ ->
+
+	          			case erlastic_search:get_doc(?INDEX,"user", User) of
+	          				{error, {Code, Body}} ->
+	            				ErrorString = api_help:generate_error(Body, Code),
+	            				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+	            			{ok,List} ->
+	            				case lib_json:get_field(List, "_source.rankings") of
+	            					undefined ->
+	            						change_ranking(StreamId, Rank),
+	            						UpdateJson = "{\"script\" : \"ctx._source.rankings += ranking\",\"params\":{\"ranking\":{ \"rank\":"++ float_to_list(Rank) ++",\"stream_id\":\""++StreamId++"\"}}}",
+	            						case api_help:update_doc(?INDEX, "user", User, UpdateJson, []) of
+											{error, {Code, Body}} ->
+					            				ErrorString = api_help:generate_error(Body, Code),
+					            				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+					            			{ok, List2} -> {true,wrq:set_resp_body(lib_json:encode(List2),ReqData),State}
+					            		end;
+	            					RankingList ->
+	            						case find_ranking(StreamId, RankingList, Rank, []) of
+	            							not_found ->
+	            								change_ranking(StreamId, Rank),
+	            								UpdateJson = "{\"script\" : \"ctx._source.rankings += ranking\",\"params\":{\"ranking\":{ \"rank\":"++ float_to_list(Rank) ++",\"stream_id\":\""++StreamId++"\"}}}",
+		            							case api_help:update_doc(?INDEX, "user", User, UpdateJson,[]) of
+													{error, {Code, Body}} ->
+						            					ErrorString = api_help:generate_error(Body, Code),
+						            					{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+						            				{ok, List3} -> {true,wrq:set_resp_body(lib_json:encode(List3),ReqData),State}
+					            				end;
+	            							{OldRank, ChangedRankingList} ->
+	                							change_ranking(StreamId, Rank, OldRank),
+	                							UpdateJson = api_help:create_update(lib_json:set_attr("rankings", ChangedRankingList)),
+	            								case api_help:update_doc(?INDEX, "user", User, UpdateJson,[]) of
+													{error, {Code, Body}} ->
+						            					ErrorString = api_help:generate_error(Body, Code),
+						            					{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+						            				{ok, List4} -> {true,wrq:set_resp_body(lib_json:encode(List4),ReqData),State}
+					            				end
+	            						end
+	            				end
+	            		end
+	        		end
+    		end
 	end.
 
 
@@ -400,7 +477,69 @@ filter_json(Json, ResourceQuery, From, Size) ->
 
 
 
+%% @doc
+%% Function: find_ranking/1
+%% Purpose: Used to find a ranking value in a list of rankings(list of JSON objects) 
+%% based on a stream_id
+%%         
+%% Returns: The value of the rank that relates to the stream_id in the provided list
+%% @end
+find_ranking(StreamId, Rankings, NewRank, List) when is_list(StreamId) ->
+	find_ranking(binary:list_to_bin(StreamId), Rankings, NewRank, []);
+find_ranking(StreamId, [], NewRank, List) ->
+	not_found;
+find_ranking(StreamId, [Head|Rest], NewRank ,List) ->
+	case lib_json:get_field(Head, "stream_id") of 
+		StreamId ->
+			OldRank = lib_json:get_field(Head, "rank"),
+			ChangedJson = lib_json:replace_field(Head, "rank", NewRank),
+			{OldRank, lists:append([List,[ChangedJson],Rest])};
+		_ ->
+			find_ranking(StreamId, Rest, NewRank, lists:append(List,[Head]))
+	end.
 		
+
+
+%% @doc
+%% Function: change_ranking/2
+%% Purpose: Used to add a new ranking value to a stream 
+%%          in ES
+%%
+%% @end
+-spec change_ranking(StreamId::string(), NewValue::float()) -> ok | {error, no_model}. 
+
+change_ranking(StreamId, NewValue) ->
+	case erlastic_search:get_doc(?INDEX, "stream", StreamId) of 
+		{error, {Code, Body}} -> {error, {Code, Body}};
+		{ok,JsonStruct} -> 	 
+		erlang:display(lib_json:get_field(JsonStruct, "_source.user_ranking.average")),
+				OldRanking = float(lib_json:get_field(JsonStruct, "_source.user_ranking.average")),
+				NumberOfRankings = lib_json:get_field(JsonStruct, "_source.user_ranking.nr_rankings"),
+				NewNumberOfRankings = NumberOfRankings + 1,
+				NewRanking = ((OldRanking * NumberOfRankings) + NewValue) / NewNumberOfRankings,
+				RankingJson = lib_json:set_attrs( [{user_ranking, "{}"}, {"user_ranking.average", NewRanking}, {"user_ranking.nr_rankings", NewNumberOfRankings} ] ),
+				case api_help:update_doc(?INDEX, "stream",StreamId, api_help:create_update(RankingJson),[]) of 
+					{error, {Code, Body}} -> {error, {Code, Body}};
+					{ok, _} -> 	ok
+				end
+	end.
+
+-spec change_ranking(StreamId::string(), NewValue::float(), OldValue::float()) -> ok | {error, no_model}. 
+
+change_ranking(StreamId, NewValue, OldValue) ->
+case erlastic_search:get_doc(?INDEX, "stream", StreamId) of 
+		{error, {Code, Body}} -> {error, {Code, Body}};
+		{ok,JsonStruct} -> 	 
+				OldRanking = float(lib_json:get_field(JsonStruct, "_source.user_ranking.average")),
+				NumberOfRankings = lib_json:get_field(JsonStruct, "_source.user_ranking.nr_rankings"),
+				NewRanking = ((OldRanking * NumberOfRankings) + NewValue - OldValue) / NumberOfRankings,
+				RankingJson = lib_json:set_attrs( [{user_ranking, "{}"}, {"user_ranking.average", NewRanking}, {"user_ranking.nr_rankings", NumberOfRankings} ] ),
+				case api_help:update_doc(?INDEX, "stream",StreamId, api_help:create_update(RankingJson),[]) of 
+					{error, {Code, Body}} -> {error, {Code, Body}};
+					{ok, _} -> 	ok
+				end
+	end.
+
 		
 %% @doc
 %% Function: add_server_side_fields/1
@@ -412,10 +551,27 @@ filter_json(Json, ResourceQuery, From, Size) ->
 add_server_side_fields(Json) ->
 	{{Year,Month,Day},{Hour,Min,Sec}} = calendar:local_time(),
 	Date = api_help:generate_date([Year,Month,Day]),
-	DateAdded = api_help:add_field(Json,"creation_date",Date),
+
 	Time = api_help:generate_timestamp([Year,Month,Day,Hour,Min,Sec],0),
-	UpdateAdded = api_help:add_field(DateAdded,"last_update",Time),
-	QualityAdded = api_help:add_field(UpdateAdded,"quality",1.0),
-	UserRankingAdded = api_help:add_field(QualityAdded,"user_ranking",1.0),
-	SubsAdded = api_help:add_field(UserRankingAdded,"subscribers",1),
-	api_help:add_field(SubsAdded,"history_size",0).
+
+		lib_json:add_values(Json,[
+			{creation_date, list_to_binary(Date)},
+			{last_updated, list_to_binary(Time)},
+			{quality, 1.0},
+			{subscribers, 1},
+			{history_size, 0}, 
+			{user_ranking, "{}"},
+			{"user_ranking.average", 0.0},
+			{"user_ranking.nr_rankings", 0}]).
+
+
+
+%%	DateAdded = api_help:add_field(Json,"creation_date",Date),
+%%	UpdateAdded = api_help:add_field(DateAdded,"last_update",Time),
+%%	QualityAdded = api_help:add_field(UpdateAdded,"quality",1.0),
+%%	UserRankingAdded = api_help:add_field(QualityAdded,"user_ranking","{}"),
+%%	UserRankingAverageAdded = api_help:add_field(UserRankingAdded,"user_ranking.average",0.0),
+%%	UserRankingNrRankingsAdded = api_help:add_field(UserRankingAverageAdded,"user_ranking.nr_rankings",0),
+%%	SubsAdded = api_help:add_field(UserRankingNrRankingsAdded,"subscribers",1),
+%%	api_help:add_field(SubsAdded,"history_size",0).
+

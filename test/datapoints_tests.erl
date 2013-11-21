@@ -36,7 +36,7 @@
 %% @end
 -spec post_test() -> ok | {error, term()}.
 post_test() ->
-		erlastic_search:index_doc_with_id(?INDEX,"stream","4","{\"test\" : \"data_points\",\"history_size\":0}"),
+		erlastic_search:index_doc_with_id(?INDEX,"stream","4","{\"tags\" : \"data_points\",\"history_size\":0}"),
 		api_help:refresh(),
         Response1 = post_request(?DATAPOINTS_URL, "application/json",
                                          "{\"value\":\"" ++ ?TEST_VALUE ++ "\", \"timestamp\": \"" ++ ?TEST_TIMESTAMP ++ "\"}"),
@@ -55,7 +55,7 @@ post_test() ->
 -spec get_existing_datapoint_test() -> ok | {error, term()}.
 get_existing_datapoint_test() ->
         Id = get_index_id(?TEST_VALUE, ?TEST_TIMESTAMP),
-        ?assertNotMatch({error, "no match"}, Id),
+        ?assertNotMatch({error, "\"no match\""}, Id),
         Response1 = get_request(?DATAPOINTS_URL ++ "_search?_id=" ++ Id),
         check_returned_code(Response1, 200).
 
@@ -68,7 +68,7 @@ get_existing_datapoint_test() ->
 %% @end
 -spec no_timestamp_test() -> ok | {error, term()}.
 no_timestamp_test() ->
-		erlastic_search:index_doc_with_id(?INDEX,"stream","5","{\"test\" : \"data_points\",\"history_size\":0}"),
+		erlastic_search:index_doc_with_id(?INDEX,"stream","5","{\"tags\" : \"data_points\",\"history_size\":0}"),
 		api_help:refresh(),
         Response1 = post_request("http://localhost:8000/streams/5/data/", "application/json",
                                          "{\"value\":\"55\"}"),
@@ -99,7 +99,7 @@ update_stream_fields_test() ->
 	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(get, {"http://localhost:8000/streams/" ++ lib_json:to_string(StreamId) ++ "/data", []}, [], []),
 	{ok, {{_Version5, 200, _ReasonPhrase5}, _Headers5, _Body5}} = httpc:request(delete, {"http://localhost:8000/users/" ++ lib_json:to_string(UserId), []}, [], []),
 	ObjectList = lib_json:get_field(Body4,"data"),
-    ?assertEqual(lib_json:get_field(Body3,"last_update"), lib_json:get_field(lists:nth(1,ObjectList),"timestamp")),
+    ?assertEqual(lib_json:get_field(Body3,"last_updated"), lib_json:get_field(lists:nth(1,ObjectList),"timestamp")),
 	?assertEqual(lib_json:get_field(Body3,"history_size"),1).
 	
 %% @doc

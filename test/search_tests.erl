@@ -55,3 +55,4 @@ process_search_post_test() ->
 refresh() ->
 	httpc:request(post, {"http://localhost:9200/sensorcloud/_refresh", [],"", ""}, [], []).
 
+
