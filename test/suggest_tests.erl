@@ -182,7 +182,7 @@ text_autocompletion_test() ->
 	api_help:refresh(),
 	
 	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"name\" : \"search\",\"resource_id\" : \""++lib_json:to_string(Id)++"\", \"private\" : \"false\", \"tags\":\"test_auto_tag\"}"}, [], []),
-	timer:sleep(1000),
+	timer:sleep(20000),
 	Response2 = get_request(?SUGGEST_URL++"model/"++"testauto"),
 	Response3 = get_request(?SUGGEST_URL++"tags/"++"testautotag"),
 	Response4 = get_request(?SUGGEST_URL++"tags/"++"test_auto_tag"),

@@ -2,4 +2,6 @@
 
 -record(state, {stream_id,
 				uri,
-				parser}).
+				parser,
+				channel,
+				exchange}).

@@ -87,7 +87,7 @@ post_datapoint(StreamId, Value)->
 	StrMinutes = integer_to_list(Minutes),
 	StrSeconds = integer_to_list(Seconds),
 	
-	FieldValue3 = {"timestamp",list_to_binary(StrYear++":"++StrMonth++":"++StrDay++" "++StrHour++":"++StrMinutes++":"++StrSeconds)},
+	FieldValue3 = {"timestamp",list_to_binary(StrYear++":"++StrMonth++":"++StrDay++"T"++StrHour++":"++StrMinutes++":"++StrSeconds)},
 	FieldValues = [FieldValue1, FieldValue2, FieldValue3],
 	FinalJson = lib_json:add_values("{}", FieldValues),
 	

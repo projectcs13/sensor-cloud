@@ -17,16 +17,16 @@
 %% ====================================================================
 %% API functions
 %% ====================================================================
--export([parseJson/2, parseText/2]).
+-export([parseJson/3, parseText/3]).
 
 %% @doc
 %% Function: parseJson/2
 %% Purpose: used to parse the json data, unfinished and needs to be updated.
-%% Returns: ok | {error, ErrMsg}
+%% Returns: JsonData | {error, ErrMsg}
 %% Side effects: Stores the newly parsed data point in the DB
 %% @end
--spec parseJson(tuple(), any()) -> ok.
-parseJson(Parser, Data) ->
+-spec parseJson(tuple(), any(), list()) -> string() | tuple().
+parseJson(Parser, Data, TimeList) ->
 
 	%%extract the data from the coming data
 	StreamId = Parser#parser.stream_id,
@@ -57,40 +57,45 @@ parseJson(Parser, Data) ->
 					{"value",list_to_binary(Res)}
 			end
 	end,
-	{{Year, Month, Day}, {Hour, Minutes, Seconds}} = calendar:now_to_universal_time(os:timestamp()),
+	TimeStamp = case TimeList of
+					[] ->
+						{{Year, Month, Day}, {Hour, Minutes, Seconds}} = calendar:now_to_universal_time(os:timestamp()),
+						StrYear = integer_to_list(Year),
+						StrMonth = integer_to_list(Month),
+						StrDay = integer_to_list(Day),
+						StrHour = integer_to_list(Hour),
+						StrMinutes = integer_to_list(Minutes),
+						StrSeconds = integer_to_list(Seconds),
+						list_to_binary(StrYear++":"++StrMonth++":"++StrDay++"T"++StrHour++":"++StrMinutes++":"++StrSeconds);
+					_->
+						list_to_binary(make_stamp(TimeList))
+				end,
 	
-	StrYear = integer_to_list(Year),
-	StrMonth = integer_to_list(Month),
-	StrDay = integer_to_list(Day),
-	StrHour = integer_to_list(Hour),
-	StrMinutes = integer_to_list(Minutes),
-	StrSeconds = integer_to_list(Seconds),
-	
-	FieldValue3 = {"timestamp",list_to_binary(StrYear++":"++StrMonth++":"++StrDay++" "++StrHour++":"++StrMinutes++":"++StrSeconds)},
+	FieldValue3 = {"timestamp",TimeStamp},
 	FieldValues = [FieldValue1, FieldValue2, FieldValue3],
 	FinalJson = lib_json:add_values("{}", FieldValues),
 	
 	case erlastic_search:index_doc(?ES_INDEX, "datapoint", FinalJson) of
 		{error, Reason} -> erlang:display("Failed to insert the new datapoint into the elasticsearch for this reason: "++Reason),
 						   {error, Reason};
-		{ok,List} -> 
+		{ok,_List} -> 
 			%% only for testing
 			%% erlang:display("the final data which is inserted into the database: "++FinalJson),
 			
-			ok
+			FinalJson
 	end.
 
 %% @doc
 %% Function: parseText/2
 %% Purpose: used to parse the text data, unfinished and needs to be updated.
-%% Returns: ok
+%% Returns: JsonData | {error, ErrMsg}
 %% Side effects: Stores the newly parsed data point in the DB
 %% @end
--spec parseText(tuple(), any()) -> ok.
-parseText(Parser, Data) ->
+-spec parseText(tuple(), any(), list()) -> string() | tuple().
+parseText(Parser, Data, TimeList) ->
 	%% extract the wanted value from the text-data and store it in the DB
 	%% return the status of the transaction, ok or {error, ErrMsg}
-	ok.
+	{error, "parseText function has not been implemented"}.
 
 
 
@@ -98,6 +103,33 @@ parseText(Parser, Data) ->
 %% ====================================================================
 %% Internal functions
 %% ====================================================================
+
+%% @doc
+%% Function: make_timestamp/1
+%% Purpose: transform the time item list to timestamp string
+%% Example: ["Thu,","21","Nov","2013","09:32:42","GMT"] => "2013:11:21T09:32:42" 
+%% Returns: string()
+%% @end
+-spec make_stamp(list()) -> string().
+make_stamp(TimeList)->
+	Day = lists:nth(2, TimeList),
+	Month = case lists:nth(3, TimeList) of
+				"Jan"->"01";
+				"Feb"->"02";
+				"Mar"->"03";
+				"Apr"->"04";
+				"May"->"05";
+				"Jun"->"06";
+				"Jul"->"07";
+				"Aug"->"08";
+				"Sep"->"09";
+				"Oct"->"10";
+				"Nov"->"11";
+				"Dec"->"12"
+			end,
+	Year = lists:nth(4, TimeList),
+	Time = lists:nth(5, TimeList),
+	Year++":"++Month++":"++Day++"T"++Time.
 
 %% @doc
 %% Function: processParser/2

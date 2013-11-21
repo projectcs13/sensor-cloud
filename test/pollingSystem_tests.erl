@@ -17,6 +17,7 @@
 -include("state.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("inets/include/mod_auth.hrl").
+-include_lib("amqp_client.hrl").
 
 %% before running this testing code, please change the following address to your address
 %% the python server code locates in scripts/python/cgi-bin folder
@@ -30,7 +31,7 @@
 -define(POLL_ADD2 ,"http://localhost:8002/cgi-bin/humidity.py").
 -endif.
 
--export([]).
+-export([test_rabbit_messages/1]).
 
 %% ====================================================================
 %% API functions
@@ -88,7 +89,11 @@ initialization_test()->
 	Parser2 = poll_help:get_parser_by_id("2"),
 	?assertEqual(true, is_record(Parser2, parser)),
 	?assertEqual("application/json", Parser2#parser.input_type),
-	?assertEqual("streams/humidity/value", Parser2#parser.input_parser).
+	?assertEqual("streams/humidity/value", Parser2#parser.input_parser),
+	
+	%% generate threads to receive commming messages
+	register(test_rabbit_1, spawn(?MODULE, test_rabbit_messages, ["1"])),
+	register(test_rabbit_2, spawn(?MODULE, test_rabbit_messages, ["2"])).
 
 %% @doc
 %% Function: polling_system_test/0
@@ -115,11 +120,15 @@ polling_system_test()->
 		"1"->
 			?assertEqual("2", State2#state.stream_id),
 			?assertEqual(?POLL_ADD2, State2#state.uri),
+			?assertEqual(<<"streams.2">>, State2#state.exchange),
+			?assertNotEqual(undefined, State2#state.channel),
 			Parser2 = State2#state.parser,
 			?assertEqual("application/json", Parser2#parser.input_type),
 			?assertEqual("streams/humidity/value", Parser2#parser.input_parser),
 			
 			?assertEqual(?POLL_ADD, State1#state.uri),
+			?assertEqual(<<"streams.1">>, State1#state.exchange),
+			?assertNotEqual(undefined, State1#state.channel),
 			Parser1 = State1#state.parser,
 			?assertEqual("application/json", Parser1#parser.input_type),
 			?assertEqual("streams/temperature/value", Parser1#parser.input_parser);
@@ -258,6 +267,19 @@ terminate_system_test()->
 -spec clear_system_test() -> atom() | tuple().
 clear_system_test()->
 
+	%% terminate the rabbit testing threads
+	case {whereis(test_rabbit_1), whereis(test_rabbit_2)} of
+		{undefined, undefined}->
+			continue;
+		{Pid, undefined}->
+			exit(Pid, "it is time to sleep");
+		{undefined, Pid}->
+			exit(Pid, "it is time to sleep");
+		{Pid1, Pid2}->
+			exit(Pid1, "it is time to sleep"),
+			exit(Pid2, "it is time to sleep")
+	end,
+	
 	%% clear all already stored resource in elasticsearch
 	clear_stream_type(),
 	clear_parser_type(),
@@ -355,3 +377,42 @@ clear_parser_type() ->
 		| {error, term()}.
 clear_datapoint_type() ->
 	httpc:request(delete, {?ES_ADDR ++ "/datapoint", []}, [], []).
+
+%% @doc
+%% Function: test_rabbit_messages/1
+%% Purpose: test if the poller could succeed sending the messages to rabbit MQ, accepts one parameter: the id of stream 
+%% Returns: ok
+%% @end
+test_rabbit_messages(StreamId)->
+	%% Exchange name binarys
+	StreamExchange = list_to_binary("streams."++StreamId),
+	
+	%% Connect
+	{ok, Connection} =
+		amqp_connection:start(#amqp_params_network{host = "localhost"}),
+	
+	%% Open In and OUT channels
+	{ok, ChannelIn} = amqp_connection:open_channel(Connection),
+	
+	%% Declare INPUT exchange and queue
+	amqp_channel:call(ChannelIn, #'exchange.declare'{exchange = StreamExchange, type = <<"fanout">>}),
+	#'queue.declare_ok'{queue = QueueIn} = amqp_channel:call(ChannelIn, #'queue.declare'{exclusive = true}),
+	amqp_channel:call(ChannelIn, #'queue.bind'{exchange = StreamExchange, queue = QueueIn}),
+	
+	%% Subscribe to INPUT queue
+	amqp_channel:subscribe(ChannelIn, #'basic.consume'{queue = QueueIn, no_ack = true}, self()),
+	
+	loop(StreamId, ChannelIn).
+
+%% @doc
+%% Function: loop/2
+%% Purpose: loop function which waits for comming messages and print them on the shell 
+%% Returns: ok
+%% @end
+loop(StreamId, ChannelIn)->
+	receive
+		{#'basic.deliver'{}, #amqp_msg{payload = Body}} ->
+			erlang:display("receive message: "++binary_to_list(Body)),			
+			%% Recurse
+			loop(StreamId, ChannelIn)
+	end.

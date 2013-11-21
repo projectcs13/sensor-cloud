@@ -12,6 +12,7 @@
 -include("parser.hrl").
 -include("state.hrl").
 -include("common.hrl").
+-include_lib("amqp_client.hrl").
 
 
 %% ====================================================================
@@ -38,7 +39,21 @@ start_link(State)->
 init(State)->
 	application:start(inets),
 	ssl:start(),
-	{ok, State}.
+	
+	%% create exchange for rabbitMQ
+	StreamExchange = list_to_binary("streams."++State#state.stream_id),
+	{ok, Connection} =
+		amqp_connection:start(#amqp_params_network{host = "localhost"}),
+	{ok, ChannelOut} = amqp_connection:open_channel(Connection),
+	amqp_channel:call(ChannelOut, #'exchange.declare'{exchange = StreamExchange, type = <<"fanout">>}),
+	
+	State#state{exchange = StreamExchange, channel = ChannelOut},
+	
+	%% only for testing
+	%% erlang:display("after changing, the stream exchange is: "++binary_to_list(State#state.exchange)),
+	%% erlang:display("after changing, the outgoing channel is: "++pid_to_list(State#state.channel)),
+	
+	{ok, #state{stream_id=State#state.stream_id, uri=State#state.uri, parser=State#state.parser, exchange=StreamExchange, channel=ChannelOut}}.
 
 %% @doc
 %% Function: handle_call/2
@@ -76,7 +91,7 @@ handle_call({rebuild}, _Form, State)->
 							FinalUri = binary_to_list(NewUri)
 					end,			
 					%% notify the supervisor to refresh its records
-					{reply, {update, StreamId, FinalUri, NewFreq}, #state{stream_id=StreamId, uri=FinalUri, parser=Parser}}
+					{reply, {update, StreamId, FinalUri, NewFreq}, #state{stream_id=StreamId, uri=FinalUri, parser=Parser, exchange=State#state.exchange, channel=State#state.channel}}
 			end
 	end;
 handle_call({check_info}, _Form, State)->
@@ -101,15 +116,32 @@ handle_info({probe}, State)->
 		{ok, {{HttpVer, Code, Msg}, Headers, Body}}->
 			case Code==200 of
 				true->
-					case check_header(Headers) of
-						"application/json" ->
-							parser:parseJson(Parser, Body);
-						"plain/text" ->
-							parser:parseText(Parser, Body);
-						_ ->
-							%%the other options
-								erlang:display("other content type")
+					
+					TimeList = case lists:keyfind("date", 1, Headers) of
+									{"date", Date}->
+										string:tokens(Date, " ");
+									_->
+										[]
+								end,
+					
+					FinalData = case check_header(Headers) of
+									"application/json" ->
+										parser:parseJson(Parser, Body, TimeList);
+									"plain/text" ->
+										parser:parseText(Parser, Body, TimeList);
+									_ ->
+										%%the other options
+										erlang:display("other content type")
+								end,
+					case FinalData == true of
+						false->
+							amqp_channel:cast(State#state.channel,
+					  							#'basic.publish'{exchange = State#state.exchange},
+					  							#amqp_msg{payload = list_to_binary(FinalData)});
+						_->
+							continue
 					end;
+
 				_ ->
 					%%polling fails
 					erlang:display("polling failed")
