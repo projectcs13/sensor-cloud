@@ -7,10 +7,10 @@
 
 -module(search).
 -export([init/1, 
-                allowed_methods/2,
-                content_types_accepted/2,
-                content_types_provided/2,
-                 process_post/2]).
+				allowed_methods/2,
+				content_types_accepted/2,
+				content_types_provided/2,
+				 process_post/2]).
 
 -include("webmachine.hrl").
 -include_lib("erlastic_search.hrl").
@@ -26,7 +26,7 @@
 %% @end
 -spec init([]) -> {ok, undefined}.
 init([]) -> 
-        {ok, undefined}.
+		{ok, undefined}.
 
 
 
@@ -37,12 +37,12 @@ init([]) ->
 %% @end
 -spec allowed_methods(ReqData::tuple(), State::string()) -> {list(), tuple(), string()}.
 allowed_methods(ReqData, State) ->
-        case api_help:parse_path(wrq:path(ReqData)) of                
-                [{"_search"}] ->
-                        {['POST','GET'], ReqData, State};
-                [error] ->
-                        {['POST','GET'], ReqData, State}
-        end.
+		case api_help:parse_path(wrq:path(ReqData)) of                
+				[{"_search"}] ->
+						{['POST','GET'], ReqData, State};
+				[error] ->
+						{['POST','GET'], ReqData, State}
+		end.
 
 
 
@@ -54,7 +54,7 @@ allowed_methods(ReqData, State) ->
 %% @end
 -spec content_types_provided(ReqData::tuple(), State::string()) -> {list(), tuple(), string()}.
 content_types_provided(ReqData, State) ->
-        {[{"application/json", get_search}], ReqData, State}.
+		{[{"application/json", get_search}], ReqData, State}.
 
 
 %% @doc
@@ -65,7 +65,7 @@ content_types_provided(ReqData, State) ->
 %% @end
 -spec content_types_accepted(ReqData::tuple(), State::string()) -> {list(), tuple(), string()}.
 content_types_accepted(ReqData, State) ->
-        {[{"application/json", process_post}], ReqData, State}.
+		{[{"application/json", process_post}], ReqData, State}.
 
 %% @doc
 %% Function: process_post/2
@@ -78,7 +78,7 @@ content_types_accepted(ReqData, State) ->
 %% @end
 -spec process_post(ReqData::tuple(), State::string()) -> {true, tuple(), string()}.
 process_post(ReqData, State) ->
-        process_search_post(ReqData,State).
+		process_search_post(ReqData,State).
 
 %% @doc
 %% Function: process_search_post/2
@@ -89,52 +89,52 @@ process_post(ReqData, State) ->
 -spec process_search_post(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 
 process_search_post(ReqData, State) ->
-        erlang:display("search with json request"),
-        case wrq:get_qs_value("size",ReqData) of 
-            undefined ->
-                Size = "10";
-            SizeParam ->
-                Size = SizeParam
-        end,
+		erlang:display("search with json request"),
+		case wrq:get_qs_value("size",ReqData) of 
+			undefined ->
+				Size = "10";
+			SizeParam ->
+				Size = SizeParam
+		end,
 		case wrq:get_qs_value("sort",ReqData) of
-            undefined ->
-                Sort = "user_ranking";
-            SortParam ->
-                Sort = SortParam
-        end,
-        case wrq:get_qs_value("from",ReqData) of
-            undefined ->
-                From = "0";
-            FromParam ->
-                From = FromParam
-        end,
-        {Json,_,_} = api_help:json_handler(ReqData,State),
-        FilteredJson = filter_json(Json, From, Size, Sort),
-        case erlastic_search:search_json(#erls_params{},?INDEX, "stream", FilteredJson) of % Maybe wanna take more
-                {error, Reason1} ->
-                        StreamSearch = {error, Reason1};
-                {ok,List1} ->
-                        StreamSearch = lib_json:encode(List1) % May need to convert
-        end,
-        case erlastic_search:search_json(#erls_params{},?INDEX, "user", lib_json:rm_field(FilteredJson, "sort")) of % Maybe wanna take more
-                {error, Reason2} ->
-                        UserSearch = {error, Reason2};
-                {ok,List2} -> 
+			undefined ->
+				Sort = "user_ranking.average";
+			SortParam ->
+				Sort = SortParam
+		end,
+		case wrq:get_qs_value("from",ReqData) of
+			undefined ->
+				From = "0";
+			FromParam ->
+				From = FromParam
+		end,
+		{Json,_,_} = api_help:json_handler(ReqData,State),
+		FilteredJson = filter_json(Json, From, Size, Sort),
+		case erlastic_search:search_json(#erls_params{},?INDEX, "stream", FilteredJson) of % Maybe wanna take more
+				{error, Reason1} ->
+						StreamSearch = {error, Reason1};
+				{ok,List1} ->
+						StreamSearch = lib_json:encode(List1) % May need to convert
+		end,
+		case erlastic_search:search_json(#erls_params{},?INDEX, "user", lib_json:rm_field(FilteredJson, "sort")) of % Maybe wanna take more
+				{error, Reason2} ->
+						UserSearch = {error, Reason2};
+				{ok,List2} -> 
 			UserSearch = lib_json:encode(List2) % May need to convert
-         end,
+		 end,
 	% check search-results for error
 	case StreamSearch of
-	    {error, {Body, Code}} ->
+		{error, {Body, Code}} ->
 		ErrorString = api_help:generate_error(Body, Code),
 		{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-	    _ -> 
+		_ -> 
 		case UserSearch of
 		  {error, {Body, Code}} ->
-		    ErrorString = api_help:generate_error(Body, Code),
-		    {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+			ErrorString = api_help:generate_error(Body, Code),
+			{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 		  _ ->
-        		SearchResults = "{\"streams\":"++ StreamSearch ++", \"users\":"++ UserSearch ++"}",
-        		{true,wrq:set_resp_body(SearchResults,ReqData),State}
+				SearchResults = "{\"streams\":"++ StreamSearch ++", \"users\":"++ UserSearch ++"}",
+				{true,wrq:set_resp_body(SearchResults,ReqData),State}
 		end
 	end.
 %% GROUPS ARE NOT IMPLEMENTED
@@ -150,8 +150,8 @@ process_search_post(ReqData, State) ->
 %% Returns: JSON string that is updated with filter
 %% @end
 filter_json(Json) ->
-        NewJson = string:sub_string(Json,1,string:len(Json)-1),
-        "{\"query\":{\"filtered\":"++NewJson++",\"filter\":{\"bool\":{\"must_not\":{\"term\":{\"private\":\"true\"}}}}}}}".
+		NewJson = string:sub_string(Json,1,string:len(Json)-1),
+		"{\"query\":{\"filtered\":"++NewJson++",\"filter\":{\"bool\":{\"must_not\":{\"term\":{\"private\":\"true\"}}}}}}}".
 
 
 %% @doc
@@ -171,9 +171,10 @@ filter_json(Json, From, Size, Sort) ->
 			UseSort = SortValue,
 			SortJson = lib_json:rm_field(Json, "sort")
 	end,
-    NewJson = string:sub_string(SortJson,1,string:len(SortJson)-1),
-    "{\"from\" : "++From++
+	NewJson = string:sub_string(SortJson,1,string:len(SortJson)-1),
+	"{\"from\" : "++From++
 	",\"size\" : "++Size++
 	",\"sort\" : " ++UseSort++
 	",\"query\" : {\"filtered\" : "++NewJson++
 	",\"filter\" : {\"bool\" : {\"must_not\" : {\"term\" : {\"private\" : \"true\"}}}}}}}".
+
