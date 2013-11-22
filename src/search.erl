@@ -148,9 +148,15 @@ process_search_post(ReqData, State) ->
     FilteredJson = filter_json(Json, From, Size, Sort),
     case erlastic_search:search_json(#erls_params{},?INDEX, "stream", FilteredJson) of % Maybe wanna take more
             {error, Reason1} ->
-                    StreamSearch = {error, Reason1};
+                StreamSearch = {error, Reason1};
             {ok,List1} ->
-                    StreamSearch = lib_json:encode(List1) % May need to convert
+                case lib_json:get_field(Json, "query.filtered.query.query_string.query") of
+                    QueryString when is_binary(QueryString) ->
+                        erlastic_search:index_doc(?INDEX,"search_query","{\"search_suggest\":{\"input\":[\""++ binary_to_list(QueryString) ++"\"],\"weight\":1}}");
+                    _ ->
+                        erlang:display("No query string text")
+                end,
+                StreamSearch = lib_json:encode(List1) % May need to convert
     end,
     case erlastic_search:search_json(#erls_params{},?INDEX, "user", lib_json:rm_field(FilteredJson, "sort")) of % Maybe wanna take more
             {error, Reason2} ->
