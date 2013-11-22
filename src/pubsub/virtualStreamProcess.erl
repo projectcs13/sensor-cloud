@@ -53,11 +53,11 @@ create(VStreamId, InputIds, Function) ->
 
 	%% Exchange name binarys.
 	InputExchanges = create_input_exchanges(InputIds),
-	VStreamExchange = list_to_binary("vstreams."++VStreamId),
+	VStreamExchange = list_to_binary("vstreams." ++ VStreamId),
 	
 	%% Connect.
 	{ok, Connection} =
-		amqp_connection:start(#amqp_params_network{host = ?RMQ_IPADDR}),
+		amqp_connection:start(#amqp_params_network{}),
 	
 	%% Open In and OUT channels.
 	{ok, ChannelIn} = amqp_connection:open_channel(Connection),
@@ -72,10 +72,8 @@ create(VStreamId, InputIds, Function) ->
 					  #'exchange.declare'{exchange = VStreamExchange,
 										  type = <<"fanout">>}),
 	
-	erlang:display("**************** VSTREAM: GET THE DATAPOINTS *****************"),
 	%% Get the latest value for each datapoint.
 	DataPoints = get_first_value_for_streams(InputIds),
-	erlang:display("**************** VSTREAM: GOT THE DATAPOINTS *****************"),
 	
 	loop(VStreamId, DataPoints, VStreamExchange,
 		 {Connection, ChannelIn, ChannelOut}, Function, false).
@@ -117,46 +115,27 @@ loop(VStreamId, DataPoints, VStreamExchange, Net, Function, Calculate) ->
 	%% Receive from the subscribeTopic!
 	receive
 		{#'basic.deliver'{}, #amqp_msg{payload = Body}} ->
-			case binary_to_list(Body) of
-				%% Get request
-				{get, GetVar} ->
-					io:format("GET: ~p~n", [GetVar]);
-				
-				%% Post request
-				{post, JSON} ->
-					io:format("POST: ~p~n", [JSON]);
-					%% Parse JSON
-					
-					%% Store value
-					
-					%% Propagate
-					%% send(ChannelOut, VStreamExchange, Body),
-				
-				%% Delete request
-				{delete} ->
-					io:format("DELETE~n");
-				
+			Data = binary_to_list(Body),
+			case erlson:is_json_string(Data) of
 				%% New value from the source as a Json
-				DataPoint when is_list(DataPoint) ->
-					Id = binary_to_list(lib_json:get_field(DataPoint,
-														   "stream_id")),
+				true ->
+					Id = binary_to_list(lib_json:get_field(Data, "stream_id")),
 					NewDataPoints =
-						lists:keyreplace(Id, 1, DataPoints, {Id, DataPoint}),
+						lists:keyreplace(Id, 1, DataPoints, {Id, Data}),
 					loop(VStreamId, NewDataPoints, VStreamExchange,
 						 Net, Function, true);
 				_ ->
-					io:format("CRAP! We are getting CRAP!~n")
-			end,
-			loop(VStreamId, DataPoints, VStreamExchange,
-				 Net, Function, Calculate);
-		
+					loop(VStreamId, DataPoints, VStreamExchange,
+						 Net, Function, Calculate)
+			end;
 		quit ->
 			{Connection, ChannelIn, ChannelOut} = Net,
 			amqp_channel:close(ChannelIn),
 			amqp_channel:close(ChannelOut),
 			amqp_connection:close(Connection),
-			ok
-	
+			ok;
+		_ -> loop(VStreamId, DataPoints, VStreamExchange,
+				  Net, Function, Calculate)
 	after
 		?PUB_SUB_TIMEOUT ->
 			case Calculate of
@@ -175,23 +154,20 @@ loop(VStreamId, DataPoints, VStreamExchange, Net, Function, Calculate) ->
 						  ++ ?QUOTE("timestamp") ++ ?COLON ++ ?QUOTE(Timestamp)
 						  ++ ","
 						  ++ ?QUOTE("value") ++ ?COLON
-						  ++ integer_to_list(Value)),
+						  ++ number_to_list(Value)),
 					
 					%% Store value in ES
 					case erlastic_search:index_doc(?ES_INDEX,
 												   "datapoint", Msg) of
-						{error, Reason} ->
-							erlang:display({error, Reason});
+						{error, Reason} -> {error, Reason};
 						{ok, _} ->
 							%% Publish the calculated value
 							ChannelOut = element(3, Net),
-							send(ChannelOut,
-								 VStreamExchange,
-								 list_to_binary(Msg))
-					end,
-					loop(VStreamId, DataPoints, VStreamExchange,
-						 Net, Function, false);
-				
+							send(ChannelOut, VStreamExchange,
+								 list_to_binary(Msg)),
+							loop(VStreamId, DataPoints, VStreamExchange,
+								 Net, Function, false)
+					end;
 				false ->
 					loop(VStreamId, DataPoints, VStreamExchange,
 						 Net, Function, Calculate)
@@ -403,7 +379,18 @@ apply_function(Function, [{_Id, DataPoint} | T]) ->
 
 
 
-
+%% @doc
+%% Function: number_to_list/1
+%% Purpose: Converts a number to a list.
+%% Args: Value - The number to convert.
+%% Returns: The number as a list.
+%% 
+%% @end
+-spec number_to_list(Value :: number()) -> list().
+number_to_list(Value) when is_integer(Value) ->
+	integer_to_list(Value);
+number_to_list(Value) when is_float(Value) ->
+	float_to_list(Value).
 
 
 

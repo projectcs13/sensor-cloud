@@ -32,12 +32,14 @@
 
 
 
-virtual_stream_process_test_() ->
+virtual_stream__process_test_() ->
 	S = fun() -> ok end,
 	C = fun(_) -> ok end,
-	[{setup, S, C, fun start_and_terminate/1},
+	[
+	 {timeout, 30, [{setup, S, C, fun start_and_terminate/1}]},
 	 {timeout, 30, [{setup, S, C, fun vstream_subscribe_to_a_stream/1}]},
-	 {timeout, 30, [{setup, S, C, fun vstream_subscribe_to_streams_interval/1}]}
+	 {timeout, 30, [{setup, S, C, fun vstream_subscribe_to_streams_interval/1}]},
+	 {timeout, 30, [{setup, S, C, fun vstream_subscribe_to_streams_sim/1}]}
 	].
 
 
@@ -52,12 +54,11 @@ virtual_stream_process_test_() ->
 -spec start_and_terminate(_) -> ok | {error, term()}.
 start_and_terminate(_) ->
 	Pid = spawn(virtualStreamProcess, create, ["1", [], "test"]),
-	Info1 = process_info(Pid),
+	?assertNotEqual(undefined, process_info(Pid)),
 	Pid ! quit,
 	timer:sleep(500),
-	Info2 = process_info(Pid),
-	[?_assertNotEqual(undefined, Info1),
-	 ?_assertEqual(undefined, Info2)].
+	?assertEqual(undefined, process_info(Pid)).
+
 
 
 
@@ -86,7 +87,7 @@ vstream_subscribe_to_a_stream(_) ->
 	
 	%% Establish connection to RabbitMQ
 	{ok, Connection} =
-		amqp_connection:start(#amqp_params_network{host = ?RMQ_IPADDR}),
+		amqp_connection:start(#amqp_params_network{}),
 	{ok, ChannelIn} = amqp_connection:open_channel(Connection),
 	{ok, ChannelOut} = amqp_connection:open_channel(Connection),
 	
@@ -98,7 +99,6 @@ vstream_subscribe_to_a_stream(_) ->
 					  #'exchange.declare'{exchange = OutExchange,
 										  type = <<"fanout">>}),
 	
-	
 	%% Publish a message
 	Msg = create_data_point(StreamId, 32),
 	amqp_channel:cast(ChannelOut,
@@ -109,13 +109,15 @@ vstream_subscribe_to_a_stream(_) ->
 	%% Listen for the update
 	Rec = receive
 			{#'basic.deliver'{}, #amqp_msg{payload = Body}} ->
-				case binary_to_list(Body) of
+				Data = binary_to_list(Body),
+				case erlson:is_json_string(Data) of
 					%% New value from the source as a Json
-					DataPoint ->
-						Value = lib_json:get_field(DataPoint, "value"),
+					true ->
+						Value = lib_json:get_field(Data, "value"),
 						Id = binary_to_list(
-								lib_json:get_field(DataPoint, "stream_id")),
-						{Value, Id}
+								lib_json:get_field(Data, "stream_id")),
+						{Value, Id};
+					_ -> false
 				end;
 			_ -> false
 		  end,
@@ -125,10 +127,13 @@ vstream_subscribe_to_a_stream(_) ->
 	amqp_channel:close(ChannelIn),
 	amqp_channel:close(ChannelOut),
 	amqp_connection:close(Connection),
+	
+	timer:sleep(1000),
 
 	[?_assertEqual(true, is_list(StreamId)),
 	 ?_assertEqual({32, "testID"}, Rec)].
 	
+
 
 
 
@@ -151,7 +156,6 @@ vstream_subscribe_to_streams_interval(_) ->
 	StreamId1 = create_a_stream_on_index(?ES_INDEX),
 	StreamId2 = create_a_stream_on_index(?ES_INDEX),
 
-	
 	%% Create virtual stream listening to our streams
 	VPid = create_virtual_stream("testID",
 								 [{"stream", StreamId1}, {"stream", StreamId2}],
@@ -164,17 +168,20 @@ vstream_subscribe_to_streams_interval(_) ->
 	
 	%% Establish connection to RabbitMQ
 	{ok, Connection} =
-		amqp_connection:start(#amqp_params_network{host = ?RMQ_IPADDR}),
+		amqp_connection:start(#amqp_params_network{}),
 	{ok, ChannelIn} = amqp_connection:open_channel(Connection),
 	{ok, ChannelOut} = amqp_connection:open_channel(Connection),
 	
-	%% Subscribe to InExchange
-	subscribe(ChannelIn, InExchange),
-	
-	%% Declare the outgoing exchange to publish to
+	%% Declare the outgoing exchange 1 and 2 to publish to
 	amqp_channel:call(ChannelOut,
 					  #'exchange.declare'{exchange = OutExchange1,
 										  type = <<"fanout">>}),
+	amqp_channel:call(ChannelOut,
+					  #'exchange.declare'{exchange = OutExchange2,
+										  type = <<"fanout">>}),
+	
+	%% Subscribe to InExchange
+	subscribe(ChannelIn, InExchange),
 	
 	%% Publish a message
 	Msg = create_data_point(StreamId1, 32),
@@ -184,23 +191,21 @@ vstream_subscribe_to_streams_interval(_) ->
 	
 	%% Listen for the update
 	Rec1 = receive
-			{#'basic.deliver'{}, #amqp_msg{payload = Body}} ->
-				case binary_to_list(Body) of
+			{#'basic.deliver'{}, #amqp_msg{payload = Body1}} ->
+				Data1 = binary_to_list(Body1),
+				case erlson:is_json_string(Data1) of
 					%% New value from the source as a Json
-					DataPoint ->
-						Val1 = lib_json:get_field(DataPoint, "value"),
+					true ->
+						Val1 = lib_json:get_field(Data1, "value"),
 						Id1 = binary_to_list(
-								   lib_json:get_field(DataPoint, "stream_id")),
-						{Val1, Id1}
+								lib_json:get_field(Data1, "stream_id")),
+						{Val1, Id1};
+					_ -> false
 				end;
 			_ -> false
-		   end,
+		  end,	
 	
 	
-	%% Declare the outgoing exchange to publish to
-	amqp_channel:call(ChannelOut,
-					  #'exchange.declare'{exchange = OutExchange2,
-										  type = <<"fanout">>}),
 	
 	%% Publish a message
 	Msg2 = create_data_point(StreamId2, 32),
@@ -211,17 +216,18 @@ vstream_subscribe_to_streams_interval(_) ->
 	%% Listen for the update
 	Rec2 = receive
 			{#'basic.deliver'{}, #amqp_msg{payload = Body2}} ->
-				case binary_to_list(Body2) of
+				Data2 = binary_to_list(Body2),
+				case erlson:is_json_string(Data2) of
 					%% New value from the source as a Json
-					DataPoint2 ->
-						Val2 = lib_json:get_field(DataPoint2, "value"),
+					true ->
+						Val2 = lib_json:get_field(Data2, "value"),
 						Id2 = binary_to_list(
-								   lib_json:get_field(DataPoint2, "stream_id")),
-						{Val2, Id2}
+								lib_json:get_field(Data2, "stream_id")),
+						{Val2, Id2};
+					_ -> false
 				end;
 			_ -> false
-		   end,
-	
+		  end,
 	
 	%% Close and clean
 	VPid ! quit,
@@ -237,6 +243,90 @@ vstream_subscribe_to_streams_interval(_) ->
 
 
 
+
+
+
+
+%% @doc
+%% Function: vstream_subscribe_to_streams_sim/1
+%% Purpose: Starts a virtual stream process that subscribes to streams, gets a
+%%          value, apply the function and publish it.
+%% Returns: ok | {error, term()}.
+%% Side effects: Deletes and creates ?ES_INDEX in ES, create two streams
+%%               and stores two data point in ES.
+%% 
+%% @end
+-spec vstream_subscribe_to_streams_sim(_) -> ok | {error, term()}.
+vstream_subscribe_to_streams_sim(_) ->
+	
+	%% Create two streams in ?ES_INDEX
+	StreamId1 = create_a_stream_on_index(?ES_INDEX),
+	StreamId2 = create_a_stream_on_index(?ES_INDEX),
+
+	%% Create virtual stream listening to our streams
+	VPid = create_virtual_stream("testID",
+								 [{"stream", StreamId1}, {"stream", StreamId2}],
+								 "test"),
+	
+	%% Create publisher and consumer exchanges
+	OutExchange1 = list_to_binary("streams." ++ StreamId1),
+	OutExchange2 = list_to_binary("streams." ++ StreamId2),
+	InExchange = list_to_binary("vstreams.testID"),
+	
+	%% Establish connection to RabbitMQ
+	{ok, Connection} =
+		amqp_connection:start(#amqp_params_network{}),
+	{ok, ChannelIn} = amqp_connection:open_channel(Connection),
+	{ok, ChannelOut} = amqp_connection:open_channel(Connection),
+	
+	%% Declare the outgoing exchange 1 and 2 to publish to
+	amqp_channel:call(ChannelOut,
+					  #'exchange.declare'{exchange = OutExchange1,
+										  type = <<"fanout">>}),
+	amqp_channel:call(ChannelOut,
+					  #'exchange.declare'{exchange = OutExchange2,
+										  type = <<"fanout">>}),
+	
+	%% Subscribe to InExchange
+	subscribe(ChannelIn, InExchange),
+	
+	%% Publish a message
+	Msg = create_data_point(StreamId1, 32),
+	amqp_channel:cast(ChannelOut,
+					  #'basic.publish'{exchange = OutExchange1},
+					  #amqp_msg{payload = Msg}),
+	
+	%% Publish a message
+	Msg2 = create_data_point(StreamId2, 32),
+	amqp_channel:cast(ChannelOut,
+					  #'basic.publish'{exchange = OutExchange2},
+					  #amqp_msg{payload = Msg2}),
+	
+	%% Listen for the update
+	Rec2 = receive
+			{#'basic.deliver'{}, #amqp_msg{payload = Body2}} ->
+				Data2 = binary_to_list(Body2),
+				case erlson:is_json_string(Data2) of
+					%% New value from the source as a Json
+					true ->
+						Val2 = lib_json:get_field(Data2, "value"),
+						Id2 = binary_to_list(
+								lib_json:get_field(Data2, "stream_id")),
+						{Val2, Id2};
+					_ -> false
+				end;
+			_ -> false
+		  end,
+	
+	%% Close and clean
+	VPid ! quit,
+	amqp_channel:close(ChannelIn),
+	amqp_channel:close(ChannelOut),
+	amqp_connection:close(Connection),
+
+	[?_assertEqual(true, is_list(StreamId1)),
+	 ?_assertEqual(true, is_list(StreamId2)),
+	 ?_assertEqual({64, "testID"}, Rec2)].
 
 
 

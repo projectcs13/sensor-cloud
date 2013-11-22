@@ -22,7 +22,7 @@
 
 main(Argv) ->
     {ok, Connection} =
-        amqp_connection:start(#amqp_params_network{host = "localhost"}),
+        amqp_connection:start(#amqp_params_network{}),
     {ok, Channel} = amqp_connection:open_channel(Connection),
 	
 	StreamId = lists:nth(1, Argv),
