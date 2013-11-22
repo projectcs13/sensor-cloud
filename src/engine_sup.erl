@@ -48,7 +48,7 @@ init([]) ->
     {ok, Dispatch} = file:consult(filename:join([priv_dir(App),
                                                  "dispatch.conf"])),
     Port = case application:get_env(engine, webmachine_port) of
-	       undefined -> 8000;
+	       undefined -> 8000; %Default port for webmachine
 	       {ok, AnyPort} -> AnyPort
            end,
     LogDir = case application:get_env(engine, webmachine_log_dir) of
