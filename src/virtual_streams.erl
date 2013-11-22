@@ -65,19 +65,19 @@ content_types_provided(ReqData, State) ->
 -spec process_post(ReqData::tuple(), State::string()) -> {true, tuple(), string()}.
 process_post(ReqData, State) ->
 	{VirtualStreamJson,_,_} = api_help:json_handler(ReqData, State),
-	{{Year,Month,Day},_} = calendar:local_time(),
-	Date = generate_date([Year,Month,Day]),
+	{{Year,Month,Day},{Hour,Minute,Second}} = calendar:local_time(),
+	Date = api_help:generate_timestamp([Year,Month,Day],0), % it is crashing if I add Hour, Minute, Second
 	DateAdded = api_help:add_field(VirtualStreamJson,"creation_date",Date),
 	case erlastic_search:index_doc(?INDEX, "vstream", DateAdded) of	
 		{error, Reason} -> 
-		VirtualStreamId = "x86vOMKiSIyLd5pQXDYi8w",	% to be fixed to do a good check
+			VirtualStreamId = "x86vOMKiSIyLd5pQXDYi8w",	% to be fixed to do a good check
 			{{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
 		{ok,List} -> 
 			VirtualStreamId = lib_json:get_field(List, "_id"),
 			{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
 	end,
 	%these should be in the ok case of index_doc?
-	StreamsInvolved = lib_json:get_field(VirtualStreamJson, "streams"),
+	StreamsInvolved = lib_json:get_field(VirtualStreamJson, "streams_involved"),
 	TimestampFrom = lib_json:get_field(VirtualStreamJson, "timestampfrom"),
 	Function = lib_json:get_field(VirtualStreamJson, "function"),
 	reduce(VirtualStreamId, StreamsInvolved, TimestampFrom, Function, ReqData, State)
@@ -95,7 +95,6 @@ process_post(ReqData, State) ->
 reduce(VirtualStreamId, Streams, TimestampFrom, Function, ReqData, State) ->
 	% (aggregated *) average, min, max, std deviation, count, sum of squares, variance
 	Query = create_query(Function, Streams, TimestampFrom),
-	
 	% should also update the connection of vstream <--> streams
 	
 	
@@ -117,26 +116,29 @@ reduce(VirtualStreamId, Streams, TimestampFrom, Function, ReqData, State) ->
 	% what do we store if whe do not aggregate and thus the statistics are only a single value?
 			case string:str(Function, [<<"aggregate">>]) of %is aggregate the proper name? maybe groupby?
             	0 ->
-					{{Year,Month,Day},_} = calendar:local_time(),
-					Date = generate_date([Year,Month,Day]), % to be reconsidered
-					DatapointsList = lib_json:get_field(JsonStruct, "facets.statistics.terms"),
+					{{Year,Month,Day},{Hour,Minute,Second}} = calendar:local_time(),
+					TimeStamp = api_help:generate_timestamp([Year,Month,Day,Hour,Minute,Second],0), % to be reconsidered
+					Datapoint = lib_json:get_field(JsonStruct, "facets.statistics"),
 					FinalDatapoint = lib_json:set_attrs([
-														   {"timestamp", lib_json:get_field(JsonStruct, Date)}, %does timestamp have a 
-														   {"streamid", VirtualStreamId},
-														   {"value",  lib_json:get_field(JsonStruct, binary_to_list(lists:nth(1, Function)))}
+														   {"timestamp", list_to_atom(TimeStamp)}, %does timestamp have a meaning here? maybe do a reverse search for the time???
+														   {"stream_id", list_to_atom(binary_to_list(VirtualStreamId))},
+														   {"value",  lib_json:get_field(Datapoint, binary_to_list(lists:nth(1, Function)))}
 														  ]),
-					erlang:display(FinalDatapoint),
-					erlastic_search:index_doc(?INDEX, "datapoint", FinalDatapoint);
+erlang:display(FinalDatapoint),
+					case erlastic_search:index_doc(?INDEX, "datapoint", FinalDatapoint) of 
+						{error, Reason2} -> erlang:display("Error");
+						{ok,JsonStruct2} ->	erlang:display("Correct")						
+					end;
 				_->
-					DatapointsList = lib_json:get_field(JsonStruct, "facets.tag_price_stats.terms"),
+					DatapointsList = lib_json:get_field(JsonStruct, "facets.statistics.entries"),
 					NewDatapoints = lists:map(fun(Json) -> 
 													  FinalDatapoint = lib_json:set_attrs([
-																						   {"timestamp", lib_json:get_field(Json, "term")},
-																						   {"streamid", VirtualStreamId},
+																						   {"timestamp", list_to_atom(msToDate(lib_json:get_field(Json, "key")))},
+																						   {"stream_id", VirtualStreamId},
 																						   {"value",  lib_json:get_field(Json, binary_to_list(lists:nth(2, Function)))}
 																						  ]),
-													  erlang:display(FinalDatapoint),
-													  erlastic_search:index_doc(?INDEX, "datapoint", FinalDatapoint)
+													erlang:display(FinalDatapoint),
+													  erlastic_search:index_doc(?INDEX, "datapoint", lib_json:to_string(FinalDatapoint)) %to add error check here
 											  end, DatapointsList)
 			
 			%%will post all datapoints one by one, improve with bulk posting should be like the following
@@ -163,7 +165,7 @@ create_query(Function, Streams, TimestampFrom) ->
 		   {"query.filtered", "{}"},
 		   {"query.filtered.query", "{}"},
 		   {"query.filtered.query.terms", "{}"},
-		   {"query.filtered.query.terms.streamid", Streams},
+		   {"query.filtered.query.terms.stream_id", Streams},
 		   {"query.filtered.filter", "{}"},
 		   {"query.filtered.filter.range", "{}"},
 		   {"query.filtered.filter.range.timestamp", "{}"},
@@ -172,42 +174,35 @@ create_query(Function, Streams, TimestampFrom) ->
 	]),
 	case string:str(Function, [<<"aggregate">>]) of %is aggregate the proper name? maybe groupby?
             0 -> %	   	["min" "max" "mean" "???average???" "sum_of_squares" "variance" "std_deviation" ->
-		  				 %the following are without aggregation, just statistics   .
+		  				%the following are without aggregation, just statistics   .
 						%min, max etc are not added in the query yet, I will investigate if it is even possible
-					Facet =  [{"facets", "{}"},
-						  	 {"facets.statistics", "{}"},
-						  	 {"facets.statistics.statistical", "{}"},
-						  	 {"facets.statistics.statistical.script", '(Long) _source.value'}]; %I have to get the value here in another way
+				Facet =  [{"facets", "{}"},
+					  	 {"facets.statistics", "{}"},
+					  	 {"facets.statistics.statistical", "{}"},
+					  	 {"facets.statistics.statistical.script", '(Long) _source.value'}]; %I have to get the value here in another way
 			_ -> %		["aggregate", "min" "max" "total(==sum)" ] ->		can also support custom calculations like *,+,-,/, ^(prob)
-					% as above
-					Facet = [{"facets", "{}"},
-							{"facets.tag_price_stats", "{}"},
-							{"facets.tag_price_stats.terms_stats", "{}"},
-							{"facets.tag_price_stats.terms_stats.key_field", 'timestamp'},
-							{"facets.tag_price_stats.terms_stats.value_script", '(Long) _source.value'},
-							{"facets.tag_price_stats.terms_stats.size", 100}] %necessary????
+				% as above
+
+				% the interval is also included in the function, in the 3rd position otherwise pick 10s??
+				Interval = binary_to_list(lists:nth(3, Function)),
+				Facet = [{"facets", "{}"},
+						{"facets.statistics", "{}"},
+						{"facets.statistics.histogram", "{}"},
+						{"facets.statistics.histogram.key_field", 'timestamp'},
+						{"facets.statistics.histogram.value_script", '(Long) _source.value'},
+						{"facets.statistics.histogram.time_interval", list_to_atom(Interval)}]
 	end,
 	lib_json:add_values(Query, Facet)
 .
 
-
 %% @doc
-%% Function: generate_date/2
-%% Purpose: Used to create a date valid in ES
-%%          from the input which should be the list
-%%          [Year,Mounth,Day]
-%% Returns: The generated timestamp
-%%
-%% @end
--spec generate_date(DateList::list()) -> string().
+%
+%
+msToDate(Milliseconds) ->
+	BaseDate = calendar:datetime_to_gregorian_seconds({{1970,1,1},{0,0,0}}),
+   	Seconds = BaseDate + (Milliseconds div 1000),
+	Date = calendar:gregorian_seconds_to_datetime(Seconds),
+	{{Year,Month,Day},{Hour,Minute,Second}} = Date,
+	TimeStamp = api_help:generate_timestamp([Year,Month,Day,Hour,Minute,Second],0),
+  	TimeStamp.
 
-generate_date([First]) ->
-	case First < 10 of
-		true -> "0" ++ integer_to_list(First);
-		false -> "" ++ integer_to_list(First)
-	end;
-generate_date([First|Rest]) ->
-	case First < 10 of
-		true -> "0" ++ integer_to_list(First) ++ "-" ++ generate_date(Rest);
-		false -> "" ++ integer_to_list(First) ++ "-" ++ generate_date(Rest)
-	end.
