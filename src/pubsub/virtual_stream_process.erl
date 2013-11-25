@@ -64,8 +64,7 @@ create(VStreamId, InputIds, Function) ->
 	{ok, ChannelOut} = amqp_connection:open_channel(Connection),
 	
 	%% Declare INPUT queues and subscribe.
-	Queues = declare_input_queues(ChannelIn, InputExchanges),
-	%subscribe(ChannelIn, Queues),
+	subscribe(ChannelIn, InputExchanges),
 	
 	%% Declare OUTPUT exchange.
 	amqp_channel:call(ChannelOut,
@@ -267,31 +266,17 @@ create_input_exchanges([{Type, Id} | InputIds], Exchanges) when
 
 
 %% @doc
-%% Function: declare_input_queues/2
-%% Purpose: Used to create a queue for each exchange in the list on a channel.
+%% Function: subscribe/2
+%% Purpose: Used to subscribe to the given exchanges on the given channel.
 %% Args: ChannelIn - The channel on which communication to the server occurs,
-%%       InputExchanges - The list of exchanges.
-%% Returns: [] | [Queue]
+%%       InputExchanges - The list of exchanges to subscribe to.
+%% Returns: ok
+%% Side-effects: Creates one queue in RabbitMQ for each exchange and binds it
+%%               to the exchange.
 %% @end 
--spec declare_input_queues(ChannelIn :: pid(), InputExchanges :: [binary()]) ->
-		  [] | [Queue :: binary()].
-declare_input_queues(ChannelIn, InputExchanges) ->
-	declare_input_queues(ChannelIn, InputExchanges, []).
-
-%% @doc
-%% Function: declare_input_queues/3
-%% Purpose: Used to create a queue for each exchange in the list on a channel.
-%% Args: ChannelIn - The channel on which communication to the server occurs,
-%%       InputExchanges - The list of exchanges.
-%%       Queues - The list of where to store the new queues.
-%% Returns: Queues | [Queue] ++ Queues.
-%% @end 
--spec declare_input_queues(ChannelIn :: pid(), InputExchanges :: [binary()],
-						   Queues) -> Queues | [Queue | Queues] when
-		  Queues :: list(),
-		  Queue :: binary().
-declare_input_queues(_ChannelIn, [], Queues) -> Queues;
-declare_input_queues(ChannelIn, [InputExchange | InputExchanges], Queues) ->
+-spec subscribe(ChannelIn :: pid(), InputExchanges :: [binary()]) -> ok.
+subscribe(_, []) -> ok;
+subscribe(ChannelIn, [InputExchange | InputExchanges]) ->
 	%% Declare INPUT queues
 	amqp_channel:call(ChannelIn,
 					  #'exchange.declare'{exchange = InputExchange,
@@ -308,33 +293,8 @@ declare_input_queues(ChannelIn, [InputExchange | InputExchanges], Queues) ->
 	receive
 		#'basic.consume_ok'{} -> ok
 	end,
-	declare_input_queues(ChannelIn, InputExchanges, [QueueIn | Queues]).
-	
+	subscribe(ChannelIn, InputExchanges).
 
-
-
-
-
-
-
-%% @doc
-%% Function: subscribe/2
-%% Purpose: Used to subscribe to the specified queues on a channel.
-%% Args: ChannelIn - The channel on which communication to the server occurs,
-%%       Queues - The list of queues for subscription.
-%% Returns: ok.
-%% @end 
--spec subscribe(ChannelIn :: pid(), Queues :: [binary()]) -> ok.
-subscribe(_ChannelIn, []) -> ok;
-subscribe(ChannelIn, [QueueIn | Queues]) ->
-	%% Subscribe to INPUT queue
-	amqp_channel:subscribe(ChannelIn,
-						   #'basic.consume'{queue = QueueIn, no_ack = true},
-						   self()),
-	receive
-		#'basic.consume_ok'{} -> ok
-	end,
-	subscribe(ChannelIn, Queues).
 
 
 
