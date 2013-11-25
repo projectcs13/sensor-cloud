@@ -3,14 +3,14 @@
 %% @version 1.0
 %% @copyright [Copyright information]
 %%
-%% @doc == virtualStreamProcess ==
+%% @doc == virtual_stream_process ==
 %% This module represents a virtual stream process which subscribes to data
 %% points from the pub/sub system for specified streams/virtual streams and
 %% publish it back into the pub/sub system for the represented virtual stream
 %% after applying the specified function with the data points as arguments. 
 %%
 %% @end
--module(virtualStreamProcess).
+-module(virtual_stream_process).
 
 -include_lib("erlastic_search.hrl").
 -include_lib("amqp_client.hrl").
@@ -34,20 +34,20 @@
 %%          publish it into the exchange for the specified virtual stream.
 %% Args: VStreamId - The id of the publishing virtual stream,
 %%       InputIds - List ids' of the streams/virtual streams to subscribe from,
-%%                  i.e [{"stream", Id}, ... , {"vstream", Id}, ...].
+%%                  i.e [{stream, Id}, ... , {vstream, Id}, ...].
 %%       Function - Tag of which function that will be applied to the incoming
 %%                  data points before publishing.
 %% Returns: Return ok.
-%% Side effects: Non terminating loop receiving data points from the pub/sub
-%%               system for a stream/virtual stream with id 'InputId' and
-%%               sending data into the pub/sub system for a virtual stream
+%% Side effects: Starts loop receiving data points from the pub/sub
+%%               system for streams/virtual streams and sending data
+%%               into the pub/sub system for a virtual stream
 %%               with id 'VStreamId'.
 %%
 %% @end
 -spec create(VStreamId :: string(), InputIds :: [StreamInfo],
 			 Function :: string()) ->  ok when
 		  StreamInfo :: {Type, Id},
-          Type :: string(),
+          Type :: atom(),
           Id :: string().
 create(VStreamId, InputIds, Function) ->
 
@@ -65,12 +65,15 @@ create(VStreamId, InputIds, Function) ->
 	
 	%% Declare INPUT queues and subscribe.
 	Queues = declare_input_queues(ChannelIn, InputExchanges),
-	subscribe(ChannelIn, Queues),
+	%subscribe(ChannelIn, Queues),
 	
 	%% Declare OUTPUT exchange.
 	amqp_channel:call(ChannelOut,
 					  #'exchange.declare'{exchange = VStreamExchange,
 										  type = <<"fanout">>}),
+
+	%% Needed for the RabbitMQ to have time to set up the system.
+	timer:sleep(1000),
 	
 	%% Get the latest value for each datapoint.
 	DataPoints = get_first_value_for_streams(InputIds),
@@ -179,6 +182,20 @@ loop(VStreamId, DataPoints, VStreamExchange, Net, Function, Calculate) ->
 
 
 
+
+
+
+
+
+
+
+%% ====================================================================
+%% Helper functions
+%% ====================================================================
+
+
+
+
 %% @doc
 %% Function: send/3
 %% Purpose: Used to publish a message into specified exchange in the pub/sub
@@ -205,14 +222,14 @@ send(Channel, Exchange, Message) ->
 %% @doc
 %% Function: create_input_exchanges/1
 %% Purpose: Used to create names of exchanges from a list of streams and
-%%          virtual streams, i.e [{"stream", Id}, {"vstream", Id}].
-%% Args: List - A list of streams, i.e [{"stream", Id}, {"vstream", Id}].
+%%          virtual streams, i.e [{stream, Id}, {vstream, Id}].
+%% Args: List - A list of streams, i.e [{stream, Id}, {vstream, Id}].
 %% Returns: [] | [Exchange]
 %% @end
 -spec create_input_exchanges(List) -> [] | [Exchange] when
 		  List :: [StreamInfo],
           StreamInfo :: {Type, Id},
-          Type :: string(),
+          Type :: atom(),
           Id :: string(),
           Exchange :: binary().
 create_input_exchanges(List) ->
@@ -222,8 +239,8 @@ create_input_exchanges(List) ->
 %% @doc
 %% Function: create_input_exchanges/2
 %% Purpose: Used to create names of exchanges from a list of streams and
-%%          virtual streams, i.e [{"stream", Id}, {"vstream", Id}].
-%% Args: List - A list of streams, i.e [{"stream", Id}, {"vstream", Id}],
+%%          virtual streams, i.e [{stream, Id}, {vstream, Id}].
+%% Args: List - A list of streams, i.e [{stream, Id}, {vstream, Id}],
 %%       Exchanges - The list to store the created exchanges in.
 %% Returns: Exchanges | [Exchange] ++ Exchanges
 %% @end
@@ -233,12 +250,13 @@ create_input_exchanges(List) ->
 		  List :: [StreamInfo],
           Exchanges :: list(),
           StreamInfo :: {Type, Id},
-          Type :: string(),
+          Type :: atom(),
           Id :: string(),
           Exchange :: binary().
 create_input_exchanges([], Exchanges) -> Exchanges;
-create_input_exchanges([{Type, Id} | InputIds], Exchanges) ->
-	Exchange = list_to_binary(Type ++ "s." ++ Id),
+create_input_exchanges([{Type, Id} | InputIds], Exchanges) when
+  Type =:= stream; Type =:= vstream ->
+	Exchange = list_to_binary(atom_to_list(Type) ++ "s." ++ Id),
 	create_input_exchanges(InputIds, [Exchange | Exchanges]).
 	
 
@@ -284,6 +302,12 @@ declare_input_queues(ChannelIn, [InputExchange | InputExchanges], Queues) ->
 							 #'queue.declare'{exclusive = true}),
 	amqp_channel:call(ChannelIn, #'queue.bind'{exchange = InputExchange,
 											   queue = QueueIn}),
+	amqp_channel:subscribe(ChannelIn,
+						   #'basic.consume'{queue = QueueIn, no_ack = true},
+						   self()),
+	receive
+		#'basic.consume_ok'{} -> ok
+	end,
 	declare_input_queues(ChannelIn, InputExchanges, [QueueIn | Queues]).
 	
 
@@ -325,7 +349,7 @@ subscribe(ChannelIn, [QueueIn | Queues]) ->
 %% Args: List - The list of streams and virtual streams.
 %% Returns: [] | [{Id, Value}].
 %% @end 
--spec get_first_value_for_streams(List :: [{Type :: string(), Id :: string()}])
+-spec get_first_value_for_streams(List :: [{Type :: atom(), Id :: string()}])
 	-> [] | [{Id :: string(), Value :: json() | undefined}].
 get_first_value_for_streams([]) -> [];
 get_first_value_for_streams([{_Type, Id} | T]) ->
@@ -342,7 +366,7 @@ get_first_value_for_streams([{_Type, Id} | T]) ->
 					Value = lib_json:get_field(Json, "_source"),
 					[{Id, Value} | get_first_value_for_streams(T)]
 			end;
-		{error, Reason} -> get_first_value_for_streams(T)
+		{error, _} -> get_first_value_for_streams(T)
 	end.
 
 

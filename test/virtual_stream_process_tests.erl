@@ -2,13 +2,13 @@
 %% [www.csproj13.student.it.uu.se]
 %% @version 1.0
 %%
-%% @doc == pub_sub_tests ==
+%% @doc == virtual_stream_process_tests ==
 %% This module contains several tests to test the functionallity
 %% of the pub/sub system, including streams and virtual streams.
 %%
 %% @end
 
--module(virtualStreamProcess_tests).
+-module(virtual_stream_process_tests).
 
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("amqp_client.hrl").
@@ -32,7 +32,7 @@
 
 
 
-virtual_stream__process_test_() ->
+virtual_stream_process_test_() ->
 	S = fun() -> ok end,
 	C = fun(_) -> ok end,
 	[
@@ -53,11 +53,15 @@ virtual_stream__process_test_() ->
 %% @end
 -spec start_and_terminate(_) -> ok | {error, term()}.
 start_and_terminate(_) ->
-	Pid = spawn(virtualStreamProcess, create, ["1", [], "test"]),
-	?assertNotEqual(undefined, process_info(Pid)),
+	Pid = spawn(virtual_stream_process, create, ["1", [], "test"]),
+	Info1 = is_process_alive(Pid),
+	%%?assertNotEqual(undefined, process_info(Pid)),
 	Pid ! quit,
-	timer:sleep(500),
-	?assertEqual(undefined, process_info(Pid)).
+	timer:sleep(1500),
+	Info2 = is_process_alive(Pid),
+	%%?assertEqual(undefined, process_info(Pid)).
+	[?_assertEqual(true, Info1),
+	 ?_assertEqual(false, Info2)].
 
 
 
@@ -79,7 +83,7 @@ vstream_subscribe_to_a_stream(_) ->
 	StreamId = create_a_stream_on_index(?ES_INDEX),
 	
 	%% Create virtual stream listening to our stream
-	VPid = create_virtual_stream("testID", [{"stream", StreamId}], "test"),
+	VPid = create_virtual_stream("testID", [{stream, StreamId}], "test"),
 	
 	%% Create a publisher and consumer exchanges
 	OutExchange = list_to_binary("streams." ++ StreamId),
@@ -98,6 +102,9 @@ vstream_subscribe_to_a_stream(_) ->
 	amqp_channel:call(ChannelOut,
 					  #'exchange.declare'{exchange = OutExchange,
 										  type = <<"fanout">>}),
+	
+	%% Needed for the RabbitMQ to have time to set up the system.
+	timer:sleep(1000),
 	
 	%% Publish a message
 	Msg = create_data_point(StreamId, 32),
@@ -158,7 +165,7 @@ vstream_subscribe_to_streams_interval(_) ->
 
 	%% Create virtual stream listening to our streams
 	VPid = create_virtual_stream("testID",
-								 [{"stream", StreamId1}, {"stream", StreamId2}],
+								 [{stream, StreamId1}, {stream, StreamId2}],
 								 "test"),
 	
 	%% Create publisher and consumer exchanges
@@ -182,6 +189,9 @@ vstream_subscribe_to_streams_interval(_) ->
 	
 	%% Subscribe to InExchange
 	subscribe(ChannelIn, InExchange),
+	
+	%% Needed for the RabbitMQ to have time to set up the system.
+	timer:sleep(1000),
 	
 	%% Publish a message
 	Msg = create_data_point(StreamId1, 32),
@@ -265,7 +275,7 @@ vstream_subscribe_to_streams_sim(_) ->
 
 	%% Create virtual stream listening to our streams
 	VPid = create_virtual_stream("testID",
-								 [{"stream", StreamId1}, {"stream", StreamId2}],
+								 [{stream, StreamId1}, {stream, StreamId2}],
 								 "test"),
 	
 	%% Create publisher and consumer exchanges
@@ -289,6 +299,9 @@ vstream_subscribe_to_streams_sim(_) ->
 	
 	%% Subscribe to InExchange
 	subscribe(ChannelIn, InExchange),
+	
+	%% Needed for the RabbitMQ to have time to set up the system.
+	timer:sleep(1000),
 	
 	%% Publish a message
 	Msg = create_data_point(StreamId1, 32),
@@ -383,7 +396,7 @@ create_a_stream_on_index(Index) ->
 		List :: [{Type :: string(), Id :: string()}],
 		Func :: string()) -> Pid :: pid().
 create_virtual_stream(VStreamId, List, Func) ->
-	spawn(virtualStreamProcess, create, [VStreamId, List, Func]).
+	spawn(virtual_stream_process, create, [VStreamId, List, Func]).
 
 
 
