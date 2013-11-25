@@ -41,7 +41,7 @@ start() ->
     application:start(engine).
 
 %% @spec stop() -> ok
-%% @doc Stop the engine server.
+%% @doc Stop the engine server.z
 stop() ->
     Res = application:stop(engine),
     application:stop(webmachine),

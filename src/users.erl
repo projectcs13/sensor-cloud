@@ -7,15 +7,17 @@
 
 -module(users).
 -export([init/1,
-                allowed_methods/2,
-                content_types_accepted/2,
-                content_types_provided/2,
-                delete_resource/2,
-                put_user/2,
-                get_user/2,
-                process_post/2]).
+		 allowed_methods/2,
+         content_types_accepted/2,
+         content_types_provided/2,
+         delete_resource/2,
+         put_user/2,
+         get_user/2,
+         process_post/2,
+		 delete_streams_with_user_id/1]).
 
 -include("webmachine.hrl").
+-include_lib("erlastic_search.hrl").
 -include("field_restrictions.hrl").
 
 %% @doc
@@ -81,7 +83,7 @@ content_types_accepted(ReqData, State) ->
 -spec delete_resource(ReqData::tuple(), State::string()) -> {string(), tuple(), string()}.
 delete_resource(ReqData, State) ->
     Id = id_from_path(ReqData),
-    case delete_resources_with_user_id(Id) of
+    case delete_streams_with_user_id(Id) of
         {error, {Code, Body}} -> 
             ErrorString = api_help:generate_error(Body, Code),
             {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
@@ -96,66 +98,72 @@ delete_resource(ReqData, State) ->
     end.
 
 
-%% @doc
-%% Function: delete_resources_with_resource_id/1
-%% Purpose: Deletes the first 500 resources associated with the given user_id
-%% Returns:  ERROR = {error,Errorcode}
-%%           OK = {ok}
-%% @end
--spec delete_resources_with_user_id(Id::string()) -> term().
-delete_resources_with_user_id(Id) ->
-	api_help:refresh(),
-    Query = "user_id:" ++ Id, 
-    case erlastic_search:search_limit(?INDEX, "resource", Query,500) of
-        {error,{Code, Body}} ->
-            {error,{Code, Body}};
-        {ok,List} -> 
-            case get_resources(List) of
-                [] -> {ok};
-                Streams ->
-                    case delete_resources(Streams) of
-                        {error,{Code, Body}} -> {error, {Code, Body}};
-                        {ok} -> {ok}
-                    end
-            end
-    end.
 
 %% @doc
-%% Function: get_resources/1
+%% Function: delete_streams_with_user_id/1
+%% Purpose: Deletes the streams with the given user id
+%% Returns:  ERROR = {error,Errorcode}
+%%			 OK = {ok}
+%% @end
+-spec delete_streams_with_user_id(Id::string()) -> term().
+
+delete_streams_with_user_id(Id) ->
+	api_help:refresh(),
+	Query = "user_id:" ++ Id, 
+	case erlastic_search:search_limit(?INDEX, "stream", Query,500) of
+		{error,Reason} -> 
+			{error,Reason};
+		{ok,List} -> 
+			case get_streams(List) of
+				[] -> {ok};
+				Streams ->
+					case delete_streams(Streams) of
+						{error,Reason} -> {error, Reason};
+						{ok} -> {ok}
+					end
+			end
+	end.
+
+%% @doc
+%% Function: get_streams/1
 %% Purpose: get a list of ids of a list of JSON objects
 %% Returns:  a list with the ids of the JSON objects given
 %% @end
--spec get_resources(JSON::string()) -> list().
+-spec get_streams(JSON::string()) -> list().
 
-get_resources(JSON) when is_tuple(JSON)->
-    Result = lib_json:get_field(JSON, "hits.hits"),
-    get_resources(Result);
-get_resources(undefined) ->
-    [];
-get_resources([]) ->
-    [];
-get_resources([JSON | Tl]) ->
-    case lib_json:get_field(JSON, "_id") of
-        undefined -> [];
-        Id -> [Id] ++ get_resources(Tl)
-    end.
+get_streams(JSON) when is_tuple(JSON)->
+	Result = lib_json:get_field(JSON, "hits.hits"),
+	get_streams(Result);
+get_streams(undefined) ->
+	[];
+get_streams([]) ->
+	[];
+get_streams([JSON | Tl]) ->
+	case lib_json:get_field(JSON, "_id") of
+		undefined -> [];
+		Id -> [Id] ++ get_streams(Tl)
+	end.
+
+
 
 %% @doc
-%% Function: delete_resources/1
-%% Purpose: Deletes all resources in the given list, the list elements are resource_ids as binaries
-%% Returns:  ok, or {error,Reason} where StreamId is the binary Id of the stream for which deletion failed
+%% Function: delete_streams/1
+%% Purpose: Deletes all streams in the given list, the list elements are streamIds as binaries
+%% Returns:  ok, or {{error,_Reason}, StreamId, Rest} where StreamId is the binary Id of the stream for which deletion failed
 %% @end
-delete_resources([]) -> {ok};
-delete_resources([ResourceId|Rest]) ->
-    case resources:delete_streams_with_resource_id(ResourceId) of
+
+delete_streams([]) -> {ok};
+delete_streams([StreamId|Rest]) ->
+	case streams:delete_data_points_with_stream_id(StreamId) of
         {error,{Code, Body}} -> 
             {error,{Code, Body}};
         {ok} ->
-            case erlastic_search:delete_doc(?INDEX,"resource", ResourceId) of
-                {error,{Code, Body}} -> {error,{Code, Body}};
-                {ok,_List} -> delete_resources(Rest)
-            end
-    end.
+			case erlastic_search:delete_doc(?INDEX, "stream", StreamId) of 
+				{error,Reason} -> {error,Reason};
+				{ok,_List} -> delete_streams(Rest)
+			end
+	end.
+
 
 %% @doc
 %% Function: put_user/2
@@ -208,7 +216,8 @@ process_post(ReqData, State) ->
 				false ->
 					{{halt,403}, wrq:set_resp_body("Unsupported field(s)", ReqData), State};
 				true ->
-					case erlastic_search:index_doc(?INDEX, "user", UserJson) of
+                    FieldsAdded = add_server_side_fields(UserJson),
+					case erlastic_search:index_doc(?INDEX, "user", FieldsAdded) of
 						{error, {Code, Body}} -> 
 							ErrorString = api_help:generate_error(Body, Code),
                     		{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
@@ -239,7 +248,9 @@ get_user(ReqData, State) ->
                         SizeParam ->
                             Size = list_to_integer(SizeParam)
                     end,
-                    case erlastic_search:search_limit(?INDEX,"user","*:*",Size) of
+					
+					Query = "{\"size\" :" ++ integer_to_list(Size) ++",\"query\" : {\"match_all\" : {}},\"filter\" : {\"bool\":{\"must_not\":{\"term\":{\"private\":\"true\"}}}}}",
+					case erlastic_search:search_json(#erls_params{},?INDEX, "user", Query) of
                         {error, {Code, Body}} -> 
                             ErrorString = api_help:generate_error(Body, Code),
                             {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
@@ -274,7 +285,7 @@ get_user(ReqData, State) ->
 process_search(ReqData, State, post) ->
         {Json,_,_} = api_help:json_handler(ReqData,State),
         {struct, JsonData} = mochijson2:decode(Json),
-        Query = api_help:transform(JsonData),
+		Query = api_help:transform(JsonData),
         case erlastic_search:search_limit(?INDEX, "user", Query, 10) of
             {error, {Code, Body}} -> 
                 ErrorString = api_help:generate_error(Body, Code),
@@ -312,3 +323,15 @@ id_from_path(RD) ->
             end;
         Id -> Id
     end.
+
+%% @doc
+%% Function: add_server_side_fields/1
+%% Purpose: Used to add all the fields that should be added server side
+%% Returns: The new json with the fields added
+%% @end
+-spec add_server_side_fields(Json::string()) -> string().
+
+add_server_side_fields(Json) ->
+
+        lib_json:add_values(Json,[
+            {rankings, "[]"}]).
