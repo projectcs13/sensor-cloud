@@ -135,6 +135,12 @@ vstream_subscribe_to_a_stream(_) ->
 	amqp_channel:close(ChannelOut),
 	amqp_connection:close(Connection),
 	
+	case erlastic_search:delete_doc(?ES_INDEX,"stream", StreamId) of
+		{error, {Code, Body2}} ->
+			erlang:display(api_help:generate_error(Body2, Code));
+		{ok, _} -> ok
+	end,
+	
 	timer:sleep(1000),
 
 	[?_assertEqual(true, is_list(StreamId)),
@@ -244,6 +250,18 @@ vstream_subscribe_to_streams_interval(_) ->
 	amqp_channel:close(ChannelIn),
 	amqp_channel:close(ChannelOut),
 	amqp_connection:close(Connection),
+	
+	case erlastic_search:delete_doc(?ES_INDEX,"stream", StreamId1) of
+		{error, {Code, Body3}} ->
+			erlang:display(api_help:generate_error(Body3, Code));
+		{ok, _} -> ok
+	end,
+	
+	case erlastic_search:delete_doc(?ES_INDEX,"stream", StreamId2) of
+		{error, {Code2, Body4}} ->
+			erlang:display(api_help:generate_error(Body4, Code2));
+		{ok, _} -> ok
+	end,
 
 	[?_assertEqual(true, is_list(StreamId1)),
 	 ?_assertEqual(true, is_list(StreamId2)),
@@ -336,6 +354,19 @@ vstream_subscribe_to_streams_sim(_) ->
 	amqp_channel:close(ChannelIn),
 	amqp_channel:close(ChannelOut),
 	amqp_connection:close(Connection),
+	
+	
+	case erlastic_search:delete_doc(?ES_INDEX,"stream", StreamId1) of
+		{error, {Code, Body3}} ->
+			erlang:display(api_help:generate_error(Body3, Code));
+		{ok, _} -> ok
+	end,
+	
+	case erlastic_search:delete_doc(?ES_INDEX,"stream", StreamId2) of
+		{error, {Code2, Body4}} ->
+			erlang:display(api_help:generate_error(Body4, Code2));
+		{ok, _} -> ok
+	end,
 
 	[?_assertEqual(true, is_list(StreamId1)),
 	 ?_assertEqual(true, is_list(StreamId2)),

@@ -55,10 +55,12 @@ process_search_post_test() ->
     DocId1 = lib_json:get_field(Body1,"_id"),
     DocId2 = lib_json:get_field(Body2,"_id"),
     refresh(),
+	timer:sleep(1000), %% still needed for the test to pass
     {ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(post, {?WEBMACHINE_URL++"/_search", [],"application/json", "{\"query\":{\"match_all\":{}}}"}, [], []),
     {ok, {{_Version8, 200, _ReasonPhrase8}, _Headers8, _Body8}} = httpc:request(delete, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(DocId1), []}, [], []),
     {ok, {{_Version9, 200, _ReasonPhrase9}, _Headers9, _Body9}} = httpc:request(delete, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(DocId2), []}, [], []),
 	{ok, {{_Version10, 200, _ReasonPhrase10}, _Headers10, _Body10}} = httpc:request(delete, {"http://localhost:8000/users/" ++ lib_json:to_string(UserId), []}, [], []),
+	erlang:display(Body3),
     ?assertEqual(true,lib_json:get_field(Body3,"streams.hits.total") >= 1).
 
 %% @doc

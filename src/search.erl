@@ -10,7 +10,9 @@
 				allowed_methods/2,
 				content_types_accepted/2,
 				content_types_provided/2,
-				 process_post/2]).
+				process_post/2,
+		 		get_search/2
+		 ]).
 
 -include("webmachine.hrl").
 -include_lib("erlastic_search.hrl").
