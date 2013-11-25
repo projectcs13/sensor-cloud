@@ -22,26 +22,21 @@
 
 main(Argv) ->
     {ok, Connection} =
-        amqp_connection:start(#amqp_params_network{host = "localhost", port = 5672}),
+        amqp_connection:start(#amqp_params_network{}),
     {ok, Channel} = amqp_connection:open_channel(Connection),
-
-    amqp_channel:call(Channel, #'exchange.declare'{exchange = <<"topic_logs">>,
+	
+	StreamId = lists:nth(1, Argv),
+	Exchange = list_to_binary("streams." ++ StreamId),
+	Json =  "{\"stream_id\" : \"" ++ StreamId ++ "\", \"timestamp\" : \"2013-11-21T12:02:42.000\", \"value\" : 32}",
+	Message = list_to_binary(Json),
+	
+    amqp_channel:call(Channel, #'exchange.declare'{exchange = Exchange,
                                                    type = <<"fanout">>}),
-
-    {RoutingKey, Message} = case Argv of
-                                [] ->
-                                    {<<"anonymous.info">>, <<"Hello World!">>};
-                                [R] ->
-                                    {list_to_binary(R), <<"Hello World!">>};
-                                [R | Msg] ->
-                                    {list_to_binary(R), list_to_binary(string:join(Msg, " "))}
-                            end,
+	
     amqp_channel:cast(Channel,
-                      #'basic.publish'{
-                        exchange = <<"topic_logs">>,
-                        routing_key = RoutingKey},
+                      #'basic.publish'{exchange = Exchange},
                       #amqp_msg{payload = Message}),
-    io:format(" [x] Sent ~p:~p~n", [RoutingKey, Message]),
+    io:format(" [x] Sent to ~p:~p~n", [StreamId, Message]),
     ok = amqp_channel:close(Channel),
     ok = amqp_connection:close(Connection),
     ok.

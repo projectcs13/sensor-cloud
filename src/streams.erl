@@ -13,7 +13,7 @@
 		 delete_resource/2, process_post/2, put_stream/2, get_stream/2,delete_data_points_with_stream_id/1]).
 
 
-
+-define(ELASTIC_SEARCH_URL, api_help:get_elastic_search_url()).
 -include_lib("erlastic_search.hrl").
 -include("webmachine.hrl").
 -include("field_restrictions.hrl").
@@ -421,7 +421,7 @@ get_stream(ReqData, State) ->
             				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 					    {ok,JsonStruct} ->
 						    FinalJson = lib_json:get_list_and_add_id(JsonStruct, streams),
-						    {FinalJson, ReqData, State} 
+						    {FinalJson, ReqData, State}
 					end;
 				StreamId ->
 				% Get specific stream

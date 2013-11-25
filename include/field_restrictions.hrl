@@ -1,4 +1,4 @@
-%% Author: Tomas Sävström <tosa7943@student.uu.se>
+%% Author: Tomas Sï¿½vstrï¿½m <tosa7943@student.uu.se>
 %% [www.csproj13.student.it.uu.se]
 %% == api include file ==
 %% Includes defenitions of what fields are accteded and what fields are restricted, 
