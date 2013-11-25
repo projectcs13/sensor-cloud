@@ -37,7 +37,7 @@ allowed_methods(ReqData, State) ->
 		[{"streams", _Id}, {"data", "_search"}] ->
 			{['POST','GET'], ReqData, State};
 		[{"streams", _Id}, {"data"}] ->
-			{['GET', 'POST', 'DELETE'], ReqData, State};
+			{['GET', 'POST'], ReqData, State};
 		[error] ->
 				{[], ReqData, State}
 	end.
@@ -275,7 +275,7 @@ update_fields_in_stream(StreamId,TimeStamp,ReqData,State) ->
             {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 		{ok,StreamJson} ->
 			OldHistorySize = lib_json:get_field(StreamJson, "_source.history_size"),
-			Json = lib_json:set_attrs([{"last_update", TimeStamp} , {"history_size", OldHistorySize+1}]),
+			Json = lib_json:set_attrs([{"last_updated", TimeStamp} , {"history_size", OldHistorySize+1}]),
 			Update = api_help:create_update(Json),
 			case api_help:update_doc(?INDEX, "stream", StreamId, Update) of
 				{error, {Code, Body}} -> 
