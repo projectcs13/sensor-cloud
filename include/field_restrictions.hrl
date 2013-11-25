@@ -14,7 +14,7 @@
 -define(RESTRCITEDCREATESTREAMS, ["quality","user_ranking","subscribers","last_update","creation_date","history_size"]).
 -define(ACCEPTEDFIELDSSTREAMS, ["resource","name","tags","description","private","type","accuracy","min_val",
 								"max_val","quality","active","user_ranking","subscribers","last_update","creation_date",
-								"history_size","location","user_id","uri","polling_freq","uuid","unit","parser"]).
+								"history_size","location","user_id","uri","polling_freq","uuid","unit","parser","data_type"]).
 
 
 %% Fields for users

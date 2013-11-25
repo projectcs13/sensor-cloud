@@ -113,7 +113,18 @@ delete_resource(ReqData, State) ->
 							ErrorString = api_help:generate_error(Body, Code),
 							{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 						{ok,List} -> 
-			 				{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
+			 				%% {true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
+							% changed by lihao
+							% delete the parser according to stream id
+							Parser_id = "parser_"++Id,
+							case erlastic_search:delete_doc(?INDEX, "parser", Parser_id) of
+								{error, {Code2, Body2}} ->
+									ErrorString2 = api_help:generate_error(Body2, Code2),
+									{{halt, Code2}, wrq:set_resp_body(ErrorString2, ReqData), State};
+								{ok, List2} ->
+									{true, wrq:set_resp_body(lib_json:encode(List2), ReqData), State}
+							end
+							% change ends
 					end
 			end
 	end.
@@ -180,7 +191,7 @@ process_post(ReqData, State) ->
             %						{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 			%					{ok,_} ->
 									FieldsAdded = add_server_side_fields(UserAdded),
-									FieldsAdded2 = lib_json:rm_field(FieldsAdded, "parser"),
+									FieldsAdded2 = lib_json:rm_fields(FieldsAdded, ["parser", "data_type"]),
 									%Final = suggest:add_stream_suggestion_fields(FieldsAdded),
 									case erlastic_search:index_doc(?INDEX, "stream", FieldsAdded2) of	
 										{error,{Code,Body}} ->
@@ -188,12 +199,12 @@ process_post(ReqData, State) ->
             								{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 										{ok,List} -> 
 											%suggest:update_suggestion(UserAdded),
-											{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State},
+											% {true, wrq:set_resp_body(lib_json:encode(List), ReqData), State},
 											
 											
 											%% changed by lihao to add post the parser to elasticsearch
 											Input_parser = lib_json:get_field(FieldsAdded, "parser"),
-											Input_type = lib_json:get_field(FieldsAdded, "type"),
+											Input_type = lib_json:get_field(FieldsAdded, "data_type"),
 											Stream_id = lib_json:get_field(FieldsAdded, lib_json:get_field(List, "_id")),
 											Parser = "{\"stream_id\":"++Stream_id++", \"input_parser\":\""++Input_parser++"\", \"input_type\":\""++Input_type++"\"}",
 											%% since every stream has only id, so it is fine to name parser using parser_++(stream_id)
@@ -202,7 +213,8 @@ process_post(ReqData, State) ->
 													ErrorString = api_help:generate_error(Body2, Code2),
 													{{halt, Code2}, wrq:set_resp_body(ErrorString, ReqData), State};
 												{ok, List2}->
-													{true, wrq:set_resp_body(lib_json:encode(List2), ReqData), State}
+													% should return the stream`s info
+													{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
 											end
 											%% change ends
 									end
@@ -319,24 +331,25 @@ put_stream(ReqData, State) ->
 							{{halt,403}, wrq:set_resp_body("Unsupported field(s)", ReqData), State};
 						{false,true} ->
 							NewJson = suggest:add_stream_suggestion_fields(Stream),
-							NewJson2 = lib_json:rm_field(NewJson, "parser"),
+							NewJson2 = lib_json:rm_fields(NewJson, ["parser", "data_type"]),
 							Update = api_help:create_update(NewJson2),
 							%suggest:update_stream(Stream, StreamId),
 							case api_help:update_doc(?INDEX, "stream", StreamId, Update) of 
 								{error, {Code, Body}} -> 
 									ErrorString = api_help:generate_error(Body, Code),
 				            		{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-								{ok,List} -> 
+								{ok,List} -> 														
+									%% update the parser
+									NewParser = lib_json:get_field(NewJson, "parser"),
+									NewType = lib_json:get_field(NewJson, "data_type"),
+									NewParserJson = "{\"stream_id\":"++StreamId++", \"input_parser\":"++NewParser++", \"input_type\":"++NewType++"}",
+									ParserUpdate = api_help:create_update(NewParserJson),
+		    						ReqPathParser = ?INDEX ++ [$/ | "parser"] ++ [$/ | ("parser_"++StreamId) ] ++ "/_update",
+		    						erls_resource:post(#erls_params{}, ReqPathParser, [], [], ParserUpdate, []),
+									%% parsers` update ends
+									
 									{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
-							end,
-					
-							%% update the parser
-							NewParser = lib_json:get_field(NewJson, "parser"),
-							NewType = lib_json:get_field(NewJson, "type"),
-							NewParserJson = "{\"stream_id\":"++StreamId++", \"input_parser\":"++NewParser++", \"input_type\":"++NewType++"}",
-							ParserUpdate = api_help:create_update(NewParserJson),
-    						ReqPathParser = ?INDEX ++ [$/ | "parser"] ++ [$/ | ("parser_"++StreamId) ] ++ "/_update",
-    						erls_resource:post(#erls_params{}, ReqPathParser, [], [], ParserUpdate, [])
+							end
 					end
 			end;
 		
@@ -471,8 +484,21 @@ get_stream(ReqData, State) ->
             				ErrorString = api_help:generate_error(Body, Code),
             				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 						{ok,JsonStruct} -> 	 
-						    FinalJson = lib_json:get_and_add_id(JsonStruct),
-						    {FinalJson, ReqData, State}
+							TempJson = lib_json:get_and_add_id(JsonStruct),
+							% Get the parser according to this stream id
+							Parser_id = "parser_"++StreamId,
+							case erlastic_search:get_doc(?INDEX, "stream", Parser_id) of
+								{error, {Code, Body}} ->
+									ErrorString = api_help:generate_error(Body, Code),
+									{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+								{ok, JsonStruct2} ->
+									SourceJson  = lib_json:get_field(JsonStruct2, "_source"),
+									Input_type = lib_json:get_field(SourceJson, "data_type"),
+									Input_parser = lib_json:get_field(SourceJson, "parser"),
+    								TempJson2 = lib_json:add_value(TempJson, "input_type", Input_type),
+									FinalJson = lib_json:add_value(TempJson2, "input_parser", Input_parser),
+									{FinalJson, ReqData, State}
+							end
 					end
 				end
 	end.
