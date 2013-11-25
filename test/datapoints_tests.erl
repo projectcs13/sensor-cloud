@@ -91,7 +91,7 @@ update_stream_fields_test() ->
 	{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} = httpc:request(post, {?WEBMACHINE_URL++ "/users", [],"application/json", "{\"username\" : \"search\"}"}, [], []),
 	UserId = lib_json:get_field(Body,"_id"),
 	api_help:refresh(),
-	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {?WEBMACHINE_URL++/streams", [],"application/json", "{\"name\" : \"search\",\"user_id\" : \"" ++ lib_json:to_string(UserId) ++ "\", \"private\" : \"false\"}"}, [], []),
+	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {?WEBMACHINE_URL++"/streams", [],"application/json", "{\"name\" : \"search\",\"user_id\" : \"" ++ lib_json:to_string(UserId) ++ "\", \"private\" : \"false\"}"}, [], []),
 	StreamId = lib_json:get_field(Body1,"_id"),
 	api_help:refresh(),
 	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(StreamId) ++ "/data", [],"application/json", "{\"value\":5.0}"}, [], []),

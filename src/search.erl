@@ -135,7 +135,7 @@ process_search_post(ReqData, State) ->
     end,
 	case wrq:get_qs_value("sort",ReqData) of
         undefined ->
-            Sort = "user_ranking";
+            Sort = "user_ranking.average";
         SortParam ->
             Sort = SortParam
     end,
@@ -147,6 +147,7 @@ process_search_post(ReqData, State) ->
     end,
     {Json,_,_} = api_help:json_handler(ReqData,State),
     FilteredJson = filter_json(Json, From, Size, Sort),
+	erlang:display(FilteredJson),
     case erlastic_search:search_json(#erls_params{},?INDEX, "stream", FilteredJson) of % Maybe wanna take more
             {error, Reason1} ->
                 StreamSearch = {error, Reason1};
