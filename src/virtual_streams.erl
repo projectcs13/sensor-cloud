@@ -55,18 +55,18 @@ content_types_provided(ReqData, State) ->
 
 %% @doc
 %% Function: process_post/2
-%% Purpose: decodes a JSON object and either adds the new datapoint in the DB or
-%% performs search in the Datapoint database.
+%% Purpose: decodes a JSON object and creates a virtual stream that aggregates 
+%% streams using a function
 %% It is run automatically for POST requests
 %% Returns: {true, ReqData, State} || {{error, Reason}, ReqData, State}
 %%
-%% Side effects: Inserts a new Datapoint in the database (when for insertion)
+%% Side effects: Inserts a new Datapoint in the database
 %% @end
 -spec process_post(ReqData::tuple(), State::string()) -> {true, tuple(), string()}.
 process_post(ReqData, State) ->
 	{VirtualStreamJson,_,_} = api_help:json_handler(ReqData, State),
 	{{Year,Month,Day},{Hour,Minute,Second}} = calendar:local_time(),
-	Date = api_help:generate_timestamp([Year,Month,Day],0), % it is crashing if I add Hour, Minute, Second
+	Date = api_help:generate_timestamp([Year,Month,Day],0), % it is crashing if I add Hour, Minute, Second, check it again later
 	DateAdded = api_help:add_field(VirtualStreamJson,"creation_date",Date),
 	case erlastic_search:index_doc(?INDEX, "vstream", DateAdded) of	
 		{error, Reason} -> 
@@ -77,6 +77,7 @@ process_post(ReqData, State) ->
 			{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
 	end,
 	%these should be in the ok case of index_doc?
+	%is the user forced to chose a starting timestamp? anyway, should be defined by the front end
 	StreamsInvolved = lib_json:get_field(VirtualStreamJson, "streams_involved"),
 	TimestampFrom = lib_json:get_field(VirtualStreamJson, "timestampfrom"),
 	Function = lib_json:get_field(VirtualStreamJson, "function"),
@@ -86,8 +87,8 @@ process_post(ReqData, State) ->
 
 %% @doc
 %% Function: reduce/6
-%% Purpose: Gets information about which streams will be used and 
-%% optionally a timestamp range, it executes a query and posts the datapoints returned
+%% Purpose: Gets information about which streams will be involved, a timestamp range
+%% and the statistical function, it executes a query and posts the datapoints returned
 %% to the current virtual stream
 %% Returns: {true, ReqData, State} || {{error, Reason}, ReqData, State}
 -spec reduce(VirtualStreamId::string(), Streams::string(), TimestampFrom::string(), Function::string(), ReqData::tuple(), State::string()) -> %%should change to date type instead, also add ReqData, State
@@ -101,7 +102,7 @@ reduce(VirtualStreamId, Streams, TimestampFrom, Function, ReqData, State) ->
 	case erlastic_search:search_json(#erls_params{},?INDEX, "datapoint", lib_json:to_string(Query)) of
 		{error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
 		{ok,JsonStruct} ->
-			%%		check what happens if list is empty, improve with bulk posting
+			%%		check what happens if list is empty, improve with bulk posting maybe?
 			%%   	{true,wrq:set_resp_body(lib_json:encode(FinalJson),ReqData),State},
 			
 			
@@ -113,7 +114,7 @@ reduce(VirtualStreamId, Streams, TimestampFrom, Function, ReqData, State) ->
 			%						 end, DatapointsList),
 
 
-	% what do we store if whe do not aggregate and thus the statistics are only a single value?
+	% what do we store if we do not aggregate and thus the statistics are only a single value?
 			case string:str(Function, [<<"aggregate">>]) of %is aggregate the proper name? maybe groupby?
             	0 ->
 					{{Year,Month,Day},{Hour,Minute,Second}} = calendar:local_time(),
@@ -124,8 +125,8 @@ reduce(VirtualStreamId, Streams, TimestampFrom, Function, ReqData, State) ->
 														   {"stream_id", list_to_atom(binary_to_list(VirtualStreamId))},
 														   {"value",  lib_json:get_field(Datapoint, binary_to_list(lists:nth(1, Function)))}
 														  ]),
-erlang:display(FinalDatapoint),
-					case erlastic_search:index_doc(?INDEX, "datapoint", FinalDatapoint) of 
+					erlang:display(FinalDatapoint), %remove this
+					case erlastic_search:index_doc(?INDEX, "vsdatapoint", FinalDatapoint) of 
 						{error, Reason2} -> erlang:display("Error");
 						{ok,JsonStruct2} ->	erlang:display("Correct")						
 					end;
@@ -137,8 +138,8 @@ erlang:display(FinalDatapoint),
 																						   {"stream_id", VirtualStreamId},
 																						   {"value",  lib_json:get_field(Json, binary_to_list(lists:nth(2, Function)))}
 																						  ]),
-													erlang:display(FinalDatapoint),
-													  erlastic_search:index_doc(?INDEX, "datapoint", lib_json:to_string(FinalDatapoint)) %to add error check here
+													erlang:display(FinalDatapoint), %remove this
+													  erlastic_search:index_doc(?INDEX, "vsdatapoint", lib_json:to_string(FinalDatapoint)) %to add error check here
 											  end, DatapointsList)
 			
 			%%will post all datapoints one by one, improve with bulk posting should be like the following
@@ -196,8 +197,10 @@ create_query(Function, Streams, TimestampFrom) ->
 .
 
 %% @doc
-%
-%
+%% Function: msToDate/3
+%% Purpose: Converts the unix timestamp to date format
+%% Returns: date()
+%% @end
 msToDate(Milliseconds) ->
 	BaseDate = calendar:datetime_to_gregorian_seconds({{1970,1,1},{0,0,0}}),
    	Seconds = BaseDate + (Milliseconds div 1000),
@@ -205,4 +208,3 @@ msToDate(Milliseconds) ->
 	{{Year,Month,Day},{Hour,Minute,Second}} = Date,
 	TimeStamp = api_help:generate_timestamp([Year,Month,Day,Hour,Minute,Second],0),
   	TimeStamp.
-

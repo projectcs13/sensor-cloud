@@ -37,7 +37,11 @@ allowed_methods(ReqData, State) ->
 		[{"streams", _Id}, {"data", "_search"}] ->
 			{['POST','GET'], ReqData, State};
 		[{"streams", _Id}, {"data"}] ->
-			{['GET', 'POST', 'DELETE'], ReqData, State};
+			{['GET', 'POST'], ReqData, State};
+		[{"vstreams", _Id}, {"data", "_search"}] ->
+			{['POST','GET'], ReqData, State};
+		[{"vstreams", _Id}, {"data"}] ->
+			{['GET', 'POST'], ReqData, State};
 		[error] ->
 				{[], ReqData, State}
 	end.
@@ -67,6 +71,14 @@ content_types_provided(ReqData, State) ->
 process_post(ReqData, State) ->
 	case api_help:is_search(ReqData) of
 		false ->
+			DataType = case is_virtual(ReqData) of
+						   true -> "vsdatapoint";
+						   false -> "datapoint"
+					   end,
+			StreamType = case is_virtual(ReqData) of
+						   true -> "vstream";
+						   false -> "stream"
+					   end,
 			{DatapointJson,_,_} = api_help:json_handler(ReqData, State),
 			Id = id_from_path(ReqData),
 			case Id of
@@ -85,14 +97,14 @@ process_post(ReqData, State) ->
 						false -> 
 							{{halt,403}, wrq:set_resp_body("Unsupported field(s)", ReqData), State};
 						true ->
-							case erlastic_search:get_doc(?INDEX, "stream", Id) of
+							case erlastic_search:get_doc(?INDEX, StreamType, Id) of
 						 		{error,{404,_}} ->
-							 		{{halt,409}, wrq:set_resp_body("{\"error\":\"no document with stream_id given is present in the system\"}", ReqData), State};
+							 		{{halt,409}, wrq:set_resp_body("{\"error\":\"no document with streamid given is present in the system\"}", ReqData), State};
                          		{error,{Code,Body}} ->
                              		ErrorString = api_help:generate_error(Body, Code),
                              		{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
                         		 {ok,_} ->
-							 		case erlastic_search:index_doc(?INDEX, "datapoint", FinalJson) of
+							 		case erlastic_search:index_doc(?INDEX, DataType, FinalJson) of
 										{error, {Code, Body}} -> 
             								ErrorString = api_help:generate_error(Body, Code),
             								{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
@@ -103,7 +115,7 @@ process_post(ReqData, State) ->
 													{{halt, Code}, ReqData, State};
 												ok ->
 													Msg = list_to_binary(FinalJson),
-													StreamExchange = list_to_binary("streams."++Id),
+													StreamExchange = list_to_binary(StreamType ++ "s." ++Id),
                                    					%% Connect
                                    					{ok, Connection} =
                                        					 amqp_connection:start(#amqp_params_network{host = "localhost"}),
@@ -131,6 +143,10 @@ process_post(ReqData, State) ->
 %% @end
 -spec get_datapoint(ReqData::tuple(), State::string()) -> {list(), tuple(), string()}.
 get_datapoint(ReqData, State) ->
+	DataType = case is_virtual(ReqData) of
+				   true -> "vsdatapoint";
+				   false -> "datapoint"
+			   end,
     case wrq:get_qs_value("size",ReqData) of 
         undefined ->
             Size = 100;
@@ -140,7 +156,7 @@ get_datapoint(ReqData, State) ->
 	case api_help:is_search(ReqData) of
 		false ->
 			Id = id_from_path(ReqData),			
-			case erlastic_search:search_limit(?INDEX, "datapoint", "stream_id:" ++ Id, Size) of
+			case erlastic_search:search_limit(?INDEX, DataType, "stream_id:" ++ Id, Size) of
 				{ok, Result} ->
 					EncodedResult = lib_json:encode(Result),
 					FinalJson = lib_json:get_list_and_add_id(Result, data),
@@ -159,25 +175,29 @@ get_datapoint(ReqData, State) ->
 %% Purpose: Does search for Datapoints for either search done with POST or GET
 %% Returns: {true, ReqData, State} || {{error, Reason}, ReqData, State}
 
-%% the POST range query should be structed as follows:
-%% 	curl -XPOST http://localhost:8000/streams/1/data/_search -d '{
-%% 		"size" : 100,
-%% 		query:{
-%% 		   "filtered" : {
-%% 		       "query" : {
-%%  		          "term" : { "stream_id" : Id }
-%%  		      }, "filter" : {  "range" : {    "timestamp" : {"gte" : timestampFromValue,"lte" : timestampToValue}}}}
-%% 		 },"sort" : [{"timestamp" : {"order" : "asc"}}]  }'
-%% the GET range query should be structed as follows:
-%% 	curl -XGET http://localhost:8000/streams/Id/data/_search    --   to return all the datapoints of the current stream
-%% or	curl -XGET http://localhost:8000/streams/Id/data/_search\?timestampFrom\=timestampFromValue\&timestampTo\=timestampToValue    --   for range query
-%% or 	curl -XGET http://localhost:8000/streams/Id/data/_search\?timestampFrom\=timestampFromValue   --   for lower bounded only range qquery
+%the POST range query should be structed as follows:
+%	curl -XPOST http://localhost:8000/streams/1/data/_search -d '{
+%		"size" : 100,
+%		query:{
+% 		   "filtered" : {
+% 		       "query" : {
+%  		          "term" : { "streamid" : Id }
+%  		      }, "filter" : {  "range" : {    "timestamp" : {"gte" : timestampFromValue,"lte" : timestampToValue}}}}
+%		 },"sort" : [{"timestamp" : {"order" : "asc"}}]  }'
+%the GET range query should be structed as follows:
+%	curl -XGET http://localhost:8000/streams/Id/data/_search    --   to return all the datapoints of the current stream
+%or	curl -XGET http://localhost:8000/streams/Id/data/_search\?timestampFrom\=timestampFromValue\&timestampTo\=timestampToValue    --   for range query
+%or 	curl -XGET http://localhost:8000/streams/Id/data/_search\?timestampFrom\=timestampFromValue   --   for lower bounded only range qquery
 %% @end
 -spec process_search(ReqData::tuple(), State::string(), term()) ->
 		{list(), tuple(), string()}.
 process_search(ReqData, State, post) ->
+	DataType = case is_virtual(ReqData) of
+				   true -> "vsdatapoint";
+				   false -> "datapoint"
+			   end,
 	{Json,_,_} = api_help:json_handler(ReqData,State),
-	case erlastic_search:search_json(#erls_params{},?INDEX, "datapoint", Json) of
+	case erlastic_search:search_json(#erls_params{},?INDEX, DataType, Json) of
 			{error, {Code, Body}} -> 
 				ErrorString = api_help:generate_error(Body, Code),
 				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
@@ -186,6 +206,10 @@ process_search(ReqData, State, post) ->
 					       {true,wrq:set_resp_body(lib_json:encode(FinalJson),ReqData),State}
 	end;
 process_search(ReqData, State, get) ->
+	DataType = case is_virtual(ReqData) of
+				   true -> "vsdatapoint";
+				   false -> "datapoint"
+			   end,
 	TempQuery = wrq:req_qs(ReqData),
 	Id = id_from_path(ReqData),
     case wrq:get_qs_value("size",ReqData) of 
@@ -196,7 +220,7 @@ process_search(ReqData, State, get) ->
     end,
 	case TempQuery of
 		[] ->   
-			case erlastic_search:search_limit(?INDEX, "datapoint","stream_id:" ++ Id ++ "&sort=timestamp:desc", Size) of
+			case erlastic_search:search_limit(?INDEX, DataType,"stream_id:" ++ Id ++ "&sort=timestamp:desc", Size) of
 				{error, {Code, Body}} -> 
     				ErrorString = api_help:generate_error(Body, Code),
     				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
@@ -206,7 +230,7 @@ process_search(ReqData, State, get) ->
 		 	end;
 		_ ->
 			TransformedQuery="stream_id:" ++ Id ++ transform(TempQuery) ++ "&sort=timestamp:desc",
-			case erlastic_search:search_limit(?INDEX, "datapoint",TransformedQuery, Size) of
+			case erlastic_search:search_limit(?INDEX, DataType,TransformedQuery, Size) of
 				{error, {Code, Body}} -> 
     				ErrorString = api_help:generate_error(Body, Code),
     				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
@@ -257,7 +281,14 @@ id_from_path(RD) ->
 		Id -> Id
 	end.
 
-
+is_virtual(ReqData) ->
+	case api_help:parse_path(wrq:path(ReqData)) of
+		[{"streams", _}, _] ->
+			false;
+		[{"vstreams", _}, _] ->
+			true
+	end.
+		 
 %% @doc
 %% Function: id_from_path/4
 %% Purpose: Update the history_size field and last_update
@@ -269,15 +300,19 @@ id_from_path(RD) ->
 -spec update_fields_in_stream(StreamId::string()|binary(),TimeStamp::string()|binary(),ReqData::term(),State::term()) -> ok | {{halt,integer()},term(),term()}.
 
 update_fields_in_stream(StreamId,TimeStamp,ReqData,State) ->
-	case erlastic_search:get_doc(?INDEX, "stream", StreamId) of
+	StreamType = case is_virtual(ReqData) of
+				   true -> "vstream";
+				   false -> "stream"
+			   end,
+	case erlastic_search:get_doc(?INDEX, StreamType, StreamId) of
 		{error, {Code, Body}} -> 
 			ErrorString = api_help:generate_error(Body, Code),
             {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 		{ok,StreamJson} ->
 			OldHistorySize = lib_json:get_field(StreamJson, "_source.history_size"),
-			Json = lib_json:set_attrs([{"last_update", TimeStamp} , {"history_size", OldHistorySize+1}]),
+			Json = lib_json:set_attrs([{"last_updated", TimeStamp} , {"history_size", OldHistorySize+1}]),
 			Update = api_help:create_update(Json),
-			case api_help:update_doc(?INDEX, "stream", StreamId, Update) of
+			case api_help:update_doc(?INDEX, StreamType, StreamId, Update) of
 				{error, {Code, Body}} -> 
 					ErrorString = api_help:generate_error(Body, Code),
 					{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
