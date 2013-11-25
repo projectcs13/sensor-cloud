@@ -204,6 +204,18 @@ text_autocompletion_test() ->
 	?assertEqual(<<"newsearch">>, lib_json:get_field(Body5, "suggestions[0].text")).
 
 %% @doc
+%% Checks if API for search autocompletion works 
+%% @end
+-spec search_autocompletion_test() -> ok | {error, term()}.
+search_autocompletion_test() ->
+	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, _Body1}} = httpc:request(post, {"http://localhost:8000/_search", [],"application/json", "{\"sort\":\"subscribers\",\"query\":{\"filtered\":{\"query\":{\"query_string\":{\"query\":\"test\"}},\"filter\":{}}}}"}, [], []),
+	api_help:refresh(),
+	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(get, {"http://localhost:8000/suggest/_search?query=test", []}, [], []),
+	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, _Body3}} = httpc:request(get, {"http://localhost:8000/suggest/_search?query=öäå", []}, [], []),
+	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, _Body4}} = httpc:request(get, {"http://localhost:8000/suggest/_search?query=test%20or", []}, [], []), 
+	?assertNotEqual(0,string:str(lib_json:to_string(lib_json:get_field(Body2, "suggestions[0].text")), "test")).
+
+%% @doc
 %% Checks if the Response has the correct http return code
 %% @end
 -spec check_returned_code(string(), integer()) -> ok.
