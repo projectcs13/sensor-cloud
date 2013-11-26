@@ -83,16 +83,23 @@ content_types_accepted(ReqData, State) ->
 -spec delete_resource(ReqData::tuple(), State::string()) -> {string(), tuple(), string()}.
 delete_resource(ReqData, State) ->
     Id = id_from_path(ReqData),
+	
+	% only for testing
+	erlang:display("begin to delete the users` information"),
     case delete_streams_with_user_id(Id) of
         {error, {Code, Body}} -> 
             ErrorString = api_help:generate_error(Body, Code),
             {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
         {ok} ->
+			% only for testing
+			erlang:display("succeed deleting the streams for this user: "++Id),
             case erlastic_search:delete_doc(?INDEX,"user", Id) of
                 {error, {Code, Body}} -> 
+					erlang:display("fail to delete this user"),
                     ErrorString = api_help:generate_error(Body, Code),
                     {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
                 {ok,List} -> 
+					erlang:display("succeed deleting this user"),
                     {true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
             end
     end.
@@ -163,9 +170,10 @@ delete_streams([StreamId|Rest]) ->
 				{ok,_List} -> 
 					% delete the parser according to the stream`s id
 					% changed by lihao
-					Parser_id = "parser_"++StreamId,
+					Parser_id = "parser_"++binary_to_list(StreamId),
 					case erlastic_search:delete_doc(?INDEX, "parser", Parser_id) of
-						{error, Reason} -> {error, Reason};
+						{error, Reason} -> {error, Reason},
+										   delete_streams(Rest);
 						{ok, _List2} ->
 							delete_streams(Rest)
 					end

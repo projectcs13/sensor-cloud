@@ -11,6 +11,7 @@
 
 -module(streams_tests).
 -include_lib("eunit/include/eunit.hrl").
+-include("field_restrictions.hrl").
 -export([]).
 
 %% @doc
@@ -41,6 +42,8 @@ process_search_post_test() ->
     DocId1 = lib_json:get_field(Body1,"_id"),
     DocId2 = lib_json:get_field(Body2,"_id"),
     api_help:refresh(),
+	erlang:display("the first id: "++lib_json:to_string(DocId1)),
+	erlang:display("the second id: "++lib_json:to_string(DocId2)),
     {ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(post, {"http://localhost:8000/streams/_search", [],"application/json", "{\"query\":{\"match_all\":{}}}"}, [], []),
     {ok, {{_Version8, 200, _ReasonPhrase8}, _Headers8, _Body8}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId1), []}, [], []),
     {ok, {{_Version9, 200, _ReasonPhrase9}, _Headers9, _Body9}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId2), []}, [], []),
@@ -69,6 +72,7 @@ get_stream_test() ->
 	DocId2 = lib_json:get_field(Body2,"_id"),
 	api_help:refresh(),
 	% Test get and search
+erlang:display("the user` id: "++binary_to_list(UserId)),
 	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(get, {"http://localhost:8000/streams/" ++ lib_json:to_string(DocId1), []}, [], []),
 	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(get, {"http://localhost:8000/users/" ++ lib_json:to_string(UserId) ++ "/streams", []}, [], []),
 	{ok, {{_Version6, 200, _ReasonPhrase6}, _Headers6, Body6}} = httpc:request(post, {"http://localhost:8000/streams/_search",[],"application/json", "{\"query\":{\"term\" : { \"name\" : \"get\" }}}"}, [], []),
@@ -370,6 +374,89 @@ delete_streams_for_a_user_test() ->
 	?assertEqual(true,lib_json:field_value_exists(Body3,"streams[*].name", <<"Private">>)),
 	?assertEqual(true,lib_json:field_value_exists(Body3,"streams[*].name", <<"Public">>)),
 	?assertEqual("{\"streams\":[]}",Body5).
+
+%% @doc
+%% Function: post_stream_with_parser_test/0
+%% Purpose: Test posting streams with parsers` information
+%% Returns: ok | {error, term()}
+%% @end
+-spec post_stream_with_parser_test() -> ok | {error, term()}.
+post_stream_with_parser_test()->
+	{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} = httpc:request(post, {"http://localhost:8000/users", [], "application/json", "{\"username\":\"lihao\"}"}, [], []),
+	UserId = lib_json:get_field(Body,"_id"),
+	api_help:refresh(),
+	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [], "application/json", "{\"name\":\"Private\",\"user_id\" : \"" ++ lib_json:to_string(UserId) ++ "\",\"private\":\"true\", \"data_type\":\"application/json\", \"parser\":\"streams/humidity/value\"}"
+																					  }, [], []),
+	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/streams", [], "application/json", "{\"name\":\"Public\",\"user_id\" : \"" ++ lib_json:to_string(UserId) ++ "\",\"private\":\"false\", \"data_type\":\"application/xml\", \"parser\":\"streams/temperature/value\"}"
+																					  }, [], []),
+	api_help:refresh(),
+	StrId1 = lib_json:get_field(Body1,"_id"),
+	StrId2 = lib_json:get_field(Body2,"_id"),
+	Parser1 = get_parser(lib_json:to_string(StrId1)),
+	Parser2 = get_parser(lib_json:to_string(StrId2)),
+	?assertEqual(<<"application/json">>,lib_json:get_field(Parser1, "input_type")),
+	?assertEqual(<<"streams/humidity/value">>, lib_json:get_field(Parser1, "input_parser")),
+	?assertEqual(<<"application/xml">>, lib_json:get_field(Parser2, "input_type")),
+	?assertEqual(<<"streams/temperature/value">>, lib_json:get_field(Parser2, "input_parser")),
+	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(get, {"http://localhost:8000/streams/" ++ lib_json:to_string(StrId1), []}, [], []),
+	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(get, {"http://localhost:8000/streams/" ++ lib_json:to_string(StrId2), []}, [], []),
+	api_help:refresh(),
+	?assertEqual("application/json", binary_to_list(lib_json:get_field(Body3, "data_type"))),
+	?assertEqual("streams/humidity/value", binary_to_list(lib_json:get_field(Body3, "parser"))),
+	?assertEqual("application/xml", binary_to_list(lib_json:get_field(Body4, "data_type"))),
+	?assertEqual("streams/temperature/value", binary_to_list(lib_json:get_field(Body4, "parser"))),
+	
+	{ok, {{_Version5, 200, _ReasonPhrase5}, _Headers5, _Body5}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ lib_json:to_string(StrId1), []}, [], []),
+	{ok, {{_Version6, 200, _ReasonPhrase6}, _Headers6, _Body6}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ lib_json:to_string(StrId2), []}, [], []),
+	{ok, {{_Version7, 200, _ReasonPhrase7}, _Headers7, _Body7}} = httpc:request(delete, {"http://localhost:8000/users/" ++ lib_json:to_string(UserId), []}, [], []).
+
+%% @doc
+%% Function: put_stream_with_parser_test/0
+%% Purpose: Test updating streams with parsers` information
+%% Returns: ok | {error, term()}
+%% @end
+-spec put_stream_with_parser_test() -> ok | {error, term()}.
+put_stream_with_parser_test()->
+	{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} = httpc:request(post, {"http://localhost:8000/users", [], "application/json", "{\"username\":\"lihao\"}"}, [], []),
+	UserId = lib_json:get_field(Body,"_id"),
+	api_help:refresh(),
+	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [], "application/json", "{\"name\":\"Private\",\"user_id\" : \"" ++ lib_json:to_string(UserId) ++ "\",\"private\":\"true\", \"data_type\":\"application/json\", \"parser\":\"streams/humidity/value\"}"
+																					  }, [], []),
+	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/streams", [], "application/json", "{\"name\":\"Public\",\"user_id\" : \"" ++ lib_json:to_string(UserId) ++ "\",\"private\":\"false\", \"data_type\":\"application/xml\", \"parser\":\"streams/temperature/value\"}"
+																					  }, [], []),
+	api_help:refresh(),
+	StrId1 = lib_json:to_string(lib_json:get_field(Body1,"_id")),
+	StrId2 = lib_json:to_string(lib_json:get_field(Body2,"_id")),
+	{ok, {{_Version01, 200, _ReasonPhrase01}, _Headers01, Body01}} = httpc:request(put, {"http://localhost:8000/streams/"++StrId1, [], "application/json", "{\"name\":\"Private\",\"user_id\" : \"" ++ lib_json:to_string(UserId) ++ "\",\"private\":\"true\", \"data_type\":\"plain/text\", \"parser\":\"humidity/value\"}"
+																					  }, [], []),
+	{ok, {{_Version02, 200, _ReasonPhrase02}, _Headers02, Body02}} = httpc:request(put, {"http://localhost:8000/streams/"++StrId2, [], "application/json", "{\"name\":\"Public\",\"user_id\" : \"" ++ lib_json:to_string(UserId) ++ "\",\"private\":\"false\", \"data_type\":\"plain/text\", \"parser\":\"temperature/value\"}"
+																					  }, [], []),
+	api_help:refresh(),
+	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(get, {"http://localhost:8000/streams/" ++ lib_json:to_string(StrId1), []}, [], []),
+	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(get, {"http://localhost:8000/streams/" ++ lib_json:to_string(StrId2), []}, [], []),
+	?assertEqual("plain/text", binary_to_list(lib_json:get_field(Body3, "data_type"))),
+	?assertEqual("humidity/value", binary_to_list(lib_json:get_field(Body3, "parser"))),
+	?assertEqual("plain/text", binary_to_list(lib_json:get_field(Body4, "data_type"))),
+	?assertEqual("temperature/value", binary_to_list(lib_json:get_field(Body4, "parser"))),
+	{ok, {{_Version5, 200, _ReasonPhrase5}, _Headers5, _Body5}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ lib_json:to_string(StrId1), []}, [], []),
+	{ok, {{_Version6, 200, _ReasonPhrase6}, _Headers6, _Body6}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ lib_json:to_string(StrId2), []}, [], []),
+	{ok, {{_Version7, 200, _ReasonPhrase7}, _Headers7, _Body7}} = httpc:request(delete, {"http://localhost:8000/users/" ++ lib_json:to_string(UserId), []}, [], []).
+
+%% @doc
+%% Function: get_parser/1
+%% Purpose: get the parser according to the stream id
+%% Returns: JSON | {error, ErrorMessage}
+%% @end
+-spec get_parser(Stream_id :: string()) -> string() | tuple(). 
+get_parser(Stream_id)->
+	Parser_id = "parser_"++Stream_id,
+	case erlastic_search:get_doc(?INDEX, "parser", Parser_id) of
+		{error, {Code, Body}} ->
+	    	ErrorString = api_help:generate_error(Body, Code),
+			{error, ErrorString};
+		{ok, List} ->
+			FinalJson = lib_json:get_field(lib_json:to_string(List), "_source")
+	end.
 	
 %% @doc
 %% Function: generate_date/2
