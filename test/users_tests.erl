@@ -134,6 +134,21 @@ put_user_search_test() ->
 
 
 
+%% @doc
+%% Function: dont_list_private_users_test/0
+%% Purpose: Test that users with private set to true will not be shown on listing
+%% Returns: ok | {error, term()}
+%%
+%% Side effects: creates and deletes documents in elasticsearch
+%% @end
+-spec dont_list_private_users_test() -> ok | {error, term()}.
+dont_list_private_users_test() ->
+	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/users", [],"application/json", "{\"username\" : \"test1\",\"private\":\"true\"}"}, [], []),
+	DocId = lib_json:get_field(Body1,"_id"),
+	api_help:refresh(),
+	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(get, {"http://localhost:8000/users", []}, [], []),
+	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(delete, {"http://localhost:8000/users/" ++ lib_json:to_string(DocId), []}, [], []),
+	?assertEqual(false, lib_json:field_value_exists(Body2, "suggestions[*].private",<<"true">>)).
 
 %% @doc
 %% Function: delete_user_test/0
@@ -144,19 +159,15 @@ put_user_search_test() ->
 %% @end
 -spec delete_user_test() -> ok | {error, term()}.
 delete_user_test() ->
-	% Create a resource and two streams, then delete the resource and check if streams are automatically deleted
-	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {?USERS_URL, [],"application/json", "{\"username\" : \"test\"}"}, [], []),
+	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {?USERS_URL, [],"application/json", "{\"username\" : \"test1\"}"}, [], []),
+	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(post, {?USERS_URL, [],"application/json", "{\"username\" : \"test2\"}"}, [], []),
 	DocId = lib_json:get_field(Body2,"_id"),
-	api_help:refresh(),
-	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(post, {?RESOURCES_URL, [],"application/json", "{\"name\" : \"delete\",\"user_id\" : \"" ++ lib_json:to_string(DocId) ++ "\"}"}, [], []),
-	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(post, {?RESOURCES_URL, [],"application/json", "{\"name\" : \"delete\",\"user_id\" : \"" ++ lib_json:to_string(DocId) ++ "\"}"}, [], []),
 	DocId2 = lib_json:get_field(Body3,"_id"),
-	DocId3 = lib_json:get_field(Body4,"_id"),
 	api_help:refresh(),
-	{ok, {{_Version5, 200, _ReasonPhrase5}, _Headers5, Body5}} = httpc:request(post, {?STREAMS_URL, [],"application/json", "{\"name\" : \"delete\",\"resource_id\" : \"" ++ lib_json:to_string(DocId2) ++ "\"}"}, [], []),
-	{ok, {{_Version6, 200, _ReasonPhrase6}, _Headers6, Body6}} = httpc:request(post, {?STREAMS_URL, [],"application/json", "{\"name\" : \"delete\",\"resource_id\" : \"" ++ lib_json:to_string(DocId2) ++ "\"}"}, [], []),
-	{ok, {{_Version7, 200, _ReasonPhrase7}, _Headers7, Body7}} = httpc:request(post, {?STREAMS_URL, [],"application/json", "{\"name\" : \"delete\",\"resource_id\" : \"" ++ lib_json:to_string(DocId3) ++ "\"}"}, [], []),
-	{ok, {{_Version8, 200, _ReasonPhrase8}, _Headers8, Body8}} = httpc:request(post, {?STREAMS_URL, [],"application/json", "{\"name\" : \"delete\",\"resource_id\" : \"" ++ lib_json:to_string(DocId3) ++ "\"}"}, [], []),
+	{ok, {{_Version5, 200, _ReasonPhrase5}, _Headers5, Body5}} = httpc:request(post, {?STREAMS_URL, [],"application/json", "{\"name\" : \"delete\",\"user_id\" : \"" ++ lib_json:to_string(DocId2) ++ "\"}"}, [], []),
+	{ok, {{_Version6, 200, _ReasonPhrase6}, _Headers6, Body6}} = httpc:request(post, {?STREAMS_URL, [],"application/json", "{\"name\" : \"delete\",\"user_id\" : \"" ++ lib_json:to_string(DocId2) ++ "\"}"}, [], []),
+	{ok, {{_Version7, 200, _ReasonPhrase7}, _Headers7, Body7}} = httpc:request(post, {?STREAMS_URL, [],"application/json", "{\"name\" : \"delete\",\"user_id\" : \"" ++ lib_json:to_string(DocId) ++ "\"}"}, [], []),
+	{ok, {{_Version8, 200, _ReasonPhrase8}, _Headers8, Body8}} = httpc:request(post, {?STREAMS_URL, [],"application/json", "{\"name\" : \"delete\",\"user_id\" : \"" ++ lib_json:to_string(DocId) ++ "\"}"}, [], []),
 	DocId4 = lib_json:get_field(Body5,"_id"),
 	DocId5 = lib_json:get_field(Body6,"_id"),
 	DocId6 = lib_json:get_field(Body7,"_id"),
@@ -168,10 +179,10 @@ delete_user_test() ->
 	{ok, {{_Version12, 200, _ReasonPhrase12}, _Headers12, _Body12}} = httpc:request(post, {?STREAMS_URL ++ lib_json:to_string(DocId7) ++ "/data", [],"application/json", "{\"value\" : 2.0}"}, [], []),
 	api_help:refresh(),
 	{ok, {{_Version13, 200, _ReasonPhrase13}, _Headers13, _Body13}} = httpc:request(delete, {?USERS_URL ++ lib_json:to_string(DocId), []}, [], []),
+	{ok, {{_Version22, 200, _ReasonPhrase22}, _Headers22, _Body22}} = httpc:request(delete, {?USERS_URL ++ lib_json:to_string(DocId2), []}, [], []),
 	api_help:refresh(),
-	{ok, {{_Version14, 200, _ReasonPhrase14}, _Headers14, Body14}} = httpc:request(get, {?USERS_URL++ lib_json:to_string(DocId) ++"/resources", []}, [], []),
-	{ok, {{_Version15, 200, _ReasonPhrase15}, _Headers15, Body15}} = httpc:request(get, {?USERS_URL++ lib_json:to_string(DocId) ++"/resources/"++ lib_json:to_string(DocId2) ++ "/streams", []}, [], []),
-	{ok, {{_Version16, 200, _ReasonPhrase16}, _Headers16, Body16}} = httpc:request(get, {?USERS_URL++ lib_json:to_string(DocId) ++"/resources/"++ lib_json:to_string(DocId3) ++ "/streams", []}, [], []),
+	{ok, {{_Version15, 200, _ReasonPhrase15}, _Headers15, Body15}} = httpc:request(get, {?USERS_URL++ lib_json:to_string(DocId) ++ "/streams", []}, [], []),
+	{ok, {{_Version16, 200, _ReasonPhrase16}, _Headers16, Body16}} = httpc:request(get, {?USERS_URL++ lib_json:to_string(DocId2) ++ "/streams", []}, [], []),
 	{ok, {{_Version17, 200, _ReasonPhrase17}, _Headers17, Body17}} = httpc:request(get, {?STREAMS_URL ++ lib_json:to_string(DocId4) ++ "/data", []}, [], []),
 	{ok, {{_Version18, 200, _ReasonPhrase18}, _Headers18, Body18}} = httpc:request(get, {?STREAMS_URL ++ lib_json:to_string(DocId5) ++ "/data", []}, [], []),
 	{ok, {{_Version19, 200, _ReasonPhrase19}, _Headers19, Body19}} = httpc:request(get, {?STREAMS_URL ++ lib_json:to_string(DocId6) ++ "/data", []}, [], []),
@@ -179,7 +190,6 @@ delete_user_test() ->
 	% Delete a resource that doesn't exist
 	{ok, {{_Version21, 404, _ReasonPhrase21}, _Headers21, _Body21}} = httpc:request(delete, {?USERS_URL++"idthatdoesntexist", []}, [], []),
 	% Test that all children to the user is removed when it is deleted
-	?assertEqual("{\"resources\":[]}",Body14),
 	?assertEqual("{\"streams\":[]}",Body15),
 	?assertEqual("{\"streams\":[]}",Body16),
 	?assertEqual("{\"data\":[]}",Body17),
