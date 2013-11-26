@@ -147,16 +147,16 @@ process_search_post(ReqData, State) ->
     end,
     {Json,_,_} = api_help:json_handler(ReqData,State),
     FilteredJson = filter_json(Json, From, Size, Sort),
-	erlang:display(FilteredJson),
+	erlang:display(lib_json:to_string(FilteredJson)),
     case erlastic_search:search_json(#erls_params{},?INDEX, "stream", FilteredJson) of % Maybe wanna take more
             {error, Reason1} ->
                 StreamSearch = {error, Reason1};
             {ok,List1} ->
-                case lib_json:get_field(Json, "query.filtered.query.query_string.query") of
-                    QueryString when is_binary(QueryString) ->
-                        erlastic_search:index_doc(?INDEX,"search_query","{\"search_suggest\":{\"input\":[\""++ binary_to_list(QueryString) ++"\"],\"weight\":1}}");
-                    _ ->
-                        erlang:display("No query string text")
+                case lib_json:get_field(FilteredJson, "query.filtered.query.query_string.query") of
+                    undefined ->
+                        erlang:display("No query string text");
+                    QueryString ->
+                        erlastic_search:index_doc(?INDEX,"search_query","{\"search_suggest\":{\"input\":[\""++ lib_json:to_string(QueryString) ++"\"],\"weight\":1}}")
                 end,
                 StreamSearch = lib_json:encode(List1) % May need to convert
     end,
@@ -169,7 +169,7 @@ process_search_post(ReqData, State) ->
 	% check search-results for error
 	case StreamSearch of
 		{error, {Body, Code}} ->
-		ErrorString = api_help:generate_error(Body, Code),
+			ErrorString = api_help:generate_error(Body, Code),
 		{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 		_ -> 
 		case UserSearch of
