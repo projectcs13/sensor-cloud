@@ -30,7 +30,13 @@
 			case element(3, element(2, TIME)) < 10 of
                 true -> "0" ++ integer_to_list(element(3, element(2, TIME)));
                 _ -> "" ++ integer_to_list(element(3, element(2, TIME)))
-        	end ++ ".000"
+        	end ++ case Num = (element(3, erlang:now()) div 1000) of
+					   X when X < 100 ->
+						   ".0" ++ integer_to_list(Num);
+					   Y when Y < 10 ->
+						   ".00" ++ integer_to_list(Num);
+					   Z -> "." ++ integer_to_list(Z)
+				   end
 		).
 
 

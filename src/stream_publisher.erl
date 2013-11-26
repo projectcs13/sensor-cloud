@@ -16,18 +16,18 @@
 %% ====================================================================
 %% API functions
 %% ====================================================================
--export([main/1]).
+-export([main/2]).
 
 
 
-main(Argv) ->
+main(Id, Val) ->
     {ok, Connection} =
         amqp_connection:start(#amqp_params_network{}),
     {ok, Channel} = amqp_connection:open_channel(Connection),
 	
-	StreamId = lists:nth(1, Argv),
+	StreamId = Id,
 	Exchange = list_to_binary("streams." ++ StreamId),
-	Json =  "{\"stream_id\" : \"" ++ StreamId ++ "\", \"timestamp\" : \"2013-11-21T12:02:42.000\", \"value\" : 32}",
+	Json =  "{\"stream_id\" : \"" ++ StreamId ++ "\", \"timestamp\" : \"2013-11-21T12:02:42.000\", \"value\" : " ++ integer_to_list(Val) ++ "}",
 	Message = list_to_binary(Json),
 	
     amqp_channel:call(Channel, #'exchange.declare'{exchange = Exchange,

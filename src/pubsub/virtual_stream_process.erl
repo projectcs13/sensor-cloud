@@ -45,7 +45,7 @@
 %%
 %% @end
 -spec create(VStreamId :: string(), InputIds :: [StreamInfo],
-			 Function :: string()) ->  ok when
+			 Function :: atom()) ->  ok when
 		  StreamInfo :: {Type, Id},
           Type :: atom(),
           Id :: string().
@@ -124,8 +124,31 @@ loop(VStreamId, DataPoints, VStreamExchange, Net, Function, Calculate) ->
 					Id = binary_to_list(lib_json:get_field(Data, "stream_id")),
 					NewDataPoints =
 						lists:keyreplace(Id, 1, DataPoints, {Id, Data}),
-					loop(VStreamId, NewDataPoints, VStreamExchange,
-						 Net, Function, true);
+					
+					%% Apply function to the new values
+					[Value] = apply_function(list_to_binary(VStreamId),
+											 Function, NewDataPoints),
+					
+					%% Create timestamp to avoid issues with asynchronus
+					%% datapoints.
+					Timestamp = ?TIME_NOW(erlang:localtime()),
+					
+					%% Create new datapoint message
+					Msg = lib_json:replace_field(Value, "timestamp",
+												 list_to_binary(Timestamp)),
+					
+					%% Store value in ES
+					case erlastic_search:index_doc(?ES_INDEX,
+												   "datapoint", Msg) of
+						{error, Reason} -> {error, Reason};
+						{ok, _} ->
+							%% Publish the calculated value
+							ChannelOut = element(3, Net),
+							send(ChannelOut, VStreamExchange,
+								 list_to_binary(Msg)),
+							loop(VStreamId, NewDataPoints, VStreamExchange,
+								 Net, Function, false)
+					end;
 				_ ->
 					loop(VStreamId, DataPoints, VStreamExchange,
 						 Net, Function, Calculate)
@@ -138,42 +161,6 @@ loop(VStreamId, DataPoints, VStreamExchange, Net, Function, Calculate) ->
 			ok;
 		_ -> loop(VStreamId, DataPoints, VStreamExchange,
 				  Net, Function, Calculate)
-	after
-		?PUB_SUB_TIMEOUT ->
-			case Calculate of
-				true ->
-					%% Apply function to the new values
-					Value = apply_function(Function, DataPoints),
-					
-					%% Create timestamp to avoid issues with asynchronus
-					%% datapoints.
-					Timestamp = ?TIME_NOW(erlang:localtime()),
-					
-					%% Create new datapoint message
-					Msg = ?TUPLE(
-						  ?QUOTE("stream_id") ++ ?COLON ++ ?QUOTE(VStreamId)
-						  ++ ","
-						  ++ ?QUOTE("timestamp") ++ ?COLON ++ ?QUOTE(Timestamp)
-						  ++ ","
-						  ++ ?QUOTE("value") ++ ?COLON
-						  ++ number_to_list(Value)),
-					
-					%% Store value in ES
-					case erlastic_search:index_doc(?ES_INDEX,
-												   "datapoint", Msg) of
-						{error, Reason} -> {error, Reason};
-						{ok, _} ->
-							%% Publish the calculated value
-							ChannelOut = element(3, Net),
-							send(ChannelOut, VStreamExchange,
-								 list_to_binary(Msg)),
-							loop(VStreamId, DataPoints, VStreamExchange,
-								 Net, Function, false)
-					end;
-				false ->
-					loop(VStreamId, DataPoints, VStreamExchange,
-						 Net, Function, Calculate)
-			end
 	end.
 
 
@@ -336,48 +323,35 @@ get_first_value_for_streams([{_Type, Id} | T]) ->
 
 
 %% @doc
-%% Function: apply_function()/2
+%% Function: apply_function()/3
 %% Purpose: Applies the specified predefined function
 %%          with the list as its argument.
-%% Args: Function - Specifier of a predefined function,
+%% Args: VStreamId - The virtual stream id for which
+%%		 			 we are doing the calculation,
+%%		 Function - Specifier of a predefined function,
 %%       List - List of datapoints for streams and virtual streams.
 %% Returns: Value of the predefined function.
 %% Side effects: Applies a predefined function
 %% @end 
--spec apply_function(Function :: string(),
+-spec apply_function(VStreamId :: binary(),
+					 Function :: atom(),
 					 List :: [{Id :: string(),
 							   DataPoint :: json() | undefined}]) -> number().
 %% TODO - Make the predefined functions
-apply_function(_Function, []) -> 0;
-apply_function(Function, [{_Id, DataPoint} | T]) ->
-	case DataPoint of
-		undefined ->
-			apply_function(Function, T);
-		_ ->
-			Val = lib_json:get_field(DataPoint, "value"),
-			Val + apply_function(Function, T)
-	end.
+apply_function(_VStreamId, _Function, []) -> 0;
+apply_function(VStreamId, Function, DataPoints) ->
+	DataList =
+		lists:foldr(fun({_, Data}, Acc) ->
+							case Data of
+								undefined -> Acc;
+								_ -> [Data|Acc]
+							end
+					end,
+					[], DataPoints),
+	vs_func_lib:Function([DataList], VStreamId).
 
-
-
-
-
-
-%% @doc
-%% Function: number_to_list/1
-%% Purpose: Converts a number to a list.
-%% Args: Value - The number to convert.
-%% Returns: The number as a list.
-%% 
-%% @end
--spec number_to_list(Value :: number()) -> list().
-number_to_list(Value) when is_integer(Value) ->
-	integer_to_list(Value);
-number_to_list(Value) when is_float(Value) ->
-	float_to_list(Value).
-
-
-
+	
+	
 
 
 
