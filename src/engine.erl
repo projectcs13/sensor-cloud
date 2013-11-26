@@ -1,4 +1,4 @@
-%% @author Georgios Koutsoumpakis
+%% @author Georgios Koutsoumpakis, Li Hao
 %%   [www.csproj13.student.it.uu.se]
 %% @version 1.0
 %% @copyright [Copyright information]
@@ -26,7 +26,8 @@ start_link() ->
     application:set_env(webmachine, webmachine_logger_module, 
                         webmachine_logger),
     ensure_started(webmachine),
-    engine_sup:start_link().
+    engine_sup:start_link(),
+	pollingSystem:start_link().
 
 %% @spec start() -> ok
 %% @doc Start the engine server.
@@ -38,7 +39,8 @@ start() ->
                         webmachine_logger),
     ensure_started(webmachine),
     analyse:start(),    % possibly temporary solution for ericsson demo
-    application:start(engine).
+    application:start(engine),
+	pollingSystem:start_link().
 
 %% @spec stop() -> ok
 %% @doc Stop the engine server
@@ -48,4 +50,6 @@ stop() ->
     application:stop(mochiweb),
     application:stop(crypto),
     application:stop(inets),
+	exit(whereis(polling_monitor), "stop"),
+	exit(whereis(polling_supervisor), "stop"),
     Res.

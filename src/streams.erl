@@ -16,6 +16,7 @@
 -define(ELASTIC_SEARCH_URL, api_help:get_elastic_search_url()).
 -include_lib("erlastic_search.hrl").
 -include("webmachine.hrl").
+-include("poller.hrl").
 -include("field_restrictions.hrl").
 
 %% @doc
@@ -122,6 +123,8 @@ delete_resource(ReqData, State) ->
 									ErrorString2 = api_help:generate_error(Body2, Code2),
 									{{halt, Code2}, wrq:set_resp_body(ErrorString2, ReqData), State};
 								{ok, List2} ->
+									% terminate the poller
+									gen_server:cast(polling_supervisor, {terminate, Id}),
 									{true, wrq:set_resp_body(lib_json:encode(List2), ReqData), State}
 							end,
 							{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
@@ -206,7 +209,7 @@ process_post(ReqData, State) ->
             								{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 										{ok,List} -> 
 											%suggest:update_suggestion(UserAdded),
-											
+																						
 											%% changed by lihao to add post the parser to elasticsearch
 											case lib_json:get_fields(FieldsAdded, ["parser", "data_type"]) of
 												[undefined, undefined]->{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State};
@@ -215,7 +218,6 @@ process_post(ReqData, State) ->
 												[_, _]->
 													Input_parser = binary_to_list(lib_json:get_field(FieldsAdded, "parser")),
 													Input_type = binary_to_list(lib_json:get_field(FieldsAdded, "data_type")),
-													
 													Stream_id = binary_to_list(lib_json:get_field(lib_json:to_string(List), "_id")),
 													Parser = "{\"stream_id\":\""++Stream_id++"\", \"input_parser\":\""++Input_parser++"\", \"input_type\":\""++Input_type++"\"}",
 													%% since every stream has only id, so it is fine to name parser using parser_++(stream_id)
@@ -224,6 +226,33 @@ process_post(ReqData, State) ->
 															ErrorString = api_help:generate_error(Body2, Code2),
 															{{halt, Code2}, wrq:set_resp_body(ErrorString, ReqData), State};
 														{ok, List2}->
+															%% create a new poller in polling system
+															api_help:refresh(),
+															case lib_json:get_field(FieldsAdded, "polling") of
+																false->continue;
+																undefined->continue;
+																true->
+																	case lib_json:get_fields(FieldsAdded, ["uri", "polling_freq"]) of
+																		[undefined, undefined]-> erlang:display("you must provide uri and frequency for polling!");
+																		[_, undefined]		  -> erlang:display("you must provide frequency for polling!");
+																		[undefined, _]        -> erlang:display("you must provide uri for polling!");
+																		[_, _]				  ->
+																								case whereis(polling_supervisor) of
+																									undefined ->
+																										pollingSystem:start_link(),
+																										timer:sleep(1000);
+																									_ ->
+																										continue
+																								end,
+																								
+																								NewPoller = #pollerInfo{stream_id = Stream_id,
+																														name = binary_to_list(lib_json:get_field(FieldsAdded, "name")),
+																														uri = binary_to_list(lib_json:get_field(FieldsAdded, "uri")),
+																														frequency = lib_json:get_field(FieldsAdded, "polling_freq")
+																														},
+																								gen_server:cast(polling_supervisor, {create_poller, NewPoller})
+																	end
+															end,
 															% should return the stream`s info
 															{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
 													end
@@ -374,7 +403,9 @@ put_stream(ReqData, State) ->
 													{{halt, Code2}, wrq:set_resp_body(ErrorString2, ReqData), State};
 												{ok, List2}->
 											%% parsers` update ends
-											
+													api_help:refresh(),
+													gen_server:cast(polling_supervisor, {rebuild, StreamId}),
+													timer:sleep(1000),
  													{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
 											end
 									end

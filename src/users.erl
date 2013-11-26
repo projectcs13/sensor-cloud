@@ -168,6 +168,13 @@ delete_streams([StreamId|Rest]) ->
 						{error, Reason} -> {error, Reason},
 										   delete_streams(Rest);
 						{ok, _List2} ->
+							% terminate the poller
+							case whereis(polling_supervisor) of
+								undefined->
+									continue;
+								_->
+									gen_server:cast(polling_supervisor, {terminate, binary_to_list(StreamId)})
+							end,
 							delete_streams(Rest)
 					end
 					% change ends

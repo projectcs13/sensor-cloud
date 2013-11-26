@@ -47,12 +47,17 @@
 -spec init_test() -> ok | {error, term()}.
 init_test() ->
 	inets:start(),
+	case whereis(polling_supervisor) of
+		undefined->continue;
+		Pid->exit(Pid, "stops!"),
+			 exit(whereis(polling_monitor), "stops!")
+	end,
 	
 	%%insert a new stream
 	clear_stream_type(),
 	api_help:refresh(),
-    post_stream_with_id(1, "test", ?POLL_ADD, 1000, "application/json"),
-	post_stream_with_id(2, "test2", ?POLL_ADD2, 1300, "application/json"),
+    post_stream_with_id("1", "test", ?POLL_ADD, 1000, "application/json"),
+	post_stream_with_id("2", "test2", ?POLL_ADD2, 1300, "application/json"),
 	
     %%insert two new parsers
 	clear_parser_type(),
@@ -294,7 +299,7 @@ clear_system_test()->
 %% Purpose: Post a stream using the values provided.
 %% Returns: {ok, Result} | {error, Reason}.
 %% @end
--spec post_stream_with_id(Id :: integer(), Name :: string(), Uri :: string(), Freq :: integer()|string(), Type :: string()) ->
+-spec post_stream_with_id(Id :: string(), Name :: string(), Uri :: string(), Freq :: integer()|string(), Type :: string()) ->
 		  {ok, term()}
 		| {ok, saved_to_file}
 		| {error, term()}.
@@ -313,9 +318,9 @@ post_stream_with_id(Id, Name, Uri, Freq, Type)->
 			_->
 				", \"polling_freq\" :" ++ Freq
 		end,
-	T = ", \"type\":\"" ++ Type ++"\"",
+	T = ", \"data_type\":\"" ++ Type ++"\"",
 	Data = "{"++N++U++F++T++"}",
-	erlastic_search:index_doc_with_id(?ES_INDEX, "stream", Id, Data).
+	{ok, _} = erlastic_search:index_doc_with_id(?ES_INDEX, "stream", Id, Data).
 
 %% @doc
 %% Function: post_parser/3
@@ -336,7 +341,7 @@ post_parser(StreamId, InputType, InputParser) when is_integer(StreamId)->
 			 "" -> "";
 			 _ -> ", \"input_parser\":\"" ++ InputParser ++ "\""
 		 end,
-	Si = integer_to_list(StreamId),
+	Si = "\""++integer_to_list(StreamId)++"\"",
 	{ok, Res} = httpc:request(post, {?ES_ADDR ++ "/parser", [],
 						 "application/json",
 						 "{\"stream_id\":"++Si++It++Ip++"}"

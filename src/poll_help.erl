@@ -104,8 +104,8 @@ post_datapoint(StreamId, Value)->
 %% Returns: {error, ErrMsg} | #parser
 %% @end
 -spec get_parser_by_id(string()) -> tuple() | tuple().
-get_parser_by_id(StreamId)->
-	case erlastic_search:search_limit(?ES_INDEX, "parser", "stream_id:" ++ StreamId, 100) of
+get_parser_by_id(StreamId)->	
+	case erlastic_search:search_limit(?ES_INDEX, "parser", "stream_id:\"" ++ StreamId++"\"", 100) of
 		{ok, Result} ->
 			EncodedResult = lib_json:encode(Result),
 			case re:run(EncodedResult, "\"max_score\":null", [{capture, first, list}]) of
@@ -114,7 +114,7 @@ get_parser_by_id(StreamId)->
 						   case length(FinalJsonList) of
 							   1 ->
 								   Item = lists:nth(1, FinalJsonList),
-								   #parser{stream_id = lib_json:get_field(Item, "stream_id"),
+								   #parser{stream_id = binary_to_list(lib_json:get_field(Item, "stream_id")),
 				  						input_parser = binary_to_list(lib_json:get_field(Item, "input_parser")),
 				  						input_type = binary_to_list(lib_json:get_field(Item, "input_type"))
 										 };

@@ -12,7 +12,29 @@
 -module(streams_tests).
 -include_lib("eunit/include/eunit.hrl").
 -include("field_restrictions.hrl").
+-include("state.hrl").
+-include("parser.hrl").
 -export([]).
+
+%% before running this testing code, please change the following address to your address
+%% the python server code locates in scripts/python/cgi-bin folder
+%% under the python folder, run the following command:
+%% python -m CGIHTTPServer 8001
+-ifndef(POLL_ADD1).
+-define(POLL_ADD1, "http://localhost:8001/cgi-bin/temperature.py").
+-endif.
+
+-ifndef(POLL_ADD2).
+-define(POLL_ADD2 ,"http://localhost:8002/cgi-bin/humidity.py").
+-endif.
+
+-ifndef(PARSER1).
+-define(PARSER1, "streams/temperature/value").
+-endif.
+
+-ifndef(PARSER2).
+-define(PARSER2, "streams/humidity/value").
+-endif.
 
 -define(WEBMACHINE_URL, api_help:get_webmachine_url()).
 %% @doc
@@ -133,6 +155,7 @@ put_stream_test() ->
 	?assertEqual(true,lib_json:get_field(Body7,"_id") == DocId1),
 	?assertEqual(true,lib_json:get_field(Body8,"_id") == DocId2),
 	?assertEqual(true,string:str(Body10,"not found") =/= 0).
+
 %% @doc
 %% Function: delete_stream_test/0
 %% Purpose: Test the delete_stream function by doing some HTTP requests
@@ -394,8 +417,11 @@ post_stream_with_parser_test()->
 	StrId2 = lib_json:get_field(Body2,"_id"),
 	Parser1 = get_parser(lib_json:to_string(StrId1)),
 	Parser2 = get_parser(lib_json:to_string(StrId2)),
+	
+	?assertEqual(StrId1, lib_json:get_field(Parser1, "stream_id")),
 	?assertEqual(<<"application/json">>,lib_json:get_field(Parser1, "input_type")),
 	?assertEqual(<<"streams/humidity/value">>, lib_json:get_field(Parser1, "input_parser")),
+	?assertEqual(StrId2, lib_json:get_field(Parser2, "stream_id")),
 	?assertEqual(<<"application/xml">>, lib_json:get_field(Parser2, "input_type")),
 	?assertEqual(<<"streams/temperature/value">>, lib_json:get_field(Parser2, "input_parser")),
 	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(get, {"http://localhost:8000/streams/" ++ lib_json:to_string(StrId1), []}, [], []),
@@ -441,6 +467,69 @@ put_stream_with_parser_test()->
 	{ok, {{_Version5, 200, _ReasonPhrase5}, _Headers5, _Body5}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ lib_json:to_string(StrId1), []}, [], []),
 	{ok, {{_Version6, 200, _ReasonPhrase6}, _Headers6, _Body6}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ lib_json:to_string(StrId2), []}, [], []),
 	{ok, {{_Version7, 200, _ReasonPhrase7}, _Headers7, _Body7}} = httpc:request(delete, {"http://localhost:8000/users/" ++ lib_json:to_string(UserId), []}, [], []).
+
+
+%% @doc
+%% Function: connect_engine_polling_test/0
+%% Purpose: Test if the engine could succeed connecting to the polling system
+%% Returns: ok | {error, term()}
+%% @end
+connect_engine_polling_test()->
+	{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} = httpc:request(post, {"http://localhost:8000/users", [], "application/json", "{\"username\":\"lihao\"}"}, [], []),
+	UserId = lib_json:get_field(Body,"_id"),
+	api_help:refresh(),
+	
+	% test posting
+	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [], "application/json", "{\"name\":\"Public\",\"user_id\" : \"" ++ lib_json:to_string(UserId) ++ "\",\"private\":\"false\", \"data_type\":\"application/json\", \"parser\":\""++?PARSER1++"\"
+																																				, \"uri\":\""++?POLL_ADD1++"\" ,\"polling_freq\":1300, \"polling\":true
+																																				}"
+																					  }, [], []),
+	StrId1 = lib_json:to_string(lib_json:get_field(Body1,"_id")),
+	api_help:refresh(),
+	
+	?assertNotEqual(undefined, whereis(polling_supervisor)),
+	?assertNotEqual(undefined, whereis(polling_monitor)),
+	ChildrenList = supervisor:which_children(polling_monitor),
+	?assertEqual(1, length(ChildrenList)),
+	{_, Pid1, _, _} = lists:nth(1, ChildrenList),
+	{info, State1} = gen_server:call(Pid1, {check_info}),
+	?assertEqual(true, is_record(State1, state)),
+	?assertEqual(StrId1, State1#state.stream_id),
+	?assertEqual(?POLL_ADD1, State1#state.uri),
+	Parser1 = State1#state.parser,
+	?assertEqual(true, is_record(Parser1, parser)),
+	?assertEqual(?PARSER1, Parser1#parser.input_parser),
+	?assertEqual("application/json", Parser1#parser.input_type),
+	
+	% test updating 
+	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(put, {"http://localhost:8000/streams/"++StrId1, [], "application/json", "{\"name\":\"Public\",\"user_id\" : \"" ++ lib_json:to_string(UserId) ++ "\",\"private\":\"false\", \"data_type\":\"application/json\", \"parser\":\""++?PARSER2++"\"
+																																				, \"uri\":\""++?POLL_ADD2++"\" ,\"polling_freq\":1500, \"polling\":true
+																																				}"
+																					  }, [], []),
+	api_help:refresh(),
+	?assertNotEqual(undefined, whereis(polling_supervisor)),
+	?assertNotEqual(undefined, whereis(polling_monitor)),
+	ChildrenList2 = supervisor:which_children(polling_monitor),
+	?assertEqual(1, length(ChildrenList2)),
+	{_, Pid2, _, _} = lists:nth(1, ChildrenList2),
+	{info, State2} = gen_server:call(Pid2, {check_info}),
+	?assertEqual(true, is_record(State2, state)),
+	?assertEqual(StrId1, State2#state.stream_id),
+	?assertEqual(?POLL_ADD2, State2#state.uri),
+	Parser2 = State2#state.parser,
+	?assertEqual(true, is_record(Parser2, parser)),
+	?assertEqual(?PARSER2, Parser2#parser.input_parser),
+	?assertEqual("application/json", Parser2#parser.input_type),
+	
+	% test deleting
+	{ok, {{_Version6, 200, _ReasonPhrase6}, _Headers6, _Body6}} = httpc:request(delete, {"http://localhost:8000/streams/" ++ lib_json:to_string(StrId1), []}, [], []),
+	{ok, {{_Version7, 200, _ReasonPhrase7}, _Headers7, _Body7}} = httpc:request(delete, {"http://localhost:8000/users/" ++ lib_json:to_string(UserId), []}, [], []),
+	api_help:refresh(),
+	ChildrenList3 = supervisor:which_children(polling_monitor),
+	?assertEqual(0, length(ChildrenList3)),
+	
+	exit(whereis(polling_supervisor), "testing ends"),
+	exit(whereis(polling_monitor), "testing ends").
 
 %% @doc
 %% Function: get_parser/1

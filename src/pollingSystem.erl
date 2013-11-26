@@ -13,6 +13,8 @@
 -include("poller.hrl").
 -include("state.hrl").
 
+-include("parser.hrl").
+
 %% ====================================================================
 %% API functions
 %% ====================================================================
@@ -94,7 +96,7 @@ handle_cast({terminate, StreamId}, PollersInfo)->
 			{noreply, delete_info(PollersInfo, StreamId)}
 	end;
 handle_cast({rebuild, StreamId}, PollersInfo)->
-	%% erlang:display("receive cast: {rebuild, ResourceId}"),
+	%% erlang:display("receive cast: {rebuild, ResourceId}, the stream id: "++StreamId),
 	
 	Poller = find_poller_by_id(StreamId, PollersInfo),
 	case Poller of

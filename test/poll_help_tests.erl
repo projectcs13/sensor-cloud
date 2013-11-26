@@ -199,7 +199,7 @@ get_parser_by_id_test() ->
 	api_help:refresh(),
 	Parser= poll_help:get_parser_by_id("1"),
 	?assertEqual(true, is_record(Parser, parser)),
-	?assertEqual(1, Parser#parser.stream_id),
+	?assertEqual("1", Parser#parser.stream_id),
 	?assertEqual("streams/temperature/value", Parser#parser.input_parser),
 	?assertEqual("application/json", Parser#parser.input_type),
 	
@@ -379,7 +379,7 @@ post_parser(StreamId, InputType, InputParser) when is_integer(StreamId)->
 			 "" -> "";
 			 _ -> ", \"input_parser\":\"" ++ InputParser ++ "\""
 		 end,
-	Si = integer_to_list(StreamId),
+	Si = "\""++integer_to_list(StreamId)++"\"",
 	{ok, Res} = httpc:request(post, {?ES_ADDR ++ "/parser", [],
 						 "application/json",
 						 "{\"stream_id\":"++Si++It++Ip++"}"
