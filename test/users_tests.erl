@@ -218,6 +218,35 @@ delete_non_existing_user_test() ->
 
 
 %% @doc
+%% Function: unique_username_test/0
+%% Purpose: Test that a user can't have the same username as
+%%          one already in the system
+%% Returns: ok | {error, term()}
+%%
+%% Side effects: creates and deletes documents in elasticsearch
+%% @end
+-spec unique_username_test() -> ok | {error, term()}.
+unique_username_test() ->
+	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/users", [],"application/json", "{\"username\" : \"unique\",\"private\":\"true\"}"}, [], []),
+	api_help:refresh(),
+	{ok, {{_Version2, 409, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/users", [],"application/json", "{\"username\" : \"unique\",\"private\":\"true\"}"}, [], []),
+	
+	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, _Body3}} = httpc:request(delete, {"http://localhost:8000/users/unique", []}, [], []),
+	?assertEqual(Body2, "Non unique username given").
+
+%% @doc
+%% Function: username_exist_test/0
+%% Purpose: Test that a user needs to have a username
+%% Returns: ok | {error, term()}
+%%
+%% Side effects: creates and deletes documents in elasticsearch
+%% @end
+-spec username_exist_test() -> ok | {error, term()}.
+username_exist_test() ->
+	{ok, {{_Version1, 403, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/users", [],"application/json", "{\"private\":\"true\"}"}, [], []),
+	?assertEqual(Body1, "Username missing").
+
+%% @doc
 %% Function: get_index_id/0
 %% Purpose: Searches the ES and finds the _id for a user
 %% Returns: string() | {error, string()}
