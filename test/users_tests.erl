@@ -65,9 +65,7 @@ post_test() ->
 %% @end
 -spec get_existing_user_test() -> ok | {error, term()}.
 get_existing_user_test() ->
-	Id = get_index_id(?TEST_NAME),
-	?assertNotMatch({error, "no match"}, Id),
-	Response1 = get_request(?USERS_URL ++ lib_json:to_string(Id)),
+	Response1 = get_request(?USERS_URL ++ lib_json:to_string(?TEST_NAME)),
 	check_returned_code(Response1, 200).
 
 
@@ -123,11 +121,9 @@ post_user_search_test() ->
 %% @end
 -spec put_user_search_test() -> ok | {error, term()}.
 put_user_search_test() ->	
-	Id = get_index_id(?TEST_NAME),
-	?assertNotMatch({error, "no match"}, Id),
-	Response1 = put_request(?USERS_URL++lib_json:to_string(Id), "application/json", "{\"username\":\""++?TEST_NAME++"\",\"private\":\"true\"}"),
+	Response1 = put_request(?USERS_URL++?TEST_NAME, "application/json", "{\"private\":\"true\"}"),
 	check_returned_code(Response1, 200),
-	Response2 = get_request(?USERS_URL ++ lib_json:to_string(Id)),
+	Response2 = get_request(?USERS_URL ++?TEST_NAME),
 	{ok, Rest} = Response2,
 	{_,_,A} = Rest,
 	?assertEqual(true, lib_json:field_value_exists(A, "private", <<"true">>)).
@@ -159,8 +155,8 @@ dont_list_private_users_test() ->
 %% @end
 -spec delete_user_test() -> ok | {error, term()}.
 delete_user_test() ->
-	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {?USERS_URL, [],"application/json", "{\"username\" : \"test1\"}"}, [], []),
-	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(post, {?USERS_URL, [],"application/json", "{\"username\" : \"test2\"}"}, [], []),
+	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {?USERS_URL, [],"application/json", "{\"username\" : \"test2\"}"}, [], []),
+	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(post, {?USERS_URL, [],"application/json", "{\"username\" : \"test3\"}"}, [], []),
 	DocId = lib_json:get_field(Body2,"_id"),
 	DocId2 = lib_json:get_field(Body3,"_id"),
 	api_help:refresh(),
@@ -205,8 +201,8 @@ delete_user_test() ->
 %% @end
 -spec add_unsupported_field_test() -> ok | {error, term()}.
 add_unsupported_field_test() ->
-	{ok, {{_Version1, 403, _ReasonPhrase1}, _Headers1, _Body1}} = httpc:request(post, {?USERS_URL, [],"application/json", "{\"test\":\"asdas\",\"username\" : \"test\"}"}, [], []),
-	{ok, {{_Version2, 403, _ReasonPhrase2}, _Headers2, _Body2}} = httpc:request(put, {?USERS_URL++"1", [],"application/json", "{\"test\":\"asdas\",\"username\" : \"test\"}"}, [], []).
+	{ok, {{_Version1, 403, _ReasonPhrase1}, _Headers1, _Body1}} = httpc:request(post, {?USERS_URL, [],"application/json", "{\"test\":\"asdas\"}"}, [], []),
+	{ok, {{_Version2, 403, _ReasonPhrase2}, _Headers2, _Body2}} = httpc:request(put, {?USERS_URL++"1", [],"application/json", "{\"test\":\"asdas\"}"}, [], []).
 
 
 %% @doc
