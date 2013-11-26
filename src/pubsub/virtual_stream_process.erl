@@ -139,7 +139,7 @@ loop(VStreamId, DataPoints, VStreamExchange, Net, Function, Calculate) ->
 					
 					%% Store value in ES
 					case erlastic_search:index_doc(?ES_INDEX,
-												   "datapoint", Msg) of
+												   "vsdatapoint", Msg) of
 						{error, Reason} -> {error, Reason};
 						{ok, _} ->
 							%% Publish the calculated value
