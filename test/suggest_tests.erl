@@ -29,9 +29,8 @@
 %% @doc
 %% Test a post request
 %% @end
--spec post_test() -> ok | {error, term()}.
-post_test() ->
-	ok.
+%-spec post_test() -> ok | {error, term()}.
+%post_test() ->
 	%Response1 = post_request(?RESOURCES_URL, "application/json", 
 	%						"{
 	%							\"model\" : \"testsmartphone2\",
@@ -48,9 +47,8 @@ post_test() ->
 %% @doc
 %% Test creating a suggestion which contains both resource and streams
 %% @end
--spec post_and_stream_test() -> ok | {error, term()}.
-post_and_stream_test() ->
-	ok.
+%-spec post_and_stream_test() -> ok | {error, term()}.
+%post_and_stream_test() ->
 	%Response1 = post_request(?RESOURCES_URL, "application/json", 
 	%						"{
 	%							\"model\" : \"testwithstream\",
@@ -75,9 +73,8 @@ post_and_stream_test() ->
 %% @doc
 %% Test a get request for a suggestion
 %% @end
--spec get_suggestion_test() -> ok | {error, term()}.
-get_suggestion_test() ->
-	ok.
+%-spec get_suggestion_test() -> ok | {error, term()}.
+%get_suggestion_test() ->
 	%Response1 = post_request(?RESOURCES_URL, "application/json", 
 	%						"{
 	%							\"model\" : \"testgetsuggestion\",
@@ -94,9 +91,8 @@ get_suggestion_test() ->
 %% @doc
 %% Test a get request for a model that doesn't exist
 %% @end
--spec get_non_existing_term_test() -> ok | {error, term()}.
-get_non_existing_term_test() ->
-	ok.
+%-spec get_non_existing_term_test() -> ok | {error, term()}.
+%get_non_existing_term_test() ->
 	%Response1 = get_request(?SUGGEST_URL ++ "/non-existing-term"),
 	%check_returned_code(Response1, 404).
 
@@ -105,9 +101,8 @@ get_non_existing_term_test() ->
 %% @doc
 %% Updates a resource and makes sure that the suggestion was updated properly
 %% @end
--spec update_resource_test() -> ok | {error, term()}.
-update_resource_test() ->
-	ok.
+%-spec update_resource_test() -> ok | {error, term()}.
+%update_resource_test() ->
 	%Response1 = post_request(?RESOURCES_URL, "application/json", 
 	%						"{
 	%							\"model\" : \"testupdate\",
@@ -140,9 +135,8 @@ update_resource_test() ->
 %% @doc
 %% Updates a stream and makes sure that the suggestion was updated properly
 %% @end
--spec update_stream_test() -> ok | {error, term()}.
-update_stream_test() ->
-	ok.
+%-spec update_stream_test() -> ok | {error, term()}.
+%update_stream_test() ->
 	%Response1 = post_request(?RESOURCES_URL, "application/json", 
 	%						"{
 	%							\"model\" : \"teststreamupdate\",
@@ -175,9 +169,8 @@ update_stream_test() ->
 %% @doc
 %% Checks if API for text autocompletion works properly
 %% @end
--spec text_autocompletion_test() -> ok | {error, term()}.
-text_autocompletion_test() ->
-	ok.
+%-spec text_autocompletion_test() -> ok | {error, term()}.
+%text_autocompletion_test() ->
 	%Response1 = post_request(?RESOURCES_URL, "application/json", 
 	%						"{
 	%							\"model\" : \"testauto\",
@@ -213,9 +206,8 @@ text_autocompletion_test() ->
 %% @doc
 %% Checks if API for search autocompletion works 
 %% @end
--spec search_autocompletion_test() -> ok | {error, term()}.
-search_autocompletion_test() ->
-	ok.
+%-spec search_autocompletion_test() -> ok | {error, term()}.
+%search_autocompletion_test() ->
 	%{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, _Body1}} = httpc:request(post, {"http://localhost:8000/_search", [],"application/json", "{\"sort\":\"subscribers\",\"query\":{\"filtered\":{\"query\":{\"query_string\":{\"query\":\"test\"}},\"filter\":{}}}}"}, [], []),
 	%api_help:refresh(),
 	%{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(get, {"http://localhost:8000/suggest/_search?query=test", []}, [], []),
