@@ -10,11 +10,9 @@
 -define(INDEX, "sensorcloud").
 
 %% Fields for streams
--define(RESTRCITEDUPDATESTREAMS, ["quality","user_ranking","subscribers","last_update","creation_date","history_size"]).
--define(RESTRCITEDCREATESTREAMS, ["quality","user_ranking","subscribers","last_update","creation_date","history_size"]).
--define(ACCEPTEDFIELDSSTREAMS, ["resource","name","tags","description","private","type","accuracy","min_val",
-								"max_val","quality","active","user_ranking","subscribers","last_update","creation_date",
-								"history_size","location","user_id","uri","polling_freq","uuid","unit","parser","data_type"]).
+-define(RESTRCITEDUPDATESTREAMS, ["active","quality","user_ranking","subscribers","last_update","creation_date","history_size"]).
+-define(RESTRCITEDCREATESTREAMS, ["active","quality","user_ranking","subscribers","last_update","creation_date","history_size"]).
+-define(ACCEPTEDFIELDSSTREAMS, ["user_id","name","description", "type","tags","private","unit","accuracy","min_val","max_val","polling","uri","polling_freq","location","resource", "parser", "data_type"]).
 
 
 %% Fields for users
@@ -23,7 +21,7 @@
 %% Fields for resources
 -define(RESTRCITEDUPDATERESOURCES, []).
 -define(RESTRCITEDCREATERESOURCES, []).
--define(ACCEPTEDFIELDSRESOURCES, ["name","tags","model","description","manufacturer"]).
+-define(ACCEPTEDFIELDSRESOURCES, ["name","description","model","manufacturer"]).
 
 %% Fields for data-points
 -define(ACCEPTEDFIELDSDATAPOINTS, ["stream_id","timestamp","value"]).

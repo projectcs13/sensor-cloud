@@ -321,8 +321,7 @@ process_search_get(ReqData, State) ->
 
 put_stream(ReqData, State) ->
 	case api_help:is_rank(ReqData) of
-		false ->
-			
+		false ->			
 			%% changed by lihao to update the parser
 			case api_help:is_parser(ReqData) of
 				true->
@@ -651,7 +650,7 @@ add_server_side_fields(Json) ->
 
 	Time = api_help:generate_timestamp([Year,Month,Day,Hour,Min,Sec],0),
 
-		lib_json:add_values(Json,[
+	JSON = lib_json:add_values(Json,[
 			{creation_date, list_to_binary(Date)},
 			{last_updated, list_to_binary(Time)},
 			{quality, 1.0},
@@ -659,8 +658,10 @@ add_server_side_fields(Json) ->
 			{history_size, 0}, 
 			{user_ranking, "{}"},
 			{"user_ranking.average", 0.0},
-			{"user_ranking.nr_rankings", 0}]).
-
+			{"user_ranking.nr_rankings", 0},
+			{active, true}]),
+	erlang:display(JSON),
+	JSON.
 
 
 %%	DateAdded = api_help:add_field(Json,"creation_date",Date),
