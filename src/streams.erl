@@ -347,7 +347,7 @@ put_stream(ReqData, State) ->
 	            							undefined ->
 	            								change_ranking(StreamId, Rank),
 	            								UpdateJson = "{\"script\" : \"ctx._source.rankings += ranking\",\"params\":{\"ranking\":{ \"rank\":"++ float_to_list(Rank) ++",\"stream_id\":\""++StreamId++"\"}}}",
-	            								case api_help:update_doc(?INDEX, "user", User, UpdateJson, []) of
+	            								case api_help:update_doc(?INDEX, "user", ESId, UpdateJson, []) of
 													{error, {Code, Body}} ->
 					            						ErrorString = api_help:generate_error(Body, Code),
 					            						{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
@@ -358,7 +358,7 @@ put_stream(ReqData, State) ->
 	            									not_found ->
 	            										change_ranking(StreamId, Rank),
 	            										UpdateJson = "{\"script\" : \"ctx._source.rankings += ranking\",\"params\":{\"ranking\":{ \"rank\":"++ float_to_list(Rank) ++",\"stream_id\":\""++StreamId++"\"}}}",
-		            									case api_help:update_doc(?INDEX, "user", User, UpdateJson,[]) of
+		            									case api_help:update_doc(?INDEX, "user", ESId, UpdateJson,[]) of
 															{error, {Code, Body}} ->
 						         		   					ErrorString = api_help:generate_error(Body, Code),
 						          		  					{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
@@ -367,7 +367,7 @@ put_stream(ReqData, State) ->
 	            									{OldRank, ChangedRankingList} ->
 	                									change_ranking(StreamId, Rank, OldRank),
 	                									UpdateJson = api_help:create_update(lib_json:set_attr("rankings", ChangedRankingList)),
-	            										case api_help:update_doc(?INDEX, "user", User, UpdateJson,[]) of
+	            										case api_help:update_doc(?INDEX, "user", ESId, UpdateJson,[]) of
 															{error, {Code, Body}} ->
 						            							ErrorString = api_help:generate_error(Body, Code),
 						            							{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
