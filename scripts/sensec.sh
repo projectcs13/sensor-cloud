@@ -2,8 +2,8 @@
 dir=`dirname $0`
 #Specify project home directory.
 HOME_PATH=`cd  $dir;cd ..;pwd`
-LOG_DIR=$HOME_PATH/priv/logs
-LOG_JS_DIR=$LOG_DIR
+LOG_DIR=priv/logs
+LOG_JS_DIR=priv/logs
 
 echo "$HOME_PATH"
 #Check if user has root access
