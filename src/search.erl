@@ -27,7 +27,7 @@
 %% @end
 -spec init([]) -> {ok, undefined}.
 init([]) -> 
-        {ok, undefined}.
+		{ok, undefined}.
 
 
 
@@ -49,6 +49,7 @@ allowed_methods(ReqData, State) ->
 
 
 
+
 %% @doc
 %% Function: content_types_provided/2
 %% Purpose: based on the Accept header on a 'GET' request, we provide different media types to the client. 
@@ -57,7 +58,7 @@ allowed_methods(ReqData, State) ->
 %% @end
 -spec content_types_provided(ReqData::tuple(), State::string()) -> {list(), tuple(), string()}.
 content_types_provided(ReqData, State) ->
-        {[{"application/json", get_search}], ReqData, State}.
+		{[{"application/json", get_search}], ReqData, State}.
 
 
 %% @doc
@@ -68,7 +69,7 @@ content_types_provided(ReqData, State) ->
 %% @end
 -spec content_types_accepted(ReqData::tuple(), State::string()) -> {list(), tuple(), string()}.
 content_types_accepted(ReqData, State) ->
-        {[{"application/json", process_post}], ReqData, State}.
+		{[{"application/json", process_post}], ReqData, State}.
 
 %% @doc
 %% Function: get_search/2
@@ -115,7 +116,7 @@ get_search(ReqData, State) ->
 %% @end
 -spec process_post(ReqData::tuple(), State::string()) -> {true, tuple(), string()}.
 process_post(ReqData, State) ->
-        process_search_post(ReqData,State).
+		process_search_post(ReqData,State).
 
 %% @doc
 %% Function: process_search_post/2
@@ -134,7 +135,7 @@ process_search_post(ReqData, State) ->
     end,
 	case wrq:get_qs_value("sort",ReqData) of
         undefined ->
-            Sort = "user_ranking";
+            Sort = "user_ranking.average";
         SortParam ->
             Sort = SortParam
     end,
@@ -146,6 +147,7 @@ process_search_post(ReqData, State) ->
     end,
     {Json,_,_} = api_help:json_handler(ReqData,State),
     FilteredJson = filter_json(Json, From, Size, Sort),
+	erlang:display(FilteredJson),
     case erlastic_search:search_json(#erls_params{},?INDEX, "stream", FilteredJson) of % Maybe wanna take more
             {error, Reason1} ->
                 StreamSearch = {error, Reason1};
@@ -166,17 +168,17 @@ process_search_post(ReqData, State) ->
      end,
 	% check search-results for error
 	case StreamSearch of
-	    {error, {Body, Code}} ->
+		{error, {Body, Code}} ->
 		ErrorString = api_help:generate_error(Body, Code),
 		{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-	    _ -> 
+		_ -> 
 		case UserSearch of
 		  {error, {Body, Code}} ->
-		    ErrorString = api_help:generate_error(Body, Code),
-		    {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+			ErrorString = api_help:generate_error(Body, Code),
+			{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 		  _ ->
-        		SearchResults = "{\"streams\":"++ StreamSearch ++", \"users\":"++ UserSearch ++"}",
-        		{true,wrq:set_resp_body(SearchResults,ReqData),State}
+				SearchResults = "{\"streams\":"++ StreamSearch ++", \"users\":"++ UserSearch ++"}",
+				{true,wrq:set_resp_body(SearchResults,ReqData),State}
 		end
 	end.
 %% GROUPS ARE NOT IMPLEMENTED
@@ -227,8 +229,8 @@ parse_datapoints([Head|Rest], FinalJson) ->
 %% Returns: JSON string that is updated with filter
 %% @end
 filter_json(Json) ->
-        NewJson = string:sub_string(Json,1,string:len(Json)-1),
-        "{\"query\":{\"filtered\":"++NewJson++",\"filter\":{\"bool\":{\"must_not\":{\"term\":{\"private\":\"true\"}}}}}}}".
+		NewJson = string:sub_string(Json,1,string:len(Json)-1),
+		"{\"query\":{\"filtered\":"++NewJson++",\"filter\":{\"bool\":{\"must_not\":{\"term\":{\"private\":\"true\"}}}}}}}".
 
 
 %% @doc
@@ -248,9 +250,10 @@ filter_json(Json, From, Size, Sort) ->
 			UseSort = SortValue,
 			SortJson = lib_json:rm_field(Json, "sort")
 	end,
-    NewJson = string:sub_string(SortJson,1,string:len(SortJson)-1),
-    "{\"from\" : "++From++
+	NewJson = string:sub_string(SortJson,1,string:len(SortJson)-1),
+	"{\"from\" : "++From++
 	",\"size\" : "++Size++
 	",\"sort\" : " ++UseSort++
 	",\"query\" : {\"filtered\" : "++NewJson++
 	",\"filter\" : {\"bool\" : {\"must_not\" : {\"term\" : {\"private\" : \"true\"}}}}}}}".
+
