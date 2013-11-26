@@ -147,19 +147,18 @@ process_search_post(ReqData, State) ->
     end,
     {Json,_,_} = api_help:json_handler(ReqData,State),
     FilteredJson = filter_json(Json, From, Size, Sort),
-	erlang:display(lib_json:to_string(Json)),
 	erlang:display(lib_json:to_string(FilteredJson)),
     case erlastic_search:search_json(#erls_params{},?INDEX, "stream", FilteredJson) of % Maybe wanna take more
             {error, Reason1} ->
                 StreamSearch = {error, Reason1};
             {ok,List1} ->
-                case lib_json:get_field(FilteredJson, "query.filtered.query.query_string.query") of
-                    undefined ->
-                        erlang:display("No query string text");
-				QueryString ->erlang:display(lib_json:to_string(QueryString)),
-                        erlastic_search:index_doc(?INDEX,"search_query","{\"search_suggest\":{\"input\":[\""++ lib_json:to_string(QueryString) ++"\"],\"weight\":1}}")
-                end,
-                StreamSearch = lib_json:encode(List1) % May need to convert
+			case lib_json:get_field(FilteredJson, "query.filtered.query.query_string.query") of
+				undefined ->
+					erlang:display("No query string text");
+				QueryString ->
+					erlastic_search:index_doc(?INDEX,"search_query","{\"search_suggest\":{\"input\":[\""++ lib_json:to_string(QueryString) ++"\"],\"weight\":1}}")
+			end,
+			StreamSearch = lib_json:encode(List1) % May need to convert
     end,
     case erlastic_search:search_json(#erls_params{},?INDEX, "user", lib_json:rm_field(FilteredJson, "sort")) of % Maybe wanna take more
             {error, Reason2} ->
