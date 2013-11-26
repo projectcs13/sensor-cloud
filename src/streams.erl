@@ -206,8 +206,7 @@ process_post(ReqData, State) ->
             								{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 										{ok,List} -> 
 											%suggest:update_suggestion(UserAdded),
-											% {true, wrq:set_resp_body(lib_json:encode(List), ReqData), State},
-
+											
 											%% changed by lihao to add post the parser to elasticsearch
 											case lib_json:get_fields(FieldsAdded, ["parser", "data_type"]) of
 												[undefined, undefined]->{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State};
