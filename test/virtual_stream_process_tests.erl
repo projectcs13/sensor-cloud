@@ -38,8 +38,7 @@ virtual_stream_process_test_() ->
 	[
 	 {timeout, 30, [{setup, S, C, fun start_and_terminate/1}]},
 	 {timeout, 30, [{setup, S, C, fun vstream_subscribe_to_a_stream/1}]},
-	 {timeout, 30, [{setup, S, C, fun vstream_subscribe_to_streams_interval/1}]},
-	 {timeout, 30, [{setup, S, C, fun vstream_subscribe_to_streams_sim/1}]}
+	 {timeout, 30, [{setup, S, C, fun vstream_subscribe_to_streams_interval/1}]}
 	].
 
 
@@ -83,7 +82,7 @@ vstream_subscribe_to_a_stream(_) ->
 	StreamId = create_a_stream_on_index(?ES_INDEX),
 	
 	%% Create virtual stream listening to our stream
-	VPid = create_virtual_stream("testID", [{stream, StreamId}], "test"),
+	VPid = create_virtual_stream("testID", [{stream, StreamId}], sum),
 	
 	%% Create a publisher and consumer exchanges
 	OutExchange = list_to_binary("streams." ++ StreamId),
@@ -172,7 +171,7 @@ vstream_subscribe_to_streams_interval(_) ->
 	%% Create virtual stream listening to our streams
 	VPid = create_virtual_stream("testID",
 								 [{stream, StreamId1}, {stream, StreamId2}],
-								 "test"),
+								 sum),
 	
 	%% Create publisher and consumer exchanges
 	OutExchange1 = list_to_binary("streams." ++ StreamId1),
@@ -266,110 +265,6 @@ vstream_subscribe_to_streams_interval(_) ->
 	[?_assertEqual(true, is_list(StreamId1)),
 	 ?_assertEqual(true, is_list(StreamId2)),
 	 ?_assertEqual({32, "testID"}, Rec1),
-	 ?_assertEqual({64, "testID"}, Rec2)].
-
-
-
-
-
-
-
-
-%% @doc
-%% Function: vstream_subscribe_to_streams_sim/1
-%% Purpose: Starts a virtual stream process that subscribes to streams, gets a
-%%          value, apply the function and publish it.
-%% Returns: ok | {error, term()}.
-%% Side effects: Deletes and creates ?ES_INDEX in ES, create two streams
-%%               and stores two data point in ES.
-%% 
-%% @end
--spec vstream_subscribe_to_streams_sim(_) -> ok | {error, term()}.
-vstream_subscribe_to_streams_sim(_) ->
-	
-	%% Create two streams in ?ES_INDEX
-	StreamId1 = create_a_stream_on_index(?ES_INDEX),
-	StreamId2 = create_a_stream_on_index(?ES_INDEX),
-
-	%% Create virtual stream listening to our streams
-	VPid = create_virtual_stream("testID",
-								 [{stream, StreamId1}, {stream, StreamId2}],
-								 "test"),
-	
-	%% Create publisher and consumer exchanges
-	OutExchange1 = list_to_binary("streams." ++ StreamId1),
-	OutExchange2 = list_to_binary("streams." ++ StreamId2),
-	InExchange = list_to_binary("vstreams.testID"),
-	
-	%% Establish connection to RabbitMQ
-	{ok, Connection} =
-		amqp_connection:start(#amqp_params_network{}),
-	{ok, ChannelIn} = amqp_connection:open_channel(Connection),
-	{ok, ChannelOut} = amqp_connection:open_channel(Connection),
-	
-	%% Declare the outgoing exchange 1 and 2 to publish to
-	amqp_channel:call(ChannelOut,
-					  #'exchange.declare'{exchange = OutExchange1,
-										  type = <<"fanout">>}),
-	amqp_channel:call(ChannelOut,
-					  #'exchange.declare'{exchange = OutExchange2,
-										  type = <<"fanout">>}),
-	
-	%% Subscribe to InExchange
-	subscribe(ChannelIn, InExchange),
-	
-	%% Needed for the RabbitMQ to have time to set up the system.
-	timer:sleep(1000),
-	
-	%% Publish a message
-	Msg = create_data_point(StreamId1, 32),
-	amqp_channel:cast(ChannelOut,
-					  #'basic.publish'{exchange = OutExchange1},
-					  #amqp_msg{payload = Msg}),
-	
-	%% Publish a message
-	Msg2 = create_data_point(StreamId2, 32),
-	amqp_channel:cast(ChannelOut,
-					  #'basic.publish'{exchange = OutExchange2},
-					  #amqp_msg{payload = Msg2}),
-	
-	%% Listen for the update
-	Rec2 = receive
-			{#'basic.deliver'{}, #amqp_msg{payload = Body2}} ->
-				Data2 = binary_to_list(Body2),
-				case erlson:is_json_string(Data2) of
-					%% New value from the source as a Json
-					true ->
-						Val2 = lib_json:get_field(Data2, "value"),
-						Id2 = binary_to_list(
-								lib_json:get_field(Data2, "stream_id")),
-						{Val2, Id2};
-					_ -> false
-				end;
-			_ -> false
-		  end,
-	
-	%% Close and clean
-	VPid ! quit,
-	amqp_channel:close(ChannelIn),
-	amqp_channel:close(ChannelOut),
-	amqp_connection:close(Connection),
-	
-	
-	case erlastic_search:delete_doc(?ES_INDEX,"stream", StreamId1) of
-		{error, {Code, Body3}} ->
-			erlang:display(api_help:generate_error(Body3, Code));
-		{ok, _} -> ok
-	end,
-	
-	case erlastic_search:delete_doc(?ES_INDEX,"stream", StreamId2) of
-		{error, {Code2, Body4}} ->
-			erlang:display(api_help:generate_error(Body4, Code2));
-		{ok, _} -> ok
-	end,
-
-	[?_assertEqual(true, is_list(StreamId1)),
-	 ?_assertEqual(true, is_list(StreamId2)),
 	 ?_assertEqual({64, "testID"}, Rec2)].
 
 
