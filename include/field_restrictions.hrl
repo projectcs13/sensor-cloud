@@ -16,6 +16,7 @@
 
 
 %% Fields for users
+-define(RESTRCITEDUPDATEUSERS, ["username"]).
 -define(ACCEPTEDFIELDSUSERS, ["username","private"]).
 
 %% Fields for resources
