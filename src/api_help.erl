@@ -137,6 +137,20 @@ is_search(ReqData) ->
 	URIList = string:tokens(wrq:path(ReqData), "/"),
 	(string:sub_string(lists:nth(length(URIList),URIList),1,7) == "_search").
 
+	%% @doc
+%% Function: is_rank/1
+%% Purpose: Used to decide if the URI specifie a rank request
+%% Returns: True if URI specifies a rank request, false otherwise
+%% @end
+-spec is_rank(ReqData::term()) -> boolean().
+is_rank(ReqData) ->
+	case string:str(wrq:path(ReqData),"_rank") of
+		0 ->
+			false;
+		_ ->
+			true
+	end.
+
 %% @doc
 %% Function: json_handler/2
 %% Purpose: Used to get the json object from the request
@@ -494,4 +508,42 @@ generate_error(Body, ErrorCode) ->
 %% FIX: This function relies on direct contact with elastic search at localhost:9200
 %% @end
 refresh() ->
-	httpc:request(post, {"http://localhost:9200/sensorcloud/_refresh", [],"", ""}, [], []).
+	httpc:request(post, {get_elastic_search_url()++"/sensorcloud/_refresh", [],"", ""}, [], []).
+
+
+
+%% @doc
+%% Returns the URL of webmachine
+%%
+%% @end
+-spec get_webmachine_url() -> string().
+get_webmachine_url() ->
+	case application:get_env(engine, webmachine_port) of
+		{ok, Value} ->
+			"http://localhost:"++integer_to_list(Value);
+		undefined ->
+			"http://localhost:8000"
+	end.
+
+%% @doc
+%% Returns the URL of Elastic Search
+%%
+%% @end
+-spec get_elastic_search_url() -> string().
+get_elastic_search_url() ->
+	Port = case application:get_env(engine, es_port) of
+		{ok, Value} ->
+			Value;
+		undefined ->
+			9200
+	end,
+	Ip = case application:get_env(engine, es_ip) of
+		{ok, Value2} ->
+			Value2;
+		undefined ->
+			"localhost"
+	end,
+	"http://"++Ip++":"++integer_to_list(Port).
+    
+
+

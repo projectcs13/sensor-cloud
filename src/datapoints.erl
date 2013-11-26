@@ -37,7 +37,7 @@ allowed_methods(ReqData, State) ->
 		[{"streams", _Id}, {"data", "_search"}] ->
 			{['POST','GET'], ReqData, State};
 		[{"streams", _Id}, {"data"}] ->
-			{['GET', 'POST', 'DELETE'], ReqData, State};
+			{['GET', 'POST'], ReqData, State};
 		[error] ->
 				{[], ReqData, State}
 	end.
@@ -159,19 +159,19 @@ get_datapoint(ReqData, State) ->
 %% Purpose: Does search for Datapoints for either search done with POST or GET
 %% Returns: {true, ReqData, State} || {{error, Reason}, ReqData, State}
 
-%the POST range query should be structed as follows:
-%	curl -XPOST http://localhost:8000/streams/1/data/_search -d '{
-%		"size" : 100,
-%		query:{
-% 		   "filtered" : {
-% 		       "query" : {
-%  		          "term" : { "stream_id" : Id }
-%  		      }, "filter" : {  "range" : {    "timestamp" : {"gte" : timestampFromValue,"lte" : timestampToValue}}}}
-%		 },"sort" : [{"timestamp" : {"order" : "asc"}}]  }'
-%the GET range query should be structed as follows:
-%	curl -XGET http://localhost:8000/streams/Id/data/_search    --   to return all the datapoints of the current stream
-%or	curl -XGET http://localhost:8000/streams/Id/data/_search\?timestampFrom\=timestampFromValue\&timestampTo\=timestampToValue    --   for range query
-%or 	curl -XGET http://localhost:8000/streams/Id/data/_search\?timestampFrom\=timestampFromValue   --   for lower bounded only range qquery
+%% the POST range query should be structed as follows:
+%% 	curl -XPOST http://localhost:8000/streams/1/data/_search -d '{
+%% 		"size" : 100,
+%% 		query:{
+%% 		   "filtered" : {
+%% 		       "query" : {
+%%  		          "term" : { "stream_id" : Id }
+%%  		      }, "filter" : {  "range" : {    "timestamp" : {"gte" : timestampFromValue,"lte" : timestampToValue}}}}
+%% 		 },"sort" : [{"timestamp" : {"order" : "asc"}}]  }'
+%% the GET range query should be structed as follows:
+%% 	curl -XGET http://localhost:8000/streams/Id/data/_search    --   to return all the datapoints of the current stream
+%% or	curl -XGET http://localhost:8000/streams/Id/data/_search\?timestampFrom\=timestampFromValue\&timestampTo\=timestampToValue    --   for range query
+%% or 	curl -XGET http://localhost:8000/streams/Id/data/_search\?timestampFrom\=timestampFromValue   --   for lower bounded only range qquery
 %% @end
 -spec process_search(ReqData::tuple(), State::string(), term()) ->
 		{list(), tuple(), string()}.
@@ -275,7 +275,7 @@ update_fields_in_stream(StreamId,TimeStamp,ReqData,State) ->
             {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 		{ok,StreamJson} ->
 			OldHistorySize = lib_json:get_field(StreamJson, "_source.history_size"),
-			Json = lib_json:set_attrs([{"last_update", TimeStamp} , {"history_size", OldHistorySize+1}]),
+			Json = lib_json:set_attrs([{"last_updated", TimeStamp} , {"history_size", OldHistorySize+1}]),
 			Update = api_help:create_update(Json),
 			case api_help:update_doc(?INDEX, "stream", StreamId, Update) of
 				{error, {Code, Body}} -> 

@@ -23,7 +23,8 @@
 %% Internal functions
 %% ====================================================================
 
--define(DATAPOINTS_URL, "http://localhost:8000/streams/4/data/").
+-define(WEBMACHINE_URL, api_help:get_webmachine_url()).
+-define(DATAPOINTS_URL, ?WEBMACHINE_URL++"/streams/4/data/").
 -define(TEST_VALUE, "3").
 -define(TEST_TIMESTAMP, "2").
 -define(INDEX, "sensorcloud").
@@ -36,7 +37,7 @@
 %% @end
 -spec post_test() -> ok | {error, term()}.
 post_test() ->
-		erlastic_search:index_doc_with_id(?INDEX,"stream","4","{\"test\" : \"data_points\",\"history_size\":0}"),
+		erlastic_search:index_doc_with_id(?INDEX,"stream","4","{\"tags\" : \"data_points\",\"history_size\":0}"),
 		api_help:refresh(),
         Response1 = post_request(?DATAPOINTS_URL, "application/json",
                                          "{\"value\":\"" ++ ?TEST_VALUE ++ "\", \"timestamp\": \"" ++ ?TEST_TIMESTAMP ++ "\"}"),
@@ -55,7 +56,7 @@ post_test() ->
 -spec get_existing_datapoint_test() -> ok | {error, term()}.
 get_existing_datapoint_test() ->
         Id = get_index_id(?TEST_VALUE, ?TEST_TIMESTAMP),
-        ?assertNotMatch({error, "no match"}, Id),
+        ?assertNotMatch({error, "\"no match\""}, Id),
         Response1 = get_request(?DATAPOINTS_URL ++ "_search?_id=" ++ Id),
         check_returned_code(Response1, 200).
 
@@ -68,13 +69,13 @@ get_existing_datapoint_test() ->
 %% @end
 -spec no_timestamp_test() -> ok | {error, term()}.
 no_timestamp_test() ->
-		erlastic_search:index_doc_with_id(?INDEX,"stream","5","{\"test\" : \"data_points\",\"history_size\":0}"),
+		erlastic_search:index_doc_with_id(?INDEX,"stream","5","{\"tags\" : \"data_points\",\"history_size\":0}"),
 		api_help:refresh(),
-        Response1 = post_request("http://localhost:8000/streams/5/data/", "application/json",
+        Response1 = post_request(?WEBMACHINE_URL++"/streams/5/data/", "application/json",
                                          "{\"value\":\"55\"}"),
         check_returned_code(Response1, 200),
 		api_help:refresh(),
-		{ok,{_,_,Body}} = httpc:request(get, {"http://localhost:8000/streams/5/data/", []}, [], []),
+		{ok,{_,_,Body}} = httpc:request(get, {?WEBMACHINE_URL++"/streams/5/data/", []}, [], []),
 		ObjectList = lib_json:get_field(Body,"data"),
         ?assertEqual(true, lib_json:get_field(lists:nth(1,ObjectList),"timestamp") =/= undefined).
 
@@ -87,19 +88,19 @@ no_timestamp_test() ->
 %% @end
 -spec update_stream_fields_test() -> ok | {error, term()}.
 update_stream_fields_test() ->
-	{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} = httpc:request(post, {"http://localhost:8000/resources", [],"application/json", "{\"name\" : \"search\"}"}, [], []),
-	ResourceId = lib_json:get_field(Body,"_id"),
+	{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} = httpc:request(post, {?WEBMACHINE_URL++ "/users", [],"application/json", "{\"username\" : \"search\"}"}, [], []),
+	UserId = lib_json:get_field(Body,"_id"),
 	api_help:refresh(),
-	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"name\" : \"search\",\"resource_id\" : \"" ++ lib_json:to_string(ResourceId) ++ "\", \"private\" : \"false\"}"}, [], []),
+	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {?WEBMACHINE_URL++"/streams", [],"application/json", "{\"name\" : \"search\",\"user_id\" : \"" ++ lib_json:to_string(UserId) ++ "\", \"private\" : \"false\"}"}, [], []),
 	StreamId = lib_json:get_field(Body1,"_id"),
 	api_help:refresh(),
-	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/streams/" ++ lib_json:to_string(StreamId) ++ "/data", [],"application/json", "{\"value\":5.0}"}, [], []),
+	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(StreamId) ++ "/data", [],"application/json", "{\"value\":5.0}"}, [], []),
 	api_help:refresh(),
-	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(get, {"http://localhost:8000/streams/" ++ lib_json:to_string(StreamId), []}, [], []),
-	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(get, {"http://localhost:8000/streams/" ++ lib_json:to_string(StreamId) ++ "/data", []}, [], []),
-	{ok, {{_Version5, 200, _ReasonPhrase5}, _Headers5, _Body5}} = httpc:request(delete, {"http://localhost:8000/resources/" ++ lib_json:to_string(ResourceId), []}, [], []),
+	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(get, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(StreamId), []}, [], []),
+	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(get, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(StreamId) ++ "/data", []}, [], []),
+	{ok, {{_Version5, 200, _ReasonPhrase5}, _Headers5, _Body5}} = httpc:request(delete, {?WEBMACHINE_URL++"/users/" ++ lib_json:to_string(UserId), []}, [], []),
 	ObjectList = lib_json:get_field(Body4,"data"),
-    ?assertEqual(lib_json:get_field(Body3,"last_update"), lib_json:get_field(lists:nth(1,ObjectList),"timestamp")),
+    ?assertEqual(lib_json:get_field(Body3,"last_updated"), lib_json:get_field(lists:nth(1,ObjectList),"timestamp")),
 	?assertEqual(lib_json:get_field(Body3,"history_size"),1).
 	
 %% @doc
@@ -153,7 +154,7 @@ get_non_existent_datapoint_test() ->
 %% @end
 -spec add_unsupported_field_test() -> ok | {error, term()}.
 add_unsupported_field_test() ->
-	{ok, {{_Version1, 403, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/streams/5/data", [],"application/json", "{\"test\":\"asdas\",\"value\" : 5.0}"}, [], []),
+	{ok, {{_Version1, 403, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {?WEBMACHINE_URL++"/streams/5/data", [],"application/json", "{\"test\":\"asdas\",\"value\" : 5.0}"}, [], []),
 	erlastic_search:delete_doc(?INDEX,"stream","5").
 
 post_request(URL, ContentType, Body) -> request(post, {URL, [], ContentType, Body}).

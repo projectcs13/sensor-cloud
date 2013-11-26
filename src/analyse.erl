@@ -23,10 +23,6 @@ allowed_methods(ReqData, State) ->
                          {['GET'], ReqData, State};
                 [{"users", _UserID}, {"streams", _StreamID}, {"_analyse"}] ->
                          {['GET'], ReqData, State};
-                [{"resources", _ResourceID}, {"streams", _StreamID}, {"_analyse"}] ->
-                         {['GET'], ReqData, State};
-                [{"users", _UserID}, {"resources", _ResourceID}, {"streams", _StreamID}, {"_analyse"}] ->
-                         {['GET'], ReqData, State};
                 [error] ->
                  {[], ReqData, State}
 end.
@@ -76,7 +72,7 @@ get_analysis(ReqData, State) ->
                             ErrorString = api_help:generate_error(Body, Code),
                             {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
                     {ok,JsonStruct} ->
-                            {true,wrq:set_resp_body(forecast(lib_json:get_field(JsonStruct, "hits.hits")),ReqData),State}
+                            {forecast(lib_json:get_field(JsonStruct, "hits.hits")),ReqData,State}
             end
     end.
 
