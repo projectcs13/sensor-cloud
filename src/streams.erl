@@ -331,44 +331,51 @@ put_stream(ReqData, State) ->
 	            			ErrorString = api_help:generate_error(Body, Code),
 	            			{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 	          			_ ->
-
-	          			case erlastic_search:get_doc(?INDEX,"user", User) of
-	          				{error, {Code, Body}} ->
-	            				ErrorString = api_help:generate_error(Body, Code),
-	            				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-	            			{ok,List} ->
-	            				case lib_json:get_field(List, "_source.rankings") of
-	            					undefined ->
-	            						change_ranking(StreamId, Rank),
-	            						UpdateJson = "{\"script\" : \"ctx._source.rankings += ranking\",\"params\":{\"ranking\":{ \"rank\":"++ float_to_list(Rank) ++",\"stream_id\":\""++StreamId++"\"}}}",
-	            						case api_help:update_doc(?INDEX, "user", User, UpdateJson, []) of
-											{error, {Code, Body}} ->
-					            				ErrorString = api_help:generate_error(Body, Code),
-					            				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-					            			{ok, List2} -> {true,wrq:set_resp_body(lib_json:encode(List2),ReqData),State}
-					            		end;
-	            					RankingList ->
-	            						case find_ranking(StreamId, RankingList, Rank, []) of
-	            							not_found ->
+						Query = "{\"size\" :100,\"query\" : {\"term\" : {\"username\":\"" ++ User ++"\"}}}",
+						case erlastic_search:search_json(#erls_params{},?INDEX, "user", Query) of
+							{error, {Code1, Body1}} -> 
+								ErrorString1 = api_help:generate_error(Body1, Code1),
+								{{halt, Code1}, wrq:set_resp_body(ErrorString1, ReqData), State};
+							{ok, Json} ->
+								ESId = lib_json:to_string(lib_json:get_field(Json, "hits.hits[0]._id")),
+								case erlastic_search:get_doc(?INDEX,"user", ESId) of
+									{error, {Code, Body}} ->
+	            						ErrorString = api_help:generate_error(Body, Code),
+	            						{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+	            					{ok,List} ->
+	            						case lib_json:get_field(List, "_source.rankings") of
+	            							undefined ->
 	            								change_ranking(StreamId, Rank),
 	            								UpdateJson = "{\"script\" : \"ctx._source.rankings += ranking\",\"params\":{\"ranking\":{ \"rank\":"++ float_to_list(Rank) ++",\"stream_id\":\""++StreamId++"\"}}}",
-		            							case api_help:update_doc(?INDEX, "user", User, UpdateJson,[]) of
+	            								case api_help:update_doc(?INDEX, "user", User, UpdateJson, []) of
 													{error, {Code, Body}} ->
-						            					ErrorString = api_help:generate_error(Body, Code),
-						            					{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-						            				{ok, List3} -> {true,wrq:set_resp_body(lib_json:encode(List3),ReqData),State}
+					            						ErrorString = api_help:generate_error(Body, Code),
+					            						{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+					            					{ok, List2} -> {true,wrq:set_resp_body(lib_json:encode(List2),ReqData),State}
 					            				end;
-	            							{OldRank, ChangedRankingList} ->
-	                							change_ranking(StreamId, Rank, OldRank),
-	                							UpdateJson = api_help:create_update(lib_json:set_attr("rankings", ChangedRankingList)),
-	            								case api_help:update_doc(?INDEX, "user", User, UpdateJson,[]) of
-													{error, {Code, Body}} ->
-						            					ErrorString = api_help:generate_error(Body, Code),
-						            					{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-						            				{ok, List4} -> {true,wrq:set_resp_body(lib_json:encode(List4),ReqData),State}
-					            				end
+	            							RankingList ->
+	            								case find_ranking(StreamId, RankingList, Rank, []) of
+	            									not_found ->
+	            										change_ranking(StreamId, Rank),
+	            										UpdateJson = "{\"script\" : \"ctx._source.rankings += ranking\",\"params\":{\"ranking\":{ \"rank\":"++ float_to_list(Rank) ++",\"stream_id\":\""++StreamId++"\"}}}",
+		            									case api_help:update_doc(?INDEX, "user", User, UpdateJson,[]) of
+															{error, {Code, Body}} ->
+						         		   					ErrorString = api_help:generate_error(Body, Code),
+						          		  					{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+						         		   				{ok, List3} -> {true,wrq:set_resp_body(lib_json:encode(List3),ReqData),State}
+					            						end;
+	            									{OldRank, ChangedRankingList} ->
+	                									change_ranking(StreamId, Rank, OldRank),
+	                									UpdateJson = api_help:create_update(lib_json:set_attr("rankings", ChangedRankingList)),
+	            										case api_help:update_doc(?INDEX, "user", User, UpdateJson,[]) of
+															{error, {Code, Body}} ->
+						            							ErrorString = api_help:generate_error(Body, Code),
+						            							{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+						            						{ok, List4} -> {true,wrq:set_resp_body(lib_json:encode(List4),ReqData),State}
+					            						end		
+	            								end
 	            						end
-	            				end
+								end
 	            		end
 	        		end
     		end
