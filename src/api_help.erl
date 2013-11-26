@@ -173,7 +173,8 @@ is_parser(ReqData) ->
 -spec json_handler(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 
 json_handler(ReqData, State) ->
-	[{Value,_ }] = mochiweb_util:parse_qs(wrq:req_body(ReqData)), 
+	Value = binary_to_list(wrq:req_body(ReqData)),
+	%[{Value,_ }] = mochiweb_util:parse_qs(wrq:req_body(ReqData)), 
 	{Value, ReqData, State}.
 
 %% @doc
@@ -521,4 +522,42 @@ generate_error(Body, ErrorCode) ->
 %% FIX: This function relies on direct contact with elastic search at localhost:9200
 %% @end
 refresh() ->
-	httpc:request(post, {"http://localhost:9200/sensorcloud/_refresh", [],"", ""}, [], []).
+	httpc:request(post, {get_elastic_search_url()++"/sensorcloud/_refresh", [],"", ""}, [], []).
+
+
+
+%% @doc
+%% Returns the URL of webmachine
+%%
+%% @end
+-spec get_webmachine_url() -> string().
+get_webmachine_url() ->
+	case application:get_env(engine, webmachine_port) of
+		{ok, Value} ->
+			"http://localhost:"++integer_to_list(Value);
+		undefined ->
+			"http://localhost:8000"
+	end.
+
+%% @doc
+%% Returns the URL of Elastic Search
+%%
+%% @end
+-spec get_elastic_search_url() -> string().
+get_elastic_search_url() ->
+	Port = case application:get_env(engine, es_port) of
+		{ok, Value} ->
+			Value;
+		undefined ->
+			9200
+	end,
+	Ip = case application:get_env(engine, es_ip) of
+		{ok, Value2} ->
+			Value2;
+		undefined ->
+			"localhost"
+	end,
+	"http://"++Ip++":"++integer_to_list(Port).
+    
+
+

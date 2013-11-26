@@ -87,7 +87,7 @@ process_post(ReqData, State) ->
 						true ->
 							case erlastic_search:get_doc(?INDEX, "stream", Id) of
 						 		{error,{404,_}} ->
-							 		{{halt,409}, wrq:set_resp_body("{\"error\":\"no document with streamid given is present in the system\"}", ReqData), State};
+							 		{{halt,409}, wrq:set_resp_body("{\"error\":\"no document with stream_id given is present in the system\"}", ReqData), State};
                          		{error,{Code,Body}} ->
                              		ErrorString = api_help:generate_error(Body, Code),
                              		{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
@@ -159,19 +159,19 @@ get_datapoint(ReqData, State) ->
 %% Purpose: Does search for Datapoints for either search done with POST or GET
 %% Returns: {true, ReqData, State} || {{error, Reason}, ReqData, State}
 
-%the POST range query should be structed as follows:
-%	curl -XPOST http://localhost:8000/streams/1/data/_search -d '{
-%		"size" : 100,
-%		query:{
-% 		   "filtered" : {
-% 		       "query" : {
-%  		          "term" : { "streamid" : Id }
-%  		      }, "filter" : {  "range" : {    "timestamp" : {"gte" : timestampFromValue,"lte" : timestampToValue}}}}
-%		 },"sort" : [{"timestamp" : {"order" : "asc"}}]  }'
-%the GET range query should be structed as follows:
-%	curl -XGET http://localhost:8000/streams/Id/data/_search    --   to return all the datapoints of the current stream
-%or	curl -XGET http://localhost:8000/streams/Id/data/_search\?timestampFrom\=timestampFromValue\&timestampTo\=timestampToValue    --   for range query
-%or 	curl -XGET http://localhost:8000/streams/Id/data/_search\?timestampFrom\=timestampFromValue   --   for lower bounded only range qquery
+%% the POST range query should be structed as follows:
+%% 	curl -XPOST http://localhost:8000/streams/1/data/_search -d '{
+%% 		"size" : 100,
+%% 		query:{
+%% 		   "filtered" : {
+%% 		       "query" : {
+%%  		          "term" : { "stream_id" : Id }
+%%  		      }, "filter" : {  "range" : {    "timestamp" : {"gte" : timestampFromValue,"lte" : timestampToValue}}}}
+%% 		 },"sort" : [{"timestamp" : {"order" : "asc"}}]  }'
+%% the GET range query should be structed as follows:
+%% 	curl -XGET http://localhost:8000/streams/Id/data/_search    --   to return all the datapoints of the current stream
+%% or	curl -XGET http://localhost:8000/streams/Id/data/_search\?timestampFrom\=timestampFromValue\&timestampTo\=timestampToValue    --   for range query
+%% or 	curl -XGET http://localhost:8000/streams/Id/data/_search\?timestampFrom\=timestampFromValue   --   for lower bounded only range qquery
 %% @end
 -spec process_search(ReqData::tuple(), State::string(), term()) ->
 		{list(), tuple(), string()}.

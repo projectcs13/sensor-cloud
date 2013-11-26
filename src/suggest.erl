@@ -40,6 +40,8 @@ init([]) ->
 -spec allowed_methods(ReqData::term(),State::term()) -> {list(), term(), term()}.
 allowed_methods(ReqData, State) ->
 	case api_help:parse_path(wrq:path(ReqData)) of
+		[{"suggest", "_search"}] ->
+            {['GET'], ReqData, State};
 		[{"suggest", _Field} , {_Term}] ->
 			{['GET'], ReqData, State}; 
 		[{"suggest", _Term}] ->
@@ -73,48 +75,72 @@ content_types_provided(ReqData, State) ->
 %% Handles GET request for text autocompletion.
 %%
 %% Example URL: localhost:8000/suggest/my_field/my_text?size=5 
+%%
+%% Case 3:
+%% Handles GET requests for phrase_suggestion/auto_completion
+%%
+%% Example URL: localhost:8000/suggest/_search?query=test
+%% This will try to find completion suggestions for the query "test"
 %% @end
 -spec get_suggestion(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 get_suggestion(ReqData, State) ->
-	case wrq:get_qs_value("size",ReqData) of 
-		undefined ->
-			Size = "1";
-		SizeParam ->
-			Size = SizeParam
-	end,
-	case proplists:get_value('field', wrq:path_info(ReqData)) of
-		undefined ->
-			Field = "suggest";
-		FieldParam ->
-			Field = FieldParam ++ "_suggest"
-	end,
-	case proplists:get_value('term', wrq:path_info(ReqData)) of
-		undefined ->
-			{{halt, 400}, ReqData, State};
-		Term ->
-			Query = "{                   
-					\"testsuggest\" : {     
-						\"text\" : \""++Term++"\",
-						\"completion\" : {                    
-						\"field\" : \""++Field++"\",
-								\"size\" : "++ Size ++"            
-						}                                                   
-					}                                      
-				}",
-			case erlastic_search:suggest(?INDEX, Query) of	
-				{error, {Code, Body}} -> 
-					ErrorString = api_help:generate_error(Body, Code),
-					{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-				{ok,List} -> 
-					EncodedList = lib_json:encode(List),
-					case re:run(EncodedList, "\"options\":\\[\\]", [{capture, first, list}]) of
-						{match, _} -> 
-							{{halt,404},ReqData, State};
-						_-> 
-							Output = lib_json:set_attr("suggestions",lib_json:get_field(List, "testsuggest[0].options")), 
-							{lib_json:encode(Output),ReqData, State}
+	case api_help:is_search(ReqData) of
+		false ->
+			case wrq:get_qs_value("size",ReqData) of 
+				undefined ->
+					Size = "1";
+				SizeParam ->
+					Size = SizeParam
+			end,
+			case proplists:get_value('field', wrq:path_info(ReqData)) of
+				undefined ->
+					Field = "suggest";
+				FieldParam ->
+					Field = FieldParam ++ "_suggest"
+			end,
+			case proplists:get_value('term', wrq:path_info(ReqData)) of
+				undefined ->
+					{{halt, 400}, ReqData, State};
+				Term ->
+					Query = "{                   
+							\"testsuggest\" : {     
+								\"text\" : \""++Term++"\",
+								\"completion\" : {                    
+								\"field\" : \""++Field++"\",
+										\"size\" : "++ Size ++"            
+								}                                                   
+							}                                      
+						}",
+					case erlastic_search:suggest(?INDEX, Query) of	
+						{error, {Code, Body}} -> 
+							ErrorString = api_help:generate_error(Body, Code),
+							{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+						{ok,List} -> 
+							EncodedList = lib_json:encode(List),
+							case re:run(EncodedList, "\"options\":\\[\\]", [{capture, first, list}]) of
+								{match, _} -> 
+									{{halt,404},ReqData, State};
+								_-> 
+									Output = lib_json:set_attr("suggestions",lib_json:get_field(List, "testsuggest[0].options")), 
+									{lib_json:encode(Output),ReqData, State}
+							end
 					end
-			end
+			end;
+		true ->
+			case wrq:get_qs_value("query",ReqData) of
+            undefined ->
+                erlang:display("No query specified!");
+            QueryString ->
+            	SuggestJson = "{\"suggestion\":{\"text\":\""++ QueryString ++"\",\"completion\":{\"field\":\"search_suggest\",\"fuzzy\":true}}}",
+            	case erlastic_search:suggest(?INDEX, SuggestJson) of
+            		{error, {Code, Body}} -> 
+						ErrorString = api_help:generate_error(Body, Code),
+						{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+					{ok,List} ->
+						OutputJson = lib_json:set_attr("suggestions",lib_json:get_field(List, "suggestion[0].options")),
+                		{OutputJson ,ReqData ,State}
+                end
+        	end
 	end.
 
 

@@ -12,6 +12,7 @@
                 content_types_provided/2,
                  process_post/2,
                  get_search/2]).
+
 -include("webmachine.hrl").
 -include_lib("erlastic_search.hrl").
 
@@ -133,7 +134,7 @@ process_search_post(ReqData, State) ->
     end,
 	case wrq:get_qs_value("sort",ReqData) of
         undefined ->
-            Sort = "user_ranking";
+            Sort = "user_ranking.average";
         SortParam ->
             Sort = SortParam
     end,
@@ -145,11 +146,18 @@ process_search_post(ReqData, State) ->
     end,
     {Json,_,_} = api_help:json_handler(ReqData,State),
     FilteredJson = filter_json(Json, From, Size, Sort),
+	erlang:display(FilteredJson),
     case erlastic_search:search_json(#erls_params{},?INDEX, "stream", FilteredJson) of % Maybe wanna take more
             {error, Reason1} ->
-                    StreamSearch = {error, Reason1};
+                StreamSearch = {error, Reason1};
             {ok,List1} ->
-                    StreamSearch = lib_json:encode(List1) % May need to convert
+                case lib_json:get_field(Json, "query.filtered.query.query_string.query") of
+                    QueryString when is_binary(QueryString) ->
+                        erlastic_search:index_doc(?INDEX,"search_query","{\"search_suggest\":{\"input\":[\""++ binary_to_list(QueryString) ++"\"],\"weight\":1}}");
+                    _ ->
+                        erlang:display("No query string text")
+                end,
+                StreamSearch = lib_json:encode(List1) % May need to convert
     end,
     case erlastic_search:search_json(#erls_params{},?INDEX, "user", lib_json:rm_field(FilteredJson, "sort")) of % Maybe wanna take more
             {error, Reason2} ->
