@@ -32,15 +32,15 @@ init_test() ->
 %% Side effects: creates documents in elasticsearch
 %% @end
 process_search_post_test() ->
-        {ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/resources", [],"application/json", "{\"name\" : \"search\"}"}, [], []),
-        DocId1 = lib_json:get_field(Body1,"_id"),
-        ?assertEqual(true,lib_json:get_field(Body1,"ok")),        
-        api_help:refresh(),
-        {ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(post, {"http://localhost:8000/resources/_search", [],"application/json", "{\"query\":{\"match\":{\"name\":\"search\"}}}"}, [], []),
-        {ok, {{_Version3, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(post, {"http://localhost:8000/resources/_search", [],"application/json", "{\"query\":{\"match\":{\"name\":\"aaaaaa\"}}}"}, [], []),
-        {ok, {{_Version8, 200, _ReasonPhrase5}, _Headers5, _Body5}} = httpc:request(delete, {?WEBMACHINE_URL++"/resources/" ++ lib_json:to_string(DocId1), []}, [], []),
-        ?assertEqual(true,lib_json:get_field(Body3,"hits.total") >= 1),
-        ?assertEqual(true,lib_json:get_field(Body4,"hits.total") >= 0).   
+	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {?WEBMACHINE_URL++"/resources", [],"application/json", "{\"name\" : \"post\"}"}, [], []),
+    DocId1 = lib_json:get_field(Body1,"_id"),
+    ?assertEqual(true,lib_json:get_field(Body1,"ok")),        
+    api_help:refresh(),
+    {ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(post, {?WEBMACHINE_URL++"/resources/_search", [],"application/json", "{\"query\":{\"match_all\":{}}}"}, [], []),
+    {ok, {{_Version3, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(post, {?WEBMACHINE_URL++"/resources/_search", [],"application/json", "{\"query\":{\"match_all\":{}}}"}, [], []),
+    {ok, {{_Version8, 200, _ReasonPhrase5}, _Headers5, _Body5}} = httpc:request(delete, {?WEBMACHINE_URL++"/resources/" ++ lib_json:to_string(DocId1), []}, [], []),
+    ?assertEqual(true,lib_json:get_field(Body3,"hits.total") >= 1),
+    ?assertEqual(true,lib_json:get_field(Body4,"hits.total") >= 0).   
 
 %% @doc
 %% Function: process_post_test/0
@@ -50,11 +50,11 @@ process_search_post_test() ->
 %% Side effects: creates documents in elasticsearch
 %% @end
 process_post_test() ->
-        {ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/resources", [],"application/json", "{\"name\" : \"post\"}"}, [], []),
+        {ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {?WEBMACHINE_URL++"/resources", [],"application/json", "{\"name\" : \"post\"}"}, [], []),
         api_help:refresh(),
         ?assertEqual(true,lib_json:get_field(Body1,"ok")),        
         %Clean up after the test
-        httpc:request(delete, {"http://localhost:8000/resources/" ++ lib_json:to_string(lib_json:get_field(Body1,"_id")), []}, [], []).
+        httpc:request(delete, {?WEBMACHINE_URL++"/resources/" ++ lib_json:to_string(lib_json:get_field(Body1,"_id")), []}, [], []).
 
 %% @doc
 %% Function: delete_resource_test/0
@@ -64,8 +64,7 @@ process_post_test() ->
 %% Side effects: creates and deletes documents in elasticsearch
 %% @end
 delete_resource_test() ->
-        % Create a resource and two streams, then delete the resource and check if streams are automatically deleted
-        {ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/resources", [],"application/json", "{\"name\" : \"delete\"}"}, [], []),
+        {ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {?WEBMACHINE_URL++"/resources", [],"application/json", "{\"name\" : \"delete\"}"}, [], []),
         DocId = lib_json:get_field(Body2,"_id"),
         api_help:refresh(),
         {ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(delete, {?WEBMACHINE_URL++"/resources/" ++ lib_json:to_string(DocId), []}, [], []),
@@ -83,7 +82,7 @@ delete_resource_test() ->
 %% Side effects: creates and updatess a document in elasticsearch
 %% @end
 put_resource_test() ->
-        {ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/resources/", [],"application/json", "{\"name\" : \"put1\"}"}, [], []),
+        {ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {?WEBMACHINE_URL++"/resources/", [],"application/json", "{\"name\" : \"put1\"}"}, [], []),
         api_help:refresh(),
         DocId = lib_json:get_field(Body1,"_id"),
         {ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(put, {?WEBMACHINE_URL++"/resources/" ++ lib_json:to_string(DocId) , [],"application/json", "{\"name\" : \"put2\"}"}, [], []),
@@ -105,13 +104,13 @@ put_resource_test() ->
 %% Side effects: creates and returns documents in elasticsearch
 %% @end
 get_resource_test() ->
-    {ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/resources/", [],"application/json", "{\"name\" : \"get\"}"}, [], []),
+    {ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {?WEBMACHINE_URL++"/resources/", [],"application/json", "{\"name\" : \"get\"}"}, [], []),
     api_help:refresh(),
     DocId = lib_json:get_field(Body1,"_id"),
     {ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(get, {?WEBMACHINE_URL++"/resources/" ++ lib_json:to_string(DocId), []}, [], []),
-    {ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(get, {"http://localhost:8000/resources/_search?name=get", []}, [], []),
+    {ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(get, {?WEBMACHINE_URL++"/resources/_search?name=get", []}, [], []),
     %Get resource that doesn't exist
-    {ok, {{_Version5, 404, _ReasonPhrase5}, _Headers5, Body5}} = httpc:request(get, {"http://localhost:8000/resources/1", []}, [], []),
+    {ok, {{_Version5, 404, _ReasonPhrase5}, _Headers5, _Body5}} = httpc:request(get, {?WEBMACHINE_URL++"/resources/1", []}, [], []),
     % Tests to make sure the correct creation date is added
     ?assertEqual(<<"get">>,lib_json:get_field(Body2,"name")),
     ?assertEqual(true , lib_json:get_field(Body4,"hits.total") >= 1),
@@ -119,7 +118,7 @@ get_resource_test() ->
     httpc:request(delete, {?WEBMACHINE_URL++"/resources/" ++ lib_json:to_string(DocId), []}, [], []).
 
 
-		
+
 
 %% @doc
 %% Function: add_unsupported_field_test/0
@@ -129,11 +128,11 @@ get_resource_test() ->
 %% @end
 -spec add_unsupported_field_test() -> ok | {error, term()}.
 add_unsupported_field_test() ->
-	{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} = httpc:request(post, {"http://localhost:8000/resources", [], "application/json", "{\"name\" : \"test\"}"}, [], []),
+	{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} = httpc:request(post, {?WEBMACHINE_URL++"/resources", [], "application/json", "{\"name\" : \"test\"}"}, [], []),
 	DocId = lib_json:get_field(Body,"_id"),
 	api_help:refresh(),
-	{ok, {{_Version1, 403, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {?WEBMACHINE_URL++"/resources", [],"application/json", "{\"test\":\"asdas\",\"name\" : \"test\"}"}, [], []),
-	{ok, {{_Version2, 403, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(put, {?WEBMACHINE_URL++"/resources/" ++ lib_json:to_string(DocId), [],"application/json", "{\"test\":\"asdas\",\"name\" : \"test\"}"}, [], []),
+	{ok, {{_Version1, 403, _ReasonPhrase1}, _Headers1, _Body1}} = httpc:request(post, {?WEBMACHINE_URL++"/resources", [],"application/json", "{\"test\":\"asdas\",\"name\" : \"test\"}"}, [], []),
+	{ok, {{_Version2, 403, _ReasonPhrase2}, _Headers2, _Body2}} = httpc:request(put, {?WEBMACHINE_URL++"/resources/" ++ lib_json:to_string(DocId), [],"application/json", "{\"test\":\"asdas\",\"name\" : \"test\"}"}, [], []),
 	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, _Body3}} = httpc:request(delete, {?WEBMACHINE_URL++"/resources/" ++ lib_json:to_string(DocId), []}, [], []).
 
 

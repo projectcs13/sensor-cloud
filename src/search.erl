@@ -6,13 +6,13 @@
 %% @doc Webmachine_resource for /users
 
 -module(search).
--export([init/1, 
-				allowed_methods/2,
-				content_types_accepted/2,
-				content_types_provided/2,
-				process_post/2,
-		 		get_search/2
-		 ]).
+-export([init/1,
+		 allowed_methods/2,
+		 content_types_accepted/2,
+		 content_types_provided/2,
+		 process_post/2,
+		 get_search/2
+		]).
 
 -include("webmachine.hrl").
 -include_lib("erlastic_search.hrl").
@@ -126,45 +126,45 @@ process_post(ReqData, State) ->
 %% @end
 -spec process_search_post(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 process_search_post(ReqData, State) ->
-		erlang:display("search with json request"),
-		case wrq:get_qs_value("size",ReqData) of 
-			undefined ->
-				Size = "10";
-			SizeParam ->
-				Size = SizeParam
-		end,
+    erlang:display("search with json request"),
+    case wrq:get_qs_value("size",ReqData) of 
+        undefined ->
+            Size = "10";
+        SizeParam ->
+            Size = SizeParam
+    end,
 	case wrq:get_qs_value("sort",ReqData) of
-			undefined ->
-				Sort = "user_ranking.average";
-			SortParam ->
-				Sort = SortParam
-		end,
-		case wrq:get_qs_value("from",ReqData) of
-			undefined ->
-				From = "0";
-			FromParam ->
-				From = FromParam
-		end,
-		{Json,_,_} = api_help:json_handler(ReqData,State),
-		FilteredJson = filter_json(Json, From, Size, Sort),
-		case erlastic_search:search_json(#erls_params{},?INDEX, "stream", FilteredJson) of % Maybe wanna take more
-				{error, Reason1} ->
-						StreamSearch = {error, Reason1};
-				{ok,List1} ->
-                case lib_json:get_field(Json, "query.filtered.query.query_string.query") of
-                    QueryString when is_binary(QueryString) ->
-                        erlastic_search:index_doc(?INDEX,"search_query","{\"search_suggest\":{\"input\":[\""++ binary_to_list(QueryString) ++"\"],\"weight\":1}}");
-                    _ ->
-                        erlang:display("No query string text")
-                end,
-						StreamSearch = lib_json:encode(List1) % May need to convert
-		end,
-		case erlastic_search:search_json(#erls_params{},?INDEX, "user", lib_json:rm_field(FilteredJson, "sort")) of % Maybe wanna take more
-				{error, Reason2} ->
-						UserSearch = {error, Reason2};
-				{ok,List2} -> 
-		UserSearch = lib_json:encode(List2) % May need to convert
-		 end,
+        undefined ->
+            Sort = "user_ranking.average";
+        SortParam ->
+            Sort = SortParam
+    end,
+    case wrq:get_qs_value("from",ReqData) of
+        undefined ->
+            From = "0";
+        FromParam ->
+            From = FromParam
+    end,
+    {Json,_,_} = api_help:json_handler(ReqData,State),
+    FilteredJson = filter_json(Json, From, Size, Sort),
+    case erlastic_search:search_json(#erls_params{},?INDEX, "stream", FilteredJson) of % Maybe wanna take more
+            {error, Reason1} ->
+                StreamSearch = {error, Reason1};
+            {ok,List1} ->
+			case lib_json:get_field(FilteredJson, "query.filtered.query.query_string.query") of
+				undefined ->
+					erlang:display("No query string text");
+				QueryString ->
+					erlastic_search:index_doc(?INDEX,"search_query","{\"search_suggest\":{\"input\":[\""++ lib_json:to_string(QueryString) ++"\"],\"weight\":1}}")
+			end,
+			StreamSearch = lib_json:encode(List1) % May need to convert
+    end,
+    case erlastic_search:search_json(#erls_params{},?INDEX, "user", lib_json:rm_field(FilteredJson, "sort")) of % Maybe wanna take more
+            {error, Reason2} ->
+                    UserSearch = {error, Reason2};
+            {ok,List2} -> 
+			UserSearch = lib_json:encode(List2) % May need to convert
+     end,
 	% check search-results for error
 	case StreamSearch of
 		{error, {Body, Code}} ->

@@ -125,7 +125,7 @@ delete_resource(ReqData, State) ->
 -spec delete_data_points_with_stream_id(Id::string() | binary()) -> term().
 
 delete_data_points_with_stream_id(Id) when is_binary(Id) ->
-	{ok, {{_Version, Code, _ReasonPhrase}, _Headers, Body}} = httpc:request(delete, {"http://localhost:9200/sensorcloud/datapoint/_query?q=stream_id:" ++ binary_to_list(Id), []}, [], []),
+	{ok, {{_Version, Code, _ReasonPhrase}, _Headers, Body}} = httpc:request(delete, {?ELASTIC_SEARCH_URL++"/sensorcloud/datapoint/_query?q=stream_id:" ++ binary_to_list(Id), []}, [], []),
 	case Code of
 		200 ->
 			{ok};
@@ -133,7 +133,7 @@ delete_data_points_with_stream_id(Id) when is_binary(Id) ->
 			{error,{Code, Body}}
 	end;
 delete_data_points_with_stream_id(Id) ->
-	{ok, {{_Version, Code, _ReasonPhrase}, _Headers, Body}} = httpc:request(delete, {"http://localhost:9200/sensorcloud/datapoint/_query?q=stream_id:" ++ Id, []}, [], []),
+	{ok, {{_Version, Code, _ReasonPhrase}, _Headers, Body}} = httpc:request(delete, {?ELASTIC_SEARCH_URL++"/sensorcloud/datapoint/_query?q=stream_id:" ++ Id, []}, [], []),
 	case Code of
 		200 ->
 			{ok};

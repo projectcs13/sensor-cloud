@@ -208,7 +208,7 @@ text_autocompletion_test() ->
 %% @end
 -spec search_autocompletion_test() -> ok | {error, term()}.
 search_autocompletion_test() ->
-	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, _Body1}} = httpc:request(post, {"http://localhost:8000/_search", [],"application/json", "{\"sort\":\"subscribers\",\"query\":{\"filtered\":{\"query\":{\"query_string\":{\"query\":\"test\"}},\"filter\":{}}}}"}, [], []),
+	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, _Body1}} = httpc:request(post, {"http://localhost:8000/_search", [],"application/json", "{\"sort\":\"subscribers\",\"query\":{\"query_string\":{\"query\":\"test\"}}}"}, [], []),
 	api_help:refresh(),
 	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(get, {"http://localhost:8000/suggest/_search?query=test", []}, [], []),
 	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, _Body3}} = httpc:request(get, {"http://localhost:8000/suggest/_search?query=öäå", []}, [], []),
