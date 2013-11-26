@@ -88,7 +88,6 @@ delete_resource(ReqData, State) ->
             ErrorString = api_help:generate_error(Body, Code),
             {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
         {ok} ->
-			erlang:display("Here"),
 			Query = "{\"size\" :100,\"query\" : {\"term\" : {\"username\":\"" ++ Id ++"\"}}}",
 			case erlastic_search:search_json(#erls_params{},?INDEX, "user", Query) of
 				{error, {Code1, Body1}} -> 
