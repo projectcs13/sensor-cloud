@@ -102,7 +102,7 @@ process_post(ReqData, State) ->
 												{{halt, Code}, ReqData, State} ->
 													{{halt, Code}, ReqData, State};
 												ok ->
-													Msg = list_to_binary(FinalJson),
+													Msg = term_to_binary(FinalJson),
 													StreamExchange = list_to_binary("streams."++Id),
                                    					%% Connect
                                    					{ok, Connection} =

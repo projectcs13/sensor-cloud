@@ -185,6 +185,10 @@ process_post(ReqData, State) ->
             								{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 										{ok,List} -> 
 											%suggest:update_suggestion(UserAdded),
+											Id = lib_json:to_string(lib_json:get_field(List, "_id")),
+											spawn_link(fun() ->
+															   triggersProcess:create(Id)
+													   end),
 											{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
 									end
 			%				end
