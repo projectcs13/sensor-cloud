@@ -248,7 +248,6 @@ get_user(ReqData, State) ->
                         SizeParam ->
                             Size = list_to_integer(SizeParam)
                     end,
-					
 					Query = "{\"size\" :" ++ integer_to_list(Size) ++",\"query\" : {\"match_all\" : {}},\"filter\" : {\"bool\":{\"must_not\":{\"term\":{\"private\":\"true\"}}}}}",
 					case erlastic_search:search_json(#erls_params{},?INDEX, "user", Query) of
                         {error, {Code, Body}} -> 
@@ -284,9 +283,8 @@ get_user(ReqData, State) ->
                  {list(), tuple(), string()}.
 process_search(ReqData, State, post) ->
         {Json,_,_} = api_help:json_handler(ReqData,State),
-        {struct, JsonData} = mochijson2:decode(Json),
-		Query = api_help:transform(JsonData),
-        case erlastic_search:search_limit(?INDEX, "user", Query, 10) of
+		FinalQuery = "{\"query\" : {\"term\" : " ++ Json ++ "},\"filter\" : {\"bool\":{\"must_not\":{\"term\":{\"private\":\"true\"}}}}}",
+        case erlastic_search:search_json(#erls_params{},?INDEX, "user", FinalQuery) of
             {error, {Code, Body}} -> 
                 ErrorString = api_help:generate_error(Body, Code),
                 {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
@@ -296,7 +294,9 @@ process_search(ReqData, State, post) ->
 process_search(ReqData, State, get) ->
         TempQuery = wrq:req_qs(ReqData),
         TransformedQuery = api_help:transform(TempQuery),
-        case erlastic_search:search_limit(?INDEX, "user", TransformedQuery, 10) of
+		TermQuery = api_help:make_term_query(TransformedQuery),
+		FinalQuery = "{\"query\" : {\"term\" : " ++ TermQuery ++ "},\"filter\" : {\"bool\":{\"must_not\":{\"term\":{\"private\":\"true\"}}}}}",
+        case erlastic_search:search_json(#erls_params{},?INDEX, "user", FinalQuery) of
             {error, {Code, Body}} -> 
                 ErrorString = api_help:generate_error(Body, Code),
                 {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
