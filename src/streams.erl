@@ -307,8 +307,8 @@ put_stream(ReqData, State) ->
 			Rank = case lib_json:get_field(Json,"ranking") of 
 				undefined ->
                 	{error, {<<"{\"error\":\"Error, incorrect or no ranking specified.\"}">>, 409}};
-				Ranking when (Ranking >= 0.0) and (Ranking =< 100.0) ->
-					Ranking;
+				Ranking when is_number(Ranking) and (Ranking >= 0.0) and (Ranking =< 100.0) ->
+					float(Ranking);
 				_ ->
 					{error, {<<"{\"error\":\"Error, incorrect or no ranking specified.\"}">>, 409}}
         	end,
