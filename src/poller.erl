@@ -49,10 +49,6 @@ init(State)->
 	
 	State#state{exchange = StreamExchange, channel = ChannelOut},
 	
-	%% only for testing
-	%% erlang:display("after changing, the stream exchange is: "++binary_to_list(State#state.exchange)),
-	%% erlang:display("after changing, the outgoing channel is: "++pid_to_list(State#state.channel)),
-	
 	{ok, #state{stream_id=State#state.stream_id, uri=State#state.uri, parser=State#state.parser, exchange=StreamExchange, channel=ChannelOut}}.
 
 %% @doc

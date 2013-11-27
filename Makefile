@@ -124,7 +124,7 @@ test_poll_system: compile
 	-@mkdir test-results
 	curl -XDELETE localhost:9200/sensorcloud
 	curl -XPUT localhost:9200/sensorcloud
-	$(ERL) -pa ebin/ lib/*/ebin/ lib/*/bin/ -boot start_sasl -s reloader -s engine -sname engine -eval 'test:run(pollingSystem)'
+	$(ERL) -pa ebin/ lib/*/ebin/ lib/*/bin/ -boot start_sasl -s reloader -s engine -sname engine -eval 'test:run(polling_system)'
 
 test_search: compile
 	-@mkdir test-results

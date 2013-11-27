@@ -239,7 +239,7 @@ process_post(ReqData, State) ->
 																		[_, _]				  ->
 																								case whereis(polling_supervisor) of
 																									undefined ->
-																										pollingSystem:start_link(),
+																										polling_system:start_link(),
 																										timer:sleep(1000);
 																									_ ->
 																										continue

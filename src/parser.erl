@@ -21,7 +21,7 @@
 
 %% @doc
 %% Function: parseJson/2
-%% Purpose: used to parse the json data, unfinished and needs to be updated.
+%% Purpose: used to parse the json data.
 %% Returns: JsonData | {error, ErrMsg}
 %% Side effects: Stores the newly parsed data point in the DB
 %% @end
@@ -66,7 +66,7 @@ parseJson(Parser, Data, TimeList) ->
 						StrHour = integer_to_list(Hour),
 						StrMinutes = integer_to_list(Minutes),
 						StrSeconds = integer_to_list(Seconds),
-						list_to_binary(StrYear++":"++StrMonth++":"++StrDay++"T"++StrHour++":"++StrMinutes++":"++StrSeconds);
+						list_to_binary(StrYear++"-"++StrMonth++"-"++StrDay++"T"++StrHour++":"++StrMinutes++":"++StrSeconds);
 					_->
 						list_to_binary(make_stamp(TimeList))
 				end,
@@ -129,7 +129,7 @@ make_stamp(TimeList)->
 			end,
 	Year = lists:nth(4, TimeList),
 	Time = lists:nth(5, TimeList),
-	Year++":"++Month++":"++Day++"T"++Time.
+	Year++"-"++Month++"-"++Day++"T"++Time++".000".
 
 %% @doc
 %% Function: processParser/2

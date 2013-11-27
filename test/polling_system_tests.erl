@@ -3,13 +3,13 @@
 %% @version 1.0
 %% @copyright [Copyright information]
 %%
-%% @doc == poll_system_tests ==
+%% @doc == polling_system_tests ==
 %% This module contains tests of the polling system
 %% needed for the polling system. 
 %%
 %% @end
 
--module(pollingSystem_tests).
+-module(polling_system_tests).
 
 -include("common.hrl").
 -include("poller.hrl").
@@ -107,7 +107,7 @@ initialization_test()->
 %% @end
 -spec polling_system_test() -> atom() | tuple().
 polling_system_test()->
-	pollingSystem:start_link(),
+	polling_system:start_link(),
 	timer:sleep(1000),
 	?assertNotEqual(undefined, whereis(polling_supervisor)),
 	?assertNotEqual(undefined, whereis(polling_monitor)),

@@ -3,12 +3,12 @@
 %% @version 1.0
 %% @copyright [Copyright information]
 %%
-%% @doc == pollingSystem ==
+%% @doc == polling_system ==
 %% This module contains all functionalities needed to poll from external resources.
 %% We are going to generate one supervisor process and a few poller processes.
 %% @end
 
--module(pollingSystem).
+-module(polling_system).
 -behaviour(gen_server).
 -include("poller.hrl").
 -include("state.hrl").
