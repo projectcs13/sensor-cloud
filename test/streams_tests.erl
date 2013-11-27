@@ -267,7 +267,7 @@ ranking_stream_test() ->
 		DocId1 = lib_json:get_field(Body1,"_id"),
 		api_help:refresh(),
 
-		{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(put, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(DocId1)++ "/_rank?user_id=RandomUser&ranking=5.0",[], "application/json", "{}"}, [], []),
+		{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(put, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(DocId1)++ "/_rank",[], "application/json", "{\"user_id\":\"RandomUser\",\"ranking\":5.0}"}, [], []),
 		{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(get, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(DocId1), []}, [], []),
 
 		?assertEqual(5.0,lib_json:get_field(Body4,"user_ranking.average")),
@@ -275,21 +275,21 @@ ranking_stream_test() ->
 
 		{ok, {{_Version5, 200, _ReasonPhrase5}, _Headers5, Body5}} = httpc:request(post, {?WEBMACHINE_URL++"/users", [], "application/json", "{\"username\" : \"RandomUser2\"}"}, [], []),
 		api_help:refresh(),
-		{ok, {{_Version6, 200, _ReasonPhrase6}, _Headers6, Body6}} = httpc:request(put, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(DocId1)++ "/_rank?user_id=RandomUser2&ranking=3.0",[], "application/json", "{}"}, [], []),
+		{ok, {{_Version6, 200, _ReasonPhrase6}, _Headers6, Body6}} = httpc:request(put, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(DocId1)++ "/_rank",[], "application/json", "{\"user_id\":\"RandomUser2\",\"ranking\":3.0}"}, [], []),
 		{ok, {{_Version7, 200, _ReasonPhrase7}, _Headers7, Body7}} = httpc:request(get, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(DocId1), []}, [], []),
 
 		?assertEqual(4.0,lib_json:get_field(Body7,"user_ranking.average")),
 		?assertEqual(2,lib_json:get_field(Body7,"user_ranking.nr_rankings")),
 
-		{ok, {{_Version8, 200, _ReasonPhrase8}, _Headers8, Body8}} = httpc:request(put, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(DocId1)++ "/_rank?user_id=RandomUser&ranking=2.0",[], "application/json", "{}"}, [], []),
+		{ok, {{_Version8, 200, _ReasonPhrase8}, _Headers8, Body8}} = httpc:request(put, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(DocId1)++ "/_rank",[], "application/json", "{\"user_id\":\"RandomUser\",\"ranking\":2.0}"}, [], []),
 		{ok, {{_Version9, 200, _ReasonPhrase9}, _Headers9, Body9}} = httpc:request(get, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(DocId1), []}, [], []),
 
 		?assertEqual(2.5,lib_json:get_field(Body9,"user_ranking.average")),
 		?assertEqual(2,lib_json:get_field(Body9,"user_ranking.nr_rankings")),
 
-	    {ok, {{_Version10, 409, _ReasonPhrase10}, _Headers10, Body10}} = httpc:request(put, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(DocId1)++ "/_rank?user_id=RandomUser&ranking=112.0",[], "application/json", "{}"}, [], []),
-	    {ok, {{_Version11, 409, _ReasonPhrase11}, _Headers11, Body11}} = httpc:request(put, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(DocId1)++ "/_rank?user_id=RandomUser&ranking=-12.0",[], "application/json", "{}"}, [], []),
-	   	{ok, {{_Version12, 404, _ReasonPhrase12}, _Headers12, Body12}} = httpc:request(put, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(DocId1)++ "/_rank?user_id=aRandomUser&ranking=12.0",[], "application/json", "{}"}, [], []),
+	    {ok, {{_Version10, 409, _ReasonPhrase10}, _Headers10, Body10}} = httpc:request(put, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(DocId1)++ "/_rank",[], "application/json", "{\"user_id\":\"RandomUser\",\"ranking\":112.0}"}, [], []),
+	    {ok, {{_Version11, 409, _ReasonPhrase11}, _Headers11, Body11}} = httpc:request(put, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(DocId1)++ "/_rank",[], "application/json", "{\"user_id\":\"RandomUser\",\"ranking\":-12.0}"}, [], []),
+	   	{ok, {{_Version12, 404, _ReasonPhrase12}, _Headers12, Body12}} = httpc:request(put, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(DocId1)++ "/_rank",[], "application/json", "{\"user_id\":\"aRandomUser\",\"ranking\":12.0}"}, [], []),
 
 		{ok, {{_Version13, 200, _ReasonPhrase13}, _Headers13, _Body13}} = httpc:request(delete, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(DocId1), []}, [], []),
 		{ok, {{_Version14, 200, _ReasonPhrase14}, _Headers14, Body14}} = httpc:request(delete, {?WEBMACHINE_URL++"/users/RandomUser", []}, [], []),
