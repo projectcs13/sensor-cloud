@@ -69,19 +69,16 @@ process_post(ReqData, State) ->
 	Date = api_help:generate_timestamp([Year,Month,Day],0), % it is crashing if I add Hour, Minute, Second, check it again later
 	DateAdded = api_help:add_field(VirtualStreamJson,"creation_date",Date),
 	case erlastic_search:index_doc(?INDEX, "vstream", DateAdded) of	
-		{error, Reason} -> 
-			VirtualStreamId = "x86vOMKiSIyLd5pQXDYi8w",	% to be fixed to do a good check
+		{error, Reason} ->
 			{{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
 		{ok,List} -> 
 			VirtualStreamId = lib_json:get_field(List, "_id"),
+			StreamsInvolved = lib_json:get_field(VirtualStreamJson, "streams_involved"),
+			TimestampFrom = lib_json:get_field(VirtualStreamJson, "timestampfrom"),
+			Function = lib_json:get_field(VirtualStreamJson, "function"),
+			reduce(VirtualStreamId, StreamsInvolved, TimestampFrom, Function, ReqData, State),
 			{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
-	end,
-	%these should be in the ok case of index_doc?
-	%is the user forced to chose a starting timestamp? anyway, should be defined by the front end
-	StreamsInvolved = lib_json:get_field(VirtualStreamJson, "streams_involved"),
-	TimestampFrom = lib_json:get_field(VirtualStreamJson, "timestampfrom"),
-	Function = lib_json:get_field(VirtualStreamJson, "function"),
-	reduce(VirtualStreamId, StreamsInvolved, TimestampFrom, Function, ReqData, State)
+	end
 	.
 
 
@@ -94,28 +91,12 @@ process_post(ReqData, State) ->
 -spec reduce(VirtualStreamId::string(), Streams::string(), TimestampFrom::string(), Function::string(), ReqData::tuple(), State::string()) -> %%should change to date type instead, also add ReqData, State
 		  {true, tuple(), string()}.
 reduce(VirtualStreamId, Streams, TimestampFrom, Function, ReqData, State) ->
-	% (aggregated *) average, min, max, std deviation, count, sum of squares, variance
 	Query = create_query(Function, Streams, TimestampFrom),
-	% should also update the connection of vstream <--> streams
-	
-	
 	case erlastic_search:search_json(#erls_params{},?INDEX, "datapoint", lib_json:to_string(Query)) of
 		{error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
 		{ok,JsonStruct} ->
-			%%		check what happens if list is empty, improve with bulk posting maybe?
 			%%   	{true,wrq:set_resp_body(lib_json:encode(FinalJson),ReqData),State},
-			
-			
-			%Do we ever need to post all the data?
-			%NewDatapoints = lists:map(fun(Json) -> 
-			%							RmId = lib_json:get_field(Json, "_source"),
-			%							FinalDatapoint = lib_json:replace_field(RmId, "streamid", VirtualStreamId),
-			%						  	erlastic_search:index_doc(?INDEX, "datapoint", FinalDatapoint)
-			%						 end, DatapointsList),
-
-
-	% what do we store if we do not aggregate and thus the statistics are only a single value?
-			case string:str(Function, [<<"aggregate">>]) of %is aggregate the proper name? maybe groupby?
+			case string:str(Function, [<<"aggregate">>]) of %this might be removed if not used. It malfunctions if empty input
             	0 ->
 					{{Year,Month,Day},{Hour,Minute,Second}} = calendar:local_time(),
 					TimeStamp = api_help:generate_timestamp([Year,Month,Day,Hour,Minute,Second],0), % to be reconsidered
@@ -125,7 +106,6 @@ reduce(VirtualStreamId, Streams, TimestampFrom, Function, ReqData, State) ->
 														   {"stream_id", list_to_atom(binary_to_list(VirtualStreamId))},
 														   {"value",  lib_json:get_field(Datapoint, binary_to_list(lists:nth(1, Function)))}
 														  ]),
-					erlang:display(FinalDatapoint), %remove this
 					case erlastic_search:index_doc(?INDEX, "vsdatapoint", FinalDatapoint) of 
 						{error, Reason2} -> erlang:display("Error");
 						{ok,JsonStruct2} ->	erlang:display("Correct")						
@@ -138,7 +118,6 @@ reduce(VirtualStreamId, Streams, TimestampFrom, Function, ReqData, State) ->
 																						   {"stream_id", VirtualStreamId},
 																						   {"value",  lib_json:get_field(Json, binary_to_list(lists:nth(2, Function)))}
 																						  ]),
-													erlang:display(FinalDatapoint), %remove this
 													  erlastic_search:index_doc(?INDEX, "vsdatapoint", lib_json:to_string(FinalDatapoint)) %to add error check here
 											  end, DatapointsList)
 			
@@ -175,7 +154,6 @@ create_query(Function, Streams, TimestampFrom) ->
 	]),
 	case string:str(Function, [<<"aggregate">>]) of %is aggregate the proper name? maybe groupby?
             0 -> %	   	["min" "max" "mean" "???average???" "sum_of_squares" "variance" "std_deviation" ->
-		  				%the following are without aggregation, just statistics   .
 						%min, max etc are not added in the query yet, I will investigate if it is even possible
 				Facet =  [{"facets", "{}"},
 					  	 {"facets.statistics", "{}"},
