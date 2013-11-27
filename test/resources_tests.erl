@@ -110,12 +110,14 @@ get_resource_test() ->
     {ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(get, {?WEBMACHINE_URL++"/resources/" ++ lib_json:to_string(DocId), []}, [], []),
     {ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(get, {?WEBMACHINE_URL++"/resources/_search?name=get", []}, [], []),
     %Get resource that doesn't exist
-    {ok, {{_Version5, 404, _ReasonPhrase5}, _Headers5, Body5}} = httpc:request(get, {?WEBMACHINE_URL++"/resources/1", []}, [], []),
+    {ok, {{_Version5, 404, _ReasonPhrase5}, _Headers5, _Body5}} = httpc:request(get, {?WEBMACHINE_URL++"/resources/1", []}, [], []),
     % Tests to make sure the correct creation date is added
     ?assertEqual(<<"get">>,lib_json:get_field(Body2,"name")),
     ?assertEqual(true , lib_json:get_field(Body4,"hits.total") >= 1),
     %Clean up
     httpc:request(delete, {?WEBMACHINE_URL++"/resources/" ++ lib_json:to_string(DocId), []}, [], []).
+
+
 
 
 %% @doc
@@ -129,8 +131,8 @@ add_unsupported_field_test() ->
 	{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} = httpc:request(post, {?WEBMACHINE_URL++"/resources", [], "application/json", "{\"name\" : \"test\"}"}, [], []),
 	DocId = lib_json:get_field(Body,"_id"),
 	api_help:refresh(),
-	{ok, {{_Version1, 403, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {?WEBMACHINE_URL++"/resources", [],"application/json", "{\"test\":\"asdas\",\"name\" : \"test\"}"}, [], []),
-	{ok, {{_Version2, 403, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(put, {?WEBMACHINE_URL++"/resources/" ++ lib_json:to_string(DocId), [],"application/json", "{\"test\":\"asdas\",\"name\" : \"test\"}"}, [], []),
+	{ok, {{_Version1, 403, _ReasonPhrase1}, _Headers1, _Body1}} = httpc:request(post, {?WEBMACHINE_URL++"/resources", [],"application/json", "{\"test\":\"asdas\",\"name\" : \"test\"}"}, [], []),
+	{ok, {{_Version2, 403, _ReasonPhrase2}, _Headers2, _Body2}} = httpc:request(put, {?WEBMACHINE_URL++"/resources/" ++ lib_json:to_string(DocId), [],"application/json", "{\"test\":\"asdas\",\"name\" : \"test\"}"}, [], []),
 	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, _Body3}} = httpc:request(delete, {?WEBMACHINE_URL++"/resources/" ++ lib_json:to_string(DocId), []}, [], []).
 
 

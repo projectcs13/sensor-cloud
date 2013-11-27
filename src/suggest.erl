@@ -41,7 +41,7 @@ init([]) ->
 allowed_methods(ReqData, State) ->
 	case api_help:parse_path(wrq:path(ReqData)) of
 		[{"suggest", "_search"}] ->
-            {['GET'], ReqData, State};
+			{['GET'], ReqData, State};
 		[{"suggest", _Field} , {_Term}] ->
 			{['GET'], ReqData, State}; 
 		[{"suggest", _Term}] ->
@@ -128,19 +128,19 @@ get_suggestion(ReqData, State) ->
 			end;
 		true ->
 			case wrq:get_qs_value("query",ReqData) of
-            undefined ->
-                erlang:display("No query specified!");
-            QueryString ->
-            	SuggestJson = "{\"suggestion\":{\"text\":\""++ QueryString ++"\",\"completion\":{\"field\":\"search_suggest\",\"fuzzy\":true}}}",
-            	case erlastic_search:suggest(?INDEX, SuggestJson) of
-            		{error, {Code, Body}} -> 
-						ErrorString = api_help:generate_error(Body, Code),
-						{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-					{ok,List} ->
-						OutputJson = lib_json:set_attr("suggestions",lib_json:get_field(List, "suggestion[0].options")),
-                		{OutputJson ,ReqData ,State}
-                end
-        	end
+				undefined ->
+					erlang:display("No query specified!");
+				QueryString ->
+					SuggestJson = "{\"suggestion\":{\"text\":\""++ QueryString ++"\",\"completion\":{\"field\":\"search_suggest\",\"fuzzy\":true}}}",
+					case erlastic_search:suggest(?INDEX, SuggestJson) of
+						{error, {Code, Body}} -> 
+							ErrorString = api_help:generate_error(Body, Code),
+							{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+						{ok,List} ->
+							OutputJson = lib_json:set_attr("suggestions",lib_json:get_field(List, "suggestion[0].options")),
+							{OutputJson ,ReqData ,State}
+					end
+			end
 	end.
 
 
@@ -162,19 +162,19 @@ add_suggestion(Resource, ResourceId) ->
 		undefined ->
 			{error, no_model};
 		_ ->
-		           Suggestion = lib_json:set_attrs(
-					  [
-					   {resource_id, ResourceId},
-					   {suggest, "{}"},
-					   {"suggest.input", Model},
-					   {"suggest.output", get_timestamp()},
-					   {"suggest.payload", "{}"},
-					   {"suggest.payload.manufacturer", Manufacturer},
-					   {"suggest.payload.tags", Tags},
-					   {"suggest.payload.polling_freq", Polling_freq},
-					   {"suggest.weight", Weight}
-					  ]
-					 ),
+			Suggestion = lib_json:set_attrs(
+					[
+						{resource_id, ResourceId},
+						{suggest, "{}"},
+						{"suggest.input", Model},
+						{"suggest.output", get_timestamp()},
+						{"suggest.payload", "{}"},
+						{"suggest.payload.manufacturer", Manufacturer},
+						{"suggest.payload.tags", Tags},
+						{"suggest.payload.polling_freq", Polling_freq},
+						{"suggest.weight", Weight}
+						]
+					),
 			case erlastic_search:index_doc(?INDEX, "suggestion", Suggestion) of 
 				{error, _Reason} -> erlang:display("Suggestion not saved ");
 				{ok, _} -> 	ok
@@ -393,14 +393,14 @@ get_stream_info(Stream) ->
 	Type  = lib_json:get_field(Stream, "type"),
 	Accuracy  = lib_json:get_field(Stream, "accuracy"),
 	Weight = scoring:calc([Name, Description, Min_val, Max_val, Tags, Type, Accuracy]),
-        Result = lib_json:set_attrs([{name, Name},
-				     {description, Description},
-				     {min_value, Min_val},
-				     {max_value, Max_val},
-				     {tags, Tags},
-				     {type, Type},
-				     {accuracy, Accuracy}
-				    ]),
+	Result = lib_json:set_attrs([{name, Name},
+				{description, Description},
+				{min_value, Min_val},
+				{max_value, Max_val},
+				{tags, Tags},
+				{type, Type},
+				{accuracy, Accuracy}
+				]),
 	{Weight, Result}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

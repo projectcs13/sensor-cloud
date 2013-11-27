@@ -253,6 +253,7 @@ transform([{Field,Value}|Rest]) ->
 		_ -> Field ++ ":" ++ Value ++ "&" ++ transform(Rest)
 	end.
 
+
 %% @doc
 %% Function: transform/2
 %% Purpose: Used to create the query for search, expects more fields
@@ -270,6 +271,36 @@ transform([{Field,Value}|Rest],AddAnd) ->
 		_ -> Field ++ ":" ++ Value ++ "&" ++ transform(Rest,AddAnd)
 	end.
 
+
+%% @doc
+%% Function: make_term_query/1
+%% Purpose: Used to create a term query from the given query string
+%%          assumes that the query string is in the key:value&key:value ...
+%%          format
+%% Returns: The string the gives the term query
+%% @end
+-spec make_term_query(QueryString::string()) -> list().
+make_term_query(String) ->
+	"{\"" ++ make_inner_term_query(String) ++ "\"}".
+
+%% @doc
+%% Function: make_inner_term_query/1
+%% Purpose: Used to create the inner part of the
+%%          term query json.
+%% Returns: The string the gives the inner part of the term query
+%% @end
+-spec make_inner_term_query(QueryString::string()) -> list().
+make_inner_term_query([]) ->
+	[];
+make_inner_term_query([First|Rest]) ->
+	case First of
+		$: ->
+			"\":\"" ++ make_inner_term_query(Rest);
+		$& ->
+			"\",\"" ++ make_inner_term_query(Rest);
+		_ ->
+			[First|make_inner_term_query(Rest)]
+	end.
 
 %% @doc
 %% Function: update_doc/4

@@ -13,6 +13,7 @@
 -module(parser).
 -include("parser.hrl").
 -include("common.hrl").
+-include("pubsub.hrl").
 
 %% ====================================================================
 %% API functions
@@ -59,14 +60,15 @@ parseJson(Parser, Data, TimeList) ->
 	end,
 	TimeStamp = case TimeList of
 					[] ->
-						{{Year, Month, Day}, {Hour, Minutes, Seconds}} = calendar:now_to_universal_time(os:timestamp()),
-						StrYear = integer_to_list(Year),
-						StrMonth = integer_to_list(Month),
-						StrDay = integer_to_list(Day),
-						StrHour = integer_to_list(Hour),
-						StrMinutes = integer_to_list(Minutes),
-						StrSeconds = integer_to_list(Seconds),
-						list_to_binary(StrYear++"-"++StrMonth++"-"++StrDay++"T"++StrHour++":"++StrMinutes++":"++StrSeconds);
+						% {{Year, Month, Day}, {Hour, Minutes, Seconds}} = calendar:now_to_universal_time(os:timestamp()),
+						% StrYear = integer_to_list(Year),
+						% StrMonth = integer_to_list(Month),
+						% StrDay = integer_to_list(Day),
+						% StrHour = integer_to_list(Hour),
+						% StrMinutes = integer_to_list(Minutes),
+						% StrSeconds = integer_to_list(Seconds),
+						% list_to_binary(StrYear++"-"++StrMonth++"-"++StrDay++"T"++StrHour++":"++StrMinutes++":"++StrSeconds);
+						list_to_binary(?TIME_NOW(erlang:localtime()));
 					_->
 						list_to_binary(make_stamp(TimeList))
 				end,

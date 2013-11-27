@@ -88,12 +88,20 @@ delete_resource(ReqData, State) ->
             ErrorString = api_help:generate_error(Body, Code),
             {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
         {ok} ->
-            case erlastic_search:delete_doc(?INDEX,"user", Id) of
-                {error, {Code, Body}} -> 
-                    ErrorString = api_help:generate_error(Body, Code),
-                    {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-                {ok,List} -> 
-                    {true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
+			Query = "{\"size\" :100,\"query\" : {\"term\" : {\"username\":\"" ++ Id ++"\"}}}",
+			case erlastic_search:search_json(#erls_params{},?INDEX, "user", Query) of
+				{error, {Code1, Body1}} -> 
+					ErrorString1 = api_help:generate_error(Body1, Code1),
+					{{halt, Code1}, wrq:set_resp_body(ErrorString1, ReqData), State};
+				{ok, Json} ->
+					ESId = lib_json:to_string(lib_json:get_field(Json, "hits.hits[0]._id")),
+					case erlastic_search:delete_doc(?INDEX,"user", ESId) of
+						{error, {Code, Body}} -> 
+							ErrorString = api_help:generate_error(Body, Code),
+							{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+						{ok,List} ->
+							{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
+					end
             end
     end.
 
@@ -195,22 +203,30 @@ put_user(ReqData, State) ->
     Id = id_from_path(ReqData),
 	{UserJson,_,_} = api_help:json_handler(ReqData, State),
     %check if doc already exists
-	case api_help:do_only_fields_exist(UserJson,?ACCEPTEDFIELDSUSERS) of
-		false ->
+	case {api_help:do_any_field_exist(UserJson,?RESTRCITEDUPDATEUSERS),api_help:do_only_fields_exist(UserJson,?ACCEPTEDFIELDSUSERS)} of
+		{true,_} ->
+			ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDUPDATEUSERS),
+			ResFields2 = string:sub_string(ResFields1, 1, length(ResFields1)-2),
+			{{halt,409}, wrq:set_resp_body("{\"error\":\"Error caused by restricted field in document, these fields are restricted : " ++ ResFields2 ++"\"}", ReqData), State};
+		{false,false} ->
 			{{halt,403}, wrq:set_resp_body("Unsupported field(s)", ReqData), State};
-		true ->
-			case erlastic_search:get_doc(?INDEX, "user", Id) of
+		{false,true} ->
+			Query = "{\"size\" :100,\"query\" : {\"term\" : {\"username\":\"" ++ Id ++"\"}}}",
+			case erlastic_search:search_json(#erls_params{},?INDEX, "user", Query) of
 				{error, {Code, Body}} -> 
 					ErrorString = api_help:generate_error(Body, Code),
 					{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 				{ok, List} ->
-            		case erlastic_search:index_doc_with_id(?INDEX, "user", Id, UserJson) of
-                		{error, {Code, Body}} -> 
-                    		ErrorString = api_help:generate_error(Body, Code),
-                    		{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-                		{ok, Json} ->
-		            		{true, wrq:set_resp_body(lib_json:encode(Json), ReqData), State}
-            		end
+					ESId = lib_json:to_string(lib_json:get_field(List, "hits.hits[0]._id")),
+					Update = api_help:create_update(UserJson),
+					case api_help:update_doc(?INDEX, "user", ESId, Update) of
+						{error, {Code, Body}} -> 
+							ErrorString = api_help:generate_error(Body, Code),
+							{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+						{ok, Json} ->
+							{true, wrq:set_resp_body(lib_json:encode(Json), ReqData), State}
+					end
+							
     		end
 	end.
 
@@ -228,16 +244,31 @@ put_user(ReqData, State) ->
 process_post(ReqData, State) ->
     case api_help:is_search(ReqData) of
         false ->
-            {UserJson,_,_} = api_help:json_handler(ReqData, State),
-			case api_help:do_only_fields_exist(UserJson,?ACCEPTEDFIELDSUSERS) of
-				false ->
+			{UserJson,_,_} = api_help:json_handler(ReqData, State),
+			UserName = lib_json:get_field(UserJson, "username"),
+			Query = "{\"size\" :100,\"query\" : {\"term\" : {\"username\":\"" ++ lib_json:to_string(UserName) ++"\"}}}", 
+			UserNameUnique = case erlastic_search:search_json(#erls_params{},?INDEX, "user", Query) of
+								 {error, {Code, Body}} -> 
+									 {Code,Body};
+								 {ok, Json} ->
+							   		lib_json:get_field(Json, "hits.total") == 0
+							 end,
+			case {api_help:do_only_fields_exist(UserJson,?ACCEPTEDFIELDSUSERS),UserNameUnique,UserName =/= undefined} of
+		  		{_,_,false} ->
+			  		{{halt,403}, wrq:set_resp_body("Username missing", ReqData), State};
+				{false,_,_} ->
 					{{halt,403}, wrq:set_resp_body("Unsupported field(s)", ReqData), State};
-				true ->
+				{true,false,_} ->
+					{{halt,409}, wrq:set_resp_body("Non unique username given", ReqData), State};
+				{true,{Code1,Body1},_} ->
+					ErrorString1 = api_help:generate_error(Body1, Code1),
+		            {{halt, Code1}, wrq:set_resp_body(ErrorString1, ReqData), State};
+				{true,true,_} ->
                     FieldsAdded = add_server_side_fields(UserJson),
 					case erlastic_search:index_doc(?INDEX, "user", FieldsAdded) of
-						{error, {Code, Body}} -> 
-							ErrorString = api_help:generate_error(Body, Code),
-                    		{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+						{error, {Code2, Body2}} -> 
+							ErrorString2 = api_help:generate_error(Body2, Code2),
+                    		{{halt, Code2}, wrq:set_resp_body(ErrorString2, ReqData), State};
                 		{ok,List} -> 
                     		{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
 					end
@@ -265,7 +296,6 @@ get_user(ReqData, State) ->
                         SizeParam ->
                             Size = list_to_integer(SizeParam)
                     end,
-					
 					Query = "{\"size\" :" ++ integer_to_list(Size) ++",\"query\" : {\"match_all\" : {}},\"filter\" : {\"bool\":{\"must_not\":{\"term\":{\"private\":\"true\"}}}}}",
 					case erlastic_search:search_json(#erls_params{},?INDEX, "user", Query) of
                         {error, {Code, Body}} -> 
@@ -277,14 +307,22 @@ get_user(ReqData, State) ->
                     end;
                 Id ->
 				    %% Get specific user
-                    case erlastic_search:get_doc(?INDEX, "user", Id) of
-                        {error, {Code, Body}} -> 
-                            ErrorString = api_help:generate_error(Body, Code),
+					Query = "{\"size\" :100,\"query\" : {\"term\" : {\"username\":\"" ++ Id ++"\"}}}",
+					case erlastic_search:search_json(#erls_params{},?INDEX, "user", Query) of 
+						{error, {Code, Body}} -> 
+							ErrorString = api_help:generate_error(Body, Code),
                             {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-                        {ok,JsonStruct} ->
-                            FinalJson = lib_json:get_and_add_id(JsonStruct),
-                            {FinalJson, ReqData, State} 
-                    end
+						{ok, Json} ->
+							ESId = lib_json:get_field(Json, "hits.hits[0]._id"),
+							case erlastic_search:get_doc(?INDEX, "user", ESId) of
+								{error, {Code1, Body1}} -> 
+									ErrorString1 = api_help:generate_error(Body1, Code1),
+									{{halt, Code1}, wrq:set_resp_body(ErrorString1, ReqData), State};
+								{ok,JsonStruct} ->
+									FinalJson = lib_json:get_and_add_id(JsonStruct),
+									{FinalJson, ReqData, State} 
+							end
+					end
             end;
         true ->                        
             process_search(ReqData,State, get)                        
@@ -301,9 +339,8 @@ get_user(ReqData, State) ->
                  {list(), tuple(), string()}.
 process_search(ReqData, State, post) ->
         {Json,_,_} = api_help:json_handler(ReqData,State),
-        {struct, JsonData} = mochijson2:decode(Json),
-		Query = api_help:transform(JsonData),
-        case erlastic_search:search_limit(?INDEX, "user", Query, 10) of
+		FinalQuery = "{\"query\" : {\"term\" : " ++ Json ++ "},\"filter\" : {\"bool\":{\"must_not\":{\"term\":{\"private\":\"true\"}}}}}",
+        case erlastic_search:search_json(#erls_params{},?INDEX, "user", FinalQuery) of
             {error, {Code, Body}} -> 
                 ErrorString = api_help:generate_error(Body, Code),
                 {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
@@ -313,7 +350,9 @@ process_search(ReqData, State, post) ->
 process_search(ReqData, State, get) ->
         TempQuery = wrq:req_qs(ReqData),
         TransformedQuery = api_help:transform(TempQuery),
-        case erlastic_search:search_limit(?INDEX, "user", TransformedQuery, 10) of
+		TermQuery = api_help:make_term_query(TransformedQuery),
+		FinalQuery = "{\"query\" : {\"term\" : " ++ TermQuery ++ "},\"filter\" : {\"bool\":{\"must_not\":{\"term\":{\"private\":\"true\"}}}}}",
+        case erlastic_search:search_json(#erls_params{},?INDEX, "user", FinalQuery) of
             {error, {Code, Body}} -> 
                 ErrorString = api_help:generate_error(Body, Code),
                 {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
