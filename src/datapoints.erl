@@ -113,6 +113,8 @@ process_post(ReqData, State) ->
                                     				amqp_channel:call(Channel, #'exchange.declare'{exchange = StreamExchange, type = <<"fanout">>}),        
                                     				%% Send
                                    					amqp_channel:cast(Channel, #'basic.publish'{exchange = StreamExchange}, #amqp_msg{payload = Msg}),
+                                   					ok = amqp_channel:close(Channel),
+							                       	ok = amqp_connection:close(Connection),
 													{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
 											end
 							 		end
