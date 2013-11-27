@@ -6,12 +6,13 @@
 %% @doc Webmachine_resource for /users
 
 -module(search).
--export([init/1, 
-                allowed_methods/2,
-                content_types_accepted/2,
-                content_types_provided/2,
-                 process_post/2,
-                 get_search/2]).
+-export([init/1,
+		 allowed_methods/2,
+		 content_types_accepted/2,
+		 content_types_provided/2,
+		 process_post/2,
+		 get_search/2
+		]).
 
 -include("webmachine.hrl").
 -include_lib("erlastic_search.hrl").
@@ -38,15 +39,14 @@ init([]) ->
 %% @end
 -spec allowed_methods(ReqData::tuple(), State::string()) -> {list(), tuple(), string()}.
 allowed_methods(ReqData, State) ->
-        case api_help:parse_path(wrq:path(ReqData)) of                
-                [{"_search"}] ->
-                        {['POST','GET'], ReqData, State};
+		case api_help:parse_path(wrq:path(ReqData)) of                
+				[{"_search"}] ->
+						{['POST','GET'], ReqData, State};
                 [{"_history"}] ->
                         {['POST','GET'], ReqData, State};
-                [error] ->
-                        {['POST','GET'], ReqData, State}
-        end.
-
+				[error] ->
+						{['POST','GET'], ReqData, State}
+		end.
 
 
 
@@ -147,7 +147,6 @@ process_search_post(ReqData, State) ->
     end,
     {Json,_,_} = api_help:json_handler(ReqData,State),
     FilteredJson = filter_json(Json, From, Size, Sort),
-	erlang:display(lib_json:to_string(FilteredJson)),
     case erlastic_search:search_json(#erls_params{},?INDEX, "stream", FilteredJson) of % Maybe wanna take more
             {error, Reason1} ->
                 StreamSearch = {error, Reason1};

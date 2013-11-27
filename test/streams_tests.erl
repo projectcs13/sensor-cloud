@@ -129,6 +129,8 @@ put_stream_test() ->
 	?assertEqual(true,lib_json:get_field(Body7,"_id") == DocId1),
 	?assertEqual(true,lib_json:get_field(Body8,"_id") == DocId2),
 	?assertEqual(true,string:str(Body10,"not found") =/= 0).
+
+
 %% @doc
 %% Function: delete_stream_test/0
 %% Purpose: Test the delete_stream function by doing some HTTP requests

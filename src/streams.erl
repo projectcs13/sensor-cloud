@@ -424,7 +424,7 @@ get_stream(ReqData, State) ->
             				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 					    {ok,JsonStruct} ->
 						    FinalJson = lib_json:get_list_and_add_id(JsonStruct, streams),
-						    {FinalJson, ReqData, State} 
+						    {FinalJson, ReqData, State}
 					end;
 				StreamId ->
 				% Get specific stream
