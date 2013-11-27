@@ -83,6 +83,9 @@ process_search_post_test() ->
 -spec get_stream_test() -> ok | {error, term()}.
 
 get_stream_test() ->
+	{timeout, 30, fun get_stream/0}.
+	
+get_stream() ->
 	{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} = httpc:request(post, {?WEBMACHINE_URL++"/users", [],"application/json", "{\"username\" : \"search\"}"}, [], []),
 	UserId = lib_json:get_field(Body,"_id"),
 	api_help:refresh(),
@@ -96,8 +99,10 @@ get_stream_test() ->
 	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(get, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(DocId1), []}, [], []),
 	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(get, {?WEBMACHINE_URL++"/users/" ++ lib_json:to_string(UserId) ++ "/streams", []}, [], []),
 	{ok, {{_Version6, 200, _ReasonPhrase6}, _Headers6, Body6}} = httpc:request(post, {?WEBMACHINE_URL++"/streams/_search",[],"application/json", "{\"query\":{\"term\" : { \"name\" : \"get\" }}}"}, [], []),
+	api_help:refresh(),
 	% Test get for missing index
 	{ok, {{_Version7, 404, _ReasonPhrase7}, _Headers7, Body7}} = httpc:request(get, {?WEBMACHINE_URL++"/streams/1", []}, [], []),
+	api_help:refresh(),
 	% Test delete
 	{ok, {{_Version8, 200, _ReasonPhrase8}, _Headers8, Body8}} = httpc:request(delete, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(DocId1), []}, [], []),
 	{ok, {{_Version9, 200, _ReasonPhrase9}, _Headers9, Body9}} = httpc:request(delete, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(DocId2), []}, [], []),
@@ -105,13 +110,13 @@ get_stream_test() ->
 	{{Year,Month,Day},_} = calendar:local_time(),
 	Date = generate_date([Year,Month,Day]),
 	% Tests to make sure the correct creation date is added
-	?assertEqual(true,lib_json:get_field(Body3,"creation_date") == list_to_binary(Date)),
-	?assertEqual(<<"get">>,lib_json:get_field(Body3,"name")),
-	?assertEqual(true,lib_json:get_field(Body3,"private") == <<"false">>),
-	?assertEqual(true,lib_json:field_value_exists(Body4,"streams[*].name", <<"get">>)),
-	?assertEqual(true,lib_json:get_field(Body6,"hits.total") >= 2), % Needed in case unempty elasticsearch
-	?assertEqual(true,lib_json:get_field(Body8,"_id") == DocId1),
-	?assertEqual(true,lib_json:get_field(Body9,"_id") == DocId2).
+	[?_assertEqual(true,lib_json:get_field(Body3,"creation_date") == list_to_binary(Date)),
+	?_assertEqual(<<"get">>,lib_json:get_field(Body3,"name")),
+	?_assertEqual(true,lib_json:get_field(Body3,"private") == <<"false">>),
+	?_assertEqual(true,lib_json:field_value_exists(Body4,"streams[*].name", <<"get">>)),
+	?_assertEqual(true,lib_json:get_field(Body6,"hits.total") >= 2), % Needed in case unempty elasticsearch
+	?_assertEqual(true,lib_json:get_field(Body8,"_id") == DocId1),
+	?_assertEqual(true,lib_json:get_field(Body9,"_id") == DocId2)].
 
 %% @doc
 %% Function: get_stream_test/0
@@ -360,6 +365,9 @@ add_unsupported_field_test() ->
 %% @end
 -spec dont_get_private_streams_test() -> ok | {error, term()}.
 dont_get_private_streams_test() ->
+	{timeout, 30, fun dont_get_private_streams/0}.
+
+dont_get_private_streams()->
 	{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} = httpc:request(post, {"http://localhost:8000/users", [], "application/json", "{\"username\":\"test\"}"}, [], []),
 	UserId = lib_json:get_field(Body,"_id"),
 	api_help:refresh(),
@@ -370,8 +378,8 @@ dont_get_private_streams_test() ->
 	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(get, {"http://localhost:8000/users/" ++ lib_json:to_string(UserId) ++ "/streams", []}, [], []),
 	{ok, {{_Version5, 200, _ReasonPhrase5}, _Headers5, _Body5}} = httpc:request(delete, {"http://localhost:8000/users/" ++ lib_json:to_string(UserId), []}, [], []),
 	
-	?assertEqual(true,lib_json:field_value_exists(Body3,"streams[*].private", <<"false">>)),
-	?assertEqual(true,lib_json:field_value_exists(Body4,"streams[*].private", <<"true">>)).
+	[?_assertEqual(true,lib_json:field_value_exists(Body3,"streams[*].private", <<"false">>)),
+	?_assertEqual(true,lib_json:field_value_exists(Body4,"streams[*].private", <<"true">>))].
 
 
 %% @doc
@@ -381,6 +389,9 @@ dont_get_private_streams_test() ->
 %% @end
 -spec delete_streams_for_a_user_test() -> ok | {error, term()}.
 delete_streams_for_a_user_test() ->
+	{timeout, 30, fun delete_streams_for_a_user/0}.
+
+delete_streams_for_a_user()->
 	{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} = httpc:request(post, {"http://localhost:8000/users", [], "application/json", "{\"username\":\"test\"}"}, [], []),
 	UserId = lib_json:get_field(Body,"_id"),
 	api_help:refresh(),
@@ -394,9 +405,9 @@ delete_streams_for_a_user_test() ->
 	{ok, {{_Version6, 200, _ReasonPhrase6}, _Headers6, _Body6}} = httpc:request(delete, {"http://localhost:8000/users/" ++ lib_json:to_string(UserId), []}, [], []),
 	
 	
-	?assertEqual(true,lib_json:field_value_exists(Body3,"streams[*].name", <<"Private">>)),
-	?assertEqual(true,lib_json:field_value_exists(Body3,"streams[*].name", <<"Public">>)),
-	?assertEqual("{\"streams\":[]}",Body5).
+	[?_assertEqual(true,lib_json:field_value_exists(Body3,"streams[*].name", <<"Private">>)),
+	?_assertEqual(true,lib_json:field_value_exists(Body3,"streams[*].name", <<"Public">>)),
+	?_assertEqual("{\"streams\":[]}",Body5)].
 
 %% @doc
 %% Function: post_stream_with_parser_test/0
@@ -474,6 +485,7 @@ put_stream_with_parser_test()->
 %% Purpose: Test if the engine could succeed connecting to the polling system
 %% Returns: ok | {error, term()}
 %% @end
+-spec connect_engine_polling_test() -> ok | {error, term()}.
 connect_engine_polling_test()->
 	{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} = httpc:request(post, {"http://localhost:8000/users", [], "application/json", "{\"username\":\"lihao\"}"}, [], []),
 	UserId = lib_json:get_field(Body,"_id"),

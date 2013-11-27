@@ -26,8 +26,7 @@ start_link() ->
     application:set_env(webmachine, webmachine_logger_module, 
                         webmachine_logger),
     ensure_started(webmachine),
-    engine_sup:start_link(),
-	pollingSystem:start_link().
+    engine_sup:start_link().
 
 %% @spec start() -> ok
 %% @doc Start the engine server.
@@ -39,8 +38,7 @@ start() ->
                         webmachine_logger),
     ensure_started(webmachine),
     analyse:start(),    % possibly temporary solution for ericsson demo
-    application:start(engine),
-	pollingSystem:start_link().
+    application:start(engine).
 
 %% @spec stop() -> ok
 %% @doc Stop the engine server
