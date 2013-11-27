@@ -147,6 +147,28 @@ dont_list_private_users_test() ->
 	?assertEqual(false, lib_json:field_value_exists(Body2, "suggestions[*].private",<<"true">>)).
 
 %% @doc
+%% Function: dont_list_private_users_test/0
+%% Purpose: Test that users with private set to true will not be shown on listing
+%% Returns: ok | {error, term()}
+%%
+%% Side effects: creates and deletes documents in elasticsearch
+%% @end
+-spec dont_search_private_users_test() -> ok | {error, term()}.
+dont_search_private_users_test() ->
+	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/users", [],"application/json", "{\"username\" : \"test_search\",\"private\":\"true\"}"}, [], []),
+	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {"http://localhost:8000/users", [],"application/json", "{\"username\" : \"test_search\",\"private\":\"false\"}"}, [], []),
+	DocId1 = lib_json:get_field(Body1,"_id"),
+	DocId2 = lib_json:get_field(Body2,"_id"),
+	api_help:refresh(),
+	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(post, {"http://localhost:8000/users", [],"application/json", "{\"username\" : \"test_search\"}"}, [], []),
+	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(get, {"http://localhost:8000/users/_search?username=test_search", []}, [], []),
+	{ok, {{_Version5, 200, _ReasonPhrase5}, _Headers5, Body5}} = httpc:request(delete, {"http://localhost:8000/users/" ++ lib_json:to_string(DocId1), []}, [], []),
+	{ok, {{_Version6, 200, _ReasonPhrase6}, _Headers6, Body6}} = httpc:request(delete, {"http://localhost:8000/users/" ++ lib_json:to_string(DocId2), []}, [], []),
+	
+	?assertEqual(false, lib_json:field_value_exists(Body3, "hits.hits[*]._source.private",<<"true">>)),
+	?assertEqual(false, lib_json:field_value_exists(Body4, "hits.hits[*]._source.private",<<"true">>)).
+
+%% @doc
 %% Function: delete_user_test/0
 %% Purpose: Test the delete_resource function by doing some HTTP requests
 %% Returns: ok | {error, term()}
