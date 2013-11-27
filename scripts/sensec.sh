@@ -2,17 +2,13 @@
 dir=`dirname $0`
 #Specify project home directory.
 HOME_PATH=`cd  $dir;cd ..;pwd`
-LOG_DIR=$HOME_PATH/priv/logs
-LOG_JS_DIR=$LOG_DIR
+LOG_DIR=priv/logs
+LOG_JS_DIR=priv/logs
 
 echo "$HOME_PATH"
 #Check if user has root access
 if [ "$USER" = "root" ]; then
 	if [ "$1" = "start" ]; then	
-		if [ ! -d "$HOME_PATH/javascripts/node_modules" ]; then
-			echo "installing npm libs"
-			(cd $HOME_PATH/javascripts; npm install socket.io; npm install rabbit.js)
-		fi
 		echo "Starting up RabbitMQ-Server"
 		$HOME_PATH/lib/rabbitmq-server/scripts/rabbitmq-server &
 		echo "Starting up ElasticSearch"
