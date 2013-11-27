@@ -9,7 +9,7 @@
 
 -module(virtual_streams).
 -export([init/1, allowed_methods/2, content_types_provided/2,
-		 process_post/2]).
+		 process_post/2, process_search/3]).
 
 -include_lib("erlastic_search.hrl").
 -include("webmachine.hrl").
@@ -37,8 +37,8 @@ allowed_methods(ReqData, State) ->
 			{['POST'], ReqData, State}; 
 		[{"vstreams", _Id}] -> %to be removed?
 			{['POST'], ReqData, State};
-		[{"vstreams", _Id}, {"data"}] -> %do we need this?
-			{['POST', 'DELETE'], ReqData, State};
+		[{"vstreams", "_search"}] ->
+			{['POST', 'GET'], ReqData, State};
 		[error] ->
 			{[], ReqData, State}
 	end.
@@ -64,20 +64,25 @@ content_types_provided(ReqData, State) ->
 %% @end
 -spec process_post(ReqData::tuple(), State::string()) -> {true, tuple(), string()}.
 process_post(ReqData, State) ->
-	{VirtualStreamJson,_,_} = api_help:json_handler(ReqData, State),
-	{{Year,Month,Day},{Hour,Minute,Second}} = calendar:local_time(),
-	Date = api_help:generate_timestamp([Year,Month,Day],0), % it is crashing if I add Hour, Minute, Second, check it again later
-	DateAdded = api_help:add_field(VirtualStreamJson,"creation_date",Date),
-	case erlastic_search:index_doc(?INDEX, "vstream", DateAdded) of	
-		{error, Reason} ->
-			{{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
-		{ok,List} -> 
-			VirtualStreamId = lib_json:get_field(List, "_id"),
-			StreamsInvolved = lib_json:get_field(VirtualStreamJson, "streams_involved"),
-			TimestampFrom = lib_json:get_field(VirtualStreamJson, "timestampfrom"),
-			Function = lib_json:get_field(VirtualStreamJson, "function"),
-			reduce(VirtualStreamId, StreamsInvolved, TimestampFrom, Function, ReqData, State),
-			{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
+	case api_help:is_search(ReqData) of
+		false ->
+			{VirtualStreamJson,_,_} = api_help:json_handler(ReqData, State),
+			{{Year,Month,Day},{Hour,Minute,Second}} = calendar:local_time(),
+			Date = api_help:generate_timestamp([Year,Month,Day],0), % it is crashing if I add Hour, Minute, Second, check it again later
+			DateAdded = api_help:add_field(VirtualStreamJson,"creation_date",Date),
+			case erlastic_search:index_doc(?INDEX, "vstream", DateAdded) of	
+				{error, Reason} ->
+					{{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
+				{ok,List} -> 
+					VirtualStreamId = lib_json:get_field(List, "_id"),
+					StreamsInvolved = lib_json:get_field(VirtualStreamJson, "streams_involved"),
+					TimestampFrom = lib_json:get_field(VirtualStreamJson, "timestampfrom"),
+					Function = lib_json:get_field(VirtualStreamJson, "function"),
+					reduce(VirtualStreamId, StreamsInvolved, TimestampFrom, Function, ReqData, State),
+					{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
+			end;
+		true ->
+			process_search(ReqData, State, post)
 	end
 	.
 
@@ -173,6 +178,30 @@ create_query(Function, Streams, TimestampFrom) ->
 	end,
 	lib_json:add_values(Query, Facet)
 .
+
+%% @doc
+%% Function: process_search/3
+%% Purpose: Used to handle search requests on vstreams that come from POST requests
+%% Returns: {true, ReqData, State} || {{error, Reason}, ReqData, State}
+%% @end
+-spec process_search(ReqData::tuple(), State::string(), term()) ->
+		{list(), tuple(), string()}.
+process_search(ReqData, State, post) ->
+	{Json,_,_} = api_help:json_handler(ReqData,State),
+	
+	erlang:display(Json),
+	case erlastic_search:search_json(#erls_params{},?INDEX, "vstream", Json) of
+			{error, {Code, Body}} -> 
+				erlang:display("ERROR!"),
+				ErrorString = api_help:generate_error(Body, Code),
+				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+			{ok,JsonStruct} ->
+				erlang:display(lib_json:to_string(JsonStruct)),
+				FinalJson = lib_json:get_list_and_add_id(JsonStruct),
+				{true,wrq:set_resp_body(lib_json:encode(FinalJson),ReqData),State}
+	end.
+
+
 
 %% @doc
 %% Function: msToDate/3
