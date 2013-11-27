@@ -97,6 +97,7 @@ loop(StreamId, ChannelInData, ChannelInCommand,Triggers) ->
 			Msg = binary_to_term(Body),
 			case erlson:is_json_string(Msg) of
 				true ->
+					run_triggers(Msg,Triggers),
 					% Here it should run the trigger functions
 					NewTriggers = Triggers,
 					erlang:display("Data: " ++ Msg);
@@ -130,7 +131,19 @@ handle_command({remove,Username,Func},[{Func,Users}|Rest]) ->
 handle_command(Command,[First|Rest]) ->
 	[First|handle_command(Command,Rest)].
 
-
+run_triggers(DataPoint,[]) ->
+	ok;
+run_triggers(DataPoint,[{Func,Users}|Rest]) ->
+	Library = triggers_lib,
+	Function = list_to_atom(Func),
+	case Library:Function(DataPoint) of
+		true ->
+			erlang:display("Trigger: "),
+			erlang:display(Users);
+		false ->
+			erlang:display("No trigger")
+	end,
+	run_triggers(DataPoint,Rest).
 
 
 %% @doc
