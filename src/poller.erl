@@ -23,9 +23,10 @@
 %% @doc
 %% Function: start_link/1
 %% Purpose: start function used to start the poller, will call init/1 function later
+%% Parameter: State--type of state record(), define the necessary information of the poller.
 %% Returns: {ok, Pid} | {error, ErrMsg}
 %% @end
--spec start_link(tuple()) -> tuple() | atom().
+-spec start_link(State :: record()) -> {ok, pid()} | {error, term()}.
 start_link(State)->
 	gen_server:start_link(?MODULE, State, []).
 
@@ -33,9 +34,9 @@ start_link(State)->
 %% Function: init/1
 %% Purpose: init function used to initialize this poller gen_server.
 %% Returns: {ok, State}
-%% Side Effects: start inets and start the ssl
+%% Side Effects: start inets and start the ssl, declare a new RabbitMQ exchange
 %% @end
--spec init(tuple()) -> tuple().
+-spec init(State :: record()) -> {ok, record()}.
 init(State)->
 	application:start(inets),
 	ssl:start(),
@@ -47,22 +48,21 @@ init(State)->
 	{ok, ChannelOut} = amqp_connection:open_channel(Connection),
 	amqp_channel:call(ChannelOut, #'exchange.declare'{exchange = StreamExchange, type = <<"fanout">>}),
 	
-	State#state{exchange = StreamExchange, channel = ChannelOut},
-	
 	{ok, #state{stream_id=State#state.stream_id, uri=State#state.uri, parser=State#state.parser, exchange=StreamExchange, channel=ChannelOut}}.
 
 %% @doc
 %% Function: handle_call/2
 %% Purpose: handle synchronous call of gen_server, could be called via: gen_server:call(pid(), {rebuild})
+%% Parameter: Request   -- the request provided by gen_server:call() or gen_server:multi_call()
+%%            _Form     -- the tuple {Pid, Tag}, in which the Pid is the pid of the cliend, and the Tag is a unique tag
+%%            State     -- the current state of the gen_server, which may contain some status information.
 %% Returns: {reply, (returned message), (new state of gen_server)}
+%%          (returned message) could be any thing you want to return to the client.
 %% @end
--spec handle_call(any(), tuple(), tuple()) -> {reply, any(), tuple()}.
+-spec handle_call(Request :: tuple(), _Form :: tuple(), State :: record()) -> {reply, any(), record()}.
 handle_call({rebuild}, _Form, State)->
 	StreamId = State#state.stream_id,
 	Url = State#state.uri,
-	%%to rebuild the poller 
-	%%extract the uri from the datastore according to stream id
-	%%get the paser from the datastore
 
 	case erlastic_search:get_doc(?ES_INDEX, "stream", StreamId) of 
 		{error,Reason} -> 
@@ -97,9 +97,11 @@ handle_call({check_info}, _Form, State)->
 %% @doc
 %% Function: handle_info/2
 %% Purpose: handle messages processing of the gen_server, could be called via: pid()!{probe}
+%% Parameter: Request -- the message sent from the client
+%%            State   -- contains some status information of the gen_server
 %% Returns: {noreply, NewState}
 %% @end
--spec handle_info(any(), tuple()) -> {noreply, tuple()}.
+-spec handle_info(Request :: any(), State :: tuple()) -> {noreply, record()}.
 handle_info({probe}, State)->
 	StreamId = State#state.stream_id,
 	Parser = State#state.parser,
@@ -112,7 +114,7 @@ handle_info({probe}, State)->
 		{ok, {{HttpVer, Code, Msg}, Headers, Body}}->
 			case Code==200 of
 				true->
-					
+					%% get the time from the http response header
 					TimeList = case lists:keyfind("date", 1, Headers) of
 									{"date", Date}->
 										string:tokens(Date, " ");
@@ -154,10 +156,12 @@ handle_info({probe}, State)->
 %% @doc
 %% Function: terminate/2
 %% Purpose: handles what is going to do when the poller is terminated
+%% Parameter: _T    -- the reason denoting the stop reason  
+%%            State -- contains the status information of the gen_server
 %% Returns: ok | {error, Reason}
 %% @end
--spec terminate(tuple(), tuple()) -> atom | tuple().
-terminate(_T, State)->
+-spec terminate(_Reason :: term(), State :: record()) -> atom | tuple().
+terminate(_Reason, State)->
 	Uri = State#state.uri,
 	erlang:display("the poller for "++Uri++" stops working!"),
 	application:stop(inets).
@@ -171,7 +175,7 @@ terminate(_T, State)->
 %% Purpose: used to return the content-type of the response from the response`s header.
 %% Returns: "no content type" | content-type
 %% @end
--spec check_header(list(string())) -> string().
+-spec check_header( [string()] ) -> string().
 check_header([]) -> "no content type";
 check_header([Tuple|Tail]) ->
 	case Tuple of

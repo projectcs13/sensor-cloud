@@ -24,10 +24,10 @@
 
 %% @doc
 %% Function: start_link/0
-%% Purpose: start function used to generate the polling_monitor process.
-%% Returns: {already_started, pid()} | {shutdown, term()} | ok
+%% Purpose: start function used to generate the polling_monitor process, and will call init/1 function to initialize.
+%% Returns: {already_started, pid()} | {shutdown, term()} | {ok, pid()}
 %% @end
--spec start_link() -> tuple() | atom().
+-spec start_link() -> {ok, pid()} | {already_started, pid()} | {shutdown, term()} | term().
 start_link()->
 	supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
@@ -36,7 +36,11 @@ start_link()->
 %% Purpose: init function used to initialize the polling_monitor, will called by supervisor:start_link()
 %% Returns: {ok, specification of the children}
 %% @end
--spec init(any()) -> tuple().
+-spec init(term()) -> {ok,{{RestartStrategy,MaxR,MaxT},[ChildSpec]}} | ignore when
+		  RestartStrategy :: term(),
+		  MaxR :: integer(),
+		  MaxT :: integer(),
+		  ChildSpec :: tuple().
 init(_)->
 	{ok, {{simple_one_for_one, 5, 60},
 		  [{poller, {poller, start_link, []}, transient, 1000, worker, [poller]}]

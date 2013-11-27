@@ -16,6 +16,7 @@
 -include("json.hrl").
 -include("poller.hrl").
 -include("parser.hrl").
+-include("pubsub.hrl").
 
 -export([get_streams_using_polling/0,
 		 json_to_record_streams/1,
@@ -36,7 +37,7 @@
 %% Purpose: get a datapoint from elasticsearch 
 %% Returns: [string() ...] | {error, ErrMsg}
 %% @end
--spec get_datapoint(integer() | string()) -> tuple() | list().
+-spec get_datapoint(StreamId :: integer() | string()) -> {error, string()} | list().
 get_datapoint(StreamId)->
 	case is_integer(StreamId) of
 		true->
@@ -59,7 +60,7 @@ get_datapoint(StreamId)->
 %% Purpose: post a new datapoint into the elasticsearch 
 %% Returns: ok | {error, ErrMsg}
 %% @end
--spec post_datapoint(integer()|string(), any()) -> atom() | tuple().
+-spec post_datapoint(StreamId :: integer()|string(), Value :: integer()|float()|list()) -> ok | {error, string()}.
 post_datapoint(StreamId, Value)->
 	FieldValue1 =  case is_integer(StreamId) of
 						true->
@@ -78,16 +79,8 @@ post_datapoint(StreamId, Value)->
 									{"value",list_to_binary(Value)}
 							end
 					end,
-	{{Year, Month, Day}, {Hour, Minutes, Seconds}} = calendar:now_to_universal_time(os:timestamp()),
 	
-	StrYear = integer_to_list(Year),
-	StrMonth = integer_to_list(Month),
-	StrDay = integer_to_list(Day),
-	StrHour = integer_to_list(Hour),
-	StrMinutes = integer_to_list(Minutes),
-	StrSeconds = integer_to_list(Seconds),
-	
-	FieldValue3 = {"timestamp",list_to_binary(StrYear++":"++StrMonth++":"++StrDay++"T"++StrHour++":"++StrMinutes++":"++StrSeconds)},
+	FieldValue3 = {"timestamp",list_to_binary(?TIME_NOW(erlang:localtime()))},
 	FieldValues = [FieldValue1, FieldValue2, FieldValue3],
 	FinalJson = lib_json:add_values("{}", FieldValues),
 	
@@ -103,7 +96,7 @@ post_datapoint(StreamId, Value)->
 %% Purpose: get parser according to specific stream id 
 %% Returns: {error, ErrMsg} | #parser
 %% @end
--spec get_parser_by_id(string()) -> tuple() | tuple().
+-spec get_parser_by_id(StreamId :: string()) -> {error, string()} | record().
 get_parser_by_id(StreamId)->	
 	case erlastic_search:search_limit(?ES_INDEX, "parser", "stream_id:\"" ++ StreamId++"\"", 100) of
 		{ok, Result} ->
@@ -122,8 +115,6 @@ get_parser_by_id(StreamId)->
 								   erlang:display("multiple parsers exist for this stream id"),
 								   {error, "multiple parsers exit for this stream id"}
 						   end
-						   %% transform this json list to record list
-						   %% jsonToRecord(FinalJsonList, [])
 			end;
 		_ ->
 			erlang:display("an error happens: the parser not found"),
@@ -189,22 +180,6 @@ json_to_record_stream(Stream) ->
 %% ====================================================================
 %% Internal functions
 %% ====================================================================
-
-
-%% @doc
-%% Function: jsonToRecord/2
-%% Purpose: transform the json list to parser record list 
-%% Returns: list()
-%% @end
--spec jsonToRecord(list(), list()) -> list().
-jsonToRecord([], Res)->
-	Res;
-jsonToRecord([Item|Tail], Res)->
-	Tmp = #parser{stream_id = lib_json:get_field(Item, "stream_id"),
-				  input_parser = binary_to_list(lib_json:get_field(Item, "input_parser")),
-				  input_type = binary_to_list(lib_json:get_field(Item, "input_type"))
-				 },
-	jsonToRecord(Tail, [Tmp|Res]).
 	
 
 

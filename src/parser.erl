@@ -23,10 +23,13 @@
 %% @doc
 %% Function: parseJson/2
 %% Purpose: used to parse the json data.
+%% Parameters: Parser   --the parser record, defined in parser.hrl file
+%%             Data     --the data which is going to be parsed, should be a json string
+%%             TimeList --the token list of the date area in http response header
 %% Returns: JsonData | {error, ErrMsg}
 %% Side effects: Stores the newly parsed data point in the DB
 %% @end
--spec parseJson(tuple(), any(), list()) -> string() | tuple().
+-spec parseJson(Parser :: tuple(), Data :: string(), TimeList :: list()) -> string() | {error, string()}.
 parseJson(Parser, Data, TimeList) ->
 
 	%%extract the data from the coming data
@@ -39,8 +42,6 @@ parseJson(Parser, Data, TimeList) ->
 	Res = lib_json:get_field(Data, Query),
 	
 	%%insert the data as a new datapoint into the database
-	%%since we need more time to investigate how to handle timestamp
-	%%so currently we only consider the time when we receive the datapackage
 	FieldValue1 = case is_integer(StreamId) of
 					true->	
 						{"stream_id",integer_to_binary(StreamId)};
@@ -60,14 +61,6 @@ parseJson(Parser, Data, TimeList) ->
 	end,
 	TimeStamp = case TimeList of
 					[] ->
-						% {{Year, Month, Day}, {Hour, Minutes, Seconds}} = calendar:now_to_universal_time(os:timestamp()),
-						% StrYear = integer_to_list(Year),
-						% StrMonth = integer_to_list(Month),
-						% StrDay = integer_to_list(Day),
-						% StrHour = integer_to_list(Hour),
-						% StrMinutes = integer_to_list(Minutes),
-						% StrSeconds = integer_to_list(Seconds),
-						% list_to_binary(StrYear++"-"++StrMonth++"-"++StrDay++"T"++StrHour++":"++StrMinutes++":"++StrSeconds);
 						list_to_binary(?TIME_NOW(erlang:localtime()));
 					_->
 						list_to_binary(make_stamp(TimeList))
@@ -81,9 +74,6 @@ parseJson(Parser, Data, TimeList) ->
 		{error, Reason} -> erlang:display("Failed to insert the new datapoint into the elasticsearch for this reason: "++Reason),
 						   {error, Reason};
 		{ok,_List} -> 
-			%% only for testing
-			 erlang:display("the final data which is inserted into the database: "++FinalJson),
-			
 			FinalJson
 	end.
 
@@ -135,11 +125,11 @@ make_stamp(TimeList)->
 
 %% @doc
 %% Function: processParser/2
-%% Purpose: transformat the format of the parser
+%% Purpose: transforms the format of the parser
 %% Example: ["streams","temperature","value"] => "streams.temperature.value" 
 %% Returns: string()
 %% @end
--spec processParser(list(string()), list(string())) -> list(string()).
+-spec processParser(list(string()), list(string())) -> string().
 processParser([Item|Tail], Res)->
 	case Item=="/" of
 		true->
