@@ -184,8 +184,19 @@ process_post(ReqData, State) ->
 											ErrorString = api_help:generate_error(Body, Code),
             								{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 										{ok,List} -> 
-											%suggest:update_suggestion(UserAdded),
-											{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
+											case lib_json:get_field(Stream, "resource.resource_type") of
+												undefined ->
+													{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State};
+												_ ->
+													case resources:add_suggested_stream(Stream) of
+														{error, ErrorStr} ->
+															erlang:display("Stream not added to the suggested streams: " ++ ErrorStr);
+														ok ->
+															erlang:display("New suggested stream")
+													end	,
+													%suggest:update_suggestion(UserAdded),
+												{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
+											end
 									end
 			%				end
 					end
@@ -564,7 +575,6 @@ add_server_side_fields(Json) ->
 			{"user_ranking.average", 0.0},
 			{"user_ranking.nr_rankings", 0},
 			{active, true}]),
-	erlang:display(JSON),
 	JSON.
 
 

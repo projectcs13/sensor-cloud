@@ -7,11 +7,13 @@
 %%%-------------------------------------------------------------------
 -module(resources).
 -export([init/1, allowed_methods/2, content_types_provided/2, content_types_accepted/2,
-		 delete_resource/2, process_post/2, put_resource/2, get_resource/2]).
+		 delete_resource/2, process_post/2, put_resource/2, add_suggested_stream/1, get_resource/2]).
 
 -include_lib("webmachine.hrl").
 -include_lib("erlastic_search.hrl").
 -include("field_restrictions.hrl").
+-include("json.hrl").
+
 
 %% @doc
 %% Function: init/1
@@ -104,8 +106,8 @@ process_post(ReqData, State) ->
 				{false,false} ->
 					{{halt,403}, wrq:set_resp_body("Unsupported field(s)", ReqData), State};
 				{false,true} ->
-					FinalResource = suggest:add_resource_suggestion_fields(Resource),
-					case erlastic_search:index_doc(?INDEX,"resource",FinalResource) of 
+					%% FinalResource = suggest:add_resource_suggestion_fields(Resource),
+					case erlastic_search:index_doc(?INDEX,"resource",Resource) of 
 						{error, {Code, Body}} -> 
 							ErrorString = api_help:generate_error(Body, Code),
 							{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
@@ -258,6 +260,64 @@ process_search(ReqData, State, get) ->
             {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 		{ok,List} -> {lib_json:encode(List),ReqData,State} % May need to convert
 	end.
+
+
+%% @doc
+%% Function: add_suggested_stream/2
+%% Purpose: Add a new suggested stream to the array of suggested streams
+%% Returns:  {JSON-object(string), ReqData, State}
+%% @end
+-spec add_suggested_stream(Stream::json()) -> ok |  {error, no_model}.
+add_suggested_stream(Stream) ->
+	ResourceId = lib_json:get_field(Stream, "resource.resource_type"),
+	case erlastic_search:get_doc(?INDEX, "resource",lib_json:to_string(ResourceId)) of
+		{error, {Code, Body}} -> 
+			ErrorString = api_help:generate_error(Body, Code),
+			{error, ErrorString};
+
+		{ok,JsonStruct} ->
+			FinalJson = lib_json:get_and_add_id(JsonStruct),
+			case find_stream_type(lib_json:get_field(Stream, "type"),lib_json:get_field(FinalJson,"streams_suggest")) of
+				false ->
+			%%		Sugg = lib_json:get_field(FinalJson, "hits[0]._source"),
+					FilteredStream = lib_json:rm_field(lib_json:rm_field(lib_json:rm_field(lib_json:rm_field(lib_json:rm_field(
+														Stream,"location"),"resource"),"private"),"uri"),"user_id"),
+					NewSuggestedStream = lib_json:add_value(FinalJson,"streams_suggest" , FilteredStream ),
+					FinalSuggested = lib_json:rm_field(NewSuggestedStream, "id"),
+					Final = api_help:create_update(FinalSuggested),
+					case api_help:update_doc(?INDEX, "resource", lib_json:to_string(ResourceId), Final) of 
+						{error,{Code,Body}} ->
+							ErrorString = api_help:generate_error(Body, Code),
+							{error, ErrorString};
+						{ok, _Json} -> ok 
+					end;
+				true ->
+					{error, "Existing type"}
+			end
+	end.			
+			
+
+
+%% @doc
+%% Function: find_stream_type/1
+%% Purpose: Used to find a type value in a list of suggested streams(list of JSON objects) 
+%% based on a given type
+%%         
+%% Returns: If the type was found in the list
+%% @end
+find_stream_type(Type, StreamsSuggest) when is_list(Type) ->
+	find_stream_type(binary:list_to_bin(Type), StreamsSuggest);
+find_stream_type(Type, []) ->
+	false;
+find_stream_type(Type, [Head|Rest]) ->
+	erlang:display(Head),
+	case lib_json:get_field(Head, "type") of 
+		Type ->
+			true;
+		_ ->
+			find_stream_type(Type, Rest)
+	end.
+		
 
 %% @doc
 %% Function: id_from_path/1

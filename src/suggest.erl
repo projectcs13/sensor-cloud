@@ -109,11 +109,11 @@ get_suggestion(ReqData, State) ->
 					EncodedList = lib_json:encode(List),
 					case re:run(EncodedList, "\"options\":\\[\\]", [{capture, first, list}]) of
 						{match, _} -> 
-							{{halt,404},ReqData, State};
+							Output = lib_json:set_attr("suggestions",[]);
 						_-> 
-							Output = lib_json:set_attr("suggestions",lib_json:get_field(List, "testsuggest[0].options")), 
-							{lib_json:encode(Output),ReqData, State}
-					end
+							Output = lib_json:set_attr("suggestions",lib_json:get_field(List, "testsuggest[0].options"))
+					end,
+					{lib_json:encode(Output),ReqData, State}
 			end
 	end.
 
@@ -141,11 +141,10 @@ add_suggestion(Resource, ResourceId) ->
 					   {resource_id, ResourceId},
 					   {suggest, "{}"},
 					   {"suggest.input", Model},
-					   {"suggest.output", get_timestamp()},
+					   {"suggest.output", Model},
 					   {"suggest.payload", "{}"},
-					   {"suggest.payload.manufacturer", Manufacturer},
-					   {"suggest.payload.tags", Tags},
-					   {"suggest.payload.polling_freq", Polling_freq},
+					   {"suggest.payload.resource", ResourceId},
+					   {"suggest.payload.model", Model},
 					   {"suggest.weight", Weight}
 					  ]
 					 ),
