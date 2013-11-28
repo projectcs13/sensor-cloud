@@ -118,7 +118,33 @@ get_resource_test() ->
     httpc:request(delete, {?WEBMACHINE_URL++"/resources/" ++ lib_json:to_string(DocId), []}, [], []).
 
 
+%% @doc
+%% Function: get_resource_test/0
+%% Purpose: Test the get_resource_test function by doing some HTTP requests
+%% Returns: ok | {error, term()}
+%%
+%% Side effects: creates and returns documents in elasticsearch
+%% @end
+get_streams_suggested_test() ->
+    {ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/resources/", [],"application/json", "{\"name\" : \"sugg\" , \"model\" : \"model1\",\"streams_suggest\" : [] }"}, [], []),
+    api_help:refresh(),
+    DocId = lib_json:get_field(Body1,"_id"),
+    {ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"name\" : \"suggStream\",\"type\": \"Temperature\",\"user_id\" : \"1\", \"resource\" : {\"resource_type\" :\""++ lib_json:to_string(DocId) ++ "\", \"uuid\" : \"1\" }}"}, [], []),
+      %Get the created resource in order to check the new new suggested stream
 
+    {ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(get, {"http://localhost:8000/resources/" ++ lib_json:to_string(DocId), []}, [], []),
+
+    % Tests to make sure the correct creation date is added
+    ?assertEqual(<<"suggStream">>,lib_json:get_field(Body2,"streams_suggest[0].name")),
+
+    {ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(post, {"http://localhost:8000/streams", [],"application/json", "{\"name\" : \"suggStr\",\"type\": \"Temperature\",\"user_id\" : \"1\", \"resource\" : {\"resource_type\" :\""++ lib_json:to_string(DocId) ++ "\", \"uuid\" : \"1\" }}"}, [], []),
+    {ok, {{_Version5, 200, _ReasonPhrase5}, _Headers5, Body5}} = httpc:request(get, {"http://localhost:8000/resources/" ++ lib_json:to_string(DocId), []}, [], []),
+
+    ?assertEqual(undefined,lib_json:get_field(Body5,"streams_suggest[1].name")),
+
+
+    %Clean up
+    httpc:request(delete, {"http://localhost:8000/resources/" ++ lib_json:to_string(DocId), []}, [], []).
 
 %% @doc
 %% Function: add_unsupported_field_test/0
