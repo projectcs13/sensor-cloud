@@ -220,7 +220,6 @@ delete_resource(ReqData, State) ->
 -spec delete_data_points_with_vstream_id(Id::string() | binary()) -> term().
 
 delete_data_points_with_vstream_id(Id) when is_binary(Id) ->
-	erlang:display("Deleting its vsdataopints BINARY!" ++Id),
 	{ok, {{_Version, Code, _ReasonPhrase}, _Headers, Body}} = httpc:request(delete, {?ELASTIC_SEARCH_URL++"/sensorcloud/vsdatapoint/_query?q=stream_id:" ++ binary_to_list(Id), []}, [], []),
 	case Code of
 		200 ->
@@ -229,10 +228,7 @@ delete_data_points_with_vstream_id(Id) when is_binary(Id) ->
 			{error,{Code, Body}}
 	end;
 delete_data_points_with_vstream_id(Id) ->
-	erlang:display("Deleting its vsdatapoints " ++ Id),
-	erlang:display(?ELASTIC_SEARCH_URL),
 	{ok, {{_Version, Code, _ReasonPhrase}, _Headers, Body}} = httpc:request(delete, {?ELASTIC_SEARCH_URL++"/sensorcloud/vsdatapoint/_query?q=stream_id:" ++ Id, []}, [], []),
-	erlang:display("passed"),
 	case Code of
 		200 ->
 			{ok};
