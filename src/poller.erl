@@ -59,7 +59,9 @@ init(State)->
 %% Returns: {reply, (returned message), (new state of gen_server)}
 %%          (returned message) could be any thing you want to return to the client.
 %% @end
--spec handle_call(Request :: tuple(), _Form :: tuple(), State :: record()) -> {reply, any(), record()}.
+-spec handle_call(Request :: tuple(), _Form :: tuple(), State :: record()) -> {reply, {update, StreamId :: string(), FinalUri :: string(), NewFreq :: integer()}, State :: record()}
+																			 |{reply, {error, Reason :: string()}, State :: record()}
+																			 |{reply, {info, State :: record()}, State :: record()}.
 handle_call({rebuild}, _Form, State)->
 	StreamId = State#state.stream_id,
 	Url = State#state.uri,
@@ -97,11 +99,11 @@ handle_call({check_info}, _Form, State)->
 %% @doc
 %% Function: handle_info/2
 %% Purpose: handle messages processing of the gen_server, could be called via: pid()!{probe}
-%% Parameter: Request -- the message sent from the client
+%% Parameter: {probe} -- the message sent from the client
 %%            State   -- contains some status information of the gen_server
 %% Returns: {noreply, NewState}
 %% @end
--spec handle_info(Request :: any(), State :: tuple()) -> {noreply, record()}.
+-spec handle_info({probe}, State :: record()) -> {noreply, record()}.
 handle_info({probe}, State)->
 	StreamId = State#state.stream_id,
 	Parser = State#state.parser,
@@ -111,7 +113,7 @@ handle_info({probe}, State)->
 	%%http://userprimary.net/posts/2009/04/04/exploring-erlangs-http-client/
 	
 	case httpc:request(get, {Uri, [{"User-Agent", (?UA++StreamId)}]}, [], []) of
-		{ok, {{HttpVer, Code, Msg}, Headers, Body}}->
+		{ok, {{_HttpVer, Code, _Msg}, Headers, Body}}->
 			case Code==200 of
 				true->
 					%% get the time from the http response header
@@ -124,12 +126,12 @@ handle_info({probe}, State)->
 					
 					FinalData = case Parser#parser.input_type of
 									"application/json" ->
-										parser:parseJson(Parser, Body, TimeList);
+										parser:parseJson(Parser, Body, make_stamp(TimeList));
 									"plain/text" ->
-										parser:parseText(Parser, Body, TimeList);
+										parser:parseText(Parser, Body, make_stamp(TimeList));
 									_ ->
 										%% the input type of json is wrong
-										erlang:display("other content type")
+										erlang:display("the data type user provided is not correct!!")
 								end,
 					case FinalData == true of
 						false->
@@ -160,7 +162,7 @@ handle_info({probe}, State)->
 %%            State -- contains the status information of the gen_server
 %% Returns: ok | {error, Reason}
 %% @end
--spec terminate(_Reason :: term(), State :: record()) -> atom | tuple().
+-spec terminate(_Reason :: term(), State :: record()) -> ok | {error, string()}.
 terminate(_Reason, State)->
 	Uri = State#state.uri,
 	erlang:display("the poller for "++Uri++" stops working!"),
@@ -171,18 +173,29 @@ terminate(_Reason, State)->
 %% ====================================================================
 
 %% @doc
-%% Function: check_header/1
-%% Purpose: used to return the content-type of the response from the response`s header.
-%%			this function is used when we check the datatype based on coming data.
-%% Returns: "no content type" | content-type
+%% Function: make_timestamp/1
+%% Purpose: transform the time item list to timestamp string
+%% Example: ["Thu,","21","Nov","2013","09:32:42","GMT"] => "2013:11:21T09:32:42" 
+%% Returns: string()
 %% @end
--spec check_header( [string()] ) -> string().
-check_header([]) -> "no content type";
-check_header([Tuple|Tail]) ->
-	case Tuple of
-		{"content-type", Res} -> Res;
-		_ -> check_header(Tail)
-	end.
-
-
+-spec make_stamp(list()) -> string().
+make_stamp(TimeList)->
+	Day = lists:nth(2, TimeList),
+	Month = case lists:nth(3, TimeList) of
+				"Jan"->"01";
+				"Feb"->"02";
+				"Mar"->"03";
+				"Apr"->"04";
+				"May"->"05";
+				"Jun"->"06";
+				"Jul"->"07";
+				"Aug"->"08";
+				"Sep"->"09";
+				"Oct"->"10";
+				"Nov"->"11";
+				"Dec"->"12"
+			end,
+	Year = lists:nth(4, TimeList),
+	Time = lists:nth(5, TimeList),
+	Year++"-"++Month++"-"++Day++"T"++Time++".000".
 

@@ -225,7 +225,7 @@ process_post(ReqData, State) ->
 														{error, {Code2, Body2}}->
 															ErrorString = api_help:generate_error(Body2, Code2),
 															{{halt, Code2}, wrq:set_resp_body(ErrorString, ReqData), State};
-														{ok, List2}->
+														{ok, _List2}->
 															%% create a new poller in polling system
 															api_help:refresh(),
 															case lib_json:get_field(FieldsAdded, "polling") of

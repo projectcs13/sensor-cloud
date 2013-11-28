@@ -60,17 +60,17 @@ init(_)->
 %%			currently only for implementing the handle_info/2 interface of gen_server, not quite useful.
 %% Returns: {noreply, State}
 %% @end
--spec handle_info(Request :: term(), State :: list()) -> {noreply, list()}.
-handle_info({print, Message}, State)->
+-spec handle_info(Request :: term(), _State :: [record()]) -> {noreply, list()}.
+handle_info({print, Message}, _State)->
 	erlang:display(Message),
-	{noreply, State}.
+	{noreply, _State}.
 
 %% @doc
 %% Function: handle_cast/2
 %% Purpose: handle asynchronous call of gen_server, accepts two parameters: message of the call and the old state of gen_server.
 %%			can be called via: gen_server:cast(polling_supervisor, {rebuild_poller, (stream_id)}).
 %% Parameters: Request 	   -- request sent from the client, could be any type of request.
-%%             PollersInfo -- the state of the gen_server, a list which contains the all information of the pollers. 
+%%             PollersInfo -- the state of the gen_server, a list which contains all the information of the pollers. 
 %% Returns: {noreply, NewState}
 %% Side effects: create new poller and send message to specific poller.
 %% @end
@@ -184,7 +184,7 @@ find_poller_by_id(StreamId, [Poller|Tail]) ->
 %% Purpose: delete a stream record with the stream`s id
 %% Returns: NewPollersRecordList | []
 %% @end
--spec delete_info(PollersList :: [record()], StreamId :: string()) -> list().
+-spec delete_info(PollersList :: [record()], StreamId :: string()) -> [record()].
 delete_info([], _)->[];
 delete_info([Poller|Tail], StreamId)->
 	case Poller#pollerInfo.stream_id == StreamId of
@@ -199,7 +199,7 @@ delete_info([Poller|Tail], StreamId)->
 %% Purpose: after poller done its rebuild, supervisor uses this function to update its pollers` info store.
 %% Returns: NewPollersRecordList | []
 %% @end
--spec update_info(PollersList :: [record()], StreamId :: string(), NewUri :: string(), NewTRef :: pid()) -> list().
+-spec update_info(PollersList :: [record()], StreamId :: string(), NewUri :: string(), NewTRef :: pid()) -> [record()].
 update_info([], _, _, _) -> [];
 update_info([Poller|Tail], StreamId, NewUri, NewTRef) ->
 	case Poller#pollerInfo.stream_id == StreamId of
@@ -208,4 +208,3 @@ update_info([Poller|Tail], StreamId, NewUri, NewTRef) ->
 		_ ->
 			[Poller | update_info(Tail, StreamId, NewUri, NewTRef)]
 	end.
-

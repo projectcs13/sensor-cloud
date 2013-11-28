@@ -25,16 +25,15 @@
 %% Purpose: used to parse the json data.
 %% Parameters: Parser   --the parser record, defined in parser.hrl file
 %%             Data     --the data which is going to be parsed, should be a json string
-%%             TimeList --the token list of the date area in http response header
+%%             Time 	--the time of the date area in http response header
 %% Returns: JsonData | {error, ErrMsg}
 %% Side effects: Stores the newly parsed data point in the DB
 %% @end
--spec parseJson(Parser :: tuple(), Data :: string(), TimeList :: list()) -> string() | {error, string()}.
-parseJson(Parser, Data, TimeList) ->
+-spec parseJson(Parser :: tuple(), Data :: string(), Time :: list()) -> string() | {error, string()}.
+parseJson(Parser, Data, Time) ->
 
 	%%extract the data from the coming data
 	StreamId = Parser#parser.stream_id,
-	InputType = Parser#parser.input_type,
 	InputParser = Parser#parser.input_parser,
 	
 	ItemList = filename:split(InputParser),
@@ -59,11 +58,11 @@ parseJson(Parser, Data, TimeList) ->
 					{"value",list_to_binary(Res)}
 			end
 	end,
-	TimeStamp = case TimeList of
+	TimeStamp = case Time of
 					[] ->
 						list_to_binary(?TIME_NOW(erlang:localtime()));
 					_->
-						list_to_binary(make_stamp(TimeList))
+						list_to_binary(Time)
 				end,
 	
 	FieldValue3 = {"timestamp",TimeStamp},
@@ -84,7 +83,7 @@ parseJson(Parser, Data, TimeList) ->
 %% Side effects: Stores the newly parsed data point in the DB
 %% @end
 -spec parseText(tuple(), any(), list()) -> string() | tuple().
-parseText(Parser, Data, TimeList) ->
+parseText(_Parser, _Data, _Time) ->
 	%% extract the wanted value from the text-data and store it in the DB
 	%% return the status of the transaction, ok or {error, ErrMsg}
 	{error, "parseText function has not been implemented"}.
@@ -95,33 +94,6 @@ parseText(Parser, Data, TimeList) ->
 %% ====================================================================
 %% Internal functions
 %% ====================================================================
-
-%% @doc
-%% Function: make_timestamp/1
-%% Purpose: transform the time item list to timestamp string
-%% Example: ["Thu,","21","Nov","2013","09:32:42","GMT"] => "2013:11:21T09:32:42" 
-%% Returns: string()
-%% @end
--spec make_stamp(list()) -> string().
-make_stamp(TimeList)->
-	Day = lists:nth(2, TimeList),
-	Month = case lists:nth(3, TimeList) of
-				"Jan"->"01";
-				"Feb"->"02";
-				"Mar"->"03";
-				"Apr"->"04";
-				"May"->"05";
-				"Jun"->"06";
-				"Jul"->"07";
-				"Aug"->"08";
-				"Sep"->"09";
-				"Oct"->"10";
-				"Nov"->"11";
-				"Dec"->"12"
-			end,
-	Year = lists:nth(4, TimeList),
-	Time = lists:nth(5, TimeList),
-	Year++"-"++Month++"-"++Day++"T"++Time++".000".
 
 %% @doc
 %% Function: processParser/2

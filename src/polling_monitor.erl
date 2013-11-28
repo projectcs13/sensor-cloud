@@ -27,14 +27,14 @@
 %% Purpose: start function used to generate the polling_monitor process, and will call init/1 function to initialize.
 %% Returns: {already_started, pid()} | {shutdown, term()} | {ok, pid()}
 %% @end
--spec start_link() -> {ok, pid()} | {already_started, pid()} | {shutdown, term()} | term().
+-spec start_link() -> {ok, pid()} | {already_started, pid()} | {shutdown, term()}.
 start_link()->
 	supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
 %% @doc
 %% Function: init/1
 %% Purpose: init function used to initialize the polling_monitor, will called by supervisor:start_link()
-%% Returns: {ok, specification of the children}
+%% Returns: {ok, {configuration of the supervisor, specifications of the children}}
 %% @end
 -spec init(term()) -> {ok,{{RestartStrategy,MaxR,MaxT},[ChildSpec]}} | ignore when
 		  RestartStrategy :: term(),

@@ -37,7 +37,7 @@
 %% Purpose: get a datapoint from elasticsearch 
 %% Returns: [string() ...] | {error, ErrMsg}
 %% @end
--spec get_datapoint(StreamId :: string()) -> {error, string()} | list().
+-spec get_datapoint(StreamId :: string()) -> {error, string()} | [string()].
 get_datapoint(StreamId) when is_list(StreamId) ->
 	Id = StreamId,
 	case erlastic_search:search_limit(?ES_INDEX, "datapoint", "stream_id:" ++ Id, 100) of
@@ -55,7 +55,7 @@ get_datapoint(StreamId) when is_list(StreamId) ->
 %% Purpose: post a new datapoint into the elasticsearch 
 %% Returns: ok | {error, ErrMsg}
 %% @end
--spec post_datapoint(StreamId :: string(), Value :: integer()|float()|list()) -> ok | {error, string()}.
+-spec post_datapoint(StreamId :: string(), Value :: integer()|float()|string()) -> ok | {error, string()}.
 post_datapoint(StreamId, Value)->
 	FieldValue1 = {"stream_id",list_to_binary(StreamId)},
 	FieldValue2 = case is_integer(Value) of
@@ -77,7 +77,7 @@ post_datapoint(StreamId, Value)->
 	case erlastic_search:index_doc(?ES_INDEX, "datapoint", FinalJson) of
 		{error, Reason} -> erlang:display("Failed to insert the new datapoint into the elasticsearch for this reason: "++Reason),
 						   {error, Reason};
-		{ok,List} -> 
+		{ok,_List} -> 
 			ok
 	end.
 
@@ -116,7 +116,7 @@ get_parser_by_id(StreamId)->
 %% Purpose: Retrieves all streams from Elastic Search that are using polling.
 %% Returns: [] | [Stream, ... ] | {error, Reason}.
 %% @end
--spec get_streams_using_polling() -> [] | [string()] | {error, term()}.
+-spec get_streams_using_polling() -> [] | [json_string()] | {error, term()}.
 get_streams_using_polling() ->
 	JsonQuery = "{\"query\" : {\"filtered\" : " ++
 					"{ \"filter\" : {\"exists\" : {\"field\" : \"uri\"}}}}}",
@@ -138,7 +138,7 @@ get_streams_using_polling() ->
 %% Purpose: Converts a list of stream Jsons to a list of pollerInfo records
 %% Returns: [] | [Stream, ...]
 %% @end
--spec json_to_record_streams([json()]) -> [] | [record()].
+-spec json_to_record_streams([json_string()]) -> [] | [record()].
 json_to_record_streams([]) -> [];
 json_to_record_streams([H|T]) ->
 	[json_to_record_stream(H) | json_to_record_streams(T)].
@@ -151,7 +151,7 @@ json_to_record_streams([H|T]) ->
 %% Purpose: Converts a stream Json to a pollerInfo record
 %% Returns: #pollerInfo{}
 %% @end
--spec json_to_record_stream(Stream::json()) -> record().
+-spec json_to_record_stream(Stream::json_string()) -> record().
 json_to_record_stream(Stream) ->
 	Name = case lib_json:get_field(Stream, "_source.name") of
 			   undefined -> undefined;
