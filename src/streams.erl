@@ -244,11 +244,16 @@ process_post(ReqData, State) ->
 																									_ ->
 																										continue
 																								end,
-																								
+																								Freq = lib_json:get_field(FieldsAdded, "polling_freq"),
 																								NewPoller = #pollerInfo{stream_id = Stream_id,
 																														name = binary_to_list(lib_json:get_field(FieldsAdded, "name")),
 																														uri = binary_to_list(lib_json:get_field(FieldsAdded, "uri")),
-																														frequency = lib_json:get_field(FieldsAdded, "polling_freq")
+																														frequency = case is_list(Freq) of
+																																		true->
+																																			list_to_integer(Freq);
+																																		_->
+																																			Freq
+																																	end
 																														},
 																								gen_server:cast(polling_supervisor, {create_poller, NewPoller})
 																	end
