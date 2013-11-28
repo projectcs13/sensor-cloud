@@ -68,8 +68,9 @@ process_post(ReqData, State) ->
 		false ->
 			{VirtualStreamJson,_,_} = api_help:json_handler(ReqData, State),
 			{{Year,Month,Day},{Hour,Minute,Second}} = calendar:local_time(),
-			Date = api_help:generate_timestamp([Year,Month,Day],0), % it is crashing if I add Hour, Minute, Second, check it again later
-			DateAdded = api_help:add_field(VirtualStreamJson,"creation_date",Date),
+			Date = api_help:generate_date([Year,Month,Day]), % it is crashing if I add Hour, Minute, Second, check it again later
+			DateAdded = lib_json:add_values(VirtualStreamJson,[{creation_date, list_to_binary(Date)}]),
+erlang:display(DateAdded),
 			case erlastic_search:index_doc(?INDEX, "vstream", DateAdded) of	
 				{error, Reason} ->
 					{{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
