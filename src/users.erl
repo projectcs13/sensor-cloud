@@ -14,7 +14,7 @@
          put_user/2,
          get_user/2,
          process_post/2,
-		 delete_streams_with_user_id/1]).
+		 delete_streams_with_user_id/2]).
 
 -include("webmachine.hrl").
 -include_lib("erlastic_search.hrl").
@@ -83,7 +83,7 @@ content_types_accepted(ReqData, State) ->
 -spec delete_resource(ReqData::tuple(), State::string()) -> {string(), tuple(), string()}.
 delete_resource(ReqData, State) ->
     Id = id_from_path(ReqData),
-    case delete_streams_with_user_id(Id) of
+    case delete_streams_with_user_id(Id, "false") of
         {error, {Code, Body}} -> 
             ErrorString = api_help:generate_error(Body, Code),
             {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
@@ -100,25 +100,41 @@ delete_resource(ReqData, State) ->
 
 
 %% @doc
-%% Function: delete_streams_with_user_id/1
-%% Purpose: Deletes the streams with the given user id
+%% Function: delete_streams_with_user_id/2
+%% Purpose: Deletes the streams and/or virtual streams with the given user id,
 %% Returns:  ERROR = {error,Errorcode}
 %%			 OK = {ok}
 %% @end
--spec delete_streams_with_user_id(Id::string()) -> term().
+-spec delete_streams_with_user_id(Id::string(), Vstreamsonly::string()) -> term().
 
-delete_streams_with_user_id(Id) ->
+delete_streams_with_user_id(Id, Vstreamsonly) ->
 	api_help:refresh(),
 	Query = "user_id:" ++ Id, 
-	case erlastic_search:search_limit(?INDEX, "stream", Query,500) of
-		{error,Reason} -> 
-			{error,Reason};
-		{ok,List} -> 
-			case get_streams(List) of
+	case Vstreamsonly of 
+		"false" ->
+			case erlastic_search:search_limit(?INDEX, "stream", Query,500) of
+				{error,Reason} -> 
+					{error,Reason};
+				{ok,List} -> 
+					case get_streams(List) of
+						[] -> {ok};
+						Streams ->
+							case delete_streams(Streams, "stream") of
+								{error,Reason} -> {error, Reason};
+								{ok} -> {ok}
+							end
+					end
+			end
+	end,
+	case erlastic_search:search_limit(?INDEX, "vstream", Query, 500) of
+		{error,Reason2} -> 
+			{error,Reason2};
+		{ok,List2} -> 
+			case get_streams(List2) of
 				[] -> {ok};
-				Streams ->
-					case delete_streams(Streams) of
-						{error,Reason} -> {error, Reason};
+				VStreams ->
+					case delete_streams(VStreams, "vstream") of
+						{error,Reason2} -> {error, Reason2};
 						{ok} -> {ok}
 					end
 			end
@@ -152,15 +168,15 @@ get_streams([JSON | Tl]) ->
 %% Returns:  ok, or {{error,_Reason}, StreamId, Rest} where StreamId is the binary Id of the stream for which deletion failed
 %% @end
 
-delete_streams([]) -> {ok};
-delete_streams([StreamId|Rest]) ->
-	case streams:delete_data_points_with_stream_id(StreamId) of
+delete_streams([], Type) -> {ok};
+delete_streams([StreamId|Rest], Type) ->
+	case streams:delete_data_points_with_stream_id(StreamId, Type) of
         {error,{Code, Body}} -> 
             {error,{Code, Body}};
         {ok} ->
-			case erlastic_search:delete_doc(?INDEX, "stream", StreamId) of 
+			case erlastic_search:delete_doc(?INDEX, Type, StreamId) of 
 				{error,Reason} -> {error,Reason};
-				{ok,_List} -> delete_streams(Rest)
+				{ok,_List} -> delete_streams(Rest, Type)
 			end
 	end.
 

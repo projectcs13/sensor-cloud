@@ -9,12 +9,13 @@
 
 -module(virtual_streams).
 -export([init/1, allowed_methods/2, content_types_provided/2,
-		 content_types_accepted/2, process_post/2, process_search/3, put_stream/2]).
+		 content_types_accepted/2, process_post/2, process_search/3, put_stream/2, delete_resource/2]).
 
 -include_lib("erlastic_search.hrl").
 -include("webmachine.hrl").
 
 -define(INDEX, "sensorcloud").
+-define(ELASTIC_SEARCH_URL, api_help:get_elastic_search_url()).
 
 %% @doc
 %% Function: init/1
@@ -36,9 +37,11 @@ allowed_methods(ReqData, State) ->
 		[{"vstreams"}] ->
 			{['POST'], ReqData, State}; 
 		[{"vstreams", _Id}] -> %to be removed?
-			{['POST', 'PUT'], ReqData, State};
+			{['POST', 'PUT', 'DELETE'], ReqData, State};
 		[{"vstreams", "_search"}] ->
 			{['POST', 'GET'], ReqData, State};
+		[{"users", _UserID}, {"vstreams"}] ->
+			{['DELETE'], ReqData, State};
 		[error] ->
 			{[], ReqData, State}
 	end.
@@ -84,7 +87,6 @@ process_post(ReqData, State) ->
 			{{Year,Month,Day},{Hour,Minute,Second}} = calendar:local_time(),
 			Date = api_help:generate_date([Year,Month,Day]), % it is crashing if I add Hour, Minute, Second, check it again later
 			DateAdded = lib_json:add_values(VirtualStreamJson,[{creation_date, list_to_binary(Date)}]),
-erlang:display(DateAdded),
 			case erlastic_search:index_doc(?INDEX, "vstream", DateAdded) of	
 				{error, Reason} ->
 					{{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
@@ -170,6 +172,74 @@ put_stream(ReqData, State) ->
 			{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
 	end.
 	
+
+%% @doc
+%% Function: delete_resource/2
+%% Purpose: Used to handle DELETE requests for deleting the virtual stream in elastic search
+%% Returns: {Success, ReqData, State}, where Success is true if delete is successful
+%% and false otherwise.
+%% FIX: This function relies on direct contact with elastic search at localhost:9200
+%% @end
+-spec delete_resource(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
+delete_resource(ReqData, State) ->
+	erlang:display("Deleting"),
+	case {proplists:get_value('user', wrq:path_info(ReqData)),proplists:get_value('id', wrq:path_info(ReqData))} of
+		{UserId,undefined} ->
+			erlang:display("VSTREAM ID undefined"),
+			case users:delete_streams_with_user_id(UserId, "true") of
+				{error, {Code, Body}} -> 
+					ErrorString = api_help:generate_error(Body, Code),
+					{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+				{ok} ->
+					{true,wrq:set_resp_body("{\"message\":\"All streams with user_id:" ++UserId++" are now deleted\"}",ReqData),State}
+			end;
+		{_,Id} ->
+			erlang:display("VSTREAM ID defined: " ++ Id),
+			case delete_data_points_with_vstream_id(Id) of 
+				{error, {Code, Body}} -> 
+					ErrorString = api_help:generate_error(Body, Code),
+            		{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+				{ok} ->
+					case erlastic_search:delete_doc(?INDEX,"vstream", Id) of
+						{error, {Code, Body}} -> 
+							ErrorString = api_help:generate_error(Body, Code),
+							{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+						{ok,List} -> 
+			 				{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
+					end
+			end
+	end.
+
+
+%% @doc
+%% Function: delete_data_points_with_vstream_id/1
+%% Purpose: Used to delete all virtual stream data-points with the given id as parent
+%% Returns: {ok} or {error,Reason} 
+%% FIX: This function relies on direct contact with elastic search at localhost:9200
+%% @end
+-spec delete_data_points_with_vstream_id(Id::string() | binary()) -> term().
+
+delete_data_points_with_vstream_id(Id) when is_binary(Id) ->
+	erlang:display("Deleting its vsdataopints BINARY!" ++Id),
+	{ok, {{_Version, Code, _ReasonPhrase}, _Headers, Body}} = httpc:request(delete, {?ELASTIC_SEARCH_URL++"/sensorcloud/vsdatapoint/_query?q=stream_id:" ++ binary_to_list(Id), []}, [], []),
+	case Code of
+		200 ->
+			{ok};
+		Code ->
+			{error,{Code, Body}}
+	end;
+delete_data_points_with_vstream_id(Id) ->
+	erlang:display("Deleting its vsdatapoints " ++ Id),
+	erlang:display(?ELASTIC_SEARCH_URL),
+	{ok, {{_Version, Code, _ReasonPhrase}, _Headers, Body}} = httpc:request(delete, {?ELASTIC_SEARCH_URL++"/sensorcloud/vsdatapoint/_query?q=stream_id:" ++ Id, []}, [], []),
+	erlang:display("passed"),
+	case Code of
+		200 ->
+			{ok};
+		Code ->
+			{error,{Code, Body}}
+	end.
+
 
 %% @doc
 %% Function: create_query/3
