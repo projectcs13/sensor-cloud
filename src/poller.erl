@@ -122,13 +122,13 @@ handle_info({probe}, State)->
 										[]
 								end,
 					
-					FinalData = case check_header(Headers) of
+					FinalData = case Parser#parser.input_type of
 									"application/json" ->
 										parser:parseJson(Parser, Body, TimeList);
 									"plain/text" ->
 										parser:parseText(Parser, Body, TimeList);
 									_ ->
-										%%the other options
+										%% the input type of json is wrong
 										erlang:display("other content type")
 								end,
 					case FinalData == true of
@@ -173,6 +173,7 @@ terminate(_Reason, State)->
 %% @doc
 %% Function: check_header/1
 %% Purpose: used to return the content-type of the response from the response`s header.
+%%			this function is used when we check the datatype based on coming data.
 %% Returns: "no content type" | content-type
 %% @end
 -spec check_header( [string()] ) -> string().
