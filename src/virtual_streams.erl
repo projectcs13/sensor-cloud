@@ -9,7 +9,7 @@
 
 -module(virtual_streams).
 -export([init/1, allowed_methods/2, content_types_provided/2,
-		 process_post/2, process_search/3]).
+		 content_types_accepted/2, process_post/2, process_search/3, put_stream/2]).
 
 -include_lib("erlastic_search.hrl").
 -include("webmachine.hrl").
@@ -36,12 +36,13 @@ allowed_methods(ReqData, State) ->
 		[{"vstreams"}] ->
 			{['POST'], ReqData, State}; 
 		[{"vstreams", _Id}] -> %to be removed?
-			{['POST'], ReqData, State};
+			{['POST', 'PUT'], ReqData, State};
 		[{"vstreams", "_search"}] ->
 			{['POST', 'GET'], ReqData, State};
 		[error] ->
 			{[], ReqData, State}
 	end.
+
 
 %% @doc
 %% Function: content_types_provided/2
@@ -52,6 +53,19 @@ allowed_methods(ReqData, State) ->
 -spec content_types_provided(ReqData::tuple(), State::string()) -> {list(), tuple(), string()}.
 content_types_provided(ReqData, State) ->
 		{[{"application/json", get_datapoint}], ReqData, State}.
+
+
+%% @doc
+%% Function: content_types_accepted/2
+%% Purpose: based on the content-type on a 'POST' or 'PUT', we know which kind of data that is allowed to be sent to the server.
+%% A code 406 is returned to the client if we don't accept a media type that the client has sent.
+%% Returns: {[{Mediatype, Handler}], ReqData, State}
+%% @end
+-spec content_types_accepted(ReqData::term(),State::term()) -> {list(), term(), term()}.
+
+content_types_accepted(ReqData, State) ->
+	{[{"application/json", put_stream}], ReqData, State}.
+
 
 %% @doc
 %% Function: process_post/2
@@ -138,6 +152,26 @@ reduce(VirtualStreamId, Streams, TimestampFrom, Function, ReqData, State) ->
 
  
 %% @doc
+%% Function: put_stream/2
+%% Purpose: Used to handle PUT requests by updating the given documents in elastic search
+%% Returns: {Success, ReqData, State}, where Success is true if the PUT request is
+%% successful and false otherwise.
+%% @end
+-spec put_stream(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
+put_stream(ReqData, State) ->
+	VStreamId = proplists:get_value('id', wrq:path_info(ReqData)),
+	{VStream,_,_} = api_help:json_handler(ReqData,State),
+	Update = api_help:create_update(VStream),
+	case api_help:update_doc(?INDEX, "vstream", VStreamId, Update) of 
+		{error, {Code, Body}} -> 
+			ErrorString = api_help:generate_error(Body, Code),
+			{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+		{ok,List} -> 
+			{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
+	end.
+	
+
+%% @doc
 %% Function: create_query/3
 %% Purpose: Creates the query for the function specified
 %% Returns: string()
@@ -189,15 +223,11 @@ create_query(Function, Streams, TimestampFrom) ->
 		{list(), tuple(), string()}.
 process_search(ReqData, State, post) ->
 	{Json,_,_} = api_help:json_handler(ReqData,State),
-	
-	erlang:display(Json),
 	case erlastic_search:search_json(#erls_params{},?INDEX, "vstream", Json) of
-			{error, {Code, Body}} -> 
-				erlang:display("ERROR!"),
+			{error, {Code, Body}} ->
 				ErrorString = api_help:generate_error(Body, Code),
 				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 			{ok,JsonStruct} ->
-				erlang:display(lib_json:to_string(JsonStruct)),
 				FinalJson = lib_json:get_list_and_add_id(JsonStruct),
 				{true,wrq:set_resp_body(lib_json:encode(FinalJson),ReqData),State}
 	end.
