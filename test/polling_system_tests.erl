@@ -40,11 +40,11 @@
 %% @doc
 %% Function: inti_test/0
 %% Purpose: Used to start the inets to be able to do HTTP requests
-%% Returns: ok | {error, term()}
+%% Returns: {ok/error, {{Version, Code, Reason}, Headers, Body}}
 %%
 %% Side effects: Start inets
 %% @end
--spec init_test() -> ok | {error, term()}.
+-spec init_test() -> {ok, tuple()} | {error, tuple()}.
 init_test() ->
 	inets:start(),
 	case whereis(polling_supervisor) of
@@ -62,16 +62,16 @@ init_test() ->
     %%insert two new parsers
 	clear_parser_type(),
 	api_help:refresh(),
-    post_parser(1, "application/json","streams/temperature/value"),
-	post_parser(2, "application/json","streams/humidity/value"),
+    post_parser("1", "application/json","streams/temperature/value"),
+	post_parser("2", "application/json","streams/humidity/value"),
 	api_help:refresh().
 
 %% @doc
 %% Function: initialization_test/0
 %% Purpose: Test if the testing data has been inserted into elasticsearch
-%% Returns: ok | {error, term()}.
+%% Returns: true.
 %% @end
--spec initialization_test() -> atom() | tuple().
+-spec initialization_test() -> true.
 initialization_test()->
 	PollerInforList = poll_help:json_to_record_streams(poll_help:get_streams_using_polling()),
 	Stream1 = lists:nth(1, PollerInforList),
@@ -105,7 +105,7 @@ initialization_test()->
 %% Purpose: Test if the polling system could be started and generate necessary pollers
 %% Returns: ok | {error, term()}.
 %% @end
--spec polling_system_test() -> atom() | tuple().
+-spec polling_system_test() -> ok | {error, term()}.
 polling_system_test()->
 	polling_system:start_link(),
 	timer:sleep(1000),
@@ -149,7 +149,7 @@ polling_system_test()->
 			?assertEqual("application/json", Parser1#parser.input_type),
 			?assertEqual("streams/humidity/value", Parser1#parser.input_parser);
 		_->
-			?assertEqual(1,2)
+			?assert(false)
 	end.
 
 %% @doc
@@ -157,7 +157,7 @@ polling_system_test()->
 %% Purpose: Test if the polling sytem could rebuild the poller
 %% Returns: ok | {error, term()}.
 %% @end
--spec rebuild_system_test() -> atom() | tuple().
+-spec rebuild_system_test() -> ok | {error, term()}.
 rebuild_system_test()->
 
 	%% testing rebuild
@@ -168,8 +168,8 @@ rebuild_system_test()->
     post_stream_with_id(1, "test2", ?POLL_ADD2, 1000, "application/json"),
 	post_stream_with_id(2, "test1", ?POLL_ADD, 1300, "application/json"),
 	
-	post_parser(2, "application/json","streams/temperature/value"),
-	post_parser(1, "application/json","streams/humidity/value"),
+	post_parser("2", "application/json","streams/temperature/value"),
+	post_parser("1", "application/json","streams/humidity/value"),
 	
 	api_help:refresh(),
 	gen_server:cast(polling_supervisor, {rebuild, "1"}),
@@ -197,7 +197,7 @@ rebuild_system_test()->
 			?assertEqual(?POLL_ADD2, State2#state.uri);
 		_->
 			erlang:display("the stream id of state1: "++State1#state.stream_id),
-			?assertEqual(1,2)
+			?assert(false)
 	end,
 
 	%% test after rebuild, if the pollers could poll in right way
@@ -213,8 +213,8 @@ rebuild_system_test()->
 	post_stream_with_id(1, "test", ?POLL_ADD, 1000, "application/json"),
 	post_stream_with_id(2, "test2", ?POLL_ADD2, 1300, "application/json"),
 	
-	post_parser(1, "application/json","streams/temperature/value"),
-	post_parser(2, "application/json","streams/humidity/value"),
+	post_parser("1", "application/json","streams/temperature/value"),
+	post_parser("2", "application/json","streams/humidity/value"),
 	
 	api_help:refresh(),
 	gen_server:cast(polling_supervisor, {rebuild, "1"}),
@@ -243,7 +243,7 @@ rebuild_system_test()->
 			?assertEqual(?POLL_ADD, State22#state.uri);
 		_->
 			erlang:display("the stream id of state21: "++State21#state.stream_id),
-			?assertEqual(1,2)
+			?assert(false)
 	end.
 
 %% @doc
@@ -251,7 +251,7 @@ rebuild_system_test()->
 %% Purpose: Test if polling system could terminate the poller
 %% Returns: ok | {error, term()}.
 %% @end
--spec terminate_system_test() -> atom() | tuple().
+-spec terminate_system_test() -> ok | {error, term()}.
 terminate_system_test()->
 	ChildrenList = supervisor:which_children(polling_monitor),
 	?assertEqual(2, length(ChildrenList)),
@@ -267,9 +267,9 @@ terminate_system_test()->
 %% @doc
 %% Function: clear_system_test/0
 %% Purpose: clear all the data what have been inserted into elasticsearch
-%% Returns: ok | {error, term()}.
+%% Returns: {ok, Result} | {ok, saved_to_file} | {error, Reason}.
 %% @end
--spec clear_system_test() -> atom() | tuple().
+-spec clear_system_test() -> {ok, term()} | {ok, saved_to_file} | {error, string()}.
 clear_system_test()->
 
 	%% terminate the rabbit testing threads
@@ -300,9 +300,8 @@ clear_system_test()->
 %% Returns: {ok, Result} | {error, Reason}.
 %% @end
 -spec post_stream_with_id(Id :: string(), Name :: string(), Uri :: string(), Freq :: integer()|string(), Type :: string()) ->
-		  {ok, term()}
-		| {ok, saved_to_file}
-		| {error, term()}.
+		  {ok, list()}
+		 |{error, string()}.
 post_stream_with_id(Id, Name, Uri, Freq, Type)->
 	N = case Name of
 			"" -> "";
@@ -328,11 +327,11 @@ post_stream_with_id(Id, Name, Uri, Freq, Type)->
 %%          empty they are ignored.
 %% Returns: {ok, Result} | {ok, saved_to_file} | {error, Reason}.
 %% @end
--spec post_parser(StreamId :: integer(), InputType :: string(), InputParser :: string()) ->
+-spec post_parser(StreamId :: string(), InputType :: string(), InputParser :: string()) ->
 		  {ok, term()}
 		| {ok, saved_to_file}
 		| {error, term()}.
-post_parser(StreamId, InputType, InputParser) when is_integer(StreamId)->
+post_parser(StreamId, InputType, InputParser) when is_list(StreamId)->
 	It = case InputType of
 			 "" -> "";
 			 _ -> ", \"input_type\":\"" ++ InputType ++ "\""
@@ -341,7 +340,7 @@ post_parser(StreamId, InputType, InputParser) when is_integer(StreamId)->
 			 "" -> "";
 			 _ -> ", \"input_parser\":\"" ++ InputParser ++ "\""
 		 end,
-	Si = "\""++integer_to_list(StreamId)++"\"",
+	Si = "\""++StreamId++"\"",
 	{ok, Res} = httpc:request(post, {?ES_ADDR ++ "/parser", [],
 						 "application/json",
 						 "{\"stream_id\":"++Si++It++Ip++"}"
@@ -388,6 +387,7 @@ clear_datapoint_type() ->
 %% Purpose: test if the poller could succeed sending the messages to rabbit MQ, accepts one parameter: the id of stream 
 %% Returns: ok
 %% @end
+-spec test_rabbit_messages(StreamId :: string()) -> ok.
 test_rabbit_messages(StreamId)->
 	%% Exchange name binarys
 	StreamExchange = list_to_binary("streams."++StreamId),
@@ -414,6 +414,7 @@ test_rabbit_messages(StreamId)->
 %% Purpose: loop function which waits for comming messages and print them on the shell 
 %% Returns: ok
 %% @end
+-spec loop(StreamId :: string(), ChannelIn :: pid()) -> ok.
 loop(StreamId, ChannelIn)->
 	receive
 		{#'basic.deliver'{}, #amqp_msg{payload = Body}} ->

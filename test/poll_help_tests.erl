@@ -14,6 +14,7 @@
 -include("common.hrl").
 -include("poller.hrl").
 -include("parser.hrl").
+-include("pubsub.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("inets/include/mod_auth.hrl").
 
@@ -188,14 +189,14 @@ json_to_record_streams_test() ->
 %% Purpose: test poll_help:get_parser_by_id_test/1 function
 %% Returns: ok | {error, term()}.
 %% @end
--spec get_parser_by_id_test() -> atom() | {error, term()}.
+-spec get_parser_by_id_test() -> ok | {error, term()}.
 get_parser_by_id_test() ->
 	
 	%% Clear all parsers stored in elasticsearch
 	clear_parser_type(),
 	api_help:refresh(),
 	
-	post_parser(1, "application/json","streams/temperature/value"),
+	post_parser("1", "application/json","streams/temperature/value"),
 	api_help:refresh(),
 	Parser= poll_help:get_parser_by_id("1"),
 	?assertEqual(true, is_record(Parser, parser)),
@@ -211,20 +212,20 @@ get_parser_by_id_test() ->
 %% Purpose: test poll_help:get_datapoint_test/1 function
 %% Returns: ok | {error, term()}.
 %% @end
--spec get_datapoint_test() -> atom() | tuple().
+-spec get_datapoint_test() -> ok | tuple().
 get_datapoint_test()->
 	
 	%% clear all datapoints stored in elasticsearch
 	clear_datapoint_type(),
 	api_help:refresh(),
 	
-	Res0 = poll_help:get_datapoint(12),
-	post_datapoint(12, 13),
+	Res0 = poll_help:get_datapoint("12"),
+	post_datapoint("12", 13),
 	api_help:refresh(),
-	Res1 = poll_help:get_datapoint(12),
+	Res1 = poll_help:get_datapoint("12"),
 	?assertEqual(0, length(Res0)),
 	?assertEqual(1, length(Res1)),
-	?assertEqual(12, lib_json:get_field(lists:nth(1, Res1), "stream_id")),
+	?assertEqual("12", binary_to_list(lib_json:get_field(lists:nth(1, Res1), "stream_id"))),
 	?assertEqual(13, lib_json:get_field(lists:nth(1, Res1), "value")),
 	
 	%% clear all datapoints stored in elasticsearch
@@ -235,15 +236,15 @@ get_datapoint_test()->
 %% Purpose: test poll_help:post_datapoint_test/2 function
 %% Returns: ok | {error, term()}.
 %% @end
--spec post_datapoint_test() -> atom() | tuple().
+-spec post_datapoint_test() -> ok | tuple().
 post_datapoint_test()->
 	
 	%% clear all datapoints stored in elasticsearch
 	clear_datapoint_type(),
 	api_help:refresh(),
 	
-	Res0 = poll_help:get_datapoint(11),
-	poll_help:post_datapoint(11,101),
+	Res0 = poll_help:get_datapoint("11"),
+	poll_help:post_datapoint("11",101),
 	api_help:refresh(),
 	Res1 = poll_help:get_datapoint("11"),
 	?assertEqual(0, length(Res0)),
@@ -269,7 +270,7 @@ post_datapoint_test()->
 		| {ok, saved_to_file}
 		| {error, term()}.
 clear_stream_type() ->
-	httpc:request(delete, {?ES_ADDR ++ "/stream", []}, [], []).
+	httpc:request(delete, {api_help:get_elastic_search_url()++"/sensorcloud" ++ "/stream", []}, [], []).
 
 %% @doc
 %% Function: clear_datapoint_type/0
@@ -281,7 +282,7 @@ clear_stream_type() ->
 		| {ok, saved_to_file}
 		| {error, term()}.
 clear_datapoint_type()->
-	httpc:request(delete, {?ES_ADDR ++ "/datapoint", []}, [], []).
+	httpc:request(delete, {api_help:get_elastic_search_url()++"/sensorcloud" ++ "/datapoint", []}, [], []).
 
 %% @doc
 %% Function: clear_parser_type/0
@@ -293,7 +294,7 @@ clear_datapoint_type()->
 		| {ok, saved_to_file}
 		| {error, term()}.
 clear_parser_type() ->
-	httpc:request(delete, {?ES_ADDR ++ "/parser", []}, [], []).
+	httpc:request(delete, {api_help:get_elastic_search_url()++"/sensorcloud" ++ "/parser", []}, [], []).
 
 %% @doc
 %% Function: post_stream/3
@@ -315,7 +316,7 @@ post_stream(Name, Uri, Freq) when is_integer(Freq) ->
 			_ -> ", \"uri\" : \"" ++ Uri ++ "\""
 		end,
 	F = "\"polling_freq\" : " ++ integer_to_list(Freq),
-	httpc:request(post, {?ES_ADDR ++ "/stream", [],
+	httpc:request(post, {api_help:get_elastic_search_url()++"/sensorcloud" ++ "/stream", [],
 						 "application/json",
 						 "{" ++ F ++ U ++ N ++ "}"
 						},
@@ -326,12 +327,12 @@ post_stream(Name, Uri, Freq) when is_integer(Freq) ->
 %% Purpose: Post a datapoint using the values provided.
 %% Returns: {ok, Result} | {ok, saved_to_file} | {error, Reason}.
 %% @end
--spec post_datapoint(StreamId :: integer(), Value :: number()) ->
+-spec post_datapoint(StreamId :: string(), Value :: number()) ->
 		  {ok, term()}
 		| {ok, saved_to_file}
 		| {error, term()}.
-post_datapoint(StreamId, Value) when is_integer(StreamId) ->
-	SId = "\"stream_id\":" ++ integer_to_list(StreamId) ++ "",
+post_datapoint(StreamId, Value) when is_list(StreamId) ->
+	SId = "\"stream_id\":\"" ++ StreamId ++ "\"",
 	case is_integer(Value) of
 		true->
 			Va = integer_to_list(Value);
@@ -344,33 +345,24 @@ post_datapoint(StreamId, Value) when is_integer(StreamId) ->
 			end
 	end,
 	Val = ", \"value\":" ++ Va ++ "",
-	{{Year, Month, Day}, {Hour, Minutes, Seconds}} = calendar:now_to_universal_time(os:timestamp()),
-	
-	StrYear = integer_to_list(Year),
-	StrMonth = integer_to_list(Month),
-	StrDay = integer_to_list(Day),
-	StrHour = integer_to_list(Hour),
-	StrMinutes = integer_to_list(Minutes),
-	StrSeconds = integer_to_list(Seconds),
-	
-	Timestamp = ", \"timestamp\":\""++StrYear++":"++StrMonth++":"++StrDay++" "++StrHour++":"++StrMinutes++":"++StrSeconds++"\"",
+	Timestamp = ", \"timestamp\":\""++?TIME_NOW(erlang:localtime())++"\"",
 	
 	FinalData = "{"++SId++Val++Timestamp++"}",
-	httpc:request(post, {?ES_ADDR++"/datapoint", [], "application/json",
+	httpc:request(post, {api_help:get_elastic_search_url()++"/sensorcloud"++"/datapoint", [], "application/json",
 						 FinalData}, 
 				  [], []).
 
 %% @doc
-%% Function: post_parser/4
+%% Function: post_parser/3
 %% Purpose: Post a parser using the values provided, if 'InputType' or 'InputParser' is
 %%          empty they are ignored.
 %% Returns: {ok, Result} | {ok, saved_to_file} | {error, Reason}.
 %% @end
--spec post_parser(StreamId :: integer(), InputType :: string(), InputParser :: string()) ->
+-spec post_parser(StreamId :: string(), InputType :: string(), InputParser :: string()) ->
 		  {ok, term()}
 		| {ok, saved_to_file}
 		| {error, term()}.
-post_parser(StreamId, InputType, InputParser) when is_integer(StreamId)->
+post_parser(StreamId, InputType, InputParser) when is_list(StreamId)->
 	It = case InputType of
 			 "" -> "";
 			 _ -> ", \"input_type\":\"" ++ InputType ++ "\""
@@ -379,8 +371,8 @@ post_parser(StreamId, InputType, InputParser) when is_integer(StreamId)->
 			 "" -> "";
 			 _ -> ", \"input_parser\":\"" ++ InputParser ++ "\""
 		 end,
-	Si = "\""++integer_to_list(StreamId)++"\"",
-	{ok, Res} = httpc:request(post, {?ES_ADDR ++ "/parser", [],
+	Si = "\""++StreamId++"\"",
+	{ok, Res} = httpc:request(post, {api_help:get_elastic_search_url()++"/sensorcloud" ++ "/parser", [],
 						 "application/json",
 						 "{\"stream_id\":"++Si++It++Ip++"}"
 						}, [],[]).
@@ -396,22 +388,22 @@ post_parser(StreamId, InputType, InputParser) when is_integer(StreamId)->
 		| {ok, saved_to_file}
 		| {error, term()}.
 post_stream("", "") ->
-	httpc:request(post, {?ES_ADDR ++ "/stream", [],
+	httpc:request(post, {api_help:get_elastic_search_url()++"/sensorcloud" ++ "/stream", [],
 						 "application/json",
 						 "{}"
 						}, [], []);
 post_stream(Name, "") ->
-	httpc:request(post, {?ES_ADDR ++ "/stream", [],
+	httpc:request(post, {api_help:get_elastic_search_url()++"/sensorcloud" ++ "/stream", [],
 						 "application/json",
 						 "{\"name\" : \"" ++ Name ++ "\" }"
 						}, [], []);
 post_stream("", Uri) ->
-	httpc:request(post, {?ES_ADDR ++ "/stream", [],
+	httpc:request(post, {api_help:get_elastic_search_url()++"/sensorcloud" ++ "/stream", [],
 						 "application/json",
 						 "{\"uri\" : \"" ++ Uri ++ "\" }"
 						}, [], []);
 post_stream(Name, Uri) ->
-	httpc:request(post, {?ES_ADDR ++ "/stream", [],
+	httpc:request(post, {api_help:get_elastic_search_url()++"/sensorcloud" ++ "/stream", [],
 						 "application/json",
 						 "{\"name\" : \"" ++ Name ++ "\"" ++
 							 ", \"uri\" : \"" ++ Uri ++ "\" }"
@@ -423,9 +415,10 @@ post_stream(Name, Uri) ->
 %% Purpose: Delete the specified stream from the stream type in ES.
 %% Returns: {ok, Result} | {ok, saved_to_file} | {error, Reason}.
 %% @end
+-spec delete_stream_from_record(Record :: record()) -> {ok, term()} | {ok, saved_to_file} | {error, term()}.
 delete_stream_from_record(Record) when is_record(Record, pollerInfo) ->
 	Id = Record#pollerInfo.stream_id,
-	httpc:request(delete, {?ES_ADDR ++ "/stream/" ++ Id, []}, [], []).
+	httpc:request(delete, {api_help:get_elastic_search_url()++"/sensorcloud" ++ "/stream/" ++ Id, []}, [], []).
 
 
 

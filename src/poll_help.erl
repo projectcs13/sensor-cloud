@@ -37,14 +37,9 @@
 %% Purpose: get a datapoint from elasticsearch 
 %% Returns: [string() ...] | {error, ErrMsg}
 %% @end
--spec get_datapoint(StreamId :: integer() | string()) -> {error, string()} | list().
-get_datapoint(StreamId)->
-	case is_integer(StreamId) of
-		true->
-			Id = integer_to_list(StreamId);
-		_->
-			Id = StreamId
-	end,
+-spec get_datapoint(StreamId :: string()) -> {error, string()} | list().
+get_datapoint(StreamId) when is_list(StreamId) ->
+	Id = StreamId,
 	case erlastic_search:search_limit(?ES_INDEX, "datapoint", "stream_id:" ++ Id, 100) of
 		{ok, Result} ->
 			FinalJson = lib_json:get_list_and_add_id(Result, data),
@@ -60,14 +55,9 @@ get_datapoint(StreamId)->
 %% Purpose: post a new datapoint into the elasticsearch 
 %% Returns: ok | {error, ErrMsg}
 %% @end
--spec post_datapoint(StreamId :: integer()|string(), Value :: integer()|float()|list()) -> ok | {error, string()}.
+-spec post_datapoint(StreamId :: string(), Value :: integer()|float()|list()) -> ok | {error, string()}.
 post_datapoint(StreamId, Value)->
-	FieldValue1 =  case is_integer(StreamId) of
-						true->
-							{"stream_id",integer_to_binary(StreamId)};
-						_ ->
-							{"stream_id",list_to_binary(StreamId)}
-					end,
+	FieldValue1 = {"stream_id",list_to_binary(StreamId)},
 	FieldValue2 = case is_integer(Value) of
 						true->
 							{"value",integer_to_binary(Value)};
