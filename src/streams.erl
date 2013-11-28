@@ -182,10 +182,21 @@ process_post(ReqData, State) ->
 									case erlastic_search:index_doc(?INDEX, "stream", FieldsAdded) of	
 										{error,{Code,Body}} ->
 											ErrorString = api_help:generate_error(Body, Code),
-            								{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+											{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 										{ok,List} -> 
-											%suggest:update_suggestion(UserAdded),
-											{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
+											case lib_json:get_field(Stream, "resource.resource_type") of
+												undefined ->
+													{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State};
+												_ ->
+													case resources:add_suggested_stream(Stream) of
+														{error, ErrorStr} ->
+															erlang:display("Stream not added to the suggested streams:  " ++ ErrorStr);
+														ok ->
+															erlang:display("New suggested stream")
+													end	,
+													%suggest:update_suggestion(UserAdded),
+												{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
+											end
 									end
 			%				end
 					end
@@ -307,8 +318,8 @@ put_stream(ReqData, State) ->
 			Rank = case lib_json:get_field(Json,"ranking") of 
 				undefined ->
                 	{error, {<<"{\"error\":\"Error, incorrect or no ranking specified.\"}">>, 409}};
-				Ranking when (Ranking >= 0.0) and (Ranking =< 100.0) ->
-					Ranking;
+				Ranking when is_number(Ranking) and (Ranking >= 0.0) and (Ranking =< 100.0) ->
+					float(Ranking);
 				_ ->
 					{error, {<<"{\"error\":\"Error, incorrect or no ranking specified.\"}">>, 409}}
         	end,
@@ -326,47 +337,56 @@ put_stream(ReqData, State) ->
         			ErrorString = api_help:generate_error(Body, Code),
         			{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
         		{Rank, User} -> 
-	        		case erlastic_search:get_doc(?INDEX,"user", User) of
-	          			{error, {Code, Body}} -> %User doesn't exist
-	            			ErrorString = api_help:generate_error(Body, Code),
-	            			{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-	            		{ok,List} ->	%User exists
-	            			case lib_json:get_field(List, "_source.rankings") of
-	            				undefined -> %User has NO previous rankings
-	            					change_ranking(StreamId, Rank),
-	            					UpdateJson = "{\"script\" : \"ctx._source.rankings += ranking\",\"params\":{\"ranking\":{ \"rank\":"++ float_to_list(Rank) ++",\"stream_id\":\""++StreamId++"\"}}}",
-	            					case api_help:update_doc(?INDEX, "user", User, UpdateJson, []) of
-										{error, {Code, Body}} ->
-					           				ErrorString = api_help:generate_error(Body, Code),
-					           				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-					           			{ok, List2} -> {true,wrq:set_resp_body(lib_json:encode(List2),ReqData),State}
-					           		end;
-            					RankingList -> %User has previous rankings
-            						case find_ranking(StreamId, RankingList, Rank, []) of
-            							not_found -> %User has NOT ranked this stream before
-            								change_ranking(StreamId, Rank),
-            								UpdateJson = "{\"script\" : \"ctx._source.rankings += ranking\",\"params\":{\"ranking\":{ \"rank\":"++ float_to_list(Rank) ++",\"stream_id\":\""++StreamId++"\"}}}",
-	            							case api_help:update_doc(?INDEX, "user", User, UpdateJson,[]) of
+					Query = "{\"size\" :100,\"query\" : {\"term\" : {\"username\":\"" ++ lib_json:to_string(User) ++"\"}}}",
+					case erlastic_search:search_json(#erls_params{},?INDEX, "user", Query) of
+						{error, {Code1, Body1}} -> 
+							ErrorString1 = api_help:generate_error(Body1, Code1),
+							{{halt, Code1}, wrq:set_resp_body(ErrorString1, ReqData), State};
+						{ok, NewJson} ->
+							ESId = lib_json:to_string(lib_json:get_field(NewJson, "hits.hits[0]._id")),
+							case erlastic_search:get_doc(?INDEX,"user", ESId) of
+								{error, {Code, Body}} -> %User doesn't exist
+	            					ErrorString = api_help:generate_error(Body, Code),
+	            					{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+								{ok,List} ->	%User exists
+	            					case lib_json:get_field(List, "_source.rankings") of
+	            						undefined -> %User has NO previous rankings
+	            							change_ranking(StreamId, Rank),
+	            							UpdateJson = "{\"script\" : \"ctx._source.rankings += ranking\",\"params\":{\"ranking\":{ \"rank\":"++ float_to_list(Rank) ++",\"stream_id\":\""++StreamId++"\"}}}",
+	            							case api_help:update_doc(?INDEX, "user", ESId, UpdateJson, []) of
 												{error, {Code, Body}} ->
-					            					ErrorString = api_help:generate_error(Body, Code),
-					            					{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-					            				{ok, List3} -> {true,wrq:set_resp_body(lib_json:encode(List3),ReqData),State}
-				            				end;
-            							{OldRank, ChangedRankingList} -> %User HAS ranked this stream before
-                							change_ranking(StreamId, Rank, OldRank),
-                							UpdateJson = api_help:create_update(lib_json:set_attr("rankings", ChangedRankingList)),
-            								case api_help:update_doc(?INDEX, "user", User, UpdateJson,[]) of
-												{error, {Code, Body}} ->
-					            					ErrorString = api_help:generate_error(Body, Code),
-					            					{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-					            				{ok, List4} -> 
-					            					{true,wrq:set_resp_body(lib_json:encode(List4),ReqData),State}
-				            				end
-            						end
-	            			end
-	            	end	
-    		end
+					           						ErrorString = api_help:generate_error(Body, Code),
+					           						{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+					           					{ok, List2} -> {true,wrq:set_resp_body(lib_json:encode(List2),ReqData),State}
+					           				end;
+            							RankingList -> %User has previous rankings
+            								case find_ranking(StreamId, RankingList, Rank, []) of
+            									not_found -> %User has NOT ranked this stream before
+            										change_ranking(StreamId, Rank),
+            										UpdateJson = "{\"script\" : \"ctx._source.rankings += ranking\",\"params\":{\"ranking\":{ \"rank\":"++ float_to_list(Rank) ++",\"stream_id\":\""++StreamId++"\"}}}",
+	            									case api_help:update_doc(?INDEX, "user", ESId, UpdateJson,[]) of
+														{error, {Code, Body}} ->
+					            							ErrorString = api_help:generate_error(Body, Code),
+					            							{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+					            						{ok, List3} -> {true,wrq:set_resp_body(lib_json:encode(List3),ReqData),State}
+				            						end;
+            									{OldRank, ChangedRankingList} -> %User HAS ranked this stream before
+                									change_ranking(StreamId, Rank, OldRank),
+                									UpdateJson = api_help:create_update(lib_json:set_attr("rankings", ChangedRankingList)),
+            										case api_help:update_doc(?INDEX, "user", ESId, UpdateJson,[]) of
+														{error, {Code, Body}} ->
+					            							ErrorString = api_help:generate_error(Body, Code),
+					            							{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+					            						{ok, List4} -> 
+					            							{true,wrq:set_resp_body(lib_json:encode(List4),ReqData),State}
+				            						end
+            								end
+									end
+							end
+					end
+			end
 	end.
+
 
 
 
@@ -415,7 +435,7 @@ get_stream(ReqData, State) ->
             				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 					    {ok,JsonStruct} ->
 						    FinalJson = lib_json:get_list_and_add_id(JsonStruct, streams),
-						    {FinalJson, ReqData, State} 
+						    {FinalJson, ReqData, State}
 					end;
 				StreamId ->
 				% Get specific stream
@@ -558,7 +578,6 @@ add_server_side_fields(Json) ->
 			{"user_ranking.average", 0.0},
 			{"user_ranking.nr_rankings", 0},
 			{active, true}]),
-	erlang:display(JSON),
 	JSON.
 
 
