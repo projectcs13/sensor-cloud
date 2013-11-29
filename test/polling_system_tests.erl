@@ -172,9 +172,8 @@ rebuild_system_test()->
 	post_parser("1", "application/json","streams/humidity/value"),
 	
 	api_help:refresh(),
-	gen_server:cast(polling_supervisor, {rebuild, "1"}),
-	gen_server:cast(polling_supervisor, {rebuild, "2"}),
-	timer:sleep(1000),
+	gen_server:call(polling_supervisor, {rebuild, "1"}),
+	gen_server:call(polling_supervisor, {rebuild, "2"}),
 	ChildrenList = supervisor:which_children(polling_monitor),
 	?assertEqual(2, length(ChildrenList)),
 	{_, Pid1, _, _} = lists:nth(1, ChildrenList),
@@ -217,9 +216,8 @@ rebuild_system_test()->
 	post_parser("2", "application/json","streams/humidity/value"),
 	
 	api_help:refresh(),
-	gen_server:cast(polling_supervisor, {rebuild, "1"}),
-	gen_server:cast(polling_supervisor, {rebuild, "2"}),
-	timer:sleep(1000),
+	gen_server:call(polling_supervisor, {rebuild, "1"}),
+	gen_server:call(polling_supervisor, {rebuild, "2"}),
 	
 	ChildrenList2 = supervisor:which_children(polling_monitor),
 	?assertEqual(2, length(ChildrenList2)),
@@ -341,7 +339,7 @@ post_parser(StreamId, InputType, InputParser) when is_list(StreamId)->
 			 _ -> ", \"input_parser\":\"" ++ InputParser ++ "\""
 		 end,
 	Si = "\""++StreamId++"\"",
-	{ok, Res} = httpc:request(post, {?ES_ADDR ++ "/parser", [],
+	{ok, Res} = httpc:request(post, {api_help:get_elastic_search_url() ++ "/sensorcloud" ++ "/parser", [],
 						 "application/json",
 						 "{\"stream_id\":"++Si++It++Ip++"}"
 						}, [],[]).
@@ -356,7 +354,7 @@ post_parser(StreamId, InputType, InputParser) when is_list(StreamId)->
 		| {ok, saved_to_file}
 		| {error, term()}.
 clear_stream_type() ->
-	httpc:request(delete, {?ES_ADDR ++ "/stream", []}, [], []).
+	httpc:request(delete, {api_help:get_elastic_search_url() ++ "/sensorcloud" ++ "/stream", []}, [], []).
 
 %% @doc
 %% Function: clear_parser_type/0
@@ -368,7 +366,7 @@ clear_stream_type() ->
 		| {ok, saved_to_file}
 		| {error, term()}.
 clear_parser_type() ->
-	httpc:request(delete, {?ES_ADDR ++ "/parser", []}, [], []).
+	httpc:request(delete, {api_help:get_elastic_search_url() ++ "/sensorcloud" ++ "/parser", []}, [], []).
 
 %% @doc
 %% Function: clear_datapoint_type/0
@@ -380,7 +378,7 @@ clear_parser_type() ->
 		| {ok, saved_to_file}
 		| {error, term()}.
 clear_datapoint_type() ->
-	httpc:request(delete, {?ES_ADDR ++ "/datapoint", []}, [], []).
+	httpc:request(delete, {api_help:get_elastic_search_url() ++ "/sensorcloud" ++ "/datapoint", []}, [], []).
 
 %% @doc
 %% Function: test_rabbit_messages/1

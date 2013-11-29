@@ -103,22 +103,7 @@ handle_cast({terminate, StreamId}, PollersInfo)->
 			supervisor:terminate_child(polling_monitor, Poller#pollerInfo.pid),
 			supervisor:delete_child(polling_monitor, Poller#pollerInfo.pid),
 			{noreply, delete_info(PollersInfo, StreamId)}
-	end;
-handle_cast({rebuild, StreamId}, PollersInfo)->
-	
-	Poller = find_poller_by_id(StreamId, PollersInfo),
-	case Poller of
-		{error, ErrMessage} -> 
-			erlang:display("the error in finding poller: " ++ ErrMessage),
-			NewPollersInfo = PollersInfo;
-		_ ->
-			{update, StreamId, NewUri, NewFreq} = gen_server:call(Poller#pollerInfo.pid, {rebuild}),
-			{ok,  cancel} = timer:cancel(Poller#pollerInfo.timer_ref),
-			{ok, NewTRef} = timer:send_interval(NewFreq, Poller#pollerInfo.pid, {probe}), 
-			%%change the url of the poller information stored
-			NewPollersInfo = update_info(PollersInfo, StreamId, NewUri, NewTRef)
-	end,
-	{noreply, NewPollersInfo}.
+	end.
 	
 %% @doc
 %% Function: handle_call/2
@@ -137,7 +122,22 @@ handle_call(create_pollers, _Form, State)->
 	PollerList = poll_help:json_to_record_streams(poll_help:get_streams_using_polling()),
 
 	create_poller_for_each(PollerList),
-	{reply, ok, State}.
+	{reply, ok, State};
+handle_call({rebuild, StreamId}, _Form, PollersInfo)->
+	
+	Poller = find_poller_by_id(StreamId, PollersInfo),
+	case Poller of
+		{error, ErrMessage} -> 
+			erlang:display("the error in finding poller: " ++ ErrMessage),
+			NewPollersInfo = PollersInfo;
+		_ ->
+			{update, StreamId, NewUri, NewFreq} = gen_server:call(Poller#pollerInfo.pid, {rebuild}),
+			{ok,  cancel} = timer:cancel(Poller#pollerInfo.timer_ref),
+			{ok, NewTRef} = timer:send_interval(NewFreq, Poller#pollerInfo.pid, {probe}), 
+			%%change the url of the poller information stored
+			NewPollersInfo = update_info(PollersInfo, StreamId, NewUri, NewTRef)
+	end,
+	{reply, ok, NewPollersInfo}.
 
 %% @doc
 %% Function: terminate/2

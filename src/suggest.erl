@@ -119,11 +119,11 @@ get_suggestion(ReqData, State) ->
 							EncodedList = lib_json:encode(List),
 							case re:run(EncodedList, "\"options\":\\[\\]", [{capture, first, list}]) of
 								{match, _} -> 
-									{{halt,404},ReqData, State};
+									Output = lib_json:set_attr("suggestions",[]);
 								_-> 
-									Output = lib_json:set_attr("suggestions",lib_json:get_field(List, "testsuggest[0].options")), 
-									{lib_json:encode(Output),ReqData, State}
-							end
+									Output = lib_json:set_attr("suggestions",lib_json:get_field(List, "testsuggest[0].options"))
+							end,
+							{lib_json:encode(Output),ReqData, State}
 					end
 			end;
 		true ->
@@ -163,18 +163,17 @@ add_suggestion(Resource, ResourceId) ->
 			{error, no_model};
 		_ ->
 			Suggestion = lib_json:set_attrs(
-					[
-						{resource_id, ResourceId},
-						{suggest, "{}"},
-						{"suggest.input", Model},
-						{"suggest.output", get_timestamp()},
-						{"suggest.payload", "{}"},
-						{"suggest.payload.manufacturer", Manufacturer},
-						{"suggest.payload.tags", Tags},
-						{"suggest.payload.polling_freq", Polling_freq},
-						{"suggest.weight", Weight}
-						]
-					),
+						  [
+						   {resource_id, ResourceId},
+						   {suggest, "{}"},
+						   {"suggest.input", Model},
+						   {"suggest.output", Model},
+						   {"suggest.payload", "{}"},
+						   {"suggest.payload.resource", ResourceId},
+						   {"suggest.payload.model", Model},
+						   {"suggest.weight", Weight}
+						  ]
+						 ),
 			case erlastic_search:index_doc(?INDEX, "suggestion", Suggestion) of 
 				{error, _Reason} -> erlang:display("Suggestion not saved ");
 				{ok, _} -> 	ok

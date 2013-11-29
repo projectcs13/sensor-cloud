@@ -104,15 +104,17 @@ process_post(ReqData, State) ->
 												ok ->
 													Msg = list_to_binary(FinalJson),
 													StreamExchange = list_to_binary("streams."++Id),
-								                    %% Connect
-								                    {ok, Connection} =
-								                         amqp_connection:start(#amqp_params_network{host = "localhost"}),
-								                    %% Open channel
-								                    {ok, Channel} = amqp_connection:open_channel(Connection),
-								                    %% Declare exchange
-								                    amqp_channel:call(Channel, #'exchange.declare'{exchange = StreamExchange, type = <<"fanout">>}),        
-								                    %% Send
-								                    amqp_channel:cast(Channel, #'basic.publish'{exchange = StreamExchange}, #amqp_msg{payload = Msg}),
+                                   					%% Connect
+                                   					{ok, Connection} =
+                                       					 amqp_connection:start(#amqp_params_network{host = "localhost"}),
+                                    				%% Open channel
+                                    				{ok, Channel} = amqp_connection:open_channel(Connection),
+                                    				%% Declare exchange
+                                    				amqp_channel:call(Channel, #'exchange.declare'{exchange = StreamExchange, type = <<"fanout">>}),        
+                                    				%% Send
+                                   					amqp_channel:cast(Channel, #'basic.publish'{exchange = StreamExchange}, #amqp_msg{payload = Msg}),
+                                   					ok = amqp_channel:close(Channel),
+							                       	ok = amqp_connection:close(Connection),
 													{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
 											end
 									end
