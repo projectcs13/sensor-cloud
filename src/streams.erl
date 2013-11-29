@@ -114,18 +114,15 @@ delete_resource(ReqData, State) ->
 							ErrorString = api_help:generate_error(Body, Code),
 							{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 						{ok,List} -> 
-			 				%% {true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
 							% changed by lihao
 							% delete the parser according to stream id
 							Parser_id = "parser_"++Id,
 							case erlastic_search:delete_doc(?INDEX, "parser", Parser_id) of
-								{error, {Code2, Body2}} ->
-									ErrorString2 = api_help:generate_error(Body2, Code2),
-									{{halt, Code2}, wrq:set_resp_body(ErrorString2, ReqData), State};
-								{ok, List2} ->
+								{error, {_Code2, _Body2}} ->
+									continue;
+								{ok, _List2} ->
 									% terminate the poller
-									gen_server:cast(polling_supervisor, {terminate, Id}),
-									{true, wrq:set_resp_body(lib_json:encode(List2), ReqData), State}
+									gen_server:cast(polling_supervisor, {terminate, Id})
 							end,
 							{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
 							% change ends
