@@ -13,3 +13,4 @@ priv/logs
 
 # Do not Ignore these
 !doc/overview.edoc
+/ebin
