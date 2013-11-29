@@ -38,7 +38,7 @@ init([]) ->
 
 allowed_methods(ReqData, State) ->
 	case api_help:parse_path(wrq:path(ReqData)) of
-		[{"users", _UserID}, {"streams", _StreamID},{"triggers",_Func}] ->
+		[{"users", _UserID},{"triggers"}] ->
 			{['POST','DELETE'], ReqData, State};
 		[error] ->
 		    {[], ReqData, State} 
@@ -77,46 +77,155 @@ get_triggers(ReqData, State) ->
 
 
 process_post(ReqData, State) ->
-	StreamId = proplists:get_value('streamid', wrq:path_info(ReqData)),
 	Username = proplists:get_value('userid', wrq:path_info(ReqData)),
-	Function = proplists:get_value('func', wrq:path_info(ReqData)),
-	erlang:display(StreamId),
-	CommandExchange = list_to_binary("triggers."++StreamId),
-	Msg = term_to_binary({add,Username,Function}),
-	%% Connect
-	{ok, Connection} =
-		amqp_connection:start(#amqp_params_network{host = "localhost"}),
-	%% Open channel
-	{ok, Channel} = amqp_connection:open_channel(Connection),
-	%% Declare exchange
-	amqp_channel:call(Channel, #'exchange.declare'{exchange = CommandExchange, type = <<"fanout">>}),        
-	%% Send
-	amqp_channel:cast(Channel, #'basic.publish'{exchange = CommandExchange}, #amqp_msg{payload = Msg}),
-	{true,ReqData,State}.
+	{Json,_,_} = api_help:json_handler(ReqData, State),
+	Input = lib_json:get_field(Json, "input"),
+	Streams = case lib_json:get_field(Json, "streams") of
+				  undefiend ->
+					  error;
+				  Value when is_binary(Value) ->
+					  [binary_to_list(Value)];
+				  List ->
+					  lists:map(fun(A) -> binary_to_list(A) end,List)
+			  end,
+	Function = case lib_json:get_field(Json, "function") of
+				   undefined ->
+					   error;
+				   Value2 ->
+					   binary_to_list(Value2)
+			   end,
+	StreamsQuery = create_stream_query(Streams,[]),
+	Query = "{\"filter\":{\"term\":{ \"function\":\"" ++ Function ++ "\"}},\"query\":{\"match\":{\"streams\":{\"query\":\"" ++ StreamsQuery ++"\",\"operator\":\"and\"}}}}",	
+	EsId = case erlastic_search:search_json(#erls_params{},?INDEX, "trigger", Query) of % Maybe wanna take more
+			   {error, {Code, Body}} -> 
+				   {error, {Code, Body}};
+			   {ok,JsonStruct} ->
+				   case lib_json:get_field(JsonStruct, "hits.total") of
+					   0 -> undefined;
+					   1 -> lib_json:get_field(JsonStruct, "hits.hits[0]._id");
+					   X -> erlang:display(X), error
+				   end
+		   end,
+	case {EsId,Streams,Function} of
+		{{error, {Code1, Body1}},_,_} ->
+			ErrorString1 = api_help:generate_error(Body1, Code1),
+			{{halt, Code1}, wrq:set_resp_body(ErrorString1, ReqData), State};
+		{_,error,_} ->
+			{{halt, 405}, wrq:set_resp_body("Invalid stream list should be a valid stream id or a list of valid stream ids", ReqData), State};
+		{_,_,error} ->
+			{{halt, 405}, wrq:set_resp_body("Invalid function", ReqData), State};
+		{undefined,_,_} ->
+			NewTrigger = lib_json:set_attrs([{"function",list_to_binary(Function)},{"streams",Streams},{"outputlist","[{}]"},{"outputlist[0].input",Input},{"outputlist[0].output",[Username]}]),
+			case erlastic_search:index_doc(?INDEX, "trigger", NewTrigger) of	
+				{error,{Code2,Body2}} ->
+					ErrorString2 = api_help:generate_error(Body2, Code2),
+					{{halt, Code2}, wrq:set_resp_body(ErrorString2, ReqData), State};
+				{ok,List2} -> 
+					TriggerId = lib_json:to_string(lib_json:get_field(List2, "_id")),
+					spawn_link(fun() ->
+									   triggersProcess:create(TriggerId, lists:map(fun(A) -> {stream,A} end,Streams), 
+															  Function, [{Input,[Username]}])
+							   end),
+					{true, wrq:set_resp_body(lib_json:encode(List2), ReqData), State}
+			end;
+		{EsId,_,_ }->			
+
+			CommandExchange = list_to_binary("command.trigger."++ EsId),
+			Msg = term_to_binary({add,{Input,Username}}),
+			%% Connect, now assumes local host
+			{ok, Connection} =
+				amqp_connection:start(#amqp_params_network{host = "localhost"}),
+			%% Open channel
+			{ok, Channel} = amqp_connection:open_channel(Connection),
+			%% Declare exchange
+			amqp_channel:call(Channel, #'exchange.declare'{exchange = CommandExchange, type = <<"fanout">>}),        
+			%% Send
+			amqp_channel:cast(Channel, #'basic.publish'{exchange = CommandExchange}, #amqp_msg{payload = Msg}),
+			case erlastic_search:get_doc(?INDEX, "trigger", EsId) of 
+				{error, {Code3, Body3}} -> 
+					ErrorString3 = api_help:generate_error(Body3, Code3),
+					{{halt, Code3}, wrq:set_resp_body(ErrorString3, ReqData), State};
+				{ok,JsonStruct2} -> 	 
+					Update = case lib_json:field_value_exists(JsonStruct2, "_source.outputlist[*].input", Input) of
+								 true ->
+									 "{\"script\" : \"for(int i=0;i < ctx._source.outputlist.size(); i++){if (ctx._source.outputlist[i].input == newinput){ctx._source.outputlist[i].output += newoutput; i = ctx._source.outputlist.size();}}\", \"params\":{\"newinput\":" ++  lib_json:to_string(Input)++ ", \"newoutput\": \""++ Username ++"\"}}";
+								 false ->
+									 "{\"script\" : \"ctx._source.outputlist += newelement\", \"params\":{\"newelement\":{\"input\" : "++ lib_json:to_string(Input) ++ ", \"output\":[\"" ++ Username ++"\"]}}}"
+							 end,
+					case api_help:update_doc(?INDEX, "trigger", EsId, Update) of 
+						{error, {Code4, Body4}} -> 
+							ErrorString4 = api_help:generate_error(Body4, Code4),
+		            		{{halt, Code4}, wrq:set_resp_body(ErrorString4, ReqData), State};
+						{ok,List4} -> 
+							{true,wrq:set_resp_body(lib_json:encode(List4),ReqData),State}
+					end
+			end
+
+	end.
+
+
+%{"script" : "ctx._source.outputlist.input.contains(newinput) ? (ctx._source.outputlist.output += user ) : ctx.op = \"none\"","params" : {"newinput" :  7, "user" : "Steine"}}
 
 delete_resource(ReqData, State) ->
-	erlang:display("Got here!"),
-	StreamId = proplists:get_value('streamid', wrq:path_info(ReqData)),
 	Username = proplists:get_value('userid', wrq:path_info(ReqData)),
-	Function = proplists:get_value('func', wrq:path_info(ReqData)),
-	erlang:display(StreamId),
-	CommandExchange = list_to_binary("triggers."++StreamId),
-	Msg = term_to_binary({remove,Username,Function}),
-	%% Connect
-	{ok, Connection} =
-		amqp_connection:start(#amqp_params_network{host = "localhost"}),
-	%% Open channel
-	{ok, Channel} = amqp_connection:open_channel(Connection),
-	%% Declare exchange
-	amqp_channel:call(Channel, #'exchange.declare'{exchange = CommandExchange, type = <<"fanout">>}),        
-	%% Send
-	amqp_channel:cast(Channel, #'basic.publish'{exchange = CommandExchange}, #amqp_msg{payload = Msg}),
-	{true,ReqData,State}.
+	{Json,_,_} = api_help:json_handler(ReqData, State),
+	Input = lib_json:get_field(Json, "input"),
+	Streams = case lib_json:get_field(Json, "streams") of
+				  undefiend ->
+					  error;
+				  Value when is_binary(Value) ->
+					  [binary_to_list(Value)];
+				  List ->
+					  lists:map(fun(A) -> binary_to_list(A) end,List)
+			  end,
+	Function = case lib_json:get_field(Json, "function") of
+				   undefined ->
+					   error;
+				   Value2 ->
+					   binary_to_list(Value2)
+			   end,
+	StreamsQuery = create_stream_query(Streams,[]),
+	Query = "{\"filter\":{\"term\":{ \"function\":\"" ++ Function ++ "\"}},\"query\":{\"match\":{\"streams\":{\"query\":\"" ++ StreamsQuery ++"\",\"operator\":\"and\"}}}}",	
+	EsId = case erlastic_search:search_json(#erls_params{},?INDEX, "trigger", Query) of % Maybe wanna take more
+			   {error, {Code, Body}} -> 
+				   {error, {Code, Body}};
+			   {ok,JsonStruct} ->
+				   case lib_json:get_field(JsonStruct, "hits.total") of
+					   0 -> error;
+					   1 -> lib_json:get_field(JsonStruct, "hits.hits[0]._id");
+					   X -> error
+				   end
+		   end,
+	case {EsId,Streams,Function} of
+		{{error, {Code1, Body1}},_,_} ->
+			ErrorString1 = api_help:generate_error(Body1, Code1),
+			{{halt, Code1}, wrq:set_resp_body(ErrorString1, ReqData), State};
+		{_,error,_} ->
+			{{halt, 405}, wrq:set_resp_body("Invalid stream list should be a valid stream id or a list of valid stream ids", ReqData), State};
+		{_,_,error} ->
+			{{halt, 405}, wrq:set_resp_body("Invalid function", ReqData), State};
+		{error,_,_} ->
+			{{halt, 404}, ReqData, State};
+		{EsId,_,_ }->			
+			CommandExchange = list_to_binary("command.trigger."++ EsId),
+			Msg = term_to_binary({remove,{Input,Username}}),
+			%% Connect, now assumes local host
+			{ok, Connection} =
+				amqp_connection:start(#amqp_params_network{host = "localhost"}),
+			%% Open channel
+			{ok, Channel} = amqp_connection:open_channel(Connection),
+			%% Declare exchange
+			amqp_channel:call(Channel, #'exchange.declare'{exchange = CommandExchange, type = <<"fanout">>}),        
+			%% Send
+			amqp_channel:cast(Channel, #'basic.publish'{exchange = CommandExchange}, #amqp_msg{payload = Msg}),
+			{true,ReqData,State}
+	end.
 
 
+create_stream_query([StreamId],Acc) ->
+	StreamId ++ Acc;
+create_stream_query([StreamId|Rest],Acc) ->
+	create_stream_query(Rest," " ++ StreamId ++ Acc).
 
 
-
-
-		
 
