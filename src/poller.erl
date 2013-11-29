@@ -48,7 +48,7 @@ init(State)->
 	{ok, ChannelOut} = amqp_connection:open_channel(Connection),
 	amqp_channel:call(ChannelOut, #'exchange.declare'{exchange = StreamExchange, type = <<"fanout">>}),
 	
-	{ok, #state{stream_id=State#state.stream_id, uri=State#state.uri, parser=State#state.parser, exchange=StreamExchange, channel=ChannelOut}}.
+	{ok, #state{stream_id=State#state.stream_id, uri=State#state.uri, parser=State#state.parser, exchange=StreamExchange, channel=ChannelOut, connection=Connection}}.
 
 %% @doc
 %% Function: handle_call/2
@@ -89,7 +89,7 @@ handle_call({rebuild}, _Form, State)->
 							FinalUri = binary_to_list(NewUri)
 					end,			
 					%% notify the supervisor to refresh its records
-					{reply, {update, StreamId, FinalUri, NewFreq}, #state{stream_id=StreamId, uri=FinalUri, parser=Parser, exchange=State#state.exchange, channel=State#state.channel}}
+					{reply, {update, StreamId, FinalUri, NewFreq}, #state{stream_id=StreamId, uri=FinalUri, parser=Parser, exchange=State#state.exchange, channel=State#state.channel, connection=State#state.connection}}
 			end
 	end;
 handle_call({check_info}, _Form, State)->
@@ -164,6 +164,10 @@ handle_info({probe}, State)->
 %% @end
 -spec terminate(_Reason :: term(), State :: record()) -> ok | {error, string()}.
 terminate(_Reason, State)->
+	%% Close the channel
+    amqp_channel:close(State#state.channel),
+    %% Close the connection
+    amqp_connection:close(State#state.connection),
 	Uri = State#state.uri,
 	erlang:display("the poller for "++Uri++" stops working!"),
 	application:stop(inets).

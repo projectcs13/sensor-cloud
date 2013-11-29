@@ -4,4 +4,5 @@
 				uri,
 				parser,
 				channel,
-				exchange}).
+				exchange,
+				connection}).
