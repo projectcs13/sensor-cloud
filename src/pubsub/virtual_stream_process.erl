@@ -299,12 +299,16 @@ subscribe(ChannelIn, [InputExchange | InputExchanges]) ->
 -spec get_first_value_for_streams(List :: [{Type :: atom(), Id :: string()}])
 	-> [] | [{Id :: string(), Value :: json() | undefined}].
 get_first_value_for_streams([]) -> [];
-get_first_value_for_streams([{_Type, Id} | T]) ->
+get_first_value_for_streams([{Type, Id} | T]) ->
 	JsonQuery = "{\"query\" : {\"term\" : {\"stream_id\" : \"" ++ Id ++ "\"}},"
 					++ "\"sort\" : [{\"timestamp\" : {\"order\" : \"desc\"}}],"
 					++ "\"size\" : 1}",
+	DataPointType = case Type of
+						stream -> "datapoint";
+						vstream -> "vsdatapoint"
+					end,
 	case erlastic_search:search_json(#erls_params{}, ?ES_INDEX,
-									 "datapoint", JsonQuery) of
+									 DataPointType, JsonQuery) of
 		{ok, Result} ->
 			Datapoint = lib_json:get_field(Result, "hits.hits"),
 			case Datapoint of
