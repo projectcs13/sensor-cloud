@@ -94,8 +94,8 @@ process_post(ReqData, State) ->
                         		 {ok,_} ->
 							 		case erlastic_search:index_doc(?INDEX, "datapoint", FinalJson) of
 										{error, {Code, Body}} -> 
-            								ErrorString = api_help:generate_error(Body, Code),
-            								{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+								        	ErrorString = api_help:generate_error(Body, Code),
+								        	{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 										{ok,List} -> 
 											FinalTimeStamp = lib_json:get_field(FinalJson, "timestamp"),
 											case update_fields_in_stream(Id,FinalTimeStamp,ReqData,State) of
@@ -117,7 +117,7 @@ process_post(ReqData, State) ->
 							                       	ok = amqp_connection:close(Connection),
 													{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
 											end
-							 		end
+									end
 							end
 					end
 			end;
@@ -287,4 +287,3 @@ update_fields_in_stream(StreamId,TimeStamp,ReqData,State) ->
 					ok
 			end
 	end.
-  
