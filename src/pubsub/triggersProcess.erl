@@ -21,7 +21,7 @@
 
 -export([create/4]).
 
-%% Index
+%% Should import correct header
 -define(INDEX, "sensorcloud").
 
 %% ====================================================================
