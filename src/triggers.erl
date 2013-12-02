@@ -145,10 +145,10 @@ process_post(ReqData, State) ->
 				{error, {Code3, Body3}} -> 
 					ErrorString3 = api_help:generate_error(Body3, Code3),
 					{{halt, Code3}, wrq:set_resp_body(ErrorString3, ReqData), State};
-				{ok,JsonStruct2} -> 	 
+				{ok,JsonStruct2} -> 
 					Update = case lib_json:field_value_exists(JsonStruct2, "_source.outputlist[*].input", Input) of
 								 true ->
-									 "{\"script\" : \"for(int i=0;i < ctx._source.outputlist.size(); i++){if (ctx._source.outputlist[i].input == newinput){ctx._source.outputlist[i].output += newoutput; i = ctx._source.outputlist.size();}}\", \"params\":{\"newinput\":" ++  lib_json:to_string(Input)++ ", \"newoutput\": \""++ Username ++"\"}}";
+									 "{\"script\" : \"for(int i=0;i < ctx._source.outputlist.size(); i++){if (ctx._source.outputlist[i].input == newinput && !ctx._source.outputlist[i].output.contains(newoutput)){ctx._source.outputlist[i].output += newoutput; i = ctx._source.outputlist.size();}}\", \"params\":{\"newinput\":" ++  lib_json:to_string(Input)++ ", \"newoutput\": \""++ Username ++"\"}}";
 								 false ->
 									 "{\"script\" : \"ctx._source.outputlist += newelement\", \"params\":{\"newelement\":{\"input\" : "++ lib_json:to_string(Input) ++ ", \"output\":[\"" ++ Username ++"\"]}}}"
 							 end,
@@ -164,7 +164,7 @@ process_post(ReqData, State) ->
 	end.
 
 
-%{"script" : "ctx._source.outputlist.input.contains(newinput) ? (ctx._source.outputlist.output += user ) : ctx.op = \"none\"","params" : {"newinput" :  7, "user" : "Steine"}}
+
 
 delete_resource(ReqData, State) ->
 	Username = proplists:get_value('userid', wrq:path_info(ReqData)),
@@ -207,6 +207,26 @@ delete_resource(ReqData, State) ->
 		{error,_,_} ->
 			{{halt, 404}, ReqData, State};
 		{EsId,_,_ }->			
+			Return = case erlastic_search:get_doc(?INDEX, "trigger", EsId) of 
+						 {error, {Code3, Body3}} -> 
+							 ErrorString3 = api_help:generate_error(Body3, Code3),
+							 {{halt, Code3}, wrq:set_resp_body(ErrorString3, ReqData), State};
+						 {ok,JsonStruct2} -> 	 
+							 Update = case lib_json:field_value_exists(JsonStruct2, "_source.outputlist[*].input", Input) of
+										  true ->
+											  "{\"script\" : \"for(int i=0;i < ctx._source.outputlist.size(); i++){if (ctx._source.outputlist[i].input == newinput){if (ctx._source.outputlist[i].output == newoutputlist) {ctx._source.outputlist.remove((Object) ctx._source.outputlist[i]); i = ctx._source.outputlist.size();} else {for(int k=0;k < ctx._source.outputlist[i].output.size(); k++) {if (ctx._source.outputlist[i].output[k] == newoutput) {ctx._source.outputlist[i].output.remove((Object) ctx._source.outputlist[i].output[k]); k = ctx._source.outputlist[i].output.size();}}}}}\", \"params\":{\"newinput\":\"" ++ lib_json:to_string(Input) ++ "\", \"newoutputlist\": [\"" ++ Username ++"\"], \"newoutput\": \"" ++ Username ++ "\"}}";
+										  false ->
+											  erlang:display("Error: input not in file"),
+											  "{}"
+									  end,
+							 case api_help:update_doc(?INDEX, "trigger", EsId, Update) of 
+								 {error, {Code4, Body4}} -> 
+									 ErrorString4 = api_help:generate_error(Body4, Code4),
+									 {{halt, Code4}, wrq:set_resp_body(ErrorString4, ReqData), State};
+								 {ok,List4} -> 
+									 {true,wrq:set_resp_body(lib_json:encode(List4),ReqData),State}
+							 end
+					 end,
 			CommandExchange = list_to_binary("command.trigger."++ EsId),
 			Msg = term_to_binary({remove,{Input,Username}}),
 			%% Connect, now assumes local host
@@ -218,7 +238,7 @@ delete_resource(ReqData, State) ->
 			amqp_channel:call(Channel, #'exchange.declare'{exchange = CommandExchange, type = <<"fanout">>}),        
 			%% Send
 			amqp_channel:cast(Channel, #'basic.publish'{exchange = CommandExchange}, #amqp_msg{payload = Msg}),
-			{true,ReqData,State}
+			Return
 	end.
 
 

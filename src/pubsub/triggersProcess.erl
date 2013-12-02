@@ -381,7 +381,12 @@ send_messages(TriggerExchange,ChannelOut,[Msg|Rest]) ->
 handle_command({add,{Input,User}},[]) ->
 	[{Input,[User]}];
 handle_command({add,{Input,User}},[{Input,Users}|Rest]) ->
-	[{Input,[User|Users]}|Rest];
+	case lists:member(User, Users) of
+		true ->
+			[{Input,Users}|Rest];
+		false ->
+			[{Input,[User|Users]}|Rest]
+	end;
 handle_command({add,{Input,User}},[First|Rest]) ->
 	[First|handle_command({add,{Input,User}},Rest)];
 
