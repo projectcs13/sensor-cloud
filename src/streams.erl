@@ -442,7 +442,7 @@ get_stream(ReqData, State) ->
 								    {FinalJson, ReqData, State}
 							end;
 						IdList -> % Get a list of streams
-							{get_streams(IdList), ReqData, State}
+							{lib_json:get_list_and_add_id(get_streams(IdList), streams), ReqData, State}
 					end
 				end
 	end.
@@ -463,7 +463,7 @@ get_streams(List) ->
             ErrorString = api_help:generate_error(Body, Code),
             ErrorString;
         {ok,JsonStruct} ->
-             lib_json:set_attr("streams",lib_json:get_field(JsonStruct, "hits.hits"))
+             JsonStruct
     end.
 
 
