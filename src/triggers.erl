@@ -1,11 +1,11 @@
-%% @author Tomas Sävström <tosa7943@student.uu.se>
+%% @author Tomas Sävström <tosa7943@student.uu.se>, Andreas Moreg�rd Haubenwaller
 %%   [www.csproj13.student.it.uu.se]
 %% @version 1.0
 %% @copyright [Copyright information]
 %%
-%% @doc == streams ==
+%% @doc == triggers ==
 %% This module will contain all functions needed to handle 
-%% http requests done to the webmachine regarding streams 
+%% http requests done to the webmachine regarding triggers
 %%
 %% @end
 
@@ -76,6 +76,14 @@ get_triggers(ReqData, State) ->
 	{"ok",ReqData,State}.
 
 
+%% @doc
+%% Function: process_post/2
+%% Purpose: Used to handle POST requests by creating new triggers or updating old ones
+%% Returns: {Success, ReqData, State}, where Success is true if the post request is
+%% successful and false otherwise.
+%% @end
+-spec process_post(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
+
 process_post(ReqData, State) ->
 	Username = proplists:get_value('userid', wrq:path_info(ReqData)),
 	{Json,_,_} = api_help:json_handler(ReqData, State),
@@ -96,7 +104,7 @@ process_post(ReqData, State) ->
 			   end,
 	StreamsQuery = create_stream_query(Streams,[]),
 	Query = "{\"filter\":{\"term\":{ \"function\":\"" ++ Function ++ "\"}},\"query\":{\"match\":{\"streams\":{\"query\":\"" ++ StreamsQuery ++"\",\"operator\":\"and\"}}}}",	
-	EsId = case erlastic_search:search_json(#erls_params{},?INDEX, "trigger", Query) of % Maybe wanna take more
+	EsId = case erlastic_search:search_json(#erls_params{},?INDEX, "trigger", Query) of % See if the trigger is already in the system
 			   {error, {Code, Body}} -> 
 				   {error, {Code, Body}};
 			   {ok,JsonStruct} ->
@@ -116,7 +124,7 @@ process_post(ReqData, State) ->
 			{{halt, 405}, wrq:set_resp_body("Invalid function", ReqData), State};
 		{undefined,_,_} ->
 			NewTrigger = lib_json:set_attrs([{"function",list_to_binary(Function)},{"streams",Streams},{"outputlist","[{}]"},{"outputlist[0].input",Input},{"outputlist[0].output",[Username]}]),
-			case erlastic_search:index_doc(?INDEX, "trigger", NewTrigger) of	
+			case erlastic_search:index_doc(?INDEX, "trigger", NewTrigger) of	% Create new triggger if not in the system
 				{error,{Code2,Body2}} ->
 					ErrorString2 = api_help:generate_error(Body2, Code2),
 					{{halt, Code2}, wrq:set_resp_body(ErrorString2, ReqData), State};
@@ -129,7 +137,6 @@ process_post(ReqData, State) ->
 					{true, wrq:set_resp_body(lib_json:encode(List2), ReqData), State}
 			end;
 		{EsId,_,_ }->			
-
 			CommandExchange = list_to_binary("command.trigger."++ EsId),
 			Msg = term_to_binary({add,{Input,Username}}),
 			%% Connect, now assumes local host
@@ -138,7 +145,7 @@ process_post(ReqData, State) ->
 			%% Open channel
 			{ok, Channel} = amqp_connection:open_channel(Connection),
 			%% Declare exchange
-			amqp_channel:call(Channel, #'exchange.declare'{exchange = CommandExchange, type = <<"fanout">>}),        
+			amqp_channel:call(Channel, #'exchange.declare'{exchange = CommandExchange, type = <<"fanout">>}),      % Update triggersProcess running of new user  
 			%% Send
 			amqp_channel:cast(Channel, #'basic.publish'{exchange = CommandExchange}, #amqp_msg{payload = Msg}),
 			case erlastic_search:get_doc(?INDEX, "trigger", EsId) of 
@@ -152,7 +159,7 @@ process_post(ReqData, State) ->
 								 false ->
 									 "{\"script\" : \"ctx._source.outputlist += newelement\", \"params\":{\"newelement\":{\"input\" : "++ lib_json:to_string(Input) ++ ", \"output\":[\"" ++ Username ++"\"]}}}"
 							 end,
-					case api_help:update_doc(?INDEX, "trigger", EsId, Update) of 
+					case api_help:update_doc(?INDEX, "trigger", EsId, Update) of % Update document in es with the new user
 						{error, {Code4, Body4}} -> 
 							ErrorString4 = api_help:generate_error(Body4, Code4),
 		            		{{halt, Code4}, wrq:set_resp_body(ErrorString4, ReqData), State};
@@ -164,7 +171,14 @@ process_post(ReqData, State) ->
 	end.
 
 
-
+%% @doc
+%% Function: delete_resource/2
+%% Purpose: Used to handle DELETE requests by deleting users from the lists of 
+%%          current triggers
+%% Returns: {Success, ReqData, State}, where Success is true if delete is successful
+%% and false otherwise.
+%% @end
+-spec delete_resource(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 
 delete_resource(ReqData, State) ->
 	Username = proplists:get_value('userid', wrq:path_info(ReqData)),
@@ -186,7 +200,7 @@ delete_resource(ReqData, State) ->
 			   end,
 	StreamsQuery = create_stream_query(Streams,[]),
 	Query = "{\"filter\":{\"term\":{ \"function\":\"" ++ Function ++ "\"}},\"query\":{\"match\":{\"streams\":{\"query\":\"" ++ StreamsQuery ++"\",\"operator\":\"and\"}}}}",	
-	EsId = case erlastic_search:search_json(#erls_params{},?INDEX, "trigger", Query) of % Maybe wanna take more
+	EsId = case erlastic_search:search_json(#erls_params{},?INDEX, "trigger", Query) of % Get the es id of the trigger
 			   {error, {Code, Body}} -> 
 				   {error, {Code, Body}};
 			   {ok,JsonStruct} ->
@@ -207,7 +221,7 @@ delete_resource(ReqData, State) ->
 		{error,_,_} ->
 			{{halt, 404}, ReqData, State};
 		{EsId,_,_ }->			
-			Return = case erlastic_search:get_doc(?INDEX, "trigger", EsId) of 
+			Return = case erlastic_search:get_doc(?INDEX, "trigger", EsId) of % Update the es document by removing the user
 						 {error, {Code3, Body3}} -> 
 							 ErrorString3 = api_help:generate_error(Body3, Code3),
 							 {{halt, Code3}, wrq:set_resp_body(ErrorString3, ReqData), State};
@@ -235,12 +249,19 @@ delete_resource(ReqData, State) ->
 			%% Open channel
 			{ok, Channel} = amqp_connection:open_channel(Connection),
 			%% Declare exchange
-			amqp_channel:call(Channel, #'exchange.declare'{exchange = CommandExchange, type = <<"fanout">>}),        
+			amqp_channel:call(Channel, #'exchange.declare'{exchange = CommandExchange, type = <<"fanout">>}),    % Update the triggersProcess by sending a message    
 			%% Send
 			amqp_channel:cast(Channel, #'basic.publish'{exchange = CommandExchange}, #amqp_msg{payload = Msg}),
 			Return
 	end.
 
+%% @doc
+%% Function: create_stream_query/2
+%% Purpose: Used to create the query string with
+%%          all streamids in the list separated by space
+%% Returns: The created query string
+%% @end
+-spec create_stream_query(StreamIdList::[string()],Acc::string()) -> string().
 
 create_stream_query([StreamId],Acc) ->
 	StreamId ++ Acc;

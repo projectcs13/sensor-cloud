@@ -1,13 +1,12 @@
-%% @author Anders Steinrud, Gabriel Tholsgård
+%% @author Anders Steinrud, Gabriel Tholsgård, Tomas Sävström <tosa7943@student.uu.se>, Andreas Moregård Haubenwaller
 %% [www.csproj13.student.it.uu.se]
 %% @version 1.0
 %% @copyright [Copyright information]
 %%
-%% @doc == virtual_stream_process ==
-%% This module represents a virtual stream process which subscribes to data
-%% points from the pub/sub system for specified streams/virtual streams and
-%% publish it back into the pub/sub system for the represented virtual stream
-%% after applying the specified function with the data points as arguments.
+%% @doc == triggersProcess ==
+%% This module represents a trigger process that will
+%% listen to some streams and then apply a trigger function
+%% to the data when a new datapoint is added
 %%
 %% @end
 -module(triggersProcess).
@@ -30,21 +29,10 @@
 
 
 %% @doc
-%% Function: create/3
-%% Purpose: Used to initialize the virtual stream process which subscribes to
-%% the exchanges beloning to the specified streams/virtual streams and
-%% publish it into the exchange for the specified virtual stream.
-%% Args: VStreamId - The id of the publishing virtual stream,
-%% InputIds - List ids' of the streams/virtual streams to subscribe from,
-%% i.e [{stream, Id}, ... , {vstream, Id}, ...].
-%% Function - Tag of which function that will be applied to the incoming
-%% data points before publishing.
-%% Returns: Return ok.
-%% Side effects: Starts loop receiving data points from the pub/sub
-%% system for streams/virtual streams and sending data
-%% into the pub/sub system for a virtual stream
-%% with id 'VStreamId'.
-%%
+%% Function: create/4
+%% Purpose: Used to start the triggersProcess by setting up all comunication
+%%          channels needed by the loop function
+%% Returns: ok 
 %% @end
 -spec create(TriggerId :: string(), InputIds :: [StreamInfo],
                          Function :: atom(), OutputList::list()) -> ok when
@@ -93,31 +81,20 @@ create(TriggerId, InputIds, Function, OutputList) ->
 
 %% @doc
 %% Function: loop/6
-%% Purpose: Receives data points from the pub/sub system for specified
-%% exchanges and publish the result of the function with the
-%% data points as argument it into the pub/sub system for the
-%% exchange of the specified virtual stream.
-%% Args: VStreamId - Id of a virtual stream,
-%% DataPoints - A list of the latest data points for each stream,
-%% VStreamExchange - Exchange to publish to,
-%% Net - A tuple holding the connection to the RMQ server and on which
-%% channels ingoing and outgoing communication occurs,
-%% Function - Function specifier to apply to the received data point(s),
-%% Calculate - Boolean which specifies if a value should be calculated.
-%% Returns: ok.
-%% Side effects: Non terminating loop receiving data points from the pub/sub
-%% system, applying the specified function to it and publishing
-%% the result to the exchange VStreamExchange.
+%% Purpose: Used to wait for new messages and then to handle them,
+%%          if the message is a new datapoint then the trigger function 
+%%          will be run, if the message is a command the the command will
+%%          be performed, these are now {add,{Input,User}} or {remove,{Input,User}}
+%%          all other things will be ignored.
+%% Returns: ok 
 %% @end
--spec loop(VStreamId :: string(),
+-spec loop(TriggerId :: string(),
                  DataPoints :: [{Id :: string(), DataPoint :: json() | undefined}],
-                 VStreamExchange :: binary(),
+                 TriggerExchange :: binary(),
                  Net :: {Connection :: pid(), ChannelIn :: pid(), ChannelOut :: pid()},
                  Function :: string(),
-                 Calculate :: boolean()) -> ok.
+                 OutputList :: list()) -> ok.
 loop(TriggerId, DataPoints, TriggerExchange, Net, Function, OutputList) ->
-        
-        %% Receive from the subscribeTopic!
         receive
                 {#'basic.deliver'{}, #amqp_msg{payload = Body}} ->
                         Data = binary_to_term(Body),
@@ -335,19 +312,16 @@ get_first_value_for_streams([{_Type, Id} | T]) ->
 %% @doc
 %% Function: apply_function()/3
 %% Purpose: Applies the specified predefined function
-%% with the list as its argument.
-%% Args: VStreamId - The virtual stream id for which
-%%                                          we are doing the calculation,
-%%                 Function - Specifier of a predefined function,
-%% List - List of datapoints for streams and virtual streams.
-%% Returns: Value of the predefined function.
+%%          with the list of datapoints and the input
+%%          and returns the datapoint, streamid, input and 
+%%          the list of users for that input if the trigger triggers
+%% Returns: List of all triggers that triggered with the
+%%          datapoint, streamid, input and users given for
+%%          each of the triggered triggers
 %% Side effects: Applies a predefined function
 %% @end
--spec apply_function(VStreamId :: binary(),
-                                         Function :: atom(),
-                                         List :: [{Id :: string(),
-                                                         DataPoint :: json() | undefined}]) -> number().
-%% TODO - Make the predefined functions
+-spec apply_function(Function :: atom(),List :: [{Id :: string(),DataPoint :: json() | undefined}], 
+					 InputList :: [{Input::term(),Users::list()}]) -> list().
 apply_function(_Function, _DataPoints, []) -> [];
 apply_function(Function, DataPoints, InputList) ->
 		Fun = list_to_atom(Function),
@@ -364,6 +338,13 @@ apply_function(Function, DataPoints, InputList) ->
         
         
 
+%% @doc
+%% Function: create_messages/3
+%% Purpose: Used to create the messages being sent to 
+%%          the output exchange
+%% Returns: the list of messages created
+%% @end
+-spec create_messages(MessageList::list(),Timestamp::string(),Acc::list()) -> list().
 
 create_messages([], _Timestamp,Acc) ->
 	Acc;
@@ -371,12 +352,28 @@ create_messages([{Value, StreamId, Input, Users}|Rest], Timestamp, Acc) ->
 	create_messages(Rest, Timestamp, 
 				   [term_to_binary({Value,Timestamp,StreamId,Input,Users})|Acc]).
 
+%% @doc
+%% Function: send_messages/3
+%% Purpose: Used to send the messages on the 
+%%          output exchange
+%% Returns: ok
+%% @end
+-spec send_messages(TriggerExchange::binary(),ChannelOut::pid(),MessageList::list()) -> list().
 
 send_messages(TriggerExchange,ChannelOut,[]) ->
 	ok;
 send_messages(TriggerExchange,ChannelOut,[Msg|Rest]) ->
   send(ChannelOut, TriggerExchange,Msg),
   send_messages(TriggerExchange,ChannelOut,Rest).
+
+
+%% @doc
+%% Function: handle_command/2
+%% Purpose: Used to handle commands sent on the
+%%          command exchange
+%% Returns: The new output list
+%% @end
+-spec handle_command(TriggerExchange::{atom(),{term(),term()}},OutputList::list()) -> list().
 
 handle_command({add,{Input,User}},[]) ->
 	[{Input,[User]}];
