@@ -49,7 +49,6 @@ allowed_methods(ReqData, State) ->
 		end.
 
 
-
 %% @doc
 %% Function: content_types_provided/2
 %% Purpose: based on the Accept header on a 'GET' request, we provide different media types to the client. 

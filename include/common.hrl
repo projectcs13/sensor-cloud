@@ -6,7 +6,6 @@
 %%
 %% @end
 
-
 -ifndef(__COMMON_HRL__).
 -define(__COMMON_HRL__, 1).
 

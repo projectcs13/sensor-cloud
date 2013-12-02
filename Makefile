@@ -104,24 +104,42 @@ test_streams: compile
 	curl -XPUT localhost:9200/sensorcloud
 	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -eval 'test:run(streams)'
 
-test_suggest: compile
-	-@mkdir test-results
-	curl -XDELETE localhost:9200/sensorcloud
-	curl -XPUT localhost:9200/sensorcloud
-	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -eval 'test:run(suggest)'
+## test_suggest: compile
+	## -@mkdir test-results
+	## curl -XDELETE localhost:9200/sensorcloud
+	## curl -XPUT localhost:9200/sensorcloud
+	## $(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -eval 'test:run(suggest)'
 
 test_users: compile
 	-@mkdir test-results
 	curl -XDELETE localhost:9200/sensorcloud
 	curl -XPUT localhost:9200/sensorcloud
 	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -eval 'test:run(users)'
+	
+test_poll: compile
+	-@mkdir test-results
+	curl -XDELETE localhost:9200/sensorcloud
+	curl -XPUT localhost:9200/sensorcloud
+	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -eval 'test:run(poll_help)'
+	
+test_poll_system: compile
+	-@mkdir test-results
+	curl -XDELETE localhost:9200/sensorcloud
+	curl -XPUT localhost:9200/sensorcloud
+	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -eval 'test:run(polling_system)'
+
+test_search: compile
+	-@mkdir test-results
+	curl -XDELETE localhost:9200/sensorcloud
+	curl -XPUT localhost:9200/sensorcloud
+	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -eval 'test:run(search)'
 
 
 test_vstreams: compile
 	-@mkdir test-results
 	curl -XDELETE localhost:9200/sensorcloud
 	curl -XPUT localhost:9200/sensorcloud
-	$(ERL) -pa ebin/ lib/*/ebin/ lib/*/bin/ -boot start_sasl -s reloader -s engine -sname engine -eval 'test:run(virtual_stream_process)'
+	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -eval 'test:run(virtual_stream_process)'
 
 
 ### Command: make docs
