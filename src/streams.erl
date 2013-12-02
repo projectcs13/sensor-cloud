@@ -430,18 +430,42 @@ get_stream(ReqData, State) ->
 						    FinalJson = lib_json:get_list_and_add_id(JsonStruct, streams),
 						    {FinalJson, ReqData, State}
 					end;
-				StreamId ->
-				% Get specific stream
-					case erlastic_search:get_doc(?INDEX, "stream", StreamId) of 
-						{error, {Code, Body}} -> 
-            				ErrorString = api_help:generate_error(Body, Code),
-            				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-						{ok,JsonStruct} -> 	 
-						    FinalJson = lib_json:get_and_add_id(JsonStruct),
-						    {FinalJson, ReqData, State}
+				StreamString ->
+					case string:tokens(StreamString, ",") of
+						[StreamId|[]] -> % Get specific stream
+							case erlastic_search:get_doc(?INDEX, "stream", StreamId) of 
+								{error, {Code, Body}} -> 
+		            				ErrorString = api_help:generate_error(Body, Code),
+		            				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+								{ok,JsonStruct} -> 	 
+								    FinalJson = lib_json:get_and_add_id(JsonStruct),
+								    {FinalJson, ReqData, State}
+							end;
+						IdList -> % Get a list of streams
+							{get_streams(IdList), ReqData, State}
 					end
 				end
 	end.
+
+%% @doc
+%% Function: get_streams/2
+%% Purpose: Gets the NrValues latest datapoints for each streamid that exists in list IdList
+%% Returns: JSON string that contains the data and streamid for each streamid in IdList
+%% @end
+get_streams([]) ->
+    "{\"streams\":[]}";
+get_streams(List) ->
+    erlang:display(List),
+    %Json = "{\"filter\":{\"and\":[{\"ids\":" ++lib_json:set_attr("values", List)++"},{\"bool\":{\"must_not\":{\"term\":{\"private\":\"true\"}}}}]}}",
+    Json = "{\"filter\":{\"ids\":" ++lib_json:set_attr("values", List)++"}}",
+    case erlastic_search:search_json(#erls_params{},?INDEX, "stream", Json) of
+        {error,{Code, Body}} ->
+            ErrorString = api_help:generate_error(Body, Code),
+            ErrorString;
+        {ok,JsonStruct} ->
+             lib_json:set_attr("streams",lib_json:get_field(JsonStruct, "hits.hits"))
+    end.
+
 
 %% @doc
 %% Function: filter_json/1
