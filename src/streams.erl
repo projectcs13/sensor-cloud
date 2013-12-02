@@ -563,9 +563,7 @@ get_stream(ReqData, State) ->
 							end;
 						IdList -> % Get a list of streams
 							{lib_json:get_list_and_add_id(get_streams(IdList), streams), ReqData, State}
-				StreamId ->
-				% Get specific stream
-					
+					end
 			end
 	end.
 
