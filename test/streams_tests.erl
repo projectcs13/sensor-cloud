@@ -96,6 +96,7 @@ get_stream() ->
 	api_help:refresh(),
 	% Test get and search
 	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(get, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(DocId1), []}, [], []),
+	{ok, {{_Version5, 200, _ReasonPhrase5}, _Headers5, Body5}} = httpc:request(get, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(DocId1) ++ "," ++ lib_json:to_string(DocId2), []}, [], []),
 	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(get, {?WEBMACHINE_URL++"/users/search2/streams", []}, [], []),
 	{ok, {{_Version6, 200, _ReasonPhrase6}, _Headers6, Body6}} = httpc:request(post, {?WEBMACHINE_URL++"/streams/_search",[],"application/json", "{\"query\":{\"term\" : { \"name\" : \"get\" }}}"}, [], []),
 	api_help:refresh(),
@@ -109,13 +110,14 @@ get_stream() ->
 	{{Year,Month,Day},_} = calendar:local_time(),
 	Date = generate_date([Year,Month,Day]),
 	% Tests to make sure the correct creation date is added
-	[?_assertEqual(true,lib_json:get_field(Body3,"creation_date") == list_to_binary(Date)),
-	?_assertEqual(<<"get">>,lib_json:get_field(Body3,"name")),
-	?_assertEqual(true,lib_json:get_field(Body3,"private") == <<"false">>),
-	?_assertEqual(true,lib_json:field_value_exists(Body4,"streams[*].name", <<"get">>)),
-	?_assertEqual(true,lib_json:get_field(Body6,"hits.total") >= 2), % Needed in case unempty elasticsearch
-	?_assertEqual(true,lib_json:get_field(Body8,"_id") == DocId1),
-	?_assertEqual(true,lib_json:get_field(Body9,"_id") == DocId2)].
+	?assertEqual(true,lib_json:get_field(Body3,"creation_date") == list_to_binary(Date)),
+	?assertEqual(<<"get">>,lib_json:get_field(Body3,"name")),
+	?assertEqual(true,lib_json:get_field(Body3,"private") == <<"false">>),
+	?assertEqual(true,lib_json:field_value_exists(Body4,"streams[*].name", <<"get">>)),
+	?assertNotEqual([],lib_json:get_field(Body5,"streams")),
+	?assertEqual(true,lib_json:get_field(Body6,"hits.total") >= 2), % Needed in case unempty elasticsearch
+	?assertEqual(true,lib_json:get_field(Body8,"_id") == DocId1),
+	?assertEqual(true,lib_json:get_field(Body9,"_id") == DocId2).
 
 %% @doc
 %% Function: get_stream_test/0

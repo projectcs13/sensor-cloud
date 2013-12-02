@@ -538,30 +538,53 @@ get_stream(ReqData, State) ->
 						    FinalJson = lib_json:get_list_and_add_id(JsonStruct, streams),
 						    {FinalJson, ReqData, State}
 					end;
-				StreamId ->
-				% Get specific stream
-					case erlastic_search:get_doc(?INDEX, "stream", StreamId) of 
-						{error, {Code, Body}} -> 
-            				ErrorString = api_help:generate_error(Body, Code),
-            				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-						{ok,JsonStruct} -> 	 
-							TempJson = lib_json:get_and_add_id(JsonStruct),
-							% Get the parser according to this stream id
-							Parser_id = "parser_"++StreamId,
-							case erlastic_search:get_doc(?INDEX, "parser", Parser_id) of
-								{error, {Code, Body}} ->
-									{TempJson, ReqData, State};
-								{ok, JsonStruct2} ->
-									SourceJson  = lib_json:get_field(JsonStruct2, "_source"),
-									Input_type = lib_json:get_field(SourceJson, "input_type"),
-									Input_parser = lib_json:get_field(SourceJson, "input_parser"),
-    								TempJson2 = lib_json:add_value(TempJson, "data_type", Input_type),
-									FinalJson = lib_json:add_value(TempJson2, "parser", Input_parser),
-									{FinalJson, ReqData, State}
-							end
+				StreamString ->
+					case string:tokens(StreamString, ",") of
+						[StreamId|[]] -> % Get specific stream
+							case erlastic_search:get_doc(?INDEX, "stream", StreamId) of 
+								{error, {Code, Body}} -> 
+		            				ErrorString = api_help:generate_error(Body, Code),
+		            				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+								{ok,JsonStruct} -> 	 
+									TempJson = lib_json:get_and_add_id(JsonStruct),
+									% Get the parser according to this stream id
+									Parser_id = "parser_"++StreamId,
+									case erlastic_search:get_doc(?INDEX, "parser", Parser_id) of
+										{error, {Code, Body}} ->
+											{TempJson, ReqData, State};
+										{ok, JsonStruct2} ->
+											SourceJson  = lib_json:get_field(JsonStruct2, "_source"),
+											Input_type = lib_json:get_field(SourceJson, "input_type"),
+											Input_parser = lib_json:get_field(SourceJson, "input_parser"),
+		    								TempJson2 = lib_json:add_value(TempJson, "data_type", Input_type),
+											FinalJson = lib_json:add_value(TempJson2, "parser", Input_parser),
+											{FinalJson, ReqData, State}
+									end
+							end;
+						IdList -> % Get a list of streams
+							{lib_json:get_list_and_add_id(get_streams(IdList), streams), ReqData, State}
 					end
-				end
+			end
 	end.
+
+%% @doc
+%% Function: get_streams/2
+%% Purpose: Gets the NrValues latest datapoints for each streamid that exists in list IdList
+%% Returns: JSON string that contains the data and streamid for each streamid in IdList
+%% @end
+get_streams([]) ->
+    "{\"streams\":[]}";
+get_streams(List) ->
+    %Json = "{\"filter\":{\"and\":[{\"ids\":" ++lib_json:set_attr("values", List)++"},{\"bool\":{\"must_not\":{\"term\":{\"private\":\"true\"}}}}]}}",
+    Json = "{\"filter\":{\"ids\":" ++lib_json:set_attr("values", List)++"}}",
+    case erlastic_search:search_json(#erls_params{},?INDEX, "stream", Json) of
+        {error,{Code, Body}} ->
+            ErrorString = api_help:generate_error(Body, Code),
+            ErrorString;
+        {ok,JsonStruct} ->
+             JsonStruct
+    end.
+
 
 %% @doc
 %% Function: filter_json/1
