@@ -138,7 +138,10 @@ loop(TriggerId, DataPoints, TriggerExchange, Net, Function, OutputList) ->
 								Messages = create_messages(TriggerList, Timestamp,[]),
 								
 								ChannelOut = element(3, Net),
+                                %% Send messages to live update
 								send_messages(TriggerExchange,ChannelOut,Messages),
+                                %% Send to standard output
+                                send_to_output(TriggerId, Messages),
 								
 								loop(TriggerId, NewDataPoints, TriggerExchange,Net, Function, OutputList);
 							
@@ -377,6 +380,46 @@ send_messages(TriggerExchange,ChannelOut,[]) ->
 send_messages(TriggerExchange,ChannelOut,[Msg|Rest]) ->
   send(ChannelOut, TriggerExchange,Msg),
   send_messages(TriggerExchange,ChannelOut,Rest).
+
+send_to_output(TriggerId, {Value, Timestamp, StreamId, Input, []}) ->
+    ok;
+send_to_output(TriggerId, {Value, Timestamp, StreamId, Input, [{user,UserId}|Rest]}) ->
+    Message = lib_json:set_attrs([
+        {trigger, "{}"},
+        {"trigger.value", Value},
+        {"trigger.timestamp", Timestamp},
+        {"trigger.stream_id", StreamId},
+        {"trigger.trigger_id", TriggerId},
+        {"trigger.input", Input}]),
+    UpdateJson = "{\"script\":\"ctx._source.notifications += msg\",\"params\":{\"msg\":"++ Message ++"}",
+    case api_help:update_doc(?INDEX, "user", UserId, UpdateJson, []) of
+        {error, {Code, Body}} ->
+            {error, {Code, Body}};
+        {ok, Response} ->
+            ok
+    end;
+send_to_output(TriggerId, {Value, Timestamp, StreamId, Input, [{uri,URI}|Rest]}) ->
+    Message = lib_json:set_attrs([
+        {trigger, "{}"},
+        {"trigger.value", Value},
+        {"trigger.timestamp", Timestamp},
+        {"trigger.stream_id", StreamId},
+        {"trigger.trigger_id", TriggerId},
+        {"trigger.input", Input}]),
+    case httpc:request(post, {URI, [],"application/json", Message}, [], []) of
+        {ok,{{_, 200, _}, _, _}} ->
+            ok;
+        {ok, {{_, Code, _}, _, Body}} ->
+            {error, {Code, Body}}
+    end.
+send_to_output(TriggerId, {Value, Timestamp, StreamId, Input, [_|Rest]}) ->
+    case httpc:request(post, {URI, [],"application/json", Message}, [], []) of
+        {ok,{{_, 200, _}, _, _}} ->
+            ok;
+        {ok, {{_, Code, _}, _, Body}} ->
+            {error, {Code, Body}}
+    end.
+              
 
 handle_command({add,{Input,User}},[]) ->
 	[{Input,[User]}];
