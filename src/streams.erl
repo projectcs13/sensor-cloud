@@ -25,7 +25,7 @@
 %% @end
 -spec init([]) -> {ok, undefined}.
 init([]) -> 
-    {ok, undefined}.
+	{ok, undefined}.
 
 %% @doc
 %% Function: allowed_methods/2
@@ -51,7 +51,7 @@ allowed_methods(ReqData, State) ->
 		[{"users", _UserID}, {"streams", _StreamID}] ->
 			{['GET', 'PUT', 'DELETE'], ReqData, State};
 		[error] ->
-		    {[], ReqData, State} 
+			{[], ReqData, State} 
 	end.
 
 
@@ -104,14 +104,14 @@ delete_resource(ReqData, State) ->
 			case delete_data_points_with_stream_id(Id) of 
 				{error, {Code, Body}} -> 
 					ErrorString = api_help:generate_error(Body, Code),
-            		{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+					{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 				{ok} ->
 					case erlastic_search:delete_doc(?INDEX,"stream", Id) of
 						{error, {Code, Body}} -> 
 							ErrorString = api_help:generate_error(Body, Code),
 							{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 						{ok,List} -> 
-			 				{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
+							{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
 					end
 			end
 	end.
@@ -153,57 +153,135 @@ process_post(ReqData, State) ->
 	case api_help:is_search(ReqData) of 
 		false ->
 			{Stream,_,_} = api_help:json_handler(ReqData, State),
-			case proplists:get_value('user', wrq:path_info(ReqData)) of
+			case lib_json:get_field(Stream,"multi_json") of
 				undefined ->
-					UserAdded = Stream;
-				UId ->
-					UserAdded = api_help:add_field(Stream,"user_id",UId)
-			end,
-			case lib_json:get_field(UserAdded,"user_id") of
-				undefined -> {false, wrq:set_resp_body("\"user_id missing\"",ReqData), State};
-				UserId ->
-					case {api_help:do_any_field_exist(UserAdded,?RESTRCITEDCREATESTREAMS),api_help:do_only_fields_exist(UserAdded,?ACCEPTEDFIELDSSTREAMS)} of
-						{true,_} ->
-							ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDCREATESTREAMS),
-							ResFields2 = string:sub_string(ResFields1, 1, length(ResFields1)-2),
-							{{halt,409}, wrq:set_resp_body("{\"error\":\"Error caused by restricted field in document, these fields are restricted : " ++ ResFields2 ++"\"}", ReqData), State};
-						{false,false} ->
-							{{halt,403}, wrq:set_resp_body("Unsupported field(s)", ReqData), State};
-						{false,true} ->
-			%				case erlastic_search:get_doc(?INDEX, "user", UserId) of
-			%					{error,{404,_}} ->
-			%						{{halt,403}, wrq:set_resp_body("{\"error\":\"no document with resource_id given is present in the system\"}", ReqData), State};
-			%					{error,{Code,Body}} ->
-			%						ErrorString = api_help:generate_error(Body, Code),
-            %						{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-			%					{ok,_} ->
-									FieldsAdded = add_server_side_fields(UserAdded),
-									%Final = suggest:add_stream_suggestion_fields(FieldsAdded),
-									case erlastic_search:index_doc(?INDEX, "stream", FieldsAdded) of	
-										{error,{Code,Body}} ->
-											ErrorString = api_help:generate_error(Body, Code),
-											{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-										{ok,List} -> 
-											case lib_json:get_field(Stream, "resource.resource_type") of
-												undefined ->
-													{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State};
-												_ ->
-													case resources:add_suggested_stream(Stream) of
-														{error, ErrorStr} ->
-															erlang:display("Stream not added to the suggested streams:  " ++ ErrorStr);
-														ok ->
-															erlang:display("New suggested stream")
-													end	,
-													%suggest:update_suggestion(UserAdded),
-												{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
+					case proplists:get_value('user', wrq:path_info(ReqData)) of
+						undefined ->
+							UserAdded = Stream;
+						UId ->
+							UserAdded = api_help:add_field(Stream,"user_id",UId)
+					end,
+					case lib_json:get_field(UserAdded,"user_id") of
+						undefined -> {false, wrq:set_resp_body("\"user_id missing\"",ReqData), State};
+						UserId ->
+							case {api_help:do_any_field_exist(UserAdded,?RESTRCITEDCREATESTREAMS),api_help:do_only_fields_exist(UserAdded,?ACCEPTEDFIELDSSTREAMS)} of
+								{true,_} ->
+									ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDCREATESTREAMS),
+									ResFields2 = string:sub_string(ResFields1, 1, length(ResFields1)-2),
+									{{halt,409}, wrq:set_resp_body("{\"ok\": false, \"error\":\"Error caused by restricted field in document, these fields are restricted : " ++ ResFields2 ++"\"}", ReqData), State};
+								{false,false} ->
+									{{halt,403}, wrq:set_resp_body("{\"ok\": false, \"error\" :  \"Unsupported field(s)\"}", ReqData), State};
+								{false,true} ->
+					%				case erlastic_search:get_doc(?INDEX, "user", UserId) of
+					%					{error,{404,_}} ->
+					%						{{halt,403}, wrq:set_resp_body("{\"error\":\"no document with resource_id given is present in the system\"}", ReqData), State};
+					%					{error,{Code,Body}} ->
+					%						ErrorString = api_help:generate_error(Body, Code),
+					%						{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+					%					{ok,_} ->
+											FieldsAdded = add_server_side_fields(UserAdded),
+											%Final = suggest:add_stream_suggestion_fields(FieldsAdded),
+											case erlastic_search:index_doc(?INDEX, "stream", FieldsAdded) of	
+												{error,{Code,Body}} ->
+													ErrorString = api_help:generate_error(Body, Code),
+													{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+												{ok,List} -> 
+													case lib_json:get_field(Stream, "resource.resource_type") of
+														undefined ->
+															{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State};
+														_ ->
+															case resources:add_suggested_stream(Stream) of
+																{error, ErrorStr} ->
+																	erlang:display("Stream not added to the suggested streams:  " ++ ErrorStr);
+																ok ->
+																	erlang:display("New suggested stream")
+															end	,
+															%suggest:update_suggestion(UserAdded),
+														{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
+													end
 											end
-									end
-			%				end
-					end
-			end;
+					%				end
+							end
+					end;
+				JsonList ->
+				multi_json_streams(JsonList,ReqData,State,[])
+
+			end;	
 		true ->
 			process_search_post(ReqData,State)	
 	end.
+
+
+
+
+%% @doc
+%% Function: multi_json_streams/1
+%% Purpose: Used to create multiple streams from a json
+%%         
+%% Returns: The responses of the different posts
+%% @end
+multi_json_streams([], ReqData, State, Response) ->
+	{true, wrq:set_resp_body(Response ++ "]}", ReqData), State};
+multi_json_streams([Head|Rest], ReqData ,State, Response) ->
+	case proplists:get_value('user', wrq:path_info(ReqData)) of
+		undefined ->
+			UserAdded = Head;
+		UId ->
+			UserAdded = api_help:add_field(Head,"user_id",UId)
+	end,
+	case Response of
+		[] ->
+			FinalResponse = "{\"results\" : [";
+		_ ->
+			FinalResponse = Response ++ ","
+		end,
+
+	case lib_json:get_field(UserAdded,"user_id") of
+		undefined -> {false, wrq:set_resp_body("\"user_id multi_json_streamsing\"",ReqData), State};
+		UserId ->
+			case {api_help:do_any_field_exist(UserAdded,?RESTRCITEDCREATESTREAMS),api_help:do_only_fields_exist(UserAdded,?ACCEPTEDFIELDSSTREAMS)} of
+				{true,_} ->
+					ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDCREATESTREAMS),
+					ResFields2 = string:sub_string(ResFields1, 1, length(ResFields1)-2),
+					multi_json_streams(Rest, ReqData ,State, FinalResponse ++ "{\"ok\": false, \"error\":\"Error caused by restricted field in document, these fields are restricted : " ++ ResFields2 ++"\"}");
+				{false,false} ->
+					multi_json_streams(Rest, ReqData ,State,  FinalResponse ++ "{\"ok\": false, \"error\" :  \"Unsupported field(s)\"}");
+
+				{false,true} ->
+	%				case erlastic_search:get_doc(?INDEX, "user", UserId) of
+	%					{error,{404,_}} ->
+	%						{{halt,403}, wrq:set_resp_body("{\"error\":\"no document with resource_id given is present in the system\"}", ReqData), State};
+	%					{error,{Code,Body}} ->
+	%						ErrorString = api_help:generate_error(Body, Code),
+	%						{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+	%					{ok,_} ->
+							FieldsAdded = add_server_side_fields(UserAdded),
+							%Final = suggest:add_stream_suggestion_fields(FieldsAdded),
+							case erlastic_search:index_doc(?INDEX, "stream", FieldsAdded) of	
+								{error,{Code,Body}} ->
+									ErrorString = api_help:generate_error(Body, Code),
+										multi_json_streams(Rest, ReqData ,State, FinalResponse ++ ErrorString);
+								{ok,List} -> 
+									case lib_json:get_field(Head, "resource.resource_type") of
+										undefined ->
+											multi_json_streams(Rest, ReqData ,State, FinalResponse ++ [lib_json:encode(List)]);
+										_ ->
+											case resources:add_suggested_stream(Head) of
+												{error, ErrorStr} ->
+													erlang:display("Stream not added to the suggested streams:  " ++ ErrorStr);
+												ok ->
+													erlang:display("New suggested stream")
+											end,
+											%find_ranking(StreamId, Rest, NewRank, lists:append(List,[Head]))
+
+											%suggest:update_suggestion(UserAdded),
+											multi_json_streams(Rest, ReqData ,State, FinalResponse ++ [lib_json:encode(List)])
+									end
+							end
+	%				end
+			end
+	end.
+		
 
 
 %% @doc
@@ -215,33 +293,33 @@ process_post(ReqData, State) ->
 -spec process_search_post(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 
 process_search_post(ReqData, State) ->
-        case wrq:get_qs_value("size",ReqData) of 
-            undefined ->
-                Size = "10";
-            SizeParam ->
-                Size = SizeParam
-        end,
-        case wrq:get_qs_value("from",ReqData) of
-            undefined ->
-                From = "0";
-            FromParam ->
-                From = FromParam
-        end,
-        {Json,_,_} = api_help:json_handler(ReqData,State),
-        case proplists:get_value('user', wrq:path_info(ReqData)) of
-                undefined ->
-                        FilteredJson = filter_json(Json, From, Size);
-                UserId ->
-                        ResQuery = "\"user_id\":" ++ UserId,
-                        FilteredJson = filter_json(Json, ResQuery, From, Size)
-        end,
-        case erlastic_search:search_json(#erls_params{},?INDEX, "stream", FilteredJson) of % Maybe wanna take more
-                {error, {Code, Body}} -> 
+		case wrq:get_qs_value("size",ReqData) of 
+			undefined ->
+				Size = "10";
+			SizeParam ->
+				Size = SizeParam
+		end,
+		case wrq:get_qs_value("from",ReqData) of
+			undefined ->
+				From = "0";
+			FromParam ->
+				From = FromParam
+		end,
+		{Json,_,_} = api_help:json_handler(ReqData,State),
+		case proplists:get_value('user', wrq:path_info(ReqData)) of
+				undefined ->
+						FilteredJson = filter_json(Json, From, Size);
+				UserId ->
+						ResQuery = "\"user_id\":" ++ UserId,
+						FilteredJson = filter_json(Json, ResQuery, From, Size)
+		end,
+		case erlastic_search:search_json(#erls_params{},?INDEX, "stream", FilteredJson) of % Maybe wanna take more
+				{error, {Code, Body}} -> 
 					ErrorString = api_help:generate_error(Body, Code),
-            		{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-                {ok,List} -> 
+					{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+				{ok,List} -> 
 					{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State} % May need to convert
-        end.
+		end.
 
 
 %% @doc
@@ -254,12 +332,12 @@ process_search_post(ReqData, State) ->
 
 process_search_get(ReqData, State) ->
 	URIQuery = wrq:req_qs(ReqData),
-    case wrq:get_qs_value("size",ReqData) of 
-        undefined ->
-            Size = 100;
-        SizeParam ->
-            Size = list_to_integer(SizeParam)
-    end,
+	case wrq:get_qs_value("size",ReqData) of 
+		undefined ->
+			Size = 100;
+		SizeParam ->
+			Size = list_to_integer(SizeParam)
+	end,
 	case proplists:get_value('user', wrq:path_info(ReqData)) of
 		undefined ->
 			UserQuery = [],
@@ -272,7 +350,7 @@ process_search_get(ReqData, State) ->
 	case erlastic_search:search_limit(?INDEX, "stream", FullQuery,Size) of % Maybe wanna take more
 		{error, {Code, Body}} -> 
 			ErrorString = api_help:generate_error(Body, Code),
-            {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+			{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 		{ok,List} -> 
 			{lib_json:encode(List),ReqData,State} 
 	end.
@@ -288,95 +366,94 @@ process_search_get(ReqData, State) ->
 
 put_stream(ReqData, State) ->
 	case api_help:is_rank(ReqData) of
-		false ->
-			StreamId = proplists:get_value('stream', wrq:path_info(ReqData)),
-			{Stream,_,_} = api_help:json_handler(ReqData,State),
-			case {api_help:do_any_field_exist(Stream,?RESTRCITEDUPDATESTREAMS),api_help:do_only_fields_exist(Stream,?ACCEPTEDFIELDSSTREAMS)} of
-				{true,_} -> 
-					ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDUPDATESTREAMS),
-					ResFields2 = string:sub_string(ResFields1, 1, length(ResFields1)-2),
-					{{halt,409}, wrq:set_resp_body("{\"error\":\"Error caused by restricted field in document, these fields are restricted : " ++ ResFields2 ++"\"}", ReqData), State};
-				{false,false} ->
-					{{halt,403}, wrq:set_resp_body("Unsupported field(s)", ReqData), State};
-				{false,true} ->
-					%NewJson = suggest:add_stream_suggestion_fields(Stream),
-					%Update = api_help:create_update(NewJson),
-					Update = api_help:create_update(Stream),
-					%suggest:update_stream(Stream, StreamId),
-					case api_help:update_doc(?INDEX, "stream", StreamId, Update) of 
-						{error, {Code, Body}} -> 
-							ErrorString = api_help:generate_error(Body, Code),
-		            		{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-						{ok,List} -> 
-							{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
-					end
-			end;
-		true ->
-			erlang:display("IN RANK!"),
-			StreamId = proplists:get_value('stream', wrq:path_info(ReqData)),
-			{Json,_,_} = api_help:json_handler(ReqData,State),
-			Rank = case lib_json:get_field(Json,"ranking") of 
+			false ->
+					StreamId = proplists:get_value('stream', wrq:path_info(ReqData)),
+					{Stream,_,_} = api_help:json_handler(ReqData,State),
+					case {api_help:do_any_field_exist(Stream,?RESTRCITEDUPDATESTREAMS),api_help:do_only_fields_exist(Stream,?ACCEPTEDFIELDSSTREAMS)} of
+							{true,_} -> 
+									ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDUPDATESTREAMS),
+									ResFields2 = string:sub_string(ResFields1, 1, length(ResFields1)-2),
+									{{halt,409}, wrq:set_resp_body("{\"error\":\"Error caused by restricted field in document, these fields are restricted : " ++ ResFields2 ++"\"}", ReqData), State};
+							{false,false} ->
+									{{halt,403}, wrq:set_resp_body("Unsupported field(s)", ReqData), State};
+							{false,true} ->
+									%NewJson = suggest:add_stream_suggestion_fields(Stream),
+									%Update = api_help:create_update(NewJson),
+									Update = api_help:create_update(Stream),
+									%suggest:update_stream(Stream, StreamId),
+									case api_help:update_doc(?INDEX, "stream", StreamId, Update) of 
+											{error, {Code, Body}} -> 
+													ErrorString = api_help:generate_error(Body, Code),
+										{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+											{ok,List} -> 
+													{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
+									end
+					end;
+			true ->
+					erlang:display("IN RANK!"),
+					StreamId = proplists:get_value('stream', wrq:path_info(ReqData)),
+					{Json,_,_} = api_help:json_handler(ReqData,State),
+					Rank = case lib_json:get_field(Json,"ranking") of 
+							undefined ->
+					{error, {<<"{\"error\":\"Error, incorrect or no ranking specified.\"}">>, 409}};
+							Ranking when is_number(Ranking) and (Ranking >= 0.0) and (Ranking =< 100.0) ->
+									float(Ranking);
+							_ ->
+									{error, {<<"{\"error\":\"Error, incorrect or no ranking specified.\"}">>, 409}}
+			end,
+			User = case lib_json:get_field(Json,"user_id") of 
 				undefined ->
-                	{error, {<<"{\"error\":\"Error, incorrect or no ranking specified.\"}">>, 409}};
-				Ranking when is_number(Ranking) and (Ranking >= 0.0) and (Ranking =< 100.0) ->
-					float(Ranking);
-				_ ->
-					{error, {<<"{\"error\":\"Error, incorrect or no ranking specified.\"}">>, 409}}
-        	end,
-        	User = case lib_json:get_field(Json,"user_id") of 
-	            undefined ->
-	                {error, {<<"{\"error\":\"Error, no user specified.\"}">>, 409}};
-	            UserId ->
-	                UserId
-        	end,
-        	case {Rank, User} of
-        		{{error, {Body, Code}},_} ->
-        			ErrorString = api_help:generate_error(Body, Code),
-        			{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-        		{_,{error, {Body, Code}}} ->
-        			ErrorString = api_help:generate_error(Body, Code),
-        			{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-        		{Rank, User} -> 
-					case erlastic_search:get_doc(?INDEX,"user", User) of
-						{error, {Code, Body}} -> %User doesn't exist
-        					ErrorString = api_help:generate_error(Body, Code),
-        					{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-						{ok,List} ->	%User exists
-        					case lib_json:get_field(List, "_source.rankings") of
-        						undefined -> %User has NO previous rankings
-        							change_ranking(StreamId, Rank),
-        							UpdateJson = "{\"script\" : \"ctx._source.rankings += ranking\",\"params\":{\"ranking\":{ \"rank\":"++ float_to_list(Rank) ++",\"stream_id\":\""++StreamId++"\"}}}",
-        							case api_help:update_doc(?INDEX, "user", User, UpdateJson, []) of
-										{error, {Code, Body}} ->
-			           						ErrorString = api_help:generate_error(Body, Code),
-			           						{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-			           					{ok, List2} -> {true,wrq:set_resp_body(lib_json:encode(List2),ReqData),State}
-			           				end;
-    							RankingList -> %User has previous rankings
-    								case find_ranking(StreamId, RankingList, Rank, []) of
-    									not_found -> %User has NOT ranked this stream before
-    										change_ranking(StreamId, Rank),
-    										UpdateJson = "{\"script\" : \"ctx._source.rankings += ranking\",\"params\":{\"ranking\":{ \"rank\":"++ float_to_list(Rank) ++",\"stream_id\":\""++StreamId++"\"}}}",
-        									case api_help:update_doc(?INDEX, "user", User, UpdateJson,[]) of
+					{error, {<<"{\"error\":\"Error, no user specified.\"}">>, 409}};
+				UserId ->
+					UserId
+			end,
+			case {Rank, User} of
+					{{error, {Body, Code}},_} ->
+							ErrorString = api_help:generate_error(Body, Code),
+							{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+					{_,{error, {Body, Code}}} ->
+							ErrorString = api_help:generate_error(Body, Code),
+							{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+					{Rank, User} -> 
+						case erlastic_search:get_doc(?INDEX,"user", User) of
+								{error, {Code, Body}} -> %User doesn't exist
+								ErrorString = api_help:generate_error(Body, Code),
+								{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+								{ok,List} ->        %User exists
+								case lib_json:get_field(List, "_source.rankings") of
+										undefined -> %User has NO previous rankings
+											change_ranking(StreamId, Rank),
+											UpdateJson = "{\"script\" : \"ctx._source.rankings += ranking\",\"params\":{\"ranking\":{ \"rank\":"++ float_to_list(Rank) ++",\"stream_id\":\""++StreamId++"\"}}}",
+											case api_help:update_doc(?INDEX, "user", User, UpdateJson, []) of
 												{error, {Code, Body}} ->
-			            							ErrorString = api_help:generate_error(Body, Code),
-			            							{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-			            						{ok, List3} -> {true,wrq:set_resp_body(lib_json:encode(List3),ReqData),State}
-		            						end;
-    									{OldRank, ChangedRankingList} -> %User HAS ranked this stream before
-        									change_ranking(StreamId, Rank, OldRank),
-        									UpdateJson = api_help:create_update(lib_json:set_attr("rankings", ChangedRankingList)),
-    										case api_help:update_doc(?INDEX, "user", User, UpdateJson,[]) of
-												{error, {Code, Body}} ->
-			            							ErrorString = api_help:generate_error(Body, Code),
-			            							{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-			            						{ok, List4} -> 
-			            							{true,wrq:set_resp_body(lib_json:encode(List4),ReqData),State}
-		            						end
-    								end
-							end
-					end
-					
+												   ErrorString = api_help:generate_error(Body, Code),
+												   {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+												{ok, List2} -> {true,wrq:set_resp_body(lib_json:encode(List2),ReqData),State}
+											end;
+										RankingList -> %User has previous rankings
+											case find_ranking(StreamId, RankingList, Rank, []) of
+												not_found -> %User has NOT ranked this stream before
+														change_ranking(StreamId, Rank),
+														UpdateJson = "{\"script\" : \"ctx._source.rankings += ranking\",\"params\":{\"ranking\":{ \"rank\":"++ float_to_list(Rank) ++",\"stream_id\":\""++StreamId++"\"}}}",
+													case api_help:update_doc(?INDEX, "user", User, UpdateJson,[]) of
+																	{error, {Code, Body}} ->
+																ErrorString = api_help:generate_error(Body, Code),
+																{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+														{ok, List3} -> {true,wrq:set_resp_body(lib_json:encode(List3),ReqData),State}
+													end;
+												{OldRank, ChangedRankingList} -> %User HAS ranked this stream before
+													change_ranking(StreamId, Rank, OldRank),
+													UpdateJson = api_help:create_update(lib_json:set_attr("rankings", ChangedRankingList)),
+														case api_help:update_doc(?INDEX, "user", User, UpdateJson,[]) of
+																	{error, {Code, Body}} ->
+																ErrorString = api_help:generate_error(Body, Code),
+																{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+														{ok, List4} -> 
+																{true,wrq:set_resp_body(lib_json:encode(List4),ReqData),State}
+														end
+											end
+								end
+						end				
 			end
 	end.
 
@@ -402,12 +479,12 @@ get_stream(ReqData, State) ->
 			case proplists:get_value('stream', wrq:path_info(ReqData)) of
 				undefined ->
 				% List streams based on URI
-			        case wrq:get_qs_value("size",ReqData) of 
-			            undefined ->
-			                Size = 100;
-			            SizeParam ->
-			                Size = list_to_integer(SizeParam)
-			        end,
+					case wrq:get_qs_value("size",ReqData) of 
+						undefined ->
+							Size = 100;
+						SizeParam ->
+							Size = list_to_integer(SizeParam)
+					end,
 					case proplists:get_value('user', wrq:path_info(ReqData)) of
 						undefined ->
 							UserQuery = [],
@@ -424,21 +501,21 @@ get_stream(ReqData, State) ->
 					end,  
 					case erlastic_search:search_json(#erls_params{},?INDEX, "stream", Query) of % Maybe wanna take more
 						{error, {Code, Body}} -> 
-            				ErrorString = api_help:generate_error(Body, Code),
-            				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-					    {ok,JsonStruct} ->
-						    FinalJson = lib_json:get_list_and_add_id(JsonStruct, streams),
-						    {FinalJson, ReqData, State}
+							ErrorString = api_help:generate_error(Body, Code),
+							{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+						{ok,JsonStruct} ->
+							FinalJson = lib_json:get_list_and_add_id(JsonStruct, streams),
+							{FinalJson, ReqData, State}
 					end;
 				StreamId ->
 				% Get specific stream
 					case erlastic_search:get_doc(?INDEX, "stream", StreamId) of 
 						{error, {Code, Body}} -> 
-            				ErrorString = api_help:generate_error(Body, Code),
-            				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+							ErrorString = api_help:generate_error(Body, Code),
+							{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 						{ok,JsonStruct} -> 	 
-						    FinalJson = lib_json:get_and_add_id(JsonStruct),
-						    {FinalJson, ReqData, State}
+							FinalJson = lib_json:get_and_add_id(JsonStruct),
+							{FinalJson, ReqData, State}
 					end
 				end
 	end.
@@ -449,8 +526,8 @@ get_stream(ReqData, State) ->
 %% Returns: JSON string that is updated with filter
 %% @end
 filter_json(Json) ->
-        NewJson = string:sub_string(Json,1,string:len(Json)-1),
-        "{\"query\":{\"filtered\":"++NewJson++",\"filter\":{\"bool\":{\"must_not\":{\"term\":{\"private\":\"true\"}}}}}}}".
+		NewJson = string:sub_string(Json,1,string:len(Json)-1),
+		"{\"query\":{\"filtered\":"++NewJson++",\"filter\":{\"bool\":{\"must_not\":{\"term\":{\"private\":\"true\"}}}}}}}".
 
 %% @doc
 %% Function: filter_json/2
@@ -458,8 +535,8 @@ filter_json(Json) ->
 %% Returns: JSON string that is updated with filter
 %% @end
 filter_json(Json,ResourceQuery) ->
-        NewJson = string:sub_string(Json,1,string:len(Json)-1),
-        "{\"query\":{\"filtered\":"++NewJson++",\"filter\":{\"bool\":{\"must_not\":[{\"term\":{\"private\":\"true\"}},{\"term\":{"++ResourceQuery++"}}]}}}}}".
+		NewJson = string:sub_string(Json,1,string:len(Json)-1),
+		"{\"query\":{\"filtered\":"++NewJson++",\"filter\":{\"bool\":{\"must_not\":[{\"term\":{\"private\":\"true\"}},{\"term\":{"++ResourceQuery++"}}]}}}}}".
 
 
 
@@ -469,8 +546,8 @@ filter_json(Json,ResourceQuery) ->
 %% Returns: JSON string that is updated with filter and the from size parameters
 %% @end
 filter_json(Json, From, Size) ->
-        NewJson = string:sub_string(Json,1,string:len(Json)-1),
-        "{\"from\" : "++From++", \"size\" : "++Size++", \"query\":{\"filtered\":"++NewJson++",\"filter\":{\"bool\":{\"must_not\":{\"term\":{\"private\":\"true\"}}}}}}}".
+		NewJson = string:sub_string(Json,1,string:len(Json)-1),
+		"{\"from\" : "++From++", \"size\" : "++Size++", \"query\":{\"filtered\":"++NewJson++",\"filter\":{\"bool\":{\"must_not\":{\"term\":{\"private\":\"true\"}}}}}}}".
 
 
 %% @doc
@@ -479,8 +556,8 @@ filter_json(Json, From, Size) ->
 %% Returns: JSON string that is updated with filter and the from size parameters
 %% @end
 filter_json(Json, ResourceQuery, From, Size) ->
-         NewJson = string:sub_string(Json,1,string:len(Json)-1),
-        "{\"from\" : "++From++", \"size\" : "++Size++", \"query\":{\"filtered\":"++NewJson++",\"filter\":{\"bool\":{\"must_not\":[{\"term\":{\"private\":\"true\"}},{\"term\":{"++ResourceQuery++"}}]}}}}}".
+		 NewJson = string:sub_string(Json,1,string:len(Json)-1),
+		"{\"from\" : "++From++", \"size\" : "++Size++", \"query\":{\"filtered\":"++NewJson++",\"filter\":{\"bool\":{\"must_not\":[{\"term\":{\"private\":\"true\"}},{\"term\":{"++ResourceQuery++"}}]}}}}}".
 
 
 
