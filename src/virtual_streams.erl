@@ -8,8 +8,15 @@
 %% @end
 
 -module(virtual_streams).
--export([init/1, allowed_methods/2, content_types_provided/2,
-		 content_types_accepted/2, process_post/2, process_search/3, put_stream/2, delete_resource/2]).
+-export([init/1, 
+		 allowed_methods/2, 
+		 content_types_provided/2,
+		 content_types_accepted/2, 
+		 process_post/2, 
+		 process_search/3, 
+		 put_stream/2, 
+		 delete_resource/2, 
+		 get_vstream/2]).
 
 -include_lib("erlastic_search.hrl").
 -include("webmachine.hrl").
@@ -35,9 +42,9 @@ init([]) ->
 allowed_methods(ReqData, State) ->
 	case api_help:parse_path(wrq:path(ReqData)) of	
 		[{"vstreams"}] ->
-			{['POST'], ReqData, State}; 
-		[{"vstreams", _Id}] -> %to be removed?
-			{['POST', 'PUT', 'DELETE'], ReqData, State};
+			{['POST', 'GET'], ReqData, State}; 
+		[{"vstreams", _Id}] ->
+			{['POST', 'PUT', 'DELETE', 'GET'], ReqData, State};
 		[{"vstreams", "_search"}] ->
 			{['POST', 'GET'], ReqData, State};
 		[error] ->
@@ -53,7 +60,7 @@ allowed_methods(ReqData, State) ->
 %% @end
 -spec content_types_provided(ReqData::tuple(), State::string()) -> {list(), tuple(), string()}.
 content_types_provided(ReqData, State) ->
-		{[{"application/json", get_datapoint}], ReqData, State}.
+		{[{"application/json", get_vstream}], ReqData, State}.
 
 
 %% @doc
@@ -83,7 +90,7 @@ process_post(ReqData, State) ->
 		false ->
 			{VirtualStreamJson,_,_} = api_help:json_handler(ReqData, State),
 			{{Year,Month,Day},{Hour,Minute,Second}} = calendar:local_time(),
-			Date = api_help:generate_date([Year,Month,Day]), % it is crashing if I add Hour, Minute, Second, check it again later
+			Date = api_help:generate_date([Year,Month,Day]),
 			DateAdded = lib_json:add_values(VirtualStreamJson,[{creation_date, list_to_binary(Date)}]),
 			case erlastic_search:index_doc(?INDEX, "virtual_stream", DateAdded) of	
 				{error, Reason} ->
@@ -157,6 +164,47 @@ reduce(VirtualStreamId, Streams, TimestampFrom, Function, ReqData, State) ->
 
  
 %% @doc
+%% Function: get_vstream/2
+%% Purpose: Used to handle GET requests by giving the document with the given
+%% Id or listing the documents that can be found from the restrictions
+%% given by the URI.
+%% Returns: {Success, ReqData, State}, where Success is true if the PUT request is
+%% successful and false otherwise.
+%% @end
+-spec get_vstream(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
+get_vstream(ReqData, State) ->
+	case id_from_path(ReqData) of
+                undefined ->
+                    % Get all vstreams
+                    case wrq:get_qs_value("size",ReqData) of 
+                        undefined ->
+                            Size = 100;
+                        SizeParam ->
+                            Size = list_to_integer(SizeParam)
+                    end,
+					Query = "{\"size\" :" ++ integer_to_list(Size) ++",\"query\" : {\"match_all\" : {}},\"filter\" : {\"bool\":{\"must_not\":{\"term\":{\"private\":\"true\"}}}}}",
+					case erlastic_search:search_json(#erls_params{},?INDEX, "virtual_stream", Query) of
+                        {error, {Code, Body}} -> 
+                            ErrorString = api_help:generate_error(Body, Code),
+                            {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+					    {ok,JsonStruct} ->
+						    FinalJson = lib_json:get_list_and_add_id(JsonStruct, users),
+						    {FinalJson, ReqData, State}  
+                    end;
+                Id ->
+				    %% Get specific virtual stream
+                    case erlastic_search:get_doc(?INDEX, "virtual_stream", Id) of
+                        {error, {Code, Body}} -> 
+                            ErrorString = api_help:generate_error(Body, Code),
+                            {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+                        {ok,JsonStruct} ->
+                            FinalJson = lib_json:get_and_add_id(JsonStruct),
+                            {FinalJson, ReqData, State} 
+                    end
+            end.
+
+	
+%% @doc
 %% Function: put_stream/2
 %% Purpose: Used to handle PUT requests by updating the given documents in elastic search
 %% Returns: {Success, ReqData, State}, where Success is true if the PUT request is
@@ -187,7 +235,6 @@ put_stream(ReqData, State) ->
 delete_resource(ReqData, State) ->
 	case {proplists:get_value('id', wrq:path_info(ReqData))} of
 		{Id} ->
-			erlang:display("VSTREAM ID defined: " ++ Id),
 			case streams:delete_data_points_with_stream_id(Id, "virtual_stream") of 
 				{error, {Code, Body}} -> 
 					ErrorString = api_help:generate_error(Body, Code),
@@ -265,6 +312,22 @@ process_search(ReqData, State, post) ->
 				{true,wrq:set_resp_body(lib_json:encode(FinalJson),ReqData),State}
 	end.
 
+
+%% @doc
+%% Function: id_from_path/2
+%% Purpose: Retrieves the id from the path.
+%% Returns: Id
+%% @end
+-spec id_from_path(string()) -> string().
+id_from_path(RD) ->
+    case wrq:path_info(id, RD) of
+        undefined ->
+            case string:tokens(wrq:disp_path(RD), "/") of
+                ["vstreams", Id] -> Id;
+                _ -> undefined
+            end;
+        Id -> Id
+    end.
 
 
 %% @doc
