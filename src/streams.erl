@@ -455,7 +455,6 @@ get_stream(ReqData, State) ->
 get_streams([]) ->
     "{\"streams\":[]}";
 get_streams(List) ->
-    erlang:display(List),
     %Json = "{\"filter\":{\"and\":[{\"ids\":" ++lib_json:set_attr("values", List)++"},{\"bool\":{\"must_not\":{\"term\":{\"private\":\"true\"}}}}]}}",
     Json = "{\"filter\":{\"ids\":" ++lib_json:set_attr("values", List)++"}}",
     case erlastic_search:search_json(#erls_params{},?INDEX, "stream", Json) of
