@@ -446,6 +446,43 @@ post_stream_with_parser_test()->
 	{ok, {{_Version7, 200, _ReasonPhrase7}, _Headers7, _Body7}} = httpc:request(delete, {?WEBMACHINE_URL++"/users/lihao", []}, [], []),
 	api_help:refresh().
 
+
+%% @doc
+%% Function: add_multiple_streams_test/0
+%% Purpose: Test the creation of multiple streams in only one json
+%% Returns: ok | {error, term()}
+%% @end
+-spec add_multiple_streams_test() -> ok | {error, term()}.
+add_multiple_streams_test() ->
+	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {?WEBMACHINE_URL++"/streams", [], "application/json", "{\"multi_json\" : [{\"name\" : \"testM1\",\"user_id\" : \"RandomUser\"},{\"name\" : \"testM2\",\"user_id\" : \"RandomUser\"}]}"}, [], []),
+	api_help:refresh(),
+	?assertEqual(true,lib_json:get_field(Body1,"results[0].ok")),
+	?assertEqual(true,lib_json:get_field(Body1,"results[1].ok")),
+	api_help:refresh(),
+	DocId1 = lib_json:get_field(Body1,"results[0]._id"),
+	DocId2 = lib_json:get_field(Body1,"results[1]._id"),
+	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, _Body3}} = httpc:request(delete, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(DocId1), []}, [], []),
+	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, _Body4}} = httpc:request(delete, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(DocId2), []}, [], []),
+
+
+
+
+	{ok, {{_Version5, 200, _ReasonPhrase5}, _Headers5, Body5}} = httpc:request(post, {?WEBMACHINE_URL++"/streams", [], "application/json", "{\"multi_json\" : [{\"name\" : \"testM1\",\"user_id\" : \"RandomUser\"},{\"nme\" : \"testM2\",\"user_id\" : \"RandomUser\"}]}"}, [], []),
+	api_help:refresh(),
+	?assertEqual(true,lib_json:get_field(Body5,"results[0].ok")),
+	?assertEqual(false,lib_json:get_field(Body5,"results[1].ok")),
+	api_help:refresh(),
+	DocId3 = lib_json:get_field(Body5,"results[0]._id"),
+	{ok, {{_Version6, 200, _ReasonPhrase6}, _Headers6, _Body6}} = httpc:request(delete, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(DocId3), []}, [], []),
+
+
+	{ok, {{_Version7, 200, _ReasonPhrase7}, _Headers7, Body7}} = httpc:request(post, {?WEBMACHINE_URL++"/streams", [], "application/json", "{\"multi_json\" : [{\"nme\" : \"testM1\",\"user_id\" : \"RandomUser\"},{\"nme\" : \"testM2\",\"user_id\" : \"RandomUser\"}]}"}, [], []),
+	api_help:refresh(),
+	?assertEqual(false,lib_json:get_field(Body7,"results[0].ok")),
+	?assertEqual(false,lib_json:get_field(Body7,"results[1].ok")),
+	api_help:refresh().
+
+
 %% @doc
 %% Function: put_stream_with_parser_test/0
 %% Purpose: Test updating streams with parsers` information

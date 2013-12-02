@@ -54,17 +54,17 @@ get_streams_using_polling_test() ->
 	%% Test that should return the epmty list, since
     %% no streams exists that are using polling.
 	post_stream("Test Stream1", ""),
-	timer:sleep(1000),
+	api_help:refresh(),	
 	?assertMatch([], poll_help:get_streams_using_polling()),
 	
 	%% Test that should return a list of length one.
 	post_stream("Test Stream2", "127.0.0.1", 10),
-	timer:sleep(1000),
+	api_help:refresh(),	
 	?assertMatch(1, length(poll_help:get_streams_using_polling())),
 	
 	%% Test that should return a list of length two.
 	post_stream("Test Stream3", "127.0.0.2", 20),
-	timer:sleep(1000),
+	api_help:refresh(),	
 	?assertMatch(2, length(poll_help:get_streams_using_polling())),
 	
 	%% Clear all entered streams.
@@ -88,7 +88,7 @@ json_to_record_stream_test() ->
 	%% Enter a streams with and without polling.
     post_stream("Test stream1", ""),
 	post_stream("Test stream2", "127.0.0.1", 10),
-	timer:sleep(1000),
+	api_help:refresh(),	
 	
 	%% Test to get the stream as json and transform it to a #pollerInfo.
 	StreamJsonList = poll_help:get_streams_using_polling(),
@@ -104,7 +104,7 @@ json_to_record_stream_test() ->
 	
 	%% Enter streams that uses polling but have undefined fields.
 	post_stream("", "127.0.0.1"), %% undefined: name, frequency
-	timer:sleep(1000),
+	api_help:refresh(),	
 	List1 = poll_help:get_streams_using_polling(),
 	Rec1 = poll_help:json_to_record_stream(lists:nth(1, List1)),
 	?assertEqual(undefined, Rec1#pollerInfo.name),
@@ -113,7 +113,7 @@ json_to_record_stream_test() ->
 	delete_stream_from_record(Rec1),
 	
 	post_stream("", "127.0.0.1", 10), %% undefined: name
-	timer:sleep(1000),
+	api_help:refresh(),	
 	List2 = poll_help:get_streams_using_polling(),
 	Rec2 = poll_help:json_to_record_stream(lists:nth(1, List2)),
 	?assertEqual(undefined, Rec2#pollerInfo.name),
@@ -122,7 +122,7 @@ json_to_record_stream_test() ->
 	delete_stream_from_record(Rec2),
 	
 	post_stream("Test", "127.0.0.1"), %% undefined: frequency
-	timer:sleep(1000),
+	api_help:refresh(),	
 	List3 = poll_help:get_streams_using_polling(),
 	Rec3 = poll_help:json_to_record_stream(lists:nth(1, List3)),
 	?assertEqual("Test", Rec3#pollerInfo.name),
@@ -151,7 +151,7 @@ json_to_record_streams_test() ->
     post_stream("Test stream1", ""),
 	post_stream("Test stream2", "127.0.0.1", 10),
 	post_stream("Test stream3", "127.0.0.2", 20),
-	timer:sleep(1000),
+	api_help:refresh(),	
 	
 	%% Test to get the stream list and transform it to a #pollerInfo list.
 	StreamJsonList = poll_help:get_streams_using_polling(),
