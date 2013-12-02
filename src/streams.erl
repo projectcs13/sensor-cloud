@@ -10,7 +10,7 @@
 %% @end
 -module(streams).
 -export([init/1, allowed_methods/2, content_types_provided/2, content_types_accepted/2,
-		 delete_resource/2, process_post/2, put_stream/2, get_stream/2,delete_data_points_with_stream_id/1]).
+		 delete_resource/2, process_post/2, put_stream/2, get_stream/2,delete_data_points_with_stream_id/2]).
 
 
 -define(ELASTIC_SEARCH_URL, api_help:get_elastic_search_url()).
@@ -101,7 +101,7 @@ delete_resource(ReqData, State) ->
 					{true,wrq:set_resp_body("{\"message\":\"All streams with user_id:" ++UserId++" are now deleted\"}",ReqData),State}
 			end;
 		{_,Id} ->
-			case delete_data_points_with_stream_id(Id) of 
+			case delete_data_points_with_stream_id(Id, "stream") of 
 				{error, {Code, Body}} -> 
 					ErrorString = api_help:generate_error(Body, Code),
             		{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
@@ -117,23 +117,31 @@ delete_resource(ReqData, State) ->
 	end.
 
 %% @doc
-%% Function: delete_data_points_with_stream_id/1
+%% Function: delete_data_points_with_stream_id/2
 %% Purpose: Used to delete all data-points with the given id as parent
 %% Returns: {ok} or {error,Reason} 
 %% FIX: This function relies on direct contact with elastic search at localhost:9200
 %% @end
--spec delete_data_points_with_stream_id(Id::string() | binary()) -> term().
+-spec delete_data_points_with_stream_id(Id::string(), Type::string() | binary()) -> term().
 
-delete_data_points_with_stream_id(Id) when is_binary(Id) ->
-	{ok, {{_Version, Code, _ReasonPhrase}, _Headers, Body}} = httpc:request(delete, {?ELASTIC_SEARCH_URL++"/sensorcloud/datapoint/_query?q=stream_id:" ++ binary_to_list(Id), []}, [], []),
+delete_data_points_with_stream_id(Id, Type) when is_binary(Id) ->
+	case Type of
+		"stream" -> DatapointType = "datapoint";
+		"virtual_stream" -> DatapointType = "vsdatapoint"
+	end,
+	{ok, {{_Version, Code, _ReasonPhrase}, _Headers, Body}} = httpc:request(delete, {?ELASTIC_SEARCH_URL++"/sensorcloud/" ++ DatapointType ++ "/_query?q=stream_id:" ++ binary_to_list(Id), []}, [], []),
 	case Code of
 		200 ->
 			{ok};
 		Code ->
 			{error,{Code, Body}}
 	end;
-delete_data_points_with_stream_id(Id) ->
-	{ok, {{_Version, Code, _ReasonPhrase}, _Headers, Body}} = httpc:request(delete, {?ELASTIC_SEARCH_URL++"/sensorcloud/datapoint/_query?q=stream_id:" ++ Id, []}, [], []),
+delete_data_points_with_stream_id(Id, Type) ->
+	case Type of
+		"stream" -> DatapointType = "datapoint";
+		"virtual_stream" -> DatapointType = "vsdatapoint"
+	end,
+		{ok, {{_Version, Code, _ReasonPhrase}, _Headers, Body}} = httpc:request(delete, {?ELASTIC_SEARCH_URL++"/sensorcloud/" ++ DatapointType ++ "/_query?q=stream_id:" ++ Id, []}, [], []),
 	case Code of
 		200 ->
 			{ok};

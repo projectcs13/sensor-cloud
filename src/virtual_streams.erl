@@ -40,8 +40,6 @@ allowed_methods(ReqData, State) ->
 			{['POST', 'PUT', 'DELETE'], ReqData, State};
 		[{"vstreams", "_search"}] ->
 			{['POST', 'GET'], ReqData, State};
-		[{"users", _UserID}, {"vstreams"}] ->
-			{['DELETE'], ReqData, State};
 		[error] ->
 			{[], ReqData, State}
 	end.
@@ -87,7 +85,7 @@ process_post(ReqData, State) ->
 			{{Year,Month,Day},{Hour,Minute,Second}} = calendar:local_time(),
 			Date = api_help:generate_date([Year,Month,Day]), % it is crashing if I add Hour, Minute, Second, check it again later
 			DateAdded = lib_json:add_values(VirtualStreamJson,[{creation_date, list_to_binary(Date)}]),
-			case erlastic_search:index_doc(?INDEX, "vstream", DateAdded) of	
+			case erlastic_search:index_doc(?INDEX, "virtual_stream", DateAdded) of	
 				{error, Reason} ->
 					{{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
 				{ok,List} -> 
@@ -95,13 +93,18 @@ process_post(ReqData, State) ->
 					StreamsInvolved = lib_json:get_field(VirtualStreamJson, "streams_involved"),
 					TimestampFrom = lib_json:get_field(VirtualStreamJson, "timestampfrom"),
 					Function = lib_json:get_field(VirtualStreamJson, "function"),
-					reduce(VirtualStreamId, StreamsInvolved, TimestampFrom, Function, ReqData, State),
-					{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
+					AllowedFunctions = ["min", "max", "mean", "count"],
+					case lists:member(binary_to_list(lists:nth(2, Function)), AllowedFunctions) of
+						true ->
+							reduce(VirtualStreamId, StreamsInvolved, TimestampFrom, Function, ReqData, State),
+							{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State};
+						false ->
+							{{halt, 404}, wrq:set_resp_body("404 Function missing or not supported", ReqData), State}
+					end
 			end;
 		true ->
 			process_search(ReqData, State, post)
-	end
-	.
+	end.
 
 
 %% @doc
@@ -164,7 +167,7 @@ put_stream(ReqData, State) ->
 	VStreamId = proplists:get_value('id', wrq:path_info(ReqData)),
 	{VStream,_,_} = api_help:json_handler(ReqData,State),
 	Update = api_help:create_update(VStream),
-	case api_help:update_doc(?INDEX, "vstream", VStreamId, Update) of 
+	case api_help:update_doc(?INDEX, "virtual_stream", VStreamId, Update) of 
 		{error, {Code, Body}} -> 
 			ErrorString = api_help:generate_error(Body, Code),
 			{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
@@ -182,30 +185,20 @@ put_stream(ReqData, State) ->
 %% @end
 -spec delete_resource(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 delete_resource(ReqData, State) ->
-	erlang:display("Deleting"),
-	case {proplists:get_value('user', wrq:path_info(ReqData)),proplists:get_value('id', wrq:path_info(ReqData))} of
-		{UserId,undefined} ->
-			erlang:display("VSTREAM ID undefined"),
-			case users:delete_streams_with_user_id(UserId, "true") of
-				{error, {Code, Body}} -> 
-					ErrorString = api_help:generate_error(Body, Code),
-					{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-				{ok} ->
-					{true,wrq:set_resp_body("{\"message\":\"All streams with user_id:" ++UserId++" are now deleted\"}",ReqData),State}
-			end;
-		{_,Id} ->
+	case {proplists:get_value('id', wrq:path_info(ReqData))} of
+		{Id} ->
 			erlang:display("VSTREAM ID defined: " ++ Id),
 			case delete_data_points_with_vstream_id(Id) of 
 				{error, {Code, Body}} -> 
 					ErrorString = api_help:generate_error(Body, Code),
-            		{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+					{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 				{ok} ->
-					case erlastic_search:delete_doc(?INDEX,"vstream", Id) of
+					case erlastic_search:delete_doc(?INDEX,"virtual_stream", Id) of
 						{error, {Code, Body}} -> 
 							ErrorString = api_help:generate_error(Body, Code),
 							{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 						{ok,List} -> 
-			 				{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
+							{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
 					end
 			end
 	end.
@@ -289,7 +282,7 @@ create_query(Function, Streams, TimestampFrom) ->
 		{list(), tuple(), string()}.
 process_search(ReqData, State, post) ->
 	{Json,_,_} = api_help:json_handler(ReqData,State),
-	case erlastic_search:search_json(#erls_params{},?INDEX, "vstream", Json) of
+	case erlastic_search:search_json(#erls_params{},?INDEX, "virtual_stream", Json) of
 			{error, {Code, Body}} ->
 				ErrorString = api_help:generate_error(Body, Code),
 				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
