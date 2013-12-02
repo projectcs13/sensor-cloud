@@ -17,7 +17,32 @@
 %% ====================================================================
 %% API functions
 %% ====================================================================
--export([]).
+-export([start_link/0]).
+
+
+
+
+%% start_link/0
+%% ====================================================================
+%% @doc
+%% Function: start_link/0
+%% Purpose: Initializes as a supervisor process for virtual streams.
+%% Return: {ok, Pid} | ignore | {error, {already_started, Pid}} |
+%%		   {error, {shutdown, Reason}} | {error, Reason}.
+%% Side effect: Starts a supervisor process for virtual streams.
+%% @end
+-spec start_link() -> Startlink_ret when
+	Startlink_ret :: {ok, pid()}
+	               | ignore
+	               | {error, Startlink_err},
+	Startlink_err :: {already_started, pid()}
+    	           | {shutdown, term()}
+        	       | term().
+%% ====================================================================
+start_link() ->
+	supervisor:start_link({local, vstream_sup}, ?MODULE, []).
+
+
 
 
 
@@ -43,13 +68,14 @@
 	Modules :: [module()] | dynamic.
 %% ====================================================================
 init([]) ->
-	%% TODO Get all virtual streams in a list
-    AChild = {'AName',{'AModule',start_link,[]},
-	      permanent,2000,worker,['AModule']},
-    {ok,{{simple_one_for_one,5,60}, [AChild]}}.
+    {ok,{{simple_one_for_one,5,60},
+    	[{virtual_stream_process,
+    	  {gen_virtual_stream_process, start_link, []},
+    	  transient, brutal_kill, worker, [gen_virtual_stream_process]}
+		]}}.
 
 %% SupervisionPolicy: {simple_one_for_one, 5, 60}  -- simple_one_for_one because it can create children dynamically but kills are harder.
-%% ChildSpec: {VStreamId, {virtual_stream_process, start_link, []}, transient, brutal_kill, worker, [virtual_stream_process]}.
+%% ChildSpec: {VStreamId, {gen_virtual_stream_process, start_link, []}, transient, brutal_kill, worker, [gen_virtual_stream_process]}.
 
 %% ====================================================================
 %% Internal functions

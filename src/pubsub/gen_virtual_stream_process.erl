@@ -27,7 +27,31 @@
 %% ====================================================================
 %% API functions
 %% ====================================================================
--export([]).
+-export([start_link/3]).
+
+
+
+%% start_link/3
+%% ====================================================================
+%% @doc
+%% Function: start_link/3
+%% Purpose: Initializes as a gen_server process.
+%% Args: VStreamId - String representing the virtual streams ID,
+%%		 InputIds - A list of streams/virtual streams to subscribe to,
+%%		 Function - Name of function to use during calculation.
+%% Return: {ok, Pid}.
+%% Side effect: Starts a gen_server process.
+%% @end
+-spec start_link(VStreamId :: string(),
+				 InputIds :: [StreamInfo], Function :: atom()) -> {ok, pid()}
+				 when StreamInfo :: {Type, Id},
+				 	  Type :: stream | vstream,
+				 	  Id :: string().
+%% ====================================================================
+start_link(VStreamId, InputIds, Function) ->
+	gen_server:start_link(?MODULE, [VStreamId, InputIds, Function], []).
+
+
 
 
 %% ====================================================================
@@ -63,6 +87,15 @@
 	Timeout :: non_neg_integer() | infinity.
 %% ====================================================================
 init([VStreamId, InputIds, Function]) ->
+	
+	erlang:display("Got Id: " ++ VStreamId),
+	erlang:display("~nGot InputIds: "),
+	erlang:display(InputIds),
+	erlang:display("~nGot Function: "),
+	erlang:display(Function),
+
+	%% Trap exits from parent
+	process_flag(trap_exit, true),
 	
 	%% Exchange name binarys.
 	InputExchanges = create_input_exchanges(InputIds),
@@ -118,7 +151,7 @@ init([VStreamId, InputIds, Function]) ->
 	Reason :: term().
 %% ====================================================================
 %% Not used by our server
-handle_call(Request, _From, State) ->
+handle_call(_Request, _From, State) ->
     Reply = ok,
     {reply, Reply, State}.
 
@@ -167,24 +200,34 @@ handle_info({#'basic.deliver'{}, #amqp_msg{payload = Body}},
 			%% Apply function to the new values
 			[Value] = apply_function(list_to_binary(VStreamId),
 									 Function, NewDataPoints),
+
+			case Value of
+				none -> {noreply, State};
+				_ ->
+					%% Create timestamp to avoid issues with
+					%% asynchronus data points.
+					Timestamp = ?TIME_NOW(erlang:localtime()),
 			
-			%% Create timestamp to avoid issues with asynchronus datapoints.
-			Timestamp = ?TIME_NOW(erlang:localtime()),
+					%% Create new datapoint message
+					Msg = lib_json:replace_field(Value, "timestamp",
+												 list_to_binary(Timestamp)),
 			
-			%% Create new datapoint message
-			Msg = lib_json:replace_field(Value, "timestamp",
-										 list_to_binary(Timestamp)),
-			
-			%% Store value in ES
-			case erlastic_search:index_doc(?ES_INDEX, "vsdatapoint", Msg) of
-				{error, Reason} ->
-					erlang:display({error, Reason}),
-					{noreply, State};
-				{ok, _} ->
+					%% Store value in ES
+					Log = case erlastic_search:index_doc(?ES_INDEX,
+														 "vsdatapoint", Msg) of
+						  	{error, Reason} ->
+						  		erlang:display({error, Reason}),
+						  		%% TODO Persistent storage using file?
+								[Msg | State#state.log];
+							{ok, _} ->
+								%% Try storing the log
+								store_log_in_es(State#state.log)
+						  end,
 					%% Publish the calculated value
 					ChannelOut = element(3, Net),
 					send(ChannelOut, VStreamExchange, list_to_binary(Msg)),
-					{noreply, State#state{datapoints = NewDataPoints}}
+					{noreply, State#state{datapoints = NewDataPoints,
+										  log = Log}}
 			end;
 		_ ->
 			{noreply, State}
@@ -207,14 +250,14 @@ handle_info(_Info, State) ->
 			| term().
 %% ====================================================================
 
-terminate(Reason, #state{network = Net}) when Net /= undefined ->
+terminate(_Reason, #state{network = Net}) when Net /= undefined ->
 	{Connection, ChannelIn, ChannelOut} = Net,
 	amqp_channel:close(ChannelIn),
 	amqp_channel:close(ChannelOut),
 	amqp_connection:close(Connection),
 	ok;
 
-terminate(Reason, State) ->
+terminate(_Reason, _State) ->
     ok.
 
 
@@ -242,6 +285,8 @@ code_change(_OldVsn, State, _Extra) ->
 %% ====================================================================
 
 
+
+
 %% send/3
 %% ====================================================================
 %% @doc
@@ -255,12 +300,45 @@ code_change(_OldVsn, State, _Extra) ->
 %% Side effects: Publish the message 'Message' into the exchange 'Exchange'.
 %%
 %% @end
-%% ====================================================================
 -spec send(Channel :: pid(), Exchange :: binary(), Message :: binary()) -> ok.
+%% ====================================================================
 send(Channel, Exchange, Message) ->
 	amqp_channel:cast(Channel,
 					  #'basic.publish'{exchange = Exchange},
 					  #amqp_msg{payload = Message}).
+
+
+
+
+
+
+
+%% store_log_in_es/1
+%% ====================================================================
+%% @doc
+%% Function: store_log_in_es/1
+%% Purpose: Used to store data points into Elastic Search that previously
+%%			could not be stored.
+%% Args: Log - List of data points to store.
+%% Returns: [] | NewLog where NewLog contain all data points that still could
+%%			not be stored.
+%% Side effects: Stores data points into Elastic Search.
+%%
+%% @end
+-spec store_log_in_es([Log :: json()]) -> [] | [NewLog :: json()].
+%% ====================================================================
+store_log_in_es([]) -> [];
+store_log_in_es([Msg | Log]) ->
+	case erlastic_search:index_doc(?ES_INDEX, "vsdatapoint", Msg) of
+		{error, Reason} ->
+			erlang:display({error, Reason}),
+			[Msg | Log];
+		{ok, _} ->
+			store_log_in_es(Log)
+	end.
+
+
+
 
 
 
@@ -277,13 +355,13 @@ send(Channel, Exchange, Message) ->
 %% Args: List - A list of streams, i.e [{stream, Id}, {vstream, Id}].
 %% Returns: [] | [Exchange]
 %% @end
-%% ====================================================================
 -spec create_input_exchanges(List) -> [] | [Exchange] when
 		  List :: [StreamInfo],
           StreamInfo :: {Type, Id},
           Type :: atom(),
           Id :: string(),
           Exchange :: binary().
+%% ====================================================================
 create_input_exchanges(List) ->
 	create_input_exchanges(List, []).
 
@@ -297,7 +375,6 @@ create_input_exchanges(List) ->
 %%       Exchanges - The list to store the created exchanges in.
 %% Returns: Exchanges | [Exchange] ++ Exchanges
 %% @end
-%% ====================================================================
 -spec create_input_exchanges(List, Exchanges) ->
 		  Exchanges
 		| [Exchange | Exchanges] when
@@ -307,6 +384,7 @@ create_input_exchanges(List) ->
           Type :: atom(),
           Id :: string(),
           Exchange :: binary().
+%% ====================================================================
 create_input_exchanges([], Exchanges) -> Exchanges;
 create_input_exchanges([{Type, Id} | InputIds], Exchanges) when
   Type =:= stream; Type =:= vstream ->
@@ -330,8 +408,8 @@ create_input_exchanges([{Type, Id} | InputIds], Exchanges) when
 %% Side-effects: Creates one queue in RabbitMQ for each exchange and binds it
 %%               to the exchange.
 %% @end
-%% ==================================================================== 
 -spec subscribe(ChannelIn :: pid(), InputExchanges :: [binary()]) -> ok.
+%% ====================================================================
 subscribe(_, []) -> ok;
 subscribe(ChannelIn, [InputExchange | InputExchanges]) ->
 	%% Declare INPUT queues
@@ -366,9 +444,9 @@ subscribe(ChannelIn, [InputExchange | InputExchanges]) ->
 %% Args: List - The list of streams and virtual streams.
 %% Returns: [] | [{Id, Value}].
 %% @end
-%% ====================================================================
 -spec get_latest_value_for_streams(List :: [{Type :: atom(), Id :: string()}])
 	-> [] | [{Id :: string(), Value :: json() | undefined}].
+%% ====================================================================
 get_latest_value_for_streams([]) -> [];
 get_latest_value_for_streams([{Type, Id} | T]) ->
 	JsonQuery = "{\"query\" : {\"term\" : {\"stream_id\" : \"" ++ Id ++ "\"}},"
@@ -408,12 +486,12 @@ get_latest_value_for_streams([{Type, Id} | T]) ->
 %% Returns: Value of the predefined function.
 %% Side effects: Applies a predefined function
 %% @end
-%% ====================================================================
 -spec apply_function(VStreamId :: binary(),
 					 Function :: atom(),
 					 List :: [{Id :: string(),
 							   DataPoint :: json() | undefined}]) -> number().
-apply_function(_VStreamId, _Function, []) -> 0;
+%% ====================================================================
+apply_function(_VStreamId, _Function, []) -> [none];
 apply_function(VStreamId, Function, DataPoints) ->
 	DataList =
 		lists:foldr(fun({_, Data}, Acc) ->
