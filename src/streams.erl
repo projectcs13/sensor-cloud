@@ -568,9 +568,9 @@ get_stream(ReqData, State) ->
 	end.
 
 %% @doc
-%% Function: get_streams/2
-%% Purpose: Gets the NrValues latest datapoints for each streamid that exists in list IdList
-%% Returns: JSON string that contains the data and streamid for each streamid in IdList
+%% Function: get_streams/1
+%% Purpose: Gets the stream document for each correct stream_id that exists in list List
+%% Returns: JSON string that contains stream for each streamid in IdList
 %% @end
 get_streams([]) ->
     "{\"streams\":[]}";
