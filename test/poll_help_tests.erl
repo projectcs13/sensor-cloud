@@ -205,55 +205,6 @@ get_parser_by_id_test() ->
 	%% Clear all entered parsers.
 	clear_parser_type().
 
-%% @doc
-%% Function: get_datapoint_test/0
-%% Purpose: test poll_help:get_datapoint_test/1 function
-%% Returns: ok | {error, term()}.
-%% @end
-%% -spec get_datapoint_test() -> ok | tuple().
-%% get_datapoint_test()->
-	
-	%% clear all datapoints stored in elasticsearch
-%%	clear_datapoint_type(),
-%%	api_help:refresh(),
-	
-%%	Res0 = poll_help:get_datapoint("12"),
-%%	post_datapoint("12", 13),
-%%	api_help:refresh(),
-%%	Res1 = poll_help:get_datapoint("12"),
-%%	?assertEqual(0, length(Res0)),
-%%	?assertEqual(1, length(Res1)),
-%%	?assertEqual("12", binary_to_list(lib_json:get_field(lists:nth(1, Res1), "stream_id"))),
-%%	?assertEqual(13, lib_json:get_field(lists:nth(1, Res1), "value")),
-	
-	%% clear all datapoints stored in elasticsearch
-%%	clear_datapoint_type().
-
-
-%% @doc
-%% Function: post_datapoint_test/0
-%% Purpose: test poll_help:post_datapoint_test/2 function
-%% Returns: ok | {error, term()}.
-%% @end
-%%-spec post_datapoint_test() -> ok | tuple().
-%%post_datapoint_test()->
-	
-	%% clear all datapoints stored in elasticsearch
-%%	clear_datapoint_type(),
-%%	api_help:refresh(),
-	
-%%	Res0 = poll_help:get_datapoint("11"),
-%%	poll_help:post_datapoint("11",101),
-%%	api_help:refresh(),
-%%	Res1 = poll_help:get_datapoint("11"),
-%%	?assertEqual(0, length(Res0)),
-%%	?assertEqual(1, length(Res1)),
-%%	?assertEqual("11", binary_to_list(lib_json:get_field(lists:nth(1, Res1), "stream_id"))),
-%%	?assertEqual("101", binary_to_list(lib_json:get_field(lists:nth(1, Res1), "value"))),
-	
-	%% clear all datapoints stored in elasticsearch
-%%	clear_datapoint_type().
-
 
 %% ====================================================================
 %% Internal functions

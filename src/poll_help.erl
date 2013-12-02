@@ -21,9 +21,7 @@
 -export([get_streams_using_polling/0,
 		 json_to_record_streams/1,
 		 json_to_record_stream/1,
-		 get_parser_by_id/1,
-		 post_datapoint/2,
-		 get_datapoint/1]).
+		 get_parser_by_id/1]).
 
 
 
@@ -32,54 +30,7 @@
 %% API functions
 %% ====================================================================
 
-%% @doc
-%% Function: get_datapoint/1
-%% Purpose: get a datapoint from elasticsearch 
-%% Returns: [string() ...] | {error, ErrMsg}
-%% @end
--spec get_datapoint(StreamId :: string()) -> {error, string()} | [string()].
-get_datapoint(StreamId) when is_list(StreamId) ->
-	Id = StreamId,
-	case erlastic_search:search_limit(?ES_INDEX, "datapoint", "stream_id:" ++ Id, 100) of
-		{ok, Result} ->
-			FinalJson = lib_json:get_list_and_add_id(Result, data),
-			lib_json:get_field(FinalJson, "data");
-		{error, {Code, Body}} -> 
-    		ErrorString = api_help:generate_error(Body, Code),
-    		erlang:display(ErrorString),
-			{error, ErrorString}
-	end.
 
-%% @doc
-%% Function: post_datapoint/2
-%% Purpose: post a new datapoint into the elasticsearch 
-%% Returns: ok | {error, ErrMsg}
-%% @end
--spec post_datapoint(StreamId :: string(), Value :: integer()|float()|string()) -> ok | {error, string()}.
-post_datapoint(StreamId, Value)->
-	FieldValue1 = {"stream_id",list_to_binary(StreamId)},
-	FieldValue2 = case is_integer(Value) of
-						true->
-							{"value",integer_to_binary(Value)};
-						_->
-							case is_float(Value) of
-								true->
-									{"value",float_to_binary(Value)};
-								_ ->
-									{"value",list_to_binary(Value)}
-							end
-					end,
-	
-	FieldValue3 = {"timestamp",list_to_binary(?TIME_NOW(erlang:localtime()))},
-	FieldValues = [FieldValue1, FieldValue2, FieldValue3],
-	FinalJson = lib_json:add_values("{}", FieldValues),
-	
-	case erlastic_search:index_doc(?ES_INDEX, "datapoint", FinalJson) of
-		{error, Reason} -> erlang:display("Failed to insert the new datapoint into the elasticsearch for this reason: "++Reason),
-						   {error, Reason};
-		{ok,_List} -> 
-			ok
-	end.
 
 %% @doc
 %% Function: get_parser_by_id/1
