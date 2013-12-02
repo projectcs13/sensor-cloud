@@ -188,7 +188,7 @@ delete_resource(ReqData, State) ->
 	case {proplists:get_value('id', wrq:path_info(ReqData))} of
 		{Id} ->
 			erlang:display("VSTREAM ID defined: " ++ Id),
-			case delete_data_points_with_vstream_id(Id) of 
+			case streams:delete_data_points_with_stream_id(Id, "virtual_stream") of 
 				{error, {Code, Body}} -> 
 					ErrorString = api_help:generate_error(Body, Code),
 					{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
@@ -201,32 +201,6 @@ delete_resource(ReqData, State) ->
 							{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
 					end
 			end
-	end.
-
-
-%% @doc
-%% Function: delete_data_points_with_vstream_id/1
-%% Purpose: Used to delete all virtual stream data-points with the given id as parent
-%% Returns: {ok} or {error,Reason} 
-%% FIX: This function relies on direct contact with elastic search at localhost:9200
-%% @end
--spec delete_data_points_with_vstream_id(Id::string() | binary()) -> term().
-
-delete_data_points_with_vstream_id(Id) when is_binary(Id) ->
-	{ok, {{_Version, Code, _ReasonPhrase}, _Headers, Body}} = httpc:request(delete, {?ELASTIC_SEARCH_URL++"/sensorcloud/vsdatapoint/_query?q=stream_id:" ++ binary_to_list(Id), []}, [], []),
-	case Code of
-		200 ->
-			{ok};
-		Code ->
-			{error,{Code, Body}}
-	end;
-delete_data_points_with_vstream_id(Id) ->
-	{ok, {{_Version, Code, _ReasonPhrase}, _Headers, Body}} = httpc:request(delete, {?ELASTIC_SEARCH_URL++"/sensorcloud/vsdatapoint/_query?q=stream_id:" ++ Id, []}, [], []),
-	case Code of
-		200 ->
-			{ok};
-		Code ->
-			{error,{Code, Body}}
 	end.
 
 
