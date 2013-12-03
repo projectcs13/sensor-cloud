@@ -358,7 +358,7 @@ send_messages(TriggerExchange,ChannelOut,[Msg|Rest]) ->
 %%
 %% Returns: ok | {error,{Code, Body}}
 %% @end
--spec send_to_output(TriggerId::string(),tuple()) ->  ok | {error,{Code, Body}}.
+-spec send_to_output(TriggerId::string(),tuple()) ->  ok | {error,_}.
 send_to_output(TriggerId, {Value, Timestamp, StreamId, [], []}) ->
     ok;
 send_to_output(TriggerId, {Value, Timestamp, StreamId, [Input|Rest], []}) ->
@@ -391,7 +391,7 @@ send_to_output(TriggerId, {Value, Timestamp, StreamId, [Input|Inputs], [{uri,URI
         {ok, {{_, Code, _}, _, Body}} ->
             {error, {Code, Body}}
     end,
-    send_to_output(TriggerId, {Value, Timestamp, StreamId, [Input|Inputs], Rest}).
+    send_to_output(TriggerId, {Value, Timestamp, StreamId, [Input|Inputs], Rest});
 send_to_output(TriggerId, {Value, Timestamp, StreamId, [Input|Inputs], [_|Rest]}) ->
     erlang:display("Invalid output!"),
     send_to_output(TriggerId, {Value, Timestamp, StreamId, [Input|Inputs], Rest}).
