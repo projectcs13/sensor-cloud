@@ -89,17 +89,17 @@ process_post(ReqData, State) ->
 		"remove" -> delete_resource(ReqData, State);
 		"add" ->
 			User = proplists:get_value('userid', wrq:path_info(ReqData)),
-			Username = case erlastic_search:search_limit(?INDEX, "stream", "username="++User,500) of
-				{error, {Code9, Body9}} -> 
-						   {error, {Code9, Body9}};
-				{ok,Response} ->
-					case lib_json:get_field(Response, "hits.hits[0]._id") of
-						Value when is_binary(Value) ->
-							binary_to_list(Value);
-						_ ->
-							error
-					end
-			end
+			Username = case erlastic_search:search_limit(?INDEX, "user", "username="++User,500) of
+						   {error, {Code9, Body9}} -> 
+							   {error, {Code9, Body9}};
+						   {ok,Response} ->
+							   case lib_json:get_field(Response, "hits.hits[0]._id") of
+								   Uid when is_binary(Uid) ->
+									   binary_to_list(Uid);
+								   _Error ->
+									   error
+							   end
+					   end,
 			{Json,_,_} = api_help:json_handler(ReqData, State),
 			Input = lib_json:get_field(Json, "input"),
 			Streams = case lib_json:get_field(Json, "streams") of
@@ -128,16 +128,21 @@ process_post(ReqData, State) ->
 							   X -> get_es_id(lib_json:get_field(JsonStruct, "hits.hits"),Streams)
 						   end
 				   end,
-			case {EsId,Streams,Function} of
-				{{error, {Code1, Body1}},_,_} ->
+			case {EsId,Streams,Function,Username} of
+				{{error, {Code1, Body1}},_,_,_} ->
 					ErrorString1 = api_help:generate_error(Body1, Code1),
 					{{halt, Code1}, wrq:set_resp_body(ErrorString1, ReqData), State};
-				{_,error,_} ->
+				{_,error,_,_} ->
 					{{halt, 405}, wrq:set_resp_body("Invalid stream list should be a valid stream id or a list of valid stream ids", ReqData), State};
-				{_,_,error} ->
+				{_,_,error,_} ->
 					{{halt, 405}, wrq:set_resp_body("Invalid function", ReqData), State};
-				{undefined,_,_} ->
-					NewTrigger = lib_json:set_attrs([{"function",list_to_binary(Function)},{"streams",Streams},{"outputlist","[{}]"},{"outputlist[0].input",Input},{"outputlist[0].output",["{}"]},{"outputlist[0].output.output_id",[Username]},{"outputlist[0].output.output_type",["user"]}]),
+				{_,_,_,error} ->
+					{{halt, 405}, wrq:set_resp_body("Error when retriving user_id", ReqData), State};
+				{_,_,_,{error, {UCode, UBody}}} ->
+					UErrorString = api_help:generate_error(UBody, UCode),
+					{{halt, UCode}, wrq:set_resp_body(UErrorString, ReqData), State};
+				{undefined,_,_,_} ->
+					NewTrigger = lib_json:set_attrs([{"function",list_to_binary(Function)},{"streams",Streams},{"outputlist","[{}]"},{"outputlist[0].input",Input},{"outputlist[0].output",["{}"]},{"outputlist[0].output[0].output_id",list_to_binary(Username)},{"outputlist[0].output[0].output_type",list_to_binary("user")}]),
 					case erlastic_search:index_doc(?INDEX, "trigger", NewTrigger) of	% Create new triggger if not in the system
 						{error,{Code2,Body2}} ->
 							ErrorString2 = api_help:generate_error(Body2, Code2),
@@ -150,7 +155,7 @@ process_post(ReqData, State) ->
 									   end),
 							{true, wrq:set_resp_body(lib_json:encode(List2), ReqData), State}
 					end;
-				{EsId,_,_ }->
+				{EsId,_,_,_}->
 					erlang:display(EsId),
 					CommandExchange = list_to_binary("command.trigger."++ EsId),
 					Msg = term_to_binary({add,{Input,{user,Username}}}),
@@ -199,7 +204,18 @@ process_post(ReqData, State) ->
 -spec delete_resource(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 
 delete_resource(ReqData, State) ->
-	Username = proplists:get_value('userid', wrq:path_info(ReqData)),
+	User = proplists:get_value('userid', wrq:path_info(ReqData)),
+	Username = case erlastic_search:search_limit(?INDEX, "user", "username="++User,500) of
+				   {error, {Code9, Body9}} -> 
+					   {error, {Code9, Body9}};
+				   {ok,Response} ->
+					   case lib_json:get_field(Response, "hits.hits[0]._id") of
+						   Uid when is_binary(Uid) ->
+							   binary_to_list(Uid);
+						   _Error ->
+							   error
+					   end
+			   end,
 	{Json,_,_} = api_help:json_handler(ReqData, State),
 	Input = lib_json:get_field(Json, "input"),
 	Streams = case lib_json:get_field(Json, "streams") of
@@ -229,17 +245,22 @@ delete_resource(ReqData, State) ->
 					   X -> get_es_id(lib_json:get_field(JsonStruct, "hits.hits"),Streams)
 				   end
 		   end,
-	case {EsId,Streams,Function} of
-		{{error, {Code1, Body1}},_,_} ->
+	case {EsId,Streams,Function,Username} of
+		{{error, {Code1, Body1}},_,_,_} ->
 			ErrorString1 = api_help:generate_error(Body1, Code1),
 			{{halt, Code1}, wrq:set_resp_body(ErrorString1, ReqData), State};
-		{_,error,_} ->
+		{_,error,_,_} ->
 			{{halt, 405}, wrq:set_resp_body("Invalid stream list should be a valid stream id or a list of valid stream ids", ReqData), State};
-		{_,_,error} ->
+		{_,_,error,_} ->
 			{{halt, 405}, wrq:set_resp_body("Invalid function", ReqData), State};
-		{error,_,_} ->
+		{error,_,_,_} ->
 			{{halt, 404}, ReqData, State};
-		{EsId,_,_ }->		
+		{_,_,_,error} ->
+			{{halt, 405}, wrq:set_resp_body("Error when retriving user_id", ReqData), State};
+		{_,_,_,{error, {UCode, UBody}}} ->
+			UErrorString = api_help:generate_error(UBody, UCode),
+			{{halt, UCode}, wrq:set_resp_body(UErrorString, ReqData), State};
+		{EsId,_,_ ,_}->		
 			Return = case erlastic_search:get_doc(?INDEX, "trigger", EsId) of % Update the es document by removing the user
 						 {error, {Code3, Body3}} -> 
 							 ErrorString3 = api_help:generate_error(Body3, Code3),

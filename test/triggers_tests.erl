@@ -36,6 +36,8 @@ init_test() ->
 %% @end
 create_delete_test() ->
 	%% Create
+	{ok, {{_VersionU1, 200, _ReasonPhraseU1}, _HeadersU1, BodyU1}} = httpc:request(post, {?WEBMACHINE_URL++"/users", [],"application/json", "{\"username\" : \"Tomas\"}"}, [], []),
+	api_help:refresh(),
 	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {?WEBMACHINE_URL++"/users/Tomas/triggers/add", [],"application/json", "{\"function\" : \"test\",\"input\":5,\"streams\":\"test\"}"}, [], []),
 	DocId1 = lib_json:get_field(Body1,"_id"),
 	api_help:refresh(),
@@ -79,7 +81,8 @@ create_delete_test() ->
 	api_help:refresh(),
 	{ok, {{_Version14, 200, _ReasonPhrase14}, _Headers14, Body14}} = httpc:request(get, {?ES_URL++"/sensorcloud/trigger/" ++ lib_json:to_string(DocId4), []}, [], []),
 	api_help:refresh(),
-	
+	{ok, {{_VersionU2, 200, _ReasonPhraseU2}, _HeadersU2, BodyU2}} = httpc:request(delete, {?WEBMACHINE_URL++"/users/Tomas", []}, [], []),
+	api_help:refresh(),
 	%% Delete tests
 	?assertEqual(true,(lib_json:get_field(Body12,"exist") == false) or (lib_json:get_field(Body12,"_source.outputlist") == [])), %% Answer will depend on how quick messages to the triggersProcess are
 	?assertEqual(true,(lib_json:get_field(Body14,"exist") == false) or (lib_json:get_field(Body14,"_source.outputlist") == [])). %% Answer will depend on how quick messages to the triggersProcess are
@@ -93,6 +96,11 @@ create_delete_test() ->
 %% Returns: ok | {error, term()}
 %% @end
 post_data_test() ->
+	{ok, {{_VersionU1, 200, _ReasonPhraseU1}, _HeadersU1, BodyU1}} = httpc:request(post, {?WEBMACHINE_URL++"/users", [],"application/json", "{\"username\" : \"Tomas\"}"}, [], []),
+	{ok, {{_VersionU2, 200, _ReasonPhraseU2}, _HeadersU2, BodyU2}} = httpc:request(post, {?WEBMACHINE_URL++"/users", [],"application/json", "{\"username\" : \"Erik\"}"}, [], []),
+	User1 = lib_json:to_string(lib_json:get_field(BodyU1,"_id")),
+	User2 = lib_json:to_string(lib_json:get_field(BodyU2,"_id")),
+	api_help:refresh(),
 	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {?WEBMACHINE_URL++"/streams", [],"application/json", "{\"name\" : \"Stream1\",\"user_id\":\"Tomas\"}"}, [], []),
 	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {?WEBMACHINE_URL++"/streams", [],"application/json", "{\"name\" : \"Stream2\",\"user_id\":\"Tomas\"}"}, [], []),
 	StreamId1 = lib_json:get_field(Body1,"_id"),
@@ -123,7 +131,7 @@ post_data_test() ->
 	{ok, {{_Version8, 200, _ReasonPhrase8}, _Headers8, Body8}} = httpc:request(post, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(StreamId1) ++"/data", [],"application/json", "{\"value\" : 7}"}, [], []),
 	{ok, {{_Version9, 200, _ReasonPhrase9}, _Headers9, Body9}} = httpc:request(post, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(StreamId2) ++"/data", [],"application/json", "{\"value\" : 4}"}, [], []),
 	
-	Messages = [{4,lib_json:to_string(StreamId1),5,["Erik","Tomas"]},{4,lib_json:to_string(StreamId1),10,["Tomas"]},{4,lib_json:to_string(StreamId1),6,["Tomas"]},{7,lib_json:to_string(StreamId1),10,["Tomas"]},{4,lib_json:to_string(StreamId2),6,["Tomas"]}],
+	Messages = [{4,lib_json:to_string(StreamId1),5,[{user,User2},{user,User1}]},{4,lib_json:to_string(StreamId1),10,[{user,User1}]},{4,lib_json:to_string(StreamId1),6,[{user,User1}]},{7,lib_json:to_string(StreamId1),10,[{user,User1}]},{4,lib_json:to_string(StreamId2),6,[{user,User1}]}],
 	receive_loop(Messages),
 	amqp_channel:close(ChannelIn),
 	amqp_connection:close(Connection),
@@ -135,7 +143,10 @@ post_data_test() ->
 	api_help:refresh(),
 	{ok, {{_Version12, 200, _ReasonPhrase12}, _Headers12, Body12}} = httpc:request(post, {?WEBMACHINE_URL++"/users/Tomas/triggers/remove", [],"application/json", "{\"function\" : \"less_than\",\"input\":10,\"streams\":\"" ++ lib_json:to_string(StreamId1) ++"\"}"}, [], []),
 	api_help:refresh(),
-	{ok, {{_Version13, 200, _ReasonPhrase13}, _Headers13, Body13}} = httpc:request(post, {?WEBMACHINE_URL++"/users/Tomas/triggers/remove", [],"application/json", "{\"function\" : \"less_than\",\"input\":6,\"streams\":[\"" ++ lib_json:to_string(StreamId1) ++"\",\"" ++ lib_json:to_string(StreamId2) ++"\"]}"}, [], []).
+	{ok, {{_Version13, 200, _ReasonPhrase13}, _Headers13, Body13}} = httpc:request(post, {?WEBMACHINE_URL++"/users/Tomas/triggers/remove", [],"application/json", "{\"function\" : \"less_than\",\"input\":6,\"streams\":[\"" ++ lib_json:to_string(StreamId1) ++"\",\"" ++ lib_json:to_string(StreamId2) ++"\"]}"}, [], []),
+	api_help:refresh(),
+	{ok, {{_VersionU3, 200, _ReasonPhraseU3}, _HeadersU3, BodyU3}} = httpc:request(delete, {?WEBMACHINE_URL++"/users/Tomas", []}, [], []),
+	{ok, {{_VersionU4, 200, _ReasonPhraseU4}, _HeadersU4, BodyU4}} = httpc:request(delete, {?WEBMACHINE_URL++"/users/Erik", []}, [], []).
 	
 
 
