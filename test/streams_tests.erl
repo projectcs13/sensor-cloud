@@ -11,6 +11,7 @@
 
 -module(streams_tests).
 -include_lib("eunit/include/eunit.hrl").
+-include("debug.hrl").
 -export([]).
 
 -define(WEBMACHINE_URL, api_help:get_webmachine_url()).
@@ -102,6 +103,10 @@ put_stream_test() ->
 	api_help:refresh(),
 	% Test create
 	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {?WEBMACHINE_URL++"/streams", [], "application/json", "{\n\"name\" : \"get\",\n\"private\" : \"true\"\n, \"user_id\" : \"search3\"}"}, [], []),
+
+	{ok, {{_VersionUser, 200, _ReasonPhraseUser}, _HeadersUser, _BodyUser}} = httpc:request(post, {?WEBMACHINE_URL++"/users", [], "application/json", "{\"username\":\"search\"}"}, [], []),
+	api_help:refresh(),
+
 	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {?WEBMACHINE_URL++"/users/search/streams", [], "application/json", "{\"name\":\"get\",\"private\" : \"true\"}"}, [], []),
 	DocId1 = lib_json:get_field(Body1,"_id"),
 	DocId2 = lib_json:get_field(Body2,"_id"),
@@ -265,6 +270,10 @@ server_side_creation_test() ->
 ranking_stream_test() ->
 
 		{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {?WEBMACHINE_URL++"/users", [], "application/json", "{\"username\" : \"RandomUser\"}"}, [], []),
+
+                {ok, {{_VersionUser, 200, _ReasonPhraseUser}, _HeadersUser, _BodyUser}} = httpc:request(post, {?WEBMACHINE_URL++"/users", [], "application/json", "{\"username\":\"RandomUser\"}"}, [], []),
+ 	        api_help:refresh(),
+
 		{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {?WEBMACHINE_URL++"/streams", [], "application/json", "{\"name\" : \"test0001\",\"user_id\" : \"RandomUser\"}"}, [], []),
 		DocId1 = lib_json:get_field(Body1,"_id"),
 		api_help:refresh(),
@@ -279,7 +288,7 @@ ranking_stream_test() ->
 		api_help:refresh(),
 		{ok, {{_Version6, 200, _ReasonPhrase6}, _Headers6, Body6}} = httpc:request(put, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(DocId1)++ "/_rank",[], "application/json", "{\"user_id\":\"RandomUser2\",\"ranking\":3.0}"}, [], []),
 		{ok, {{_Version7, 200, _ReasonPhrase7}, _Headers7, Body7}} = httpc:request(get, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(DocId1), []}, [], []),
-
+		api_help:refresh(),
 		?assertEqual(4.0,lib_json:get_field(Body7,"user_ranking.average")),
 		?assertEqual(2,lib_json:get_field(Body7,"user_ranking.nr_rankings")),
 
