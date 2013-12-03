@@ -1,4 +1,4 @@
-%% @author Jose Arias, Andreas MoregÃ¥rd Haubenwaller
+%% @author Jose Arias, Andreas Moregård Haubenwaller
 %% [www.csproj13.student.it.uu.se]
 %% @version 1.0
 %% @copyright [Copyright information]
@@ -34,8 +34,8 @@ init_test() ->
 %% Returns: ok | {error, term()}
 %% @end
 get_search_test() ->
-    {ok, {{_Version1, 405, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(get, {?WEBMACHINE_URL++"/_history", []}, [], []),
-    {ok, {{_Version2, 501, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(get, {?WEBMACHINE_URL++"/_search", []}, [], []),
+    {ok, {{_Version1, 405, _ReasonPhrase1}, _Headers1, _Body1}} = httpc:request(get, {?WEBMACHINE_URL++"/_history", []}, [], []),
+    {ok, {{_Version2, 501, _ReasonPhrase2}, _Headers2, _Body2}} = httpc:request(get, {?WEBMACHINE_URL++"/_search", []}, [], []),
     {ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(get, {?WEBMACHINE_URL++"/_history?stream_id=id_that_doesnt_exist", []}, [], []),
     ?assertEqual([],lib_json:get_field(Body3,"history[0].data")).
 
