@@ -18,7 +18,7 @@
 -include_lib("json.hrl").
 -include_lib("debug.hrl").
 
--export([create/4]).
+-export([create/4, subscribe/2]).
 
 %% Should import correct header
 -define(INDEX, "sensorcloud").
