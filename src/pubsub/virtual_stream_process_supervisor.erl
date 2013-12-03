@@ -22,7 +22,7 @@
 %% ====================================================================
 %% API functions
 %% ====================================================================
--export([start_link/0, start_processes/0]).
+-export([start_link/0, start_processes/0, add_child/3]).
 
 
 
@@ -88,6 +88,35 @@ start_processes() ->
 			end
 	end.
 
+
+
+
+%% add_child/3
+%% ====================================================================
+%% @doc
+%% Function: add_child/3
+%% Purpose: Add a virtual stream process under supervision.
+%% Args: Id - The id of the virtual stream to start
+%%       InputIds - The list of streams to subscribe to, in the form:
+%%                  [{Type, SId}, ...] where SId is the Id of the
+%%                  stream and Type is either the atom stream or vstream.
+%%       Function - The aggregation function to apply 
+%% Return: ok | {error, Reason}.
+%% Side effects: Starts a virtual stream processes under supervision.
+%% @end
+-spec add_child(Id :: string(), InputIds :: [StreamInfo], Function :: atom()) ->
+	ok | {error, string()} when
+		StreamInfo :: {Type, Id :: string()},
+		Type :: stream | vstream.
+%% ====================================================================
+add_child(Id, InputIds, Function) ->
+	case whereis(vstream_sup) of
+		undefined ->
+			{error, "Start the supervisor first"};
+		_ ->
+			_ = supervisor:start_child(vstream_sup, [Id, InputIds, Function]),
+			ok
+	end.
 
 
 

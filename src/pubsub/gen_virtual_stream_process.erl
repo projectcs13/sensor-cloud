@@ -87,13 +87,6 @@ start_link(VStreamId, InputIds, Function) ->
 	Timeout :: non_neg_integer() | infinity.
 %% ====================================================================
 init([VStreamId, InputIds, Function]) ->
-	
-	erlang:display("Got Id: " ++ VStreamId),
-	erlang:display("~nGot InputIds: "),
-	erlang:display(InputIds),
-	erlang:display("~nGot Function: "),
-	erlang:display(Function),
-
 	%% Trap exits from parent
 	process_flag(trap_exit, true),
 	
