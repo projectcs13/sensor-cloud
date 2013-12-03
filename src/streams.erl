@@ -17,6 +17,7 @@
 -include_lib("erlastic_search.hrl").
 -include("webmachine.hrl").
 -include("field_restrictions.hrl").
+-include("debug.hrl").
 
 %% @doc
 %% Function: init/1
@@ -170,42 +171,41 @@ process_post(ReqData, State) ->
 						{false,false} ->
 							{{halt,403}, wrq:set_resp_body("Unsupported field(s)", ReqData), State};
 						{false,true} ->
-			%				case erlastic_search:get_doc(?INDEX, "user", UserId) of
-			%					{error,{404,_}} ->
-			%						{{halt,403}, wrq:set_resp_body("{\"error\":\"no document with resource_id given is present in the system\"}", ReqData), State};
-			%					{error,{Code,Body}} ->
-			%						ErrorString = api_help:generate_error(Body, Code),
-            %						{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-			%					{ok,_} ->
-									FieldsAdded = add_server_side_fields(UserAdded),
-									%Final = suggest:add_stream_suggestion_fields(FieldsAdded),
-									case erlastic_search:index_doc(?INDEX, "stream", FieldsAdded) of	
-										{error,{Code,Body}} ->
+							case erlastic_search:search_limit(?INDEX, "user", "username:"++binary_to_list(UserId), 100) of
+								{ok, Json} ->
+								        case lib_json:field_value_exists(Json, "hits.hits[*]._source.username", UserId) of
+									    true ->
+										FieldsAdded = add_server_side_fields(UserAdded),
+										%%Final = suggest:add_stream_suggestion_fields(FieldsAdded),
+										case erlastic_search:index_doc(?INDEX, "stream", FieldsAdded) of	
+										    {error,{Code,Body}} ->
 											ErrorString = api_help:generate_error(Body, Code),
 											{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-										{ok,List} -> 
+										    {ok,List} -> 
 											case lib_json:get_field(Stream, "resource.resource_type") of
-												undefined ->
-													{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State};
-												_ ->
-													case resources:add_suggested_stream(Stream) of
-														{error, ErrorStr} ->
-															erlang:display("Stream not added to the suggested streams:  " ++ ErrorStr);
-														ok ->
-															erlang:display("New suggested stream")
-													end	,
-													%suggest:update_suggestion(UserAdded),
+											    undefined ->
+												{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State};
+											    _ ->
+												case resources:add_suggested_stream(Stream) of
+												    {error, ErrorStr} ->
+													erlang:display("Stream not added to the suggested streams:  " ++ ErrorStr);
+												    ok ->
+													erlang:display("New suggested stream")
+												end	,
+												%%suggest:update_suggestion(UserAdded),
 												{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
 											end
+										end;
+									    false ->
+										Error = lib_json:set_attr(error, binary:list_to_bin("Not found user with Id: "++UserId)),
+										{{halt,403}, wrq:set_resp_body(Error, ReqData), State}
 									end
-			%				end
+							end
 					end
 			end;
 		true ->
 			process_search_post(ReqData,State)	
 	end.
-
-
 %% @doc
 %% Function: process_search_post/2
 %% Purpose: Used to handle search requests that come from POST requests
