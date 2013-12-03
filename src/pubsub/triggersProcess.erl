@@ -141,6 +141,7 @@ loop(TriggerId, DataPoints, TriggerExchange, Net, Function, OutputList) ->
                                 %% Send messages to live update
 								send_messages(TriggerExchange,ChannelOut,Messages),
                                 %% Send to standard output
+                                %% TODO: Parallelize, spawn one process for each Message?
                                 send_to_output(TriggerId, Messages),
 								
 								loop(TriggerId, NewDataPoints, TriggerExchange,Net, Function, OutputList);
@@ -178,16 +179,6 @@ loop(TriggerId, DataPoints, TriggerExchange, Net, Function, OutputList) ->
 
 
 
-
-
-
-
-
-
-
-
-
-
 %% ====================================================================
 %% Helper functions
 %% ====================================================================
@@ -211,10 +202,6 @@ send(Channel, Exchange, Message) ->
         amqp_channel:cast(Channel,
                                          #'basic.publish'{exchange = Exchange},
                                          #amqp_msg{payload = Message}).
-
-
-
-
 
 
 
@@ -261,10 +248,6 @@ create_input_exchanges([{Type, Id} | InputIds], Exchanges) when
 
 
 
-
-
-
-
 %% @doc
 %% Function: subscribe/2
 %% Purpose: Used to subscribe to the given exchanges on the given channel.
@@ -298,10 +281,6 @@ subscribe(ChannelIn, [InputExchange | InputExchanges]) ->
 
 
 
-
-
-
-
 %% @doc
 %% Function: get_first_value_for_streams()/1
 %% Purpose: Used to get the latest value for each stream/virtual stream
@@ -328,10 +307,6 @@ get_first_value_for_streams([{_Type, Id} | T]) ->
                         end;
                 {error, _} -> get_first_value_for_streams(T)
         end.
-
-
-
-
 
 
 
@@ -364,9 +339,6 @@ apply_function(Function, DataPoints, InputList) ->
                                         [], DataPoints),
         triggers_lib:Fun(InputList,DataList).
 
-        
-        
-
 
 create_messages([], _Timestamp,Acc) ->
 	Acc;
@@ -381,11 +353,13 @@ send_messages(TriggerExchange,ChannelOut,[Msg|Rest]) ->
   send(ChannelOut, TriggerExchange,Msg),
   send_messages(TriggerExchange,ChannelOut,Rest).
 
-send_to_output(TriggerId, {Value, Timestamp, StreamId, Input, []}) ->
+
+send_to_output(TriggerId, {Value, Timestamp, StreamId, [], []}) ->
     ok;
-send_to_output(TriggerId, {Value, Timestamp, StreamId, Input, [{user,UserId}|Rest]}) ->
-    Message = lib_json:set_attrs([
-        {trigger, "{}"},
+send_to_output(TriggerId, {Value, Timestamp, StreamId, [Input|Rest], []}) ->
+    send_to_output(TriggerId, {Value, Timestamp, StreamId, Rest, []});
+send_to_output(TriggerId, {Value, Timestamp, StreamId, [Input|Inputs], [{user,UserId}|Rest]}) ->
+    Message = lib_json:set_attrs([{trigger, "{}"},
         {"trigger.value", Value},
         {"trigger.timestamp", Timestamp},
         {"trigger.stream_id", StreamId},
@@ -397,10 +371,10 @@ send_to_output(TriggerId, {Value, Timestamp, StreamId, Input, [{user,UserId}|Res
             {error, {Code, Body}};
         {ok, Response} ->
             ok
-    end;
-send_to_output(TriggerId, {Value, Timestamp, StreamId, Input, [{uri,URI}|Rest]}) ->
-    Message = lib_json:set_attrs([
-        {trigger, "{}"},
+    end,
+    send_to_output(TriggerId, {Value, Timestamp, StreamId, [Input|Inputs], Rest});
+send_to_output(TriggerId, {Value, Timestamp, StreamId, [Input|Inputs], [{uri,URI}|Rest]}) ->
+    Message = lib_json:set_attrs([{trigger, "{}"},
         {"trigger.value", Value},
         {"trigger.timestamp", Timestamp},
         {"trigger.stream_id", StreamId},
@@ -411,14 +385,11 @@ send_to_output(TriggerId, {Value, Timestamp, StreamId, Input, [{uri,URI}|Rest]})
             ok;
         {ok, {{_, Code, _}, _, Body}} ->
             {error, {Code, Body}}
-    end.
-send_to_output(TriggerId, {Value, Timestamp, StreamId, Input, [_|Rest]}) ->
-    case httpc:request(post, {URI, [],"application/json", Message}, [], []) of
-        {ok,{{_, 200, _}, _, _}} ->
-            ok;
-        {ok, {{_, Code, _}, _, Body}} ->
-            {error, {Code, Body}}
-    end.
+    end,
+    send_to_output(TriggerId, {Value, Timestamp, StreamId, [Input|Inputs], Rest}).
+send_to_output(TriggerId, {Value, Timestamp, StreamId, [Input|Inputs], [_|Rest]}) ->
+    erlang:display("Invalid output!"),
+    send_to_output(TriggerId, {Value, Timestamp, StreamId, [Input|Inputs], Rest}).
               
 
 handle_command({add,{Input,User}},[]) ->
