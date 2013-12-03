@@ -40,6 +40,8 @@ allowed_methods(ReqData, State) ->
 	case api_help:parse_path(wrq:path(ReqData)) of
 		[{"users", _UserID},{"triggers",_Action}] ->
 			{['POST'], ReqData, State};
+		[{"triggers",_Action}] ->
+			{['POST'], ReqData, State};
 		[error] ->
 		    {[], ReqData, State} 
 	end.
@@ -88,123 +90,322 @@ process_post(ReqData, State) ->
 	case proplists:get_value('action', wrq:path_info(ReqData)) of
 		"remove" -> delete_resource(ReqData, State);
 		"add" ->
-			User = proplists:get_value('userid', wrq:path_info(ReqData)),
-			Username = case erlastic_search:search_limit(?INDEX, "user", "username="++User,500) of
-						   {error, {Code9, Body9}} -> 
-							   {error, {Code9, Body9}};
-						   {ok,Response} ->
-							   case lib_json:get_field(Response, "hits.hits[0]._id") of
-								   Uid when is_binary(Uid) ->
-									   binary_to_list(Uid);
-								   _Error ->
-									   error
-							   end
-					   end,
-			{Json,_,_} = api_help:json_handler(ReqData, State),
-			Input = lib_json:get_field(Json, "input"),
-			Streams = case lib_json:get_field(Json, "streams") of
-						  undefiend ->
-							  error;
-						  Value when is_binary(Value) ->
-							  [binary_to_list(Value)];
-						  List ->
-							  lists:map(fun(A) -> binary_to_list(A) end,List)
-					  end,
-			Function = case lib_json:get_field(Json, "function") of
-						   undefined ->
-							   error;
-						   Value2 ->
-							   binary_to_list(Value2)
-					   end,
-			StreamsQuery = create_stream_query(Streams,[]),
-			Query = "{\"filter\":{\"term\":{ \"function\":\"" ++ Function ++ "\"}},\"query\":{\"match\":{\"streams\":{\"query\":\"" ++ StreamsQuery ++"\",\"operator\":\"and\"}}}}",	
-			EsId = case erlastic_search:search_json(#erls_params{},?INDEX, "trigger", Query) of % See if the trigger is already in the system
-					   {error, {Code, Body}} -> 
-						   {error, {Code, Body}};
-					   {ok,JsonStruct} ->
-						   case lib_json:get_field(JsonStruct, "hits.total") of
-							   0 -> undefined;
-							   1 -> lib_json:get_field(JsonStruct, "hits.hits[0]._id");
-							   X -> get_es_id(lib_json:get_field(JsonStruct, "hits.hits"),Streams)
-						   end
-				   end,
-			case {EsId,Streams,Function,Username} of
-				{{error, {Code1, Body1}},_,_,_} ->
-					ErrorString1 = api_help:generate_error(Body1, Code1),
-					{{halt, Code1}, wrq:set_resp_body(ErrorString1, ReqData), State};
-				{_,error,_,_} ->
-					{{halt, 405}, wrq:set_resp_body("Invalid stream list should be a valid stream id or a list of valid stream ids", ReqData), State};
-				{_,_,error,_} ->
-					{{halt, 405}, wrq:set_resp_body("Invalid function", ReqData), State};
-				{_,_,_,error} ->
-					{{halt, 405}, wrq:set_resp_body("Error when retriving user_id", ReqData), State};
-				{_,_,_,{error, {UCode, UBody}}} ->
-					UErrorString = api_help:generate_error(UBody, UCode),
-					{{halt, UCode}, wrq:set_resp_body(UErrorString, ReqData), State};
-				{undefined,_,_,_} ->
-					NewTrigger = lib_json:set_attrs([{"function",list_to_binary(Function)},{"streams",Streams},{"outputlist","[{}]"},{"outputlist[0].input",Input},{"outputlist[0].output",["{}"]},{"outputlist[0].output[0].output_id",list_to_binary(Username)},{"outputlist[0].output[0].output_type",list_to_binary("user")}]),
-					case erlastic_search:index_doc(?INDEX, "trigger", NewTrigger) of	% Create new triggger if not in the system
-						{error,{Code2,Body2}} ->
-							ErrorString2 = api_help:generate_error(Body2, Code2),
-							{{halt, Code2}, wrq:set_resp_body(ErrorString2, ReqData), State};
-						{ok,List2} -> 
-							TriggerId = lib_json:to_string(lib_json:get_field(List2, "_id")),
-							spawn_link(fun() ->
-											   triggersProcess:create(TriggerId, lists:map(fun(A) -> {stream,A} end,Streams), 
-																	  Function, [{Input,[{user,Username}]}])
-									   end),
-							{true, wrq:set_resp_body(lib_json:encode(List2), ReqData), State}
-					end;
-				{EsId,_,_,_}->
-					erlang:display(EsId),
-					CommandExchange = list_to_binary("command.trigger."++ EsId),
-					Msg = term_to_binary({add,{Input,{user,Username}}}),
-					%% Connect, now assumes local host
-					{ok, Connection} =
-						amqp_connection:start(#amqp_params_network{host = "localhost"}),
-					%% Open channel
-					{ok, Channel} = amqp_connection:open_channel(Connection),
-					%% Declare exchange
-					amqp_channel:call(Channel, #'exchange.declare'{exchange = CommandExchange, type = <<"fanout">>}),      % Update triggersProcess running of new user  
-					%% Send
-					amqp_channel:cast(Channel, #'basic.publish'{exchange = CommandExchange}, #amqp_msg{payload = Msg}),
-					case erlastic_search:get_doc(?INDEX, "trigger", EsId) of 
-						{error, {Code3, Body3}} -> 
-							ErrorString3 = api_help:generate_error(Body3, Code3),
-							{{halt, Code3}, wrq:set_resp_body(ErrorString3, ReqData), State};
-						{ok,JsonStruct2} -> 
-							Update = case lib_json:field_value_exists(JsonStruct2, "_source.outputlist[*].input", Input) of
-										 true ->
-											 "{\"script\" : \"for(int i=0;i < ctx._source.outputlist.size(); i++){if (ctx._source.outputlist[i].input == newinput && !ctx._source.outputlist[i].output.contains(newoutput)){ctx._source.outputlist[i].output += newoutput; i = ctx._source.outputlist.size();}}\", \"params\":{\"newinput\":" ++  lib_json:to_string(Input)++ ", \"newoutput\":{\"output_id\":\""++Username++"\",\"output_type\":\"user\"}}}";
-										 false ->
-											 "{\"script\" : \"ctx._source.outputlist += newelement\", \"params\":{\"newelement\":{\"input\" : "++ lib_json:to_string(Input) ++ ", \"output\":[{\"output_id\":\""++Username++"\",\"output_type\":\"user\"}]}}}"
-									 end,
-							case api_help:update_doc(?INDEX, "trigger", EsId, Update) of % Update document in es with the new user
-								{error, {Code4, Body4}} -> 
-									ErrorString4 = api_help:generate_error(Body4, Code4),
-									{{halt, Code4}, wrq:set_resp_body(ErrorString4, ReqData), State};
-								{ok,List4} -> 
-									{true,wrq:set_resp_body(lib_json:encode(List4),ReqData),State}
-							end
-					end
-			
+			case proplists:get_value('userid', wrq:path_info(ReqData)) of
+				undefined ->
+					add_uri(ReqData, State);
+				User ->
+					add_user(User,ReqData,State)
 			end;
 		_ ->
 			{true,ReqData,State}
 	end.
 
-
 %% @doc
 %% Function: delete_resource/2
 %% Purpose: Used to handle requests for deleting users from the lists of 
 %%          current triggers
+
 %% Returns: {Success, ReqData, State}, where Success is true if delete is successful
 %% and false otherwise.
 %% @end
 -spec delete_resource(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 
 delete_resource(ReqData, State) ->
-	User = proplists:get_value('userid', wrq:path_info(ReqData)),
+	case proplists:get_value('userid', wrq:path_info(ReqData)) of
+				undefined ->
+					remove_uri(ReqData, State);
+				User ->
+					remove_user(User,ReqData,State)
+	end.
+
+add_uri(ReqData, State) ->
+	{Json,_,_} = api_help:json_handler(ReqData, State),
+	Input = lib_json:get_field(Json, "input"),
+	Streams = case lib_json:get_field(Json, "streams") of
+				  undefined ->
+					  error;
+				  Value when is_binary(Value) ->
+					  [binary_to_list(Value)];
+				  List ->
+					  lists:map(fun(A) -> binary_to_list(A) end,List)
+			  end,
+	Function = case lib_json:get_field(Json, "function") of
+				   undefined ->
+					   error;
+				   Value2 ->
+					   binary_to_list(Value2)
+			   end,
+	URI = case lib_json:get_field(Json, "uri") of
+			Value3 when is_binary(Value3) ->
+				binary_to_list(Value3);
+			undefined ->
+				error
+	end,
+	StreamsQuery = create_stream_query(Streams,[]),
+	Query = "{\"filter\":{\"term\":{ \"function\":\"" ++ Function ++ "\"}},\"query\":{\"match\":{\"streams\":{\"query\":\"" ++ StreamsQuery ++"\",\"operator\":\"and\"}}}}",	
+	EsId = case erlastic_search:search_json(#erls_params{},?INDEX, "trigger", Query) of % See if the trigger is already in the system
+			   {error, {Code, Body}} -> 
+				   {error, {Code, Body}};
+			   {ok,JsonStruct} ->
+				   case lib_json:get_field(JsonStruct, "hits.total") of
+					   0 -> undefined;
+					   1 -> lib_json:get_field(JsonStruct, "hits.hits[0]._id");
+					   X -> get_es_id(lib_json:get_field(JsonStruct, "hits.hits"),Streams)
+				   end
+		   end,
+	case {EsId,Streams,Function,URI} of
+		{{error, {Code1, Body1}},_,_,_} ->
+			ErrorString1 = api_help:generate_error(Body1, Code1),
+			{{halt, Code1}, wrq:set_resp_body(ErrorString1, ReqData), State};
+		{_,error,_,_} ->
+			{{halt, 405}, wrq:set_resp_body("Invalid stream list should be a valid stream id or a list of valid stream ids", ReqData), State};
+		{_,_,error,_} ->
+			{{halt, 405}, wrq:set_resp_body("Invalid function", ReqData), State};
+		{_,_,_,error} ->
+			{{halt, 405}, wrq:set_resp_body("Error when retriving user_id", ReqData), State};
+		{_,_,_,{error, {UCode, UBody}}} ->
+			UErrorString = api_help:generate_error(UBody, UCode),
+			{{halt, UCode}, wrq:set_resp_body(UErrorString, ReqData), State};
+		{undefined,_,_,_} ->
+			NewTrigger = lib_json:set_attrs([{"function",list_to_binary(Function)},{"streams",Streams},{"outputlist","[{}]"},{"outputlist[0].input",Input},{"outputlist[0].output",["{}"]},{"outputlist[0].output[0].output_id",list_to_binary(URI)},{"outputlist[0].output[0].output_type",list_to_binary("uri")}]),
+			case erlastic_search:index_doc(?INDEX, "trigger", NewTrigger) of	% Create new triggger if not in the system
+				{error,{Code2,Body2}} ->
+					ErrorString2 = api_help:generate_error(Body2, Code2),
+					{{halt, Code2}, wrq:set_resp_body(ErrorString2, ReqData), State};
+				{ok,List2} -> 
+					TriggerId = lib_json:to_string(lib_json:get_field(List2, "_id")),
+					spawn_link(fun() ->
+									   triggersProcess:create(TriggerId, lists:map(fun(A) -> {stream,A} end,Streams), 
+															  Function, [{Input,[{uri,URI}]}])
+							   end),
+					{true, wrq:set_resp_body(lib_json:encode(List2), ReqData), State}
+			end;
+		{EsId,_,_,_}->
+			erlang:display(EsId),
+			CommandExchange = list_to_binary("command.trigger."++ EsId),
+			Msg = term_to_binary({add,{Input,{uri,URI}}}),
+			%% Connect, now assumes local host
+			{ok, Connection} =
+				amqp_connection:start(#amqp_params_network{host = "localhost"}),
+			%% Open channel
+			{ok, Channel} = amqp_connection:open_channel(Connection),
+			%% Declare exchange
+			amqp_channel:call(Channel, #'exchange.declare'{exchange = CommandExchange, type = <<"fanout">>}),      % Update triggersProcess running of new user  
+			%% Send
+			amqp_channel:cast(Channel, #'basic.publish'{exchange = CommandExchange}, #amqp_msg{payload = Msg}),
+			case erlastic_search:get_doc(?INDEX, "trigger", EsId) of 
+				{error, {Code3, Body3}} -> 
+					ErrorString3 = api_help:generate_error(Body3, Code3),
+					{{halt, Code3}, wrq:set_resp_body(ErrorString3, ReqData), State};
+				{ok,JsonStruct2} -> 
+					Update = case lib_json:field_value_exists(JsonStruct2, "_source.outputlist[*].input", Input) of
+								 true ->
+									 "{\"script\" : \"for(int i=0;i < ctx._source.outputlist.size(); i++){if (ctx._source.outputlist[i].input == newinput && !ctx._source.outputlist[i].output.contains(newoutput)){ctx._source.outputlist[i].output += newoutput; i = ctx._source.outputlist.size();}}\", \"params\":{\"newinput\":" ++  lib_json:to_string(Input)++ ", \"newoutput\":{\"output_id\":\""++URI++"\",\"output_type\":\"uri\"}}}";
+								 false ->
+									 "{\"script\" : \"ctx._source.outputlist += newelement\", \"params\":{\"newelement\":{\"input\" : "++ lib_json:to_string(Input) ++ ", \"output\":[{\"output_id\":\""++URI++"\",\"output_type\":\"uri\"}]}}}"
+							 end,
+					case api_help:update_doc(?INDEX, "trigger", EsId, Update) of % Update document in es with the new user
+						{error, {Code4, Body4}} -> 
+							ErrorString4 = api_help:generate_error(Body4, Code4),
+							{{halt, Code4}, wrq:set_resp_body(ErrorString4, ReqData), State};
+						{ok,List4} -> 
+							{true,wrq:set_resp_body(lib_json:encode(List4),ReqData),State}
+					end
+			end
+	
+	end.
+
+
+add_user(User, ReqData, State) ->
+	Username = case erlastic_search:search_limit(?INDEX, "user", "username="++User,500) of
+	   {error, {Code9, Body9}} -> 
+		   {error, {Code9, Body9}};
+	   {ok,Response} ->
+		   case lib_json:get_field(Response, "hits.hits[0]._id") of
+			   Uid when is_binary(Uid) ->
+				   binary_to_list(Uid);
+			   _Error ->
+				   error
+		   end
+	end,
+	{Json,_,_} = api_help:json_handler(ReqData, State),
+	Input = lib_json:get_field(Json, "input"),
+	Streams = case lib_json:get_field(Json, "streams") of
+				  undefiend ->
+					  error;
+				  Value when is_binary(Value) ->
+					  [binary_to_list(Value)];
+				  List ->
+					  lists:map(fun(A) -> binary_to_list(A) end,List)
+			  end,
+	Function = case lib_json:get_field(Json, "function") of
+				   undefined ->
+					   error;
+				   Value2 ->
+					   binary_to_list(Value2)
+			   end,
+	StreamsQuery = create_stream_query(Streams,[]),
+	Query = "{\"filter\":{\"term\":{ \"function\":\"" ++ Function ++ "\"}},\"query\":{\"match\":{\"streams\":{\"query\":\"" ++ StreamsQuery ++"\",\"operator\":\"and\"}}}}",	
+	EsId = case erlastic_search:search_json(#erls_params{},?INDEX, "trigger", Query) of % See if the trigger is already in the system
+			   {error, {Code, Body}} -> 
+				   {error, {Code, Body}};
+			   {ok,JsonStruct} ->
+				   case lib_json:get_field(JsonStruct, "hits.total") of
+					   0 -> undefined;
+					   1 -> lib_json:get_field(JsonStruct, "hits.hits[0]._id");
+					   X -> get_es_id(lib_json:get_field(JsonStruct, "hits.hits"),Streams)
+				   end
+		   end,
+	case {EsId,Streams,Function,Username} of
+		{{error, {Code1, Body1}},_,_,_} ->
+			ErrorString1 = api_help:generate_error(Body1, Code1),
+			{{halt, Code1}, wrq:set_resp_body(ErrorString1, ReqData), State};
+		{_,error,_,_} ->
+			{{halt, 405}, wrq:set_resp_body("Invalid stream list should be a valid stream id or a list of valid stream ids", ReqData), State};
+		{_,_,error,_} ->
+			{{halt, 405}, wrq:set_resp_body("Invalid function", ReqData), State};
+		{_,_,_,error} ->
+			{{halt, 405}, wrq:set_resp_body("Error when retriving user_id", ReqData), State};
+		{_,_,_,{error, {UCode, UBody}}} ->
+			UErrorString = api_help:generate_error(UBody, UCode),
+			{{halt, UCode}, wrq:set_resp_body(UErrorString, ReqData), State};
+		{undefined,_,_,_} ->
+			NewTrigger = lib_json:set_attrs([{"function",list_to_binary(Function)},{"streams",Streams},{"outputlist","[{}]"},{"outputlist[0].input",Input},{"outputlist[0].output",["{}"]},{"outputlist[0].output[0].output_id",list_to_binary(Username)},{"outputlist[0].output[0].output_type",list_to_binary("user")}]),
+			case erlastic_search:index_doc(?INDEX, "trigger", NewTrigger) of	% Create new triggger if not in the system
+				{error,{Code2,Body2}} ->
+					ErrorString2 = api_help:generate_error(Body2, Code2),
+					{{halt, Code2}, wrq:set_resp_body(ErrorString2, ReqData), State};
+				{ok,List2} -> 
+					TriggerId = lib_json:to_string(lib_json:get_field(List2, "_id")),
+					spawn_link(fun() ->
+									   triggersProcess:create(TriggerId, lists:map(fun(A) -> {stream,A} end,Streams), 
+															  Function, [{Input,[{user,Username}]}])
+							   end),
+					{true, wrq:set_resp_body(lib_json:encode(List2), ReqData), State}
+			end;
+		{EsId,_,_,_}->
+			erlang:display(EsId),
+			CommandExchange = list_to_binary("command.trigger."++ EsId),
+			Msg = term_to_binary({add,{Input,{user,Username}}}),
+			%% Connect, now assumes local host
+			{ok, Connection} =
+				amqp_connection:start(#amqp_params_network{host = "localhost"}),
+			%% Open channel
+			{ok, Channel} = amqp_connection:open_channel(Connection),
+			%% Declare exchange
+			amqp_channel:call(Channel, #'exchange.declare'{exchange = CommandExchange, type = <<"fanout">>}),      % Update triggersProcess running of new user  
+			%% Send
+			amqp_channel:cast(Channel, #'basic.publish'{exchange = CommandExchange}, #amqp_msg{payload = Msg}),
+			case erlastic_search:get_doc(?INDEX, "trigger", EsId) of 
+				{error, {Code3, Body3}} -> 
+					ErrorString3 = api_help:generate_error(Body3, Code3),
+					{{halt, Code3}, wrq:set_resp_body(ErrorString3, ReqData), State};
+				{ok,JsonStruct2} -> 
+					Update = case lib_json:field_value_exists(JsonStruct2, "_source.outputlist[*].input", Input) of
+								 true ->
+									 "{\"script\" : \"for(int i=0;i < ctx._source.outputlist.size(); i++){if (ctx._source.outputlist[i].input == newinput && !ctx._source.outputlist[i].output.contains(newoutput)){ctx._source.outputlist[i].output += newoutput; i = ctx._source.outputlist.size();}}\", \"params\":{\"newinput\":" ++  lib_json:to_string(Input)++ ", \"newoutput\":{\"output_id\":\""++Username++"\",\"output_type\":\"user\"}}}";
+								 false ->
+									 "{\"script\" : \"ctx._source.outputlist += newelement\", \"params\":{\"newelement\":{\"input\" : "++ lib_json:to_string(Input) ++ ", \"output\":[{\"output_id\":\""++Username++"\",\"output_type\":\"user\"}]}}}"
+							 end,
+					case api_help:update_doc(?INDEX, "trigger", EsId, Update) of % Update document in es with the new user
+						{error, {Code4, Body4}} -> 
+							ErrorString4 = api_help:generate_error(Body4, Code4),
+							{{halt, Code4}, wrq:set_resp_body(ErrorString4, ReqData), State};
+						{ok,List4} -> 
+							{true,wrq:set_resp_body(lib_json:encode(List4),ReqData),State}
+					end
+			end
+
+	end.
+
+	
+remove_uri(ReqData, State) ->
+	{Json,_,_} = api_help:json_handler(ReqData, State),
+	Input = lib_json:get_field(Json, "input"),
+	Streams = case lib_json:get_field(Json, "streams") of
+				  undefiend ->
+					  error;
+				  Value when is_binary(Value) ->
+					  [binary_to_list(Value)];
+				  List ->
+					  lists:map(fun(A) -> binary_to_list(A) end,List)
+			  end,
+	Function = case lib_json:get_field(Json, "function") of
+				   undefined ->
+					   error;
+				   Value2 ->
+					   binary_to_list(Value2)
+			   end,
+	URI = case lib_json:get_field(Json, "uri") of
+			Value3 when is_binary(Value3) ->
+				binary_to_list(Value3);
+			undefined ->
+				error
+	end,
+	StreamsQuery = create_stream_query(Streams,[]),
+	Query = "{\"filter\":{\"term\":{ \"function\":\"" ++ Function ++ "\"}},\"query\":{\"match\":{\"streams\":{\"query\":\"" ++ StreamsQuery ++"\",\"operator\":\"and\"}}}}",% now finds all triggers where the streams being searched for is a subset of the streams for the trigger when they have the same function 
+	EsId = case erlastic_search:search_json(#erls_params{},?INDEX, "trigger", Query) of % Get the es id of the trigger
+			   {error, {Code, Body}} -> 
+				   {error, {Code, Body}};
+			   {ok,JsonStruct} ->
+				   erlang:display(binary_to_list(iolist_to_binary(lib_json:encode(JsonStruct)))),
+				   case lib_json:get_field(JsonStruct, "hits.total") of
+					   0 -> error;
+					   1 -> lib_json:get_field(JsonStruct, "hits.hits[0]._id");
+					   X -> get_es_id(lib_json:get_field(JsonStruct, "hits.hits"),Streams)
+				   end
+		   end,
+	case {EsId,Streams,Function,URI} of
+		{{error, {Code1, Body1}},_,_,_} ->
+			ErrorString1 = api_help:generate_error(Body1, Code1),
+			{{halt, Code1}, wrq:set_resp_body(ErrorString1, ReqData), State};
+		{_,error,_,_} ->
+			{{halt, 405}, wrq:set_resp_body("Invalid stream list should be a valid stream id or a list of valid stream ids", ReqData), State};
+		{_,_,error,_} ->
+			{{halt, 405}, wrq:set_resp_body("Invalid function", ReqData), State};
+		{error,_,_,_} ->
+			{{halt, 404}, ReqData, State};
+		{_,_,_,error} ->
+			{{halt, 405}, wrq:set_resp_body("Error when retriving user_id", ReqData), State};
+		{_,_,_,{error, {UCode, UBody}}} ->
+			UErrorString = api_help:generate_error(UBody, UCode),
+			{{halt, UCode}, wrq:set_resp_body(UErrorString, ReqData), State};
+		{EsId,_,_ ,_}->		
+			Return = case erlastic_search:get_doc(?INDEX, "trigger", EsId) of % Update the es document by removing the user
+						 {error, {Code3, Body3}} -> 
+							 ErrorString3 = api_help:generate_error(Body3, Code3),
+							 {{halt, Code3}, wrq:set_resp_body(ErrorString3, ReqData), State};
+						 {ok,JsonStruct2} -> 	 
+							 Update = case lib_json:field_value_exists(JsonStruct2, "_source.outputlist[*].input", Input) of
+										  true ->
+											  "{\"script\" : \"for(int i=0;i < ctx._source.outputlist.size(); i++){if (ctx._source.outputlist[i].input == newinput){if (ctx._source.outputlist[i].output == newoutputlist) {ctx._source.outputlist.remove((Object) ctx._source.outputlist[i]); i = ctx._source.outputlist.size();} else {for(int k=0;k < ctx._source.outputlist[i].output.size(); k++) {if (ctx._source.outputlist[i].output[k] == newoutput) {ctx._source.outputlist[i].output.remove((Object) ctx._source.outputlist[i].output[k]); k = ctx._source.outputlist[i].output.size();}}}}}\", \"params\":{\"newinput\":\"" ++ lib_json:to_string(Input) ++ "\",  \"newoutputlist\":[{\"output_id\":\""++URI++"\",\"output_type\":\"uri\"}],  \"newoutput\":{\"output_id\":\""++URI++"\",\"output_type\":\"uri\"}}}";
+										  false ->
+											  erlang:display("Error: input not in file"),
+											  "{}"
+									  end,
+							 case api_help:update_doc(?INDEX, "trigger", EsId, Update) of 
+								 {error, {Code4, Body4}} -> 
+									 ErrorString4 = api_help:generate_error(Body4, Code4),
+									 {{halt, Code4}, wrq:set_resp_body(ErrorString4, ReqData), State};
+								 {ok,List4} -> 
+									 {true,wrq:set_resp_body(lib_json:encode(List4),ReqData),State}
+							 end
+					 end,
+			CommandExchange = list_to_binary("command.trigger."++ EsId),
+			Msg = term_to_binary({remove,{Input,{uri,URI}}}),
+			%% Connect, now assumes local host
+			{ok, Connection} =
+				amqp_connection:start(#amqp_params_network{host = "localhost"}),
+			%% Open channel
+			{ok, Channel} = amqp_connection:open_channel(Connection),
+			%% Declare exchange
+			amqp_channel:call(Channel, #'exchange.declare'{exchange = CommandExchange, type = <<"fanout">>}),    % Update the triggersProcess by sending a message    
+			%% Send
+			amqp_channel:cast(Channel, #'basic.publish'{exchange = CommandExchange}, #amqp_msg{payload = Msg}),
+			Return
+	end.
+
+remove_user(User, ReqData, State) ->
 	Username = case erlastic_search:search_limit(?INDEX, "user", "username="++User,500) of
 				   {error, {Code9, Body9}} -> 
 					   {error, {Code9, Body9}};

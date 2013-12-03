@@ -388,10 +388,14 @@ send_to_output(TriggerId, [{Value, Timestamp, StreamId, Input, [{uri,URI}|Rest]}
         {"trigger.stream_id", StreamId},
         {"trigger.trigger_id", TriggerId},
         {"trigger.input", Input}]),
+    erlang:display(URI),
     case httpc:request(post, {URI, [],"application/json", Message}, [], []) of
         {ok,{{_, 200, _}, _, _}} ->
+            erlang:display("OK"),
             ok;
         {ok, {{_, Code, _}, _, Body}} ->
+            erlang:display("ERROR"),
+            erlang:display(Body),
             {error, {Code, Body}}
     end,
     send_to_output(TriggerId, [{Value, Timestamp, StreamId, Input, Rest}|Messages]);
