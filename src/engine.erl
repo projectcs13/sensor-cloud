@@ -1,4 +1,4 @@
-%% @author Georgios Koutsoumpakis
+%% @author Georgios Koutsoumpakis, Li Hao
 %%   [www.csproj13.student.it.uu.se]
 %% @version 1.0
 %% @copyright [Copyright information]
@@ -48,4 +48,6 @@ stop() ->
     application:stop(mochiweb),
     application:stop(crypto),
     application:stop(inets),
+	exit(whereis(polling_monitor), "stop"),
+	exit(whereis(polling_supervisor), "stop"),
     Res.

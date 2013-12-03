@@ -125,11 +125,8 @@ delete_vstream_test() ->
 	?assertEqual(length(lib_json:get_field(lib_json:to_string(Body3), "hits")), 0),
 	{ok, {{_Version3, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(get, {?WEBMACHINE_URL++"/vstreams/" ++ lib_json:to_string(StreamId) ++ "/data/_search", []}, [], []),
 	?assertEqual(length(lib_json:get_field(lib_json:to_string(Body4), "data")), 0),
-	{ok, {{_Version5, 200, _ReasonPhrase5}, _Headers5, Body5}} = httpc:request(get, {?WEBMACHINE_URL++"/users/_search?username=vstreamuser", []}, [], []),
-	UserId = lib_json:get_field(Body5,"hits.hits[0]._id"),
 	api_help:refresh(),
-	erlang:display(lib_json:to_string(UserId)),
-	{ok, {{_Version6, 200, _ReasonPhrase6}, _Headers6, Body6}} = httpc:request(delete, {?WEBMACHINE_URL++"/users/" ++ lib_json:to_string(UserId), []}, [], [])
+	{ok, {{_Version6, 200, _ReasonPhrase6}, _Headers6, Body6}} = httpc:request(delete, {?WEBMACHINE_URL++"/users/vstreamuser", []}, [], [])
 	.
 
 

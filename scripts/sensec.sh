@@ -8,7 +8,7 @@ LOG_JS_DIR=priv/logs
 echo "$HOME_PATH"
 #Check if user has root access
 if [ "$USER" = "root" ]; then
-	if [ "$1" = "start" ]; then		
+	if [ "$1" = "start" ]; then	
 		echo "Starting up RabbitMQ-Server"
 		$HOME_PATH/lib/rabbitmq-server/scripts/rabbitmq-server &
 		echo "Starting up ElasticSearch"

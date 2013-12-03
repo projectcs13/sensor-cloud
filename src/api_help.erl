@@ -1,4 +1,4 @@
-%% @author Tomas Sävström <tosa7943@student.uu.se>
+%% @author Tomas Sävström <tosa7943@student.uu.se>, Li Hao <hali2222@student.uu.se>
 %%   [www.csproj13.student.it.uu.se]
 %% @version 1.0
 %% @copyright [Copyright information]
@@ -152,6 +152,20 @@ is_rank(ReqData) ->
 	end.
 
 %% @doc
+%% Function: is_parser/1
+%% Purpose: Used to decide if the URI specifie a parser request
+%% Returns: True if URI specifies a parser request, false otherwise
+%% @end
+-spec is_parser(ReqData::term()) -> boolean().
+is_parser(ReqData) ->
+	case string:str(wrq:path(ReqData),"parser") of
+		0 ->
+			false;
+		_ ->
+			true
+	end.
+
+%% @doc
 %% Function: json_handler/2
 %% Purpose: Used to get the json object from the request
 %% Returns: {Json,ReqData,State}
@@ -239,6 +253,7 @@ transform([{Field,Value}|Rest]) ->
 		_ -> Field ++ ":" ++ Value ++ "&" ++ transform(Rest)
 	end.
 
+
 %% @doc
 %% Function: transform/2
 %% Purpose: Used to create the query for search, expects more fields
@@ -256,6 +271,36 @@ transform([{Field,Value}|Rest],AddAnd) ->
 		_ -> Field ++ ":" ++ Value ++ "&" ++ transform(Rest,AddAnd)
 	end.
 
+
+%% @doc
+%% Function: make_term_query/1
+%% Purpose: Used to create a term query from the given query string
+%%          assumes that the query string is in the key:value&key:value ...
+%%          format
+%% Returns: The string the gives the term query
+%% @end
+-spec make_term_query(QueryString::string()) -> list().
+make_term_query(String) ->
+	"{\"" ++ make_inner_term_query(String) ++ "\"}".
+
+%% @doc
+%% Function: make_inner_term_query/1
+%% Purpose: Used to create the inner part of the
+%%          term query json.
+%% Returns: The string the gives the inner part of the term query
+%% @end
+-spec make_inner_term_query(QueryString::string()) -> list().
+make_inner_term_query([]) ->
+	[];
+make_inner_term_query([First|Rest]) ->
+	case First of
+		$: ->
+			"\":\"" ++ make_inner_term_query(Rest);
+		$& ->
+			"\",\"" ++ make_inner_term_query(Rest);
+		_ ->
+			[First|make_inner_term_query(Rest)]
+	end.
 
 %% @doc
 %% Function: update_doc/4
