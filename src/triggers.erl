@@ -70,7 +70,7 @@ content_types_accepted(ReqData, State) ->
 
 
 
-%% Place holder, not sure if we want this to be do able
+%% Place holder, not sure if we want this to be doable
 
 get_triggers(ReqData, State) ->
 	{"ok",ReqData,State}.
