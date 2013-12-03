@@ -88,7 +88,18 @@ process_post(ReqData, State) ->
 	case proplists:get_value('action', wrq:path_info(ReqData)) of
 		"remove" -> delete_resource(ReqData, State);
 		"add" ->
-			Username = proplists:get_value('userid', wrq:path_info(ReqData)),
+			User = proplists:get_value('userid', wrq:path_info(ReqData)),
+			Username = case erlastic_search:search_limit(?INDEX, "stream", "username="++User,500) of
+				{error, {Code9, Body9}} -> 
+						   {error, {Code9, Body9}};
+				{ok,Response} ->
+					case lib_json:get_field(Response, "hits.hits[0]._id") of
+						Value when is_binary(Value) ->
+							binary_to_list(Value);
+						_ ->
+							error
+					end
+			end
 			{Json,_,_} = api_help:json_handler(ReqData, State),
 			Input = lib_json:get_field(Json, "input"),
 			Streams = case lib_json:get_field(Json, "streams") of
@@ -126,7 +137,7 @@ process_post(ReqData, State) ->
 				{_,_,error} ->
 					{{halt, 405}, wrq:set_resp_body("Invalid function", ReqData), State};
 				{undefined,_,_} ->
-					NewTrigger = lib_json:set_attrs([{"function",list_to_binary(Function)},{"streams",Streams},{"outputlist","[{}]"},{"outputlist[0].input",Input},{"outputlist[0].output",[Username]}]),
+					NewTrigger = lib_json:set_attrs([{"function",list_to_binary(Function)},{"streams",Streams},{"outputlist","[{}]"},{"outputlist[0].input",Input},{"outputlist[0].output",["{}"]},{"outputlist[0].output.output_id",[Username]},{"outputlist[0].output.output_type",["user"]}]),
 					case erlastic_search:index_doc(?INDEX, "trigger", NewTrigger) of	% Create new triggger if not in the system
 						{error,{Code2,Body2}} ->
 							ErrorString2 = api_help:generate_error(Body2, Code2),
@@ -135,14 +146,14 @@ process_post(ReqData, State) ->
 							TriggerId = lib_json:to_string(lib_json:get_field(List2, "_id")),
 							spawn_link(fun() ->
 											   triggersProcess:create(TriggerId, lists:map(fun(A) -> {stream,A} end,Streams), 
-																	  Function, [{Input,[Username]}])
+																	  Function, [{Input,[{user,Username}]}])
 									   end),
 							{true, wrq:set_resp_body(lib_json:encode(List2), ReqData), State}
 					end;
 				{EsId,_,_ }->
 					erlang:display(EsId),
 					CommandExchange = list_to_binary("command.trigger."++ EsId),
-					Msg = term_to_binary({add,{Input,Username}}),
+					Msg = term_to_binary({add,{Input,{user,Username}}}),
 					%% Connect, now assumes local host
 					{ok, Connection} =
 						amqp_connection:start(#amqp_params_network{host = "localhost"}),
@@ -159,9 +170,9 @@ process_post(ReqData, State) ->
 						{ok,JsonStruct2} -> 
 							Update = case lib_json:field_value_exists(JsonStruct2, "_source.outputlist[*].input", Input) of
 										 true ->
-											 "{\"script\" : \"for(int i=0;i < ctx._source.outputlist.size(); i++){if (ctx._source.outputlist[i].input == newinput && !ctx._source.outputlist[i].output.contains(newoutput)){ctx._source.outputlist[i].output += newoutput; i = ctx._source.outputlist.size();}}\", \"params\":{\"newinput\":" ++  lib_json:to_string(Input)++ ", \"newoutput\": \""++ Username ++"\"}}";
+											 "{\"script\" : \"for(int i=0;i < ctx._source.outputlist.size(); i++){if (ctx._source.outputlist[i].input == newinput && !ctx._source.outputlist[i].output.contains(newoutput)){ctx._source.outputlist[i].output += newoutput; i = ctx._source.outputlist.size();}}\", \"params\":{\"newinput\":" ++  lib_json:to_string(Input)++ ", \"newoutput\":{\"output_id\":\""++Username++"\",\"output_type\":\"user\"}}}";
 										 false ->
-											 "{\"script\" : \"ctx._source.outputlist += newelement\", \"params\":{\"newelement\":{\"input\" : "++ lib_json:to_string(Input) ++ ", \"output\":[\"" ++ Username ++"\"]}}}"
+											 "{\"script\" : \"ctx._source.outputlist += newelement\", \"params\":{\"newelement\":{\"input\" : "++ lib_json:to_string(Input) ++ ", \"output\":[{\"output_id\":\""++Username++"\",\"output_type\":\"user\"}]}}}"
 									 end,
 							case api_help:update_doc(?INDEX, "trigger", EsId, Update) of % Update document in es with the new user
 								{error, {Code4, Body4}} -> 
@@ -236,7 +247,7 @@ delete_resource(ReqData, State) ->
 						 {ok,JsonStruct2} -> 	 
 							 Update = case lib_json:field_value_exists(JsonStruct2, "_source.outputlist[*].input", Input) of
 										  true ->
-											  "{\"script\" : \"for(int i=0;i < ctx._source.outputlist.size(); i++){if (ctx._source.outputlist[i].input == newinput){if (ctx._source.outputlist[i].output == newoutputlist) {ctx._source.outputlist.remove((Object) ctx._source.outputlist[i]); i = ctx._source.outputlist.size();} else {for(int k=0;k < ctx._source.outputlist[i].output.size(); k++) {if (ctx._source.outputlist[i].output[k] == newoutput) {ctx._source.outputlist[i].output.remove((Object) ctx._source.outputlist[i].output[k]); k = ctx._source.outputlist[i].output.size();}}}}}\", \"params\":{\"newinput\":\"" ++ lib_json:to_string(Input) ++ "\", \"newoutputlist\": [\"" ++ Username ++"\"], \"newoutput\": \"" ++ Username ++ "\"}}";
+											  "{\"script\" : \"for(int i=0;i < ctx._source.outputlist.size(); i++){if (ctx._source.outputlist[i].input == newinput){if (ctx._source.outputlist[i].output == newoutputlist) {ctx._source.outputlist.remove((Object) ctx._source.outputlist[i]); i = ctx._source.outputlist.size();} else {for(int k=0;k < ctx._source.outputlist[i].output.size(); k++) {if (ctx._source.outputlist[i].output[k] == newoutput) {ctx._source.outputlist[i].output.remove((Object) ctx._source.outputlist[i].output[k]); k = ctx._source.outputlist[i].output.size();}}}}}\", \"params\":{\"newinput\":\"" ++ lib_json:to_string(Input) ++ "\",  \"newoutputlist\":[{\"output_id\":\""++Username++"\",\"output_type\":\"user\"}],  \"newoutput\":{\"output_id\":\""++Username++"\",\"output_type\":\"user\"}}}";
 										  false ->
 											  erlang:display("Error: input not in file"),
 											  "{}"
@@ -250,7 +261,7 @@ delete_resource(ReqData, State) ->
 							 end
 					 end,
 			CommandExchange = list_to_binary("command.trigger."++ EsId),
-			Msg = term_to_binary({remove,{Input,Username}}),
+			Msg = term_to_binary({remove,{Input,{user,Username}}}),
 			%% Connect, now assumes local host
 			{ok, Connection} =
 				amqp_connection:start(#amqp_params_network{host = "localhost"}),

@@ -359,26 +359,29 @@ send_messages(TriggerExchange,ChannelOut,[Msg|Rest]) ->
 %% Returns: ok | {error,{Code, Body}}
 %% @end
 -spec send_to_output(TriggerId::string(),tuple()) ->  ok | {error,_}.
-send_to_output(TriggerId, {Value, Timestamp, StreamId, [], []}) ->
+send_to_output(TriggerId, []) ->
     ok;
-send_to_output(TriggerId, {Value, Timestamp, StreamId, [Input|Rest], []}) ->
-    send_to_output(TriggerId, {Value, Timestamp, StreamId, Rest, []});
-send_to_output(TriggerId, {Value, Timestamp, StreamId, [Input|Inputs], [{user,UserId}|Rest]}) ->
+send_to_output(TriggerId, [Head|Tail]) when is_binary(Head) ->
+    send_to_output(TriggerId, [binary_to_term(Head)|Tail]);
+send_to_output(TriggerId, [{Value, Timestamp, StreamId, Input, []}|Messages]) ->
+    send_to_output(TriggerId, Messages);
+send_to_output(TriggerId, [{Value, Timestamp, StreamId, Input, [{user,UserId}|Rest]}|Messages]) ->
     Message = lib_json:set_attrs([{trigger, "{}"},
         {"trigger.value", Value},
-        {"trigger.timestamp", Timestamp},
-        {"trigger.stream_id", StreamId},
-        {"trigger.trigger_id", TriggerId},
+        {"trigger.timestamp", list_to_binary(Timestamp)},
+        {"trigger.stream_id", list_to_binary(StreamId)},
+        {"trigger.trigger_id", list_to_binary(TriggerId)},
         {"trigger.input", Input}]),
-    UpdateJson = "{\"script\":\"ctx._source.notifications += msg\",\"params\":{\"msg\":"++ Message ++"}",
+    UpdateJson = "{\"script\":\"ctx._source.notifications += msg\",\"params\":{\"msg\":"++ Message ++"}}",
+    erlang:display(UpdateJson),
     case api_help:update_doc(?INDEX, "user", UserId, UpdateJson, []) of
         {error, {Code, Body}} ->
             {error, {Code, Body}};
         {ok, Response} ->
             ok
     end,
-    send_to_output(TriggerId, {Value, Timestamp, StreamId, [Input|Inputs], Rest});
-send_to_output(TriggerId, {Value, Timestamp, StreamId, [Input|Inputs], [{uri,URI}|Rest]}) ->
+    send_to_output(TriggerId, [{Value, Timestamp, StreamId, Input, Rest}|Messages]);
+send_to_output(TriggerId, [{Value, Timestamp, StreamId, Input, [{uri,URI}|Rest]}|Messages]) ->
     Message = lib_json:set_attrs([{trigger, "{}"},
         {"trigger.value", Value},
         {"trigger.timestamp", Timestamp},
@@ -391,10 +394,10 @@ send_to_output(TriggerId, {Value, Timestamp, StreamId, [Input|Inputs], [{uri,URI
         {ok, {{_, Code, _}, _, Body}} ->
             {error, {Code, Body}}
     end,
-    send_to_output(TriggerId, {Value, Timestamp, StreamId, [Input|Inputs], Rest});
-send_to_output(TriggerId, {Value, Timestamp, StreamId, [Input|Inputs], [_|Rest]}) ->
+    send_to_output(TriggerId, [{Value, Timestamp, StreamId, Input, Rest}|Messages]);
+send_to_output(TriggerId, [{Value, Timestamp, StreamId, Input, [_|Rest]}|Messages]) ->
     erlang:display("Invalid output!"),
-    send_to_output(TriggerId, {Value, Timestamp, StreamId, [Input|Inputs], Rest}).
+    send_to_output(TriggerId, [{Value, Timestamp, StreamId, Input, Rest}|Messages]).
               
 
 %% @doc
