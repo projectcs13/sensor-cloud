@@ -114,7 +114,7 @@ process_post(ReqData, State) ->
 						   case lib_json:get_field(JsonStruct, "hits.total") of
 							   0 -> undefined;
 							   1 -> lib_json:get_field(JsonStruct, "hits.hits[0]._id");
-							   X -> erlang:display(X), error %% Should not happen
+							   X -> get_es_id(lib_json:get_field(JsonStruct, "hits.hits"),Streams)
 						   end
 				   end,
 			case {EsId,Streams,Function} of
@@ -215,7 +215,7 @@ delete_resource(ReqData, State) ->
 				   case lib_json:get_field(JsonStruct, "hits.total") of
 					   0 -> error;
 					   1 -> lib_json:get_field(JsonStruct, "hits.hits[0]._id");
-					   X -> error
+					   X -> get_es_id(lib_json:get_field(JsonStruct, "hits.hits"),Streams)
 				   end
 		   end,
 	case {EsId,Streams,Function} of
@@ -276,5 +276,54 @@ create_stream_query([StreamId],Acc) ->
 create_stream_query([StreamId|Rest],Acc) ->
 	create_stream_query(Rest," " ++ StreamId ++ Acc).
 
+%% @doc
+%% Function: get_es_id/2
+%% Purpose: Used to get the id of the document that
+%%          as the given list of streams and no
+%%          more
+%% Returns: A es id if there is a document that contains,
+%%          exaclty the list given and nothing more
+%%          error otherwise
+%% @end
+-spec get_es_id(DocumentList::list(),StreamsList::string()) -> binary() | error.
 
+get_es_id([],_Streams) ->
+	error;
+get_es_id([First|Rest],Streams) ->
+	case matches_exactly(lib_json:get_field(First, "_source.streams"),Streams) of
+		true ->
+			lib_json:get_field(First, "_id");
+		false ->
+			  get_es_id(Rest,Streams)
+	end.
+
+
+%% @doc
+%% Function: matches_exactly/2
+%% Purpose: Used check if the streams in the list are 
+%%          the streams in the document, and that
+%%          there are no more streams then them
+%% Returns: returns true if the given list from the
+%%          document contains only the streams in the list
+%%          and no more, false otherwise
+%% @end
+-spec matches_exactly(DocumentStreamsList::list(),StreamsList::string()) -> bool().
+
+matches_exactly([],[]) ->
+	true;
+matches_exactly([First|Rest],Streams) when is_binary(First) ->
+	TestId = binary_to_list(First),
+	case lists:member(TestId, Streams) of
+		true ->
+			matches_exactly(Rest,lists:delete(TestId, Streams));
+		false ->
+			false
+	end;
+matches_exactly([First|Rest],Streams) ->
+	case lists:member(First, Streams) of
+		true ->
+			matches_exactly(Rest,lists:delete(First, Streams));
+		false ->
+			false
+	end.
 
