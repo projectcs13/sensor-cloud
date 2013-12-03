@@ -66,6 +66,7 @@ init([]) ->
            permanent, 5000, worker, [mochiweb_socket_server]},
 	polling_system:start_link(),
     virtual_stream_process_supervisor:start_link(),
+    virtual_stream_process_supervisor:start_processes(),
     Processes = [Web],
     {ok, { {one_for_one, 10, 10}, Processes} }.
 

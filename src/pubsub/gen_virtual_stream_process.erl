@@ -489,7 +489,7 @@ get_latest_value_for_streams([{Type, Id} | T]) ->
 -spec apply_function(VStreamId :: binary(),
 					 Function :: atom(),
 					 List :: [{Id :: string(),
-							   DataPoint :: json() | undefined}]) -> number().
+							   DataPoint :: json() | undefined}]) -> [number()].
 %% ====================================================================
 apply_function(_VStreamId, _Function, []) -> [none];
 apply_function(VStreamId, Function, DataPoints) ->

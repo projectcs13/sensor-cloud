@@ -22,7 +22,7 @@
 %% ====================================================================
 %% API functions
 %% ====================================================================
--export([start_link/0]).
+-export([start_link/0, start_processes/0]).
 
 
 
@@ -64,11 +64,7 @@ start_processes() ->
 		undefined ->
 			{error, "Start the supervisor first"};
 		_ ->
-			GetAllQuery = "{\"query\" : {\"match_all\" : {}}}",
-			case erlastic_search:search_json(#erls_params{},
-											 ?ES_INDEX,
-											 "stream",
-											 GetAllQuery) of
+			case erlastic_search:search(?ES_INDEX, "virtual_stream", "*") of
 				{error, {Code, Body}} ->
 					ErrorString = api_help:generate_error(Body, Code),
 					{error, ErrorString};
@@ -78,12 +74,16 @@ start_processes() ->
 				    	fun(List) ->
 				    		[{stream, binary_to_list(X)} || X <- List]
 				    	end,
-				    %% Structure: [{VId, [{stream, SId}, ... ]}, ...].
+				    %% Structure: [{VId, Function, [{stream, SId}, ... ]}, ...].
 				    ProcessInfoList =
 				    	[{binary_to_list(lib_json:get_field(X, "_id")),
-				    	  MapFunc(lib_json:get_field(X, "streams_involved")} ||
-				    	  X <- VStreamList],
-				   	
+				    	  list_to_atom( binary_to_list(
+				    	  	lib_json:get_field(X, "_source.function") ) ),
+				    	  MapFunc(
+				    	  	lib_json:get_field(X, "_source.streams_involved") )}
+				    	  || X <- VStreamList],
+				    _ = [supervisor:start_child(vstream_sup, [Id, Input, Func])
+				    	 || {Id, Func, Input} <- ProcessInfoList],
 				    ok
 			end
 	end.
