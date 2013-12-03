@@ -129,7 +129,7 @@ less_than([{Threshold,Users}|Rest], StreamId,Data) ->
 %% Returns: [{Value,StreamId1,[Lower1,Upper1],Users1},...] for the value where the
 %%        	value is not in the interval created by Lower and Upper.
 %% @end
--spec less_than(InputList::list(),StreamId::string(),Datapoint::string()) -> AlertList::list().
+-spec span(InputList::list(),StreamId::string(),Datapoint::string()) -> AlertList::list().
 
 span([], _StreamId,_Data) ->
 	[];
