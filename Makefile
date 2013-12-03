@@ -58,6 +58,8 @@ all: compile
 ### Command: make install
 ### Downloads all dependencies and builds the entire project
 install: get_libs compile_libs conf
+	echo "installing npm libs"
+	(cd javascripts; npm install socket.io; npm install rabbit.js)
 	 cp -r lib/elasticsearch-servicewrapper/service lib/elasticsearch/bin/
 
 
@@ -102,17 +104,43 @@ test_streams: compile
 	curl -XPUT localhost:9200/sensorcloud
 	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -eval 'test:run(streams)'
 
-test_suggest: compile
-	-@mkdir test-results
-	curl -XDELETE localhost:9200/sensorcloud
-	curl -XPUT localhost:9200/sensorcloud
-	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -eval 'test:run(suggest)'
+## test_suggest: compile
+	## -@mkdir test-results
+	## curl -XDELETE localhost:9200/sensorcloud
+	## curl -XPUT localhost:9200/sensorcloud
+	## $(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -eval 'test:run(suggest)'
 
 test_users: compile
 	-@mkdir test-results
 	curl -XDELETE localhost:9200/sensorcloud
 	curl -XPUT localhost:9200/sensorcloud
 	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -eval 'test:run(users)'
+	
+test_poll: compile
+	-@mkdir test-results
+	curl -XDELETE localhost:9200/sensorcloud
+	curl -XPUT localhost:9200/sensorcloud
+	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -eval 'test:run(poll_help)'
+	
+test_poll_system: compile
+	-@mkdir test-results
+	curl -XDELETE localhost:9200/sensorcloud
+	curl -XPUT localhost:9200/sensorcloud
+	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -eval 'test:run(polling_system)'
+
+test_search: compile
+	-@mkdir test-results
+	curl -XDELETE localhost:9200/sensorcloud
+	curl -XPUT localhost:9200/sensorcloud
+	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -eval 'test:run(search)'
+
+
+test_vstreams: compile
+	-@mkdir test-results
+	curl -XDELETE localhost:9200/sensorcloud
+	curl -XPUT localhost:9200/sensorcloud
+	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -eval 'test:run(virtual_stream_process)'
+
 
 ### Command: make docs
 ### Genereats all of the documentation files

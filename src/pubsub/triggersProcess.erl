@@ -115,7 +115,11 @@ loop(TriggerId, DataPoints, TriggerExchange, Net, Function, OutputList) ->
 								Messages = create_messages(TriggerList, Timestamp,[]),
 								
 								ChannelOut = element(3, Net),
+                                %% Send messages to live update
 								send_messages(TriggerExchange,ChannelOut,Messages),
+                                %% Send to standard output
+                                %% TODO: Parallelize, spawn one process for each Message?
+                                send_to_output(TriggerId, Messages),
 								
 								loop(TriggerId, NewDataPoints, TriggerExchange,Net, Function, OutputList);
 							
@@ -152,16 +156,6 @@ loop(TriggerId, DataPoints, TriggerExchange, Net, Function, OutputList) ->
 
 
 
-
-
-
-
-
-
-
-
-
-
 %% ====================================================================
 %% Helper functions
 %% ====================================================================
@@ -185,10 +179,6 @@ send(Channel, Exchange, Message) ->
         amqp_channel:cast(Channel,
                                          #'basic.publish'{exchange = Exchange},
                                          #amqp_msg{payload = Message}).
-
-
-
-
 
 
 
@@ -235,10 +225,6 @@ create_input_exchanges([{Type, Id} | InputIds], Exchanges) when
 
 
 
-
-
-
-
 %% @doc
 %% Function: subscribe/2
 %% Purpose: Used to subscribe to the given exchanges on the given channel.
@@ -272,10 +258,6 @@ subscribe(ChannelIn, [InputExchange | InputExchanges]) ->
 
 
 
-
-
-
-
 %% @doc
 %% Function: get_first_value_for_streams()/1
 %% Purpose: Used to get the latest value for each stream/virtual stream
@@ -302,10 +284,6 @@ get_first_value_for_streams([{_Type, Id} | T]) ->
                         end;
                 {error, _} -> get_first_value_for_streams(T)
         end.
-
-
-
-
 
 
 
@@ -367,6 +345,61 @@ send_messages(TriggerExchange,ChannelOut,[Msg|Rest]) ->
   send_messages(TriggerExchange,ChannelOut,Rest).
 
 
+
+%% @doc
+%% Function: send_to_output/2
+%% Purpose: Used to send the messages to the different outputs 
+%% the outputs can either be a user or a uri. If it is a user
+%% then the message will be added to the notifications list in
+%% the user. If it is a uri, the message will be POSTed to the
+%% uri. The message is a json object with the following format:
+%% 
+%% Example message: {"trigger": {"value": Value, "timestamp": Timestamp, "stream_id": StreamId, "trigger_id": TriggerId}}
+%%
+%% Returns: ok | {error,{Code, Body}}
+%% @end
+-spec send_to_output(TriggerId::string(),tuple()) ->  ok | {error,_}.
+send_to_output(TriggerId, []) ->
+    ok;
+send_to_output(TriggerId, [Head|Tail]) when is_binary(Head) ->
+    send_to_output(TriggerId, [binary_to_term(Head)|Tail]);
+send_to_output(TriggerId, [{Value, Timestamp, StreamId, Input, []}|Messages]) ->
+    send_to_output(TriggerId, Messages);
+send_to_output(TriggerId, [{Value, Timestamp, StreamId, Input, [{user,UserId}|Rest]}|Messages]) ->
+    Message = lib_json:set_attrs([{trigger, "{}"},
+        {"trigger.value", Value},
+        {"trigger.timestamp", list_to_binary(Timestamp)},
+        {"trigger.stream_id", list_to_binary(StreamId)},
+        {"trigger.trigger_id", list_to_binary(TriggerId)},
+        {"trigger.input", Input}]),
+    UpdateJson = "{\"script\":\"ctx._source.notifications += msg\",\"params\":{\"msg\":"++ Message ++"}}",
+    erlang:display(UpdateJson),
+    case api_help:update_doc(?INDEX, "user", UserId, UpdateJson, []) of
+        {error, {Code, Body}} ->
+            {error, {Code, Body}};
+        {ok, Response} ->
+            ok
+    end,
+    send_to_output(TriggerId, [{Value, Timestamp, StreamId, Input, Rest}|Messages]);
+send_to_output(TriggerId, [{Value, Timestamp, StreamId, Input, [{uri,URI}|Rest]}|Messages]) ->
+    Message = lib_json:set_attrs([{trigger, "{}"},
+        {"trigger.value", Value},
+        {"trigger.timestamp", Timestamp},
+        {"trigger.stream_id", StreamId},
+        {"trigger.trigger_id", TriggerId},
+        {"trigger.input", Input}]),
+    case httpc:request(post, {URI, [],"application/json", Message}, [], []) of
+        {ok,{{_, 200, _}, _, _}} ->
+            ok;
+        {ok, {{_, Code, _}, _, Body}} ->
+            {error, {Code, Body}}
+    end,
+    send_to_output(TriggerId, [{Value, Timestamp, StreamId, Input, Rest}|Messages]);
+send_to_output(TriggerId, [{Value, Timestamp, StreamId, Input, [_|Rest]}|Messages]) ->
+    erlang:display("Invalid output!"),
+    send_to_output(TriggerId, [{Value, Timestamp, StreamId, Input, Rest}|Messages]).
+              
+
 %% @doc
 %% Function: handle_command/2
 %% Purpose: Used to handle commands sent on the
@@ -374,7 +407,6 @@ send_messages(TriggerExchange,ChannelOut,[Msg|Rest]) ->
 %% Returns: The new output list
 %% @end
 -spec handle_command(TriggerExchange::{atom(),{term(),term()}},OutputList::list()) -> list().
-
 handle_command({add,{Input,User}},[]) ->
 	[{Input,[User]}];
 handle_command({add,{Input,User}},[{Input,Users}|Rest]) ->
