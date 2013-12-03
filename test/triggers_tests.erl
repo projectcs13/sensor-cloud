@@ -126,7 +126,15 @@ post_data_test() ->
 	Messages = [{4,lib_json:to_string(StreamId1),5,["Erik","Tomas"]},{4,lib_json:to_string(StreamId1),10,["Tomas"]},{4,lib_json:to_string(StreamId1),6,["Tomas"]},{7,lib_json:to_string(StreamId1),10,["Tomas"]},{4,lib_json:to_string(StreamId2),6,["Tomas"]}],
 	receive_loop(Messages),
 	amqp_channel:close(ChannelIn),
-	amqp_connection:close(Connection).
+	amqp_connection:close(Connection),
+	%% Move this back when problem with finding more then 1 trigger is fixed
+	{ok, {{_Version13, 200, _ReasonPhrase13}, _Headers13, Body13}} = httpc:request(post, {?WEBMACHINE_URL++"/users/Tomas/triggers/remove", [],"application/json", "{\"function\" : \"less_than\",\"input\":6,\"streams\":[\"" ++ lib_json:to_string(StreamId1) ++"\",\"" ++ lib_json:to_string(StreamId2) ++"\"]}"}, [], []),
+	api_help:refresh(),
+	{ok, {{_Version10, 200, _ReasonPhrase10}, _Headers10, Body10}} = httpc:request(post, {?WEBMACHINE_URL++"/users/Tomas/triggers/remove", [],"application/json", "{\"function\" : \"less_than\",\"input\":5,\"streams\":\"" ++ lib_json:to_string(StreamId1) ++"\"}"}, [], []),
+	api_help:refresh(),
+	{ok, {{_Version11, 200, _ReasonPhrase11}, _Headers11, Body11}} = httpc:request(post, {?WEBMACHINE_URL++"/users/Erik/triggers/remove", [],"application/json", "{\"function\" : \"less_than\",\"input\":5,\"streams\":\"" ++ lib_json:to_string(StreamId1) ++"\"}"}, [], []),
+	api_help:refresh(),
+	{ok, {{_Version12, 200, _ReasonPhrase12}, _Headers12, Body12}} = httpc:request(post, {?WEBMACHINE_URL++"/users/Tomas/triggers/remove", [],"application/json", "{\"function\" : \"less_than\",\"input\":10,\"streams\":\"" ++ lib_json:to_string(StreamId1) ++"\"}"}, [], []).
 
 
 
