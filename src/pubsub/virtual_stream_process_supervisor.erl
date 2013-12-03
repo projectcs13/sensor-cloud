@@ -11,6 +11,11 @@
 %% @end
 
 -module(virtual_stream_process_supervisor).
+
+-include_lib("erlastic_search.hrl").
+-include_lib("json.hrl").
+-include_lib("common.hrl").
+
 -behaviour(supervisor).
 -export([init/1]).
 
@@ -44,6 +49,47 @@ start_link() ->
 
 
 
+%% start_processes/0
+%% ====================================================================
+%% @doc
+%% Function: start_processes/0
+%% Purpose: Load and start all virtual stream processes under supervison.
+%% Return: ok | {error, Reason}.
+%% Side effects: Starts several virtual stream processes.
+%% @end
+-spec start_processes() -> ok | {error, string()}.
+%% ====================================================================
+start_processes() ->
+	case whereis(vstream_sup) of
+		undefined ->
+			{error, "Start the supervisor first"};
+		_ ->
+			GetAllQuery = "{\"query\" : {\"match_all\" : {}}}",
+			case erlastic_search:search_json(#erls_params{},
+											 ?ES_INDEX,
+											 "stream",
+											 GetAllQuery) of
+				{error, {Code, Body}} ->
+					ErrorString = api_help:generate_error(Body, Code),
+					{error, ErrorString};
+				{ok, JsonStruct} ->
+				    VStreamList = lib_json:get_field(JsonStruct, "hits.hits"),
+				    MapFunc =
+				    	fun(List) ->
+				    		[{stream, binary_to_list(X)} || X <- List]
+				    	end,
+				    %% Structure: [{VId, [{stream, SId}, ... ]}, ...].
+				    ProcessInfoList =
+				    	[{binary_to_list(lib_json:get_field(X, "_id")),
+				    	  MapFunc(lib_json:get_field(X, "streams_involved")} ||
+				    	  X <- VStreamList],
+				   	
+				    ok
+			end
+	end.
+
+
+
 
 
 %% ====================================================================
@@ -74,8 +120,7 @@ init([]) ->
     	  transient, brutal_kill, worker, [gen_virtual_stream_process]}
 		]}}.
 
-%% SupervisionPolicy: {simple_one_for_one, 5, 60}  -- simple_one_for_one because it can create children dynamically but kills are harder.
-%% ChildSpec: {VStreamId, {gen_virtual_stream_process, start_link, []}, transient, brutal_kill, worker, [gen_virtual_stream_process]}.
+
 
 %% ====================================================================
 %% Internal functions
