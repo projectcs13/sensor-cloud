@@ -82,7 +82,7 @@ content_types_accepted(ReqData, State) ->
 %% It is run automatically for POST requests
 %% Returns: {true, ReqData, State} || {{error, Reason}, ReqData, State}
 %%
-%% Side effects: Inserts a new Datapoint in the database
+%% Side effects: Inserts vsdatapoints in the database
 %% @end
 -spec process_post(ReqData::tuple(), State::string()) -> {true, tuple(), string()}.
 process_post(ReqData, State) ->
@@ -101,7 +101,7 @@ process_post(ReqData, State) ->
 					TimestampFrom = lib_json:get_field(VirtualStreamJson, "timestampfrom"),
 					Function = lib_json:get_field(VirtualStreamJson, "function"),
 					AllowedFunctions = ["min", "max", "mean", "count"],
-					case lists:member(binary_to_list(lists:nth(2, Function)), AllowedFunctions) of
+					case lists:member(binary_to_list(lists:nth(1, Function)), AllowedFunctions) of
 						true ->
 							reduce(VirtualStreamId, StreamsInvolved, TimestampFrom, Function, ReqData, State),
 							{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State};
@@ -117,7 +117,7 @@ process_post(ReqData, State) ->
 %% @doc
 %% Function: reduce/6
 %% Purpose: Gets information about which streams will be involved, a timestamp range
-%% and the statistical function, it executes a query and posts the datapoints returned
+%% and the statistical function, it executes a query and posts the vsdatapoints returned
 %% to the current virtual stream
 %% Returns: {true, ReqData, State} || {{error, Reason}, ReqData, State}
 -spec reduce(VirtualStreamId::string(), Streams::string(), TimestampFrom::string(), Function::string(), ReqData::tuple(), State::string()) -> %%should change to date type instead, also add ReqData, State
@@ -127,46 +127,25 @@ reduce(VirtualStreamId, Streams, TimestampFrom, Function, ReqData, State) ->
 	case erlastic_search:search_json(#erls_params{},?INDEX, "datapoint", lib_json:to_string(Query)) of
 		{error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
 		{ok,JsonStruct} ->
-			%%   	{true,wrq:set_resp_body(lib_json:encode(FinalJson),ReqData),State},
-			case string:str(Function, [<<"aggregate">>]) of %this might be removed if not used. It malfunctions if empty input
-            	0 ->
-					{{Year,Month,Day},{Hour,Minute,Second}} = calendar:local_time(),
-					TimeStamp = api_help:generate_timestamp([Year,Month,Day,Hour,Minute,Second],0), % to be reconsidered
-					Datapoint = lib_json:get_field(JsonStruct, "facets.statistics"),
-					FinalDatapoint = lib_json:set_attrs([
-														   {"timestamp", list_to_atom(TimeStamp)}, %does timestamp have a meaning here? maybe do a reverse search for the time???
-														   {"stream_id", list_to_atom(binary_to_list(VirtualStreamId))},
-														   {"value",  lib_json:get_field(Datapoint, binary_to_list(lists:nth(1, Function)))}
-														  ]),
-					case erlastic_search:index_doc(?INDEX, "vsdatapoint", FinalDatapoint) of 
-						{error, Reason2} -> erlang:display("Error");
-						{ok,JsonStruct2} ->	erlang:display("Correct")						
-					end;
-				_->
-					DatapointsList = lib_json:get_field(JsonStruct, "facets.statistics.entries"),
-					NewDatapoints = lists:map(fun(Json) -> 
-													  FinalDatapoint = lib_json:set_attrs([
-																						   {"timestamp", list_to_atom(msToDate(lib_json:get_field(Json, "key")))},
-																						   {"stream_id", VirtualStreamId},
-																						   {"value",  lib_json:get_field(Json, binary_to_list(lists:nth(2, Function)))}
-																						  ]),
-													  erlastic_search:index_doc(?INDEX, "vsdatapoint", lib_json:to_string(FinalDatapoint)) %to add error check here
-											  end, DatapointsList)
-			
-			%%will post all datapoints one by one, improve with bulk posting should be like the following
-			%% 							case erlastic_search:bulk_index_docs(?INDEX, "datapoint", NewDatapoints) of
-			%% 									{error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
-			%% 									{ok,List} -> {true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
-			%% 							end
-			end,
-			{true, wrq:set_resp_body("\"status\":\"ok\"", ReqData), State} %% need to fix message returned
+			%%{true,wrq:set_resp_body(lib_json:encode(FinalJson),ReqData),State},
+
+			DatapointsList = lib_json:get_field(JsonStruct, "facets.statistics.entries"),
+			NewDatapoints = lists:map(fun(Json) -> 
+											FinalDatapoint = lib_json:set_attrs([
+																			   {"timestamp", list_to_atom(msToDate(lib_json:get_field(Json, "key")))},
+																			   {"stream_id", VirtualStreamId},
+																			   {"value",  lib_json:get_field(Json, binary_to_list(lists:nth(1, Function)))}
+																			  ]),
+											  erlastic_search:index_doc(?INDEX, "vsdatapoint", lib_json:to_string(FinalDatapoint)) %to add error check here
+									  end, DatapointsList),
+		{true, wrq:set_resp_body("\"status\":\"ok\"", ReqData), State} %% need to fix message returned
 	end.
 
  
 %% @doc
 %% Function: get_vstream/2
-%% Purpose: Used to handle GET requests by giving the document with the given
-%% Id or listing the documents that can be found from the restrictions
+%% Purpose: Used to handle GET requests by giving the document with the given Id
+%% or listing the documents that can be found from the restrictions
 %% given by the URI.
 %% Returns: {Success, ReqData, State}, where Success is true if the PUT request is
 %% successful and false otherwise.
@@ -175,7 +154,6 @@ reduce(VirtualStreamId, Streams, TimestampFrom, Function, ReqData, State) ->
 get_vstream(ReqData, State) ->
 	case id_from_path(ReqData) of
                 undefined ->
-                    % Get all vstreams
                     case wrq:get_qs_value("size",ReqData) of 
                         undefined ->
                             Size = 100;
@@ -192,7 +170,6 @@ get_vstream(ReqData, State) ->
 						    {FinalJson, ReqData, State}  
                     end;
                 Id ->
-				    %% Get specific virtual stream
                     case erlastic_search:get_doc(?INDEX, "virtual_stream", Id) of
                         {error, {Code, Body}} -> 
                             ErrorString = api_help:generate_error(Body, Code),
@@ -226,7 +203,8 @@ put_stream(ReqData, State) ->
 
 %% @doc
 %% Function: delete_resource/2
-%% Purpose: Used to handle DELETE requests for deleting the virtual stream in elastic search
+%% Purpose: Used to handle DELETE requests for deleting the virtual stream and its 
+%% vsdatapoints in elastic search
 %% Returns: {Success, ReqData, State}, where Success is true if delete is successful
 %% and false otherwise.
 %% FIX: This function relies on direct contact with elastic search at localhost:9200
@@ -253,7 +231,7 @@ delete_resource(ReqData, State) ->
 
 %% @doc
 %% Function: create_query/3
-%% Purpose: Creates the query for the function specified
+%% Purpose: Creates the query for the function specified when creating a vstream
 %% Returns: string()
 %% @end
 -spec create_query(Function::string(), Streams::string(), TimestampFrom::string()) -> {string()}.
@@ -270,27 +248,15 @@ create_query(Function, Streams, TimestampFrom) ->
 		   {"query.filtered.filter.range", "{}"},
 		   {"query.filtered.filter.range.timestamp", "{}"},
 		   {"query.filtered.filter.range.timestamp.gte", TimestampFrom}
-		  	
 	]),
-	case string:str(Function, [<<"aggregate">>]) of %is aggregate the proper name? maybe groupby?
-            0 -> %	   	["min" "max" "mean" "???average???" "sum_of_squares" "variance" "std_deviation" ->
-						%min, max etc are not added in the query yet, I will investigate if it is even possible
-				Facet =  [{"facets", "{}"},
-					  	 {"facets.statistics", "{}"},
-					  	 {"facets.statistics.statistical", "{}"},
-					  	 {"facets.statistics.statistical.script", '(Long) _source.value'}]; %I have to get the value here in another way
-			_ -> %		["aggregate", "min" "max" "total(==sum)" ] ->		can also support custom calculations like *,+,-,/, ^(prob)
-				% as above
-
-				% the interval is also included in the function, in the 3rd position otherwise pick 10s??
-				Interval = binary_to_list(lists:nth(3, Function)),
-				Facet = [{"facets", "{}"},
-						{"facets.statistics", "{}"},
-						{"facets.statistics.histogram", "{}"},
-						{"facets.statistics.histogram.key_field", 'timestamp'},
-						{"facets.statistics.histogram.value_script", '(Long) _source.value'},
-						{"facets.statistics.histogram.time_interval", list_to_atom(Interval)}]
-	end,
+	
+	Interval = binary_to_list(lists:nth(2, Function)),
+	Facet = [{"facets", "{}"},
+			{"facets.statistics", "{}"},
+			{"facets.statistics.histogram", "{}"},
+			{"facets.statistics.histogram.key_field", 'timestamp'},
+			{"facets.statistics.histogram.value_script", '(Long) _source.value'},
+			{"facets.statistics.histogram.time_interval", list_to_atom(Interval)}],
 	lib_json:add_values(Query, Facet)
 .
 

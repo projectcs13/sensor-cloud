@@ -64,7 +64,7 @@ post_test() ->
 	api_help:refresh(),
 		Response3 = post_request(?VSTREAMS_URL, "application/json", "{\"user_id\" : \"" ++ lib_json:to_string(UserId) ++ "\", \"name\" : \"post_testvstream1\", \"description\" : \"test\",
 			 \"streams_involved\" : [\"" ++ lib_json:to_string(Streamid1) ++ "\", \"" ++ lib_json:to_string(Streamid2) ++ "\"], 
-			 \"timestampfrom\" : \"now-1h\", \"function\" : [\"aggregate\", \"mean\", \"1s\"]}"),
+			 \"timestampfrom\" : \"now-1h\", \"function\" : [\"mean\", \"1s\"]}"),
 	check_returned_code(Response3, 200),
 	api_help:refresh().
 
