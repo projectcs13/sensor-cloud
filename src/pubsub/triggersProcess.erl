@@ -1,4 +1,4 @@
-%% @author Anders Steinrud, Gabriel Tholsgård, Tomas Sävström <tosa7943@student.uu.se>, Andreas Moregård Haubenwaller
+%% @author Anders Steinrud, Gabriel Tholsgï¿½rd, Tomas Sï¿½vstrï¿½m <tosa7943@student.uu.se>, Andreas Moregï¿½rd Haubenwaller
 %% [www.csproj13.student.it.uu.se]
 %% @version 1.0
 %% @copyright [Copyright information]
@@ -20,7 +20,7 @@
 
 -export([create/4, subscribe/2]).
 
-%% Should import correct header
+
 -define(INDEX, "sensorcloud").
 
 %% ====================================================================
