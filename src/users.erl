@@ -82,7 +82,7 @@ content_types_accepted(ReqData, State) ->
 %% @end
 -spec delete_resource(ReqData::tuple(), State::string()) -> {string(), tuple(), string()}.
 delete_resource(ReqData, State) ->
-    Id = string:to_lower(id_from_path(ReqData)),
+    Id = id_from_path(ReqData),
     case delete_streams_with_user_id(Id) of
         {error, {Code, Body}} -> 
             ErrorString = api_help:generate_error(Body, Code),
@@ -364,10 +364,10 @@ id_from_path(RD) ->
     case wrq:path_info(id, RD) of
         undefined ->
             case string:tokens(wrq:disp_path(RD), "/") of
-                ["users", Id] -> Id;
+                ["users", Id] -> string:to_lower(Id);
                 _ -> undefined
             end;
-        Id -> Id
+        Id -> string:to_lower(Id)
     end.
 
 %% @doc
