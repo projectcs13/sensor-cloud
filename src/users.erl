@@ -82,27 +82,19 @@ content_types_accepted(ReqData, State) ->
 %% @end
 -spec delete_resource(ReqData::tuple(), State::string()) -> {string(), tuple(), string()}.
 delete_resource(ReqData, State) ->
-    Id = id_from_path(ReqData),
+    Id = string:to_lower(id_from_path(ReqData)),
     case delete_streams_with_user_id(Id) of
         {error, {Code, Body}} -> 
             ErrorString = api_help:generate_error(Body, Code),
             {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
         {ok} ->
-			Query = "{\"size\" :100,\"query\" : {\"term\" : {\"username\":\"" ++ Id ++"\"}}}",
-			case erlastic_search:search_json(#erls_params{},?INDEX, "user", Query) of
-				{error, {Code1, Body1}} -> 
-					ErrorString1 = api_help:generate_error(Body1, Code1),
-					{{halt, Code1}, wrq:set_resp_body(ErrorString1, ReqData), State};
-				{ok, Json} ->
-					ESId = lib_json:to_string(lib_json:get_field(Json, "hits.hits[0]._id")),
-					case erlastic_search:delete_doc(?INDEX,"user", ESId) of
-						{error, {Code, Body}} -> 
-							ErrorString = api_help:generate_error(Body, Code),
-							{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-						{ok,List} ->
-							{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
-					end
-            end
+			case erlastic_search:delete_doc(?INDEX,"user", Id) of
+				{error, {Code, Body}} -> 
+					ErrorString = api_help:generate_error(Body, Code),
+					{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+				{ok,List} ->
+					{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
+			end
     end.
 
 
