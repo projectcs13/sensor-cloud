@@ -118,6 +118,16 @@ delete_resource(ReqData, State) ->
 					remove_user(User,ReqData,State)
 	end.
 
+
+
+%% @doc
+%% Function: add_uri/2
+%% Purpose: Used to handle requests for adding uri's to a trigger
+%% Returns: {Success, ReqData, State}, where Success is true if delete is successful
+%% and false otherwise.
+%% @end
+-spec add_uri(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
+
 add_uri(ReqData, State) ->
 	{Json,_,_} = api_help:json_handler(ReqData, State),
 	Input = lib_json:get_field(Json, "input"),
@@ -215,6 +225,15 @@ add_uri(ReqData, State) ->
 	
 	end.
 
+
+
+%% @doc
+%% Function: add_user/3
+%% Purpose: Used to handle requests for adding users to a trigger
+%% Returns: {Success, ReqData, State}, where Success is true if delete is successful
+%% and false otherwise.
+%% @end
+-spec add_user(User::string(),ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 
 add_user(User, ReqData, State) ->
 	Username = case erlastic_search:search_limit(?INDEX, "user", "username="++User,500) of
@@ -319,6 +338,15 @@ add_user(User, ReqData, State) ->
 	end.
 
 	
+
+%% @doc
+%% Function: remove_uri/2
+%% Purpose: Used to handle requests for removing uri's from a trigger
+%% Returns: {Success, ReqData, State}, where Success is true if delete is successful
+%% and false otherwise.
+%% @end
+-spec remove_uri(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
+
 remove_uri(ReqData, State) ->
 	{Json,_,_} = api_help:json_handler(ReqData, State),
 	Input = lib_json:get_field(Json, "input"),
@@ -404,6 +432,17 @@ remove_uri(ReqData, State) ->
 			amqp_channel:cast(Channel, #'basic.publish'{exchange = CommandExchange}, #amqp_msg{payload = Msg}),
 			Return
 	end.
+
+
+
+
+%% @doc
+%% Function: remove_user/3
+%% Purpose: Used to handle requests for removing users from a trigger
+%% Returns: {Success, ReqData, State}, where Success is true if delete is successful
+%% and false otherwise.
+%% @end
+-spec remove_user(User::string(),ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 
 remove_user(User, ReqData, State) ->
 	Username = case erlastic_search:search_limit(?INDEX, "user", "username="++User,500) of
