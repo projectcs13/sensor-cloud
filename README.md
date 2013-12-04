@@ -18,11 +18,15 @@ Welcome to the "Project CS 2013" project
 
         make install
         
-2. Start Elastic Search server
+2. Start RabbitMQ
+
+        make run_rabbit
+
+3. Start Elastic Search server
 
         make run_es
 
-2. Run the tests
+4. Run the tests
 
         make test
 

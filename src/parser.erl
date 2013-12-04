@@ -49,13 +49,13 @@ parseJson(Parser, Data, Time) ->
 				  end,
 	FieldValue2 = case is_integer(Res) of
 		true->
-			{"value",integer_to_binary(Res)};
+			{"value",Res};
 		_->
 			case is_float(Res) of
 				true->
-					{"value",float_to_binary(Res)};
+					{"value",Res};
 				_ ->
-					{"value",list_to_binary(Res)}
+					{"value",list_to_float(Res)}
 			end
 	end,
 	TimeStamp = case Time of
