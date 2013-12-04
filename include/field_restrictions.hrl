@@ -1,4 +1,4 @@
-%% Author: Tomas Sävström <tosa7943@student.uu.se>, Li Hao <hali2222@student.uu.se>
+%% Author: Tomas Sï¿½vstrï¿½m <tosa7943@student.uu.se>, Li Hao <hali2222@student.uu.se>
 %% [www.csproj13.student.it.uu.se]
 %% == api include file ==
 %% Includes defenitions of what fields are accteded and what fields are restricted, 
@@ -16,7 +16,7 @@
 
 %% Fields for users
 -define(RESTRCITEDUPDATEUSERS, ["username"]).
--define(ACCEPTEDFIELDSUSERS, ["username","private"]).
+-define(ACCEPTEDFIELDSUSERS, ["username", "email", "firstname", "lastname", "description", "password", "private"]).
 
 %% Fields for resources
 -define(RESTRCITEDUPDATERESOURCES, []).
