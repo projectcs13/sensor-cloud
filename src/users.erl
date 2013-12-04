@@ -1,4 +1,4 @@
-%% @author Georgios Koutsoumpakis
+%% @author Georgios Koutsoumpakis, Li Hao
 %% [www.csproj13.student.it.uu.se]
 %% @version 1.0
 %% @copyright [Copyright information]
@@ -168,7 +168,24 @@ delete_streams([StreamId|Rest]) ->
         {ok} ->
 			case erlastic_search:delete_doc(?INDEX, "stream", StreamId) of 
 				{error,Reason} -> {error,Reason};
-				{ok,_List} -> delete_streams(Rest)
+				{ok,_List} -> 
+					% delete the parser according to the stream`s id
+					% changed by lihao
+					Parser_id = "parser_"++binary_to_list(StreamId),
+					case erlastic_search:delete_doc(?INDEX, "parser", Parser_id) of
+						{error, Reason} -> {error, Reason},
+										   delete_streams(Rest);
+						{ok, _List2} ->
+							% terminate the poller
+							case whereis(polling_supervisor) of
+								undefined->
+									continue;
+								_->
+									gen_server:cast(polling_supervisor, {terminate, binary_to_list(StreamId)})
+							end,
+							delete_streams(Rest)
+					end
+					% change ends
 			end
 	end.
 

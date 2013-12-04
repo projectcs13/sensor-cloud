@@ -1,4 +1,4 @@
-%% @author Jose Arias, Andreas MoregÃ¥rd Haubenwaller
+%% @author Jose Arias, Andreas Moregård Haubenwaller
 %% [www.csproj13.student.it.uu.se]
 %% @version 1.0
 %% @copyright [Copyright information]
