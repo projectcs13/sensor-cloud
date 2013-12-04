@@ -1,4 +1,4 @@
-%% @author Tomas Sävström <tosa7943@student.uu.se>
+%% @author Tomas Sï¿½vstrï¿½m <tosa7943@student.uu.se>
 %% [www.csproj13.student.it.uu.se]
 %% @version 1.0
 %% @copyright [Copyright information]
@@ -135,7 +135,6 @@ post_data_test() ->
 	receive_loop(Messages),
 	amqp_channel:close(ChannelIn),
 	amqp_connection:close(Connection),
-	%% Move this back when problem with finding more then 1 trigger is fixed
 
 	{ok, {{_Version10, 200, _ReasonPhrase10}, _Headers10, Body10}} = httpc:request(post, {?WEBMACHINE_URL++"/users/Tomas/triggers/remove", [],"application/json", "{\"function\" : \"less_than\",\"input\":5,\"streams\":\"" ++ lib_json:to_string(StreamId1) ++"\"}"}, [], []),
 	api_help:refresh(),
