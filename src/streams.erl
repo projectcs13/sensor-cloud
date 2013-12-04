@@ -186,11 +186,9 @@ process_post(ReqData, State) ->
 				{false,false} ->
 				    {{halt,403}, wrq:set_resp_body("{\"ok\": false, \"error\" :  \"Unsupported field(s)\"}", ReqData), State};
 				{false,true} ->
-				    case erlastic_search:search_limit(?INDEX, "user", "username:"++binary_to_list(UserId), 100) of
-					{ok, Json} ->
-					    case lib_json:field_value_exists(Json, "hits.hits[*]._source.username", UserId) of
-						true ->				      
-						    FieldsAdded = add_server_side_fields(UserAdded),		      
+				    case erlastic_search:get_doc(?INDEX, "user", string:to_lower(binary_to_list(UserId))) of
+						{ok, Json} ->
+					    	FieldsAdded = add_server_side_fields(UserAdded),		      
 						    FieldsAdded2 = case lib_json:get_fields(FieldsAdded, ["parser","data_type"]) of
 								       [undefined, undefined]->FieldsAdded;
 								       [undefined, _]->lib_json:rm_field(FieldsAdded, "data_type");
@@ -257,18 +255,19 @@ process_post(ReqData, State) ->
 											    gen_server:cast(polling_supervisor, {create_poller, NewPoller})
 										    end
 									    end,
-						% should return the stream`s info
+										% should return the stream`s info
 									    {true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
 								    end
 							    end
 							    %% change ends
-								
-								
-						    end;
-						false ->
-						    Error = lib_json:set_attr(error, binary:list_to_bin("Not found user with Id: "++UserId)),
-						    {{halt,403}, wrq:set_resp_body(Error, ReqData), State}
-					    end
+						    end;		      
+						{error, {404, _}} ->
+						    Error = lib_json:set_attr(error, binary:list_to_bin("User: "++UserId++" was not found.")),
+						    {{halt,403}, wrq:set_resp_body(Error, ReqData), State};
+						{error, {Code2, Body2}} ->
+							ErrorString = api_help:generate_error(Body2, Code2),
+							{{halt, Code2}, wrq:set_resp_body(ErrorString, ReqData), State}
+					    
 				    end
 			    end
 		    end;
