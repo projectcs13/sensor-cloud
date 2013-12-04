@@ -384,18 +384,20 @@ send_to_output(TriggerId, [{Value, Timestamp, StreamId, Input, [{user,UserId}|Re
 send_to_output(TriggerId, [{Value, Timestamp, StreamId, Input, [{uri,URI}|Rest]}|Messages]) ->
     Message = lib_json:set_attrs([{trigger, "{}"},
         {"trigger.value", Value},
-        {"trigger.timestamp", Timestamp},
-        {"trigger.stream_id", StreamId},
-        {"trigger.trigger_id", TriggerId},
+        {"trigger.timestamp", list_to_binary(Timestamp)},
+        {"trigger.stream_id", list_to_binary(StreamId)},
+        {"trigger.trigger_id", list_to_binary(TriggerId)},
         {"trigger.input", Input}]),
     erlang:display(URI),
     case httpc:request(post, {URI, [],"application/json", Message}, [], []) of
         {ok,{{_, 200, _}, _, _}} ->
-            erlang:display("OK"),
+            ok;
+        {ok,{{_, 204, _}, _, _}} ->
             ok;
         {ok, {{_, Code, _}, _, Body}} ->
             erlang:display("ERROR"),
             erlang:display(Body),
+            erlang:display(Code),
             {error, {Code, Body}}
     end,
     send_to_output(TriggerId, [{Value, Timestamp, StreamId, Input, Rest}|Messages]);
