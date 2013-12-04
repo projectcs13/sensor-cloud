@@ -191,7 +191,7 @@ post_data_user_test() ->
 	api_help:refresh(),
 	{ok, {{_Version13, 200, _ReasonPhrase13}, _Headers13, Body13}} = httpc:request(post, {?WEBMACHINE_URL++"/users/Tomas/triggers/remove", [],"application/json", "{\"function\" : \"less_than\",\"input\":6,\"streams\":[\"" ++ lib_json:to_string(StreamId1) ++"\",\"" ++ lib_json:to_string(StreamId2) ++"\"]}"}, [], []),
 	api_help:refresh(),
-	timer:sleep(4000),
+	timer:sleep(3000),
 	{ok, {{_VersionU3, 200, _ReasonPhraseU3}, _HeadersU3, BodyU3}} = httpc:request(get, {?WEBMACHINE_URL++"/users/Tomas", []}, [], []),
 	{ok, {{_VersionU4, 200, _ReasonPhraseU4}, _HeadersU4, BodyU4}} = httpc:request(get, {?WEBMACHINE_URL++"/users/Erik", []}, [], []),
 	api_help:refresh(),

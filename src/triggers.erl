@@ -150,7 +150,7 @@ add_uri(ReqData, State) ->
 				binary_to_list(Value3);
 			undefined ->
 				error
-	end,
+		  end,
 	StreamsQuery = create_stream_query(Streams,[]),
 	Query = "{\"filter\":{\"term\":{ \"function\":\"" ++ Function ++ "\"}},\"query\":{\"match\":{\"streams\":{\"query\":\"" ++ StreamsQuery ++"\",\"operator\":\"and\"}}}}",	
 	EsId = case erlastic_search:search_json(#erls_params{},?INDEX, "trigger", Query) of % See if the trigger is already in the system
@@ -300,7 +300,17 @@ add_user(User, ReqData, State) ->
 									   triggersProcess:create(TriggerId, lists:map(fun(A) -> {stream,A} end,Streams), 
 															  Function, [{Input,[{user,Username}]}])
 							   end),
-					{true, wrq:set_resp_body(lib_json:encode(List2), ReqData), State}
+					UserUpdate = lib_json:set_attrs([{"script",list_to_binary("ctx._source.triggers += newelement")},
+													 {"params","{}"},{"params.newelement","{}"},
+													 {"params.newelement.function",list_to_binary(Function)}, {"params.newelement.input",Input},
+													 {"params.newelement.streams",Streams}]),
+					case api_help:update_doc(?INDEX, "user", Username, UserUpdate) of
+						{error, {UPCode, UPBody}} -> 
+							UPErrorString = api_help:generate_error(UPBody, UPCode),
+							{{halt, UPCode}, wrq:set_resp_body(UPErrorString, ReqData), State};
+						{ok, _} ->
+							{true, wrq:set_resp_body(lib_json:encode(List2), ReqData), State}
+					end
 			end;
 		{EsId,_,_,_}->
 			erlang:display(EsId),
@@ -331,7 +341,17 @@ add_user(User, ReqData, State) ->
 							ErrorString4 = api_help:generate_error(Body4, Code4),
 							{{halt, Code4}, wrq:set_resp_body(ErrorString4, ReqData), State};
 						{ok,List4} -> 
-							{true,wrq:set_resp_body(lib_json:encode(List4),ReqData),State}
+							UserUpdate = lib_json:set_attrs([{"script",list_to_binary("ctx._source.triggers += newelement")},
+															 {"params","{}"},{"params.newelement","{}"},
+															 {"params.newelement.function",list_to_binary(Function)}, {"params.newelement.input",Input},
+															 {"params.newelement.streams",Streams}]),
+							case api_help:update_doc(?INDEX, "user", Username, UserUpdate) of
+								{error, {UPCode, UPBody}} -> 
+									UPErrorString = api_help:generate_error(UPBody, UPCode),
+									{{halt, UPCode}, wrq:set_resp_body(UPErrorString, ReqData), State};
+								{ok, _} ->
+									{true,wrq:set_resp_body(lib_json:encode(List4),ReqData),State}
+							end	
 					end
 			end
 
@@ -518,7 +538,17 @@ remove_user(User, ReqData, State) ->
 									 ErrorString4 = api_help:generate_error(Body4, Code4),
 									 {{halt, Code4}, wrq:set_resp_body(ErrorString4, ReqData), State};
 								 {ok,List4} -> 
-									 {true,wrq:set_resp_body(lib_json:encode(List4),ReqData),State}
+									 UserUpdate = lib_json:set_attrs([{"script",list_to_binary("for(int i=0;i < ctx._source.triggers.size(); i++){if (ctx._source.triggers[i] == newelement){ctx._source.triggers.remove((Object) ctx._source.triggers[i]); i = ctx._source.triggers.size();}}")},
+																	  {"params","{}"},{"params.newelement","{}"},
+																	  {"params.newelement.function",list_to_binary(Function)}, {"params.newelement.input",Input},
+																	  {"params.newelement.streams",Streams}]),
+									 case api_help:update_doc(?INDEX, "user", Username, UserUpdate) of
+										 {error, {UPCode, UPBody}} -> 
+											 UPErrorString = api_help:generate_error(UPBody, UPCode),
+											 {{halt, UPCode}, wrq:set_resp_body(UPErrorString, ReqData), State};
+										 {ok, _} ->
+											 {true,wrq:set_resp_body(lib_json:encode(List4),ReqData),State}
+									 end	
 							 end
 					 end,
 			CommandExchange = list_to_binary("command.trigger."++ EsId),
