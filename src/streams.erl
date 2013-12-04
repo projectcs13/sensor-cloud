@@ -10,7 +10,7 @@
 %% @end
 -module(streams).
 -export([init/1, allowed_methods/2, content_types_provided/2, content_types_accepted/2,
-		 delete_resource/2, process_post/2, put_stream/2, get_stream/2,delete_data_points_with_stream_id/1]).
+		 delete_resource/2, process_post/2, put_stream/2, get_stream/2, delete_data_points_with_stream_id/1, delete_stream_id_from_subscriptions/2]).
 
 
 -define(ELASTIC_SEARCH_URL, api_help:get_elastic_search_url()).
@@ -105,6 +105,12 @@ delete_resource(ReqData, State) ->
 					{true,wrq:set_resp_body("{\"message\":\"All streams with user_id:" ++string:to_lower(UserId)++" are now deleted\"}",ReqData),State}
 			end;
 		{_,Id} ->
+			case erlastic_search:get_doc(?INDEX, "stream", Id) of 
+			{error, {Code2, Body2}} -> {error, {Code2, Body2}};
+			{ok,JsonStruct} -> 	 
+				SubsList = lib_json:get_field(JsonStruct, "_source.subscribers"),
+				delete_stream_id_from_subscriptions(Id,SubsList)
+			end,
 			case delete_data_points_with_stream_id(Id) of 
 				{error, {Code, Body}} -> 
 					ErrorString = api_help:generate_error(Body, Code),
@@ -132,6 +138,41 @@ delete_resource(ReqData, State) ->
 	end.
 
 %% @doc
+%% Function: delete_stream_id_from_subscriptions/2
+%% Purpose: Used to delete all data-points with the given id as parent
+%% Returns: {ok} or {error,Reason} 
+%% FIX: This function relies on direct contact with elastic search at localhost:9200
+%% @end
+-spec delete_stream_id_from_subscriptions(StreamId::string() | binary(), Subscribers::string()) -> ok | error.
+
+delete_stream_id_from_subscriptions(StreamId,Subscribers) when is_list(StreamId) ->
+	delete_stream_id_from_subscriptions(binary:list_to_bin(StreamId), Subscribers);
+delete_stream_id_from_subscriptions(StreamId,[]) ->
+	ok;
+delete_stream_id_from_subscriptions(StreamId, [Head|Rest]) ->
+	case lib_json:get_field(Head, "user_id") of 
+		[] ->
+			error;
+		UserId ->
+			case erlastic_search:get_doc(?INDEX, "user", UserId) of
+				{error, {Code, Body}} -> %User doesn't exist
+					erlang:display("Non-existing user"),
+					delete_stream_id_from_subscriptions(StreamId,Rest);
+				{ok,List} ->	%User exists
+					UpdateJson = "{\"script\" : \"ctx._source.subscriptions.remove(subscription)\",\"params\":{\"subscription\":{ \"stream_id\":\""++binary_to_list(StreamId)++"\"}}}",
+					case api_help:update_doc(?INDEX, "user", UserId, UpdateJson,[]) of
+						{error, {Code, Body}} ->
+							erlang:display("Error removing the stream_id from the user");
+						{ok, List3} -> 	
+							delete_stream_id_from_subscriptions(StreamId,Rest)
+					end
+			end
+end.
+
+
+
+
+	%% @doc
 %% Function: delete_data_points_with_stream_id/1
 %% Purpose: Used to delete all data-points with the given id as parent
 %% Returns: {ok} or {error,Reason} 
@@ -155,6 +196,7 @@ delete_data_points_with_stream_id(Id) ->
 		Code ->
 			{error,{Code, Body}}
 	end.
+
 
 %% @doc
 %% Function: process_post/2
@@ -835,7 +877,8 @@ add_server_side_fields(Json) ->
 			{creation_date, list_to_binary(Date)},
 			{last_updated, list_to_binary(Time)},
 			{quality, 1.0},
-			{subscribers, 1},
+			{nr_subscribers, 0},
+			{subscribers, "[]"},
 			{history_size, 0}, 
 			{user_ranking, "{}"},
 			{"user_ranking.average", 0.0},

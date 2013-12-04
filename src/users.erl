@@ -43,6 +43,10 @@ allowed_methods(ReqData, State) ->
             {['POST','GET'], ReqData, State};
         [{"users",_Id}] ->
             {['GET', 'PUT', 'DELETE'], ReqData, State};
+        [{"users",_Id},{"_subscribe"}] ->
+            {['PUT'], ReqData, State};
+        [{"users",_Id},{"_unsubscribe"}] ->
+            {['PUT'], ReqData, State};
         [{"users"}] ->
             {['POST','GET'], ReqData, State};
         [error] ->
@@ -154,6 +158,12 @@ get_streams([JSON | Tl]) ->
 
 delete_streams([]) -> {ok};
 delete_streams([StreamId|Rest]) ->
+	case erlastic_search:get_doc(?INDEX, "stream", StreamId) of 
+			{error, {Code2, Body2}} -> {error, {Code2, Body2}};
+			{ok,JsonStruct} -> 	 
+				SubsList = lib_json:get_field(JsonStruct, "_source.subscribers"),
+				streams:delete_stream_id_from_subscriptions(StreamId,SubsList)
+	end,
 	case streams:delete_data_points_with_stream_id(StreamId) of
         {error,{Code, Body}} -> 
             {error,{Code, Body}};
@@ -192,27 +202,155 @@ delete_streams([StreamId|Rest]) ->
 %% @end
 -spec put_user(ReqData::tuple(), State::string()) -> {true, tuple(), string()}.
 put_user(ReqData, State) ->
-    Id = id_from_path(ReqData),
-	{UserJson,_,_} = api_help:json_handler(ReqData, State),
-    %check if doc already exists
-	case {api_help:do_any_field_exist(UserJson,?RESTRCITEDUPDATEUSERS),api_help:do_only_fields_exist(UserJson,?ACCEPTEDFIELDSUSERS)} of
-		{true,_} ->
-			ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDUPDATEUSERS),
-			ResFields2 = string:sub_string(ResFields1, 1, length(ResFields1)-2),
-			{{halt,409}, wrq:set_resp_body("{\"error\":\"Error caused by restricted field in document, these fields are restricted : " ++ ResFields2 ++"\"}", ReqData), State};
-		{false,false} ->
-			{{halt,403}, wrq:set_resp_body("Unsupported field(s)", ReqData), State};
-		{false,true} ->
-			Update = api_help:create_update(UserJson),
-			case api_help:update_doc(?INDEX, "user", Id, Update) of
-				{error, {Code, Body}} -> 
-					ErrorString = api_help:generate_error(Body, Code),
-					{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-				{ok, Json} ->
-					{true, wrq:set_resp_body(lib_json:encode(Json), ReqData), State}
-			end	
+	case api_help:is_subs(ReqData) or api_help:is_unsubs(ReqData) of 
+		false ->
+		    Id = string:to_lower(id_from_path(ReqData)),
+			{UserJson,_,_} = api_help:json_handler(ReqData, State),
+		    %check if doc already exists
+			case {api_help:do_any_field_exist(UserJson,?RESTRCITEDUPDATEUSERS),api_help:do_only_fields_exist(UserJson,?ACCEPTEDFIELDSUSERS)} of
+				{true,_} ->
+					ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDUPDATEUSERS),
+					ResFields2 = string:sub_string(ResFields1, 1, length(ResFields1)-2),
+					{{halt,409}, wrq:set_resp_body("{\"error\":\"Error caused by restricted field in document, these fields are restricted : " ++ ResFields2 ++"\"}", ReqData), State};
+				{false,false} ->
+					{{halt,403}, wrq:set_resp_body("Unsupported field(s)", ReqData), State};
+				{false,true} ->
+					Update = api_help:create_update(UserJson),
+					case api_help:update_doc(?INDEX, "user", Id, Update) of
+						{error, {Code, Body}} -> 
+							ErrorString = api_help:generate_error(Body, Code),
+							{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+						{ok, Json} ->
+							{true, wrq:set_resp_body(lib_json:encode(Json), ReqData), State}
+					end
+			end;
+		true ->
+			erlang:display("SUBSCRIPTION!"),
+			Id = string:to_lower(id_from_path(ReqData)),
+			{Json,_,_} = api_help:json_handler(ReqData,State),
+			StreamId = case lib_json:get_field(Json,"stream_id") of 
+							undefined ->
+			                	ErrorString = api_help:generate_error(<<"{\"error\":\"Error, incorrect or no stream specified.\"}">>, 409),
+			        			{{halt, 409}, wrq:set_resp_body(ErrorString, ReqData), State};
+							Stream ->
+								Stream
+        				end,
+			case erlastic_search:get_doc(?INDEX, "user", Id) of
+				{error, {Code, Body}} -> %User doesn't exist
+					ErrorString2 = api_help:generate_error(Body, Code),
+					{{halt, Code}, wrq:set_resp_body(ErrorString2, ReqData), State};
+				{ok,List} ->	%User exists
+						SubsList = lib_json:get_field(List, "_source.subscriptions"),
+						case api_help:is_unsubs(ReqData) of
+							true -> 
+									case find_subscription(StreamId, SubsList) of
+										found -> %User has NOT subscribed to this stream before
+											case remove_subscriber(StreamId, Id) of
+												{error, {Code, Body}} ->
+
+													ErrorString3 = api_help:generate_error(Body, Code),
+					            					{{halt, Code}, wrq:set_resp_body(ErrorString3, ReqData), State};
+				            					ok ->
+				            						UpdateJson = "{\"script\" : \"ctx._source.subscriptions.remove(subscription)\",\"params\":{\"subscription\":{ \"stream_id\":\""++binary_to_list(StreamId)++"\"}}}",
+													case api_help:update_doc(?INDEX, "user", Id, UpdateJson,[]) of
+														{error, {Code, Body}} ->
+
+					            							ErrorString4 = api_help:generate_error(Body, Code),
+					            							{{halt, Code}, wrq:set_resp_body(ErrorString4, ReqData), State};
+					            						{ok, List3} -> {true,wrq:set_resp_body(lib_json:encode(List3),ReqData),State}
+				            						end
+				            				end;
+										not_found -> %User HAS subscribed to this stream before
+					            			{{halt, 409}, wrq:set_resp_body("{\"ok\": false, \"error\" : \"Not subscribed\"}", ReqData), State}	
+					            	end;
+							false ->
+								case find_subscription(StreamId, SubsList) of
+									not_found -> %User has NOT subscribed to this stream before
+										case add_subscriber(StreamId, Id) of
+											{error, {Code, Body}} ->
+
+												ErrorString3 = api_help:generate_error(Body, Code),
+				            					{{halt, Code}, wrq:set_resp_body(ErrorString3, ReqData), State};
+			            					ok ->
+			            						UpdateJson = "{\"script\" : \"ctx._source.subscriptions += subscription\",\"params\":{\"subscription\":{ \"stream_id\":\""++binary_to_list(StreamId)++"\"}}}",
+												case api_help:update_doc(?INDEX, "user", Id, UpdateJson,[]) of
+													{error, {Code, Body}} ->
+				            							ErrorString4 = api_help:generate_error(Body, Code),
+				            							{{halt, Code}, wrq:set_resp_body(ErrorString4, ReqData), State};
+				            						{ok, List3} -> {true,wrq:set_resp_body(lib_json:encode(List3),ReqData),State}
+			            						end
+			            				end;
+									found -> %User HAS subscribed to this stream before
+				            			{{halt, 409}, wrq:set_resp_body("{\"ok\": false, \"error\" : \"Already subscribed\"}", ReqData), State}	
+								end
+						end
+				end
+		end.
+
+
+%% @doc
+%% Function: find_subscription/1
+%% Purpose: Used to find a stream in a list of subscriptions(list of JSON objects) 
+%% based on a stream_id
+%%         
+%% Returns: Found/Not found
+%% @end
+find_subscription(StreamId, Subscriptions) when is_list(StreamId) ->
+	find_subscription(binary:list_to_bin(StreamId), Subscriptions);
+find_subscription(StreamId, []) ->
+	not_found;
+find_subscription(StreamId, [Head|Rest]) ->
+	case lib_json:get_field(Head, "stream_id") of 
+		StreamId ->
+			found;
+		_ ->
+			find_subscription(StreamId, Rest)
+	end.
+		
+
+
+%% @doc
+%% Function: add_subscriber/2
+%% Purpose: Used to add a new subscriber to a stream 
+%%          in ES
+%%
+%% @end
+-spec add_subscriber(StreamId::string(), UserId::string()) -> ok | {error, no_model}. 
+
+add_subscriber(StreamId, UserId) ->
+	case erlastic_search:get_doc(?INDEX, "stream", StreamId) of 
+		{error, {Code, Body}} -> {error, {Code, Body}};
+		{ok,JsonStruct} -> 	 
+			NumberOfSubscribers = lib_json:get_field(JsonStruct, "_source.nr_subscribers") + 1, 
+				UpdateJson = "{\"script\" :\"{ctx._source.nr_subscribers = nr_subscribers; ctx._source.subscribers += subscriber};\",
+								\"params\":{\"nr_subscribers\":"++integer_to_list(NumberOfSubscribers)++",\"subscriber\":{ \"user_id\":\""++UserId++"\"}}}",
+			case api_help:update_doc(?INDEX, "stream",StreamId, UpdateJson,[]) of 
+					{error, {Code, Body}} -> {error, {Code, Body}};
+					{ok, _} -> 	ok
+			end
 	end.
 
+
+	%% @doc
+%% Function: remove_subscriber/2
+%% Purpose: Used to remove a new subscriber to a stream 
+%%          in ES
+%%
+%% @end
+-spec remove_subscriber(StreamId::string(), UserId::string()) -> ok | {error, no_model}. 
+
+remove_subscriber(StreamId, UserId) ->
+	case erlastic_search:get_doc(?INDEX, "stream", StreamId) of 
+		{error, {Code, Body}} -> {error, {Code, Body}};
+		{ok,JsonStruct} -> 	 
+			NumberOfSubscribers = lib_json:get_field(JsonStruct, "_source.nr_subscribers") - 1, 
+				UpdateJson = "{\"script\" :\"{ctx._source.nr_subscribers = nr_subscribers; ctx._source.subscribers.remove(subscriber)};\",
+								\"params\":{\"nr_subscribers\":"++integer_to_list(NumberOfSubscribers)++",\"subscriber\":{ \"user_id\":\""++UserId++"\"}}}",
+			case api_help:update_doc(?INDEX, "stream",StreamId, UpdateJson,[]) of 
+					{error, {Code, Body}} -> {error, {Code, Body}};
+					{ok, _} -> 	ok
+			end
+	end.
 
 %% @doc
 %% Function: process_post/2
@@ -305,7 +443,7 @@ get_user(ReqData, State) ->
                     end;
                 Id ->
 				    %% Get specific user
-					case erlastic_search:get_doc(?INDEX, "user", Id) of
+					case erlastic_search:get_doc(?INDEX, "user", string:to_lower(Id)) of
 						{error, {Code1, Body1}} -> 
 							ErrorString1 = api_help:generate_error(Body1, Code1),
 							{{halt, Code1}, wrq:set_resp_body(ErrorString1, ReqData), State};
@@ -380,4 +518,5 @@ id_from_path(RD) ->
 add_server_side_fields(Json) ->
 
         lib_json:add_values(Json,[
-            {rankings, "[]"}]).
+            {rankings, "[]"},
+            {subscriptions, "[]"}]).

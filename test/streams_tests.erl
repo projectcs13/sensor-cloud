@@ -460,7 +460,7 @@ post_stream_with_parser_test()->
 	api_help:refresh().
 
 
-%% @doc
+	%% @doc
 %% Function: add_multiple_streams_test/0
 %% Purpose: Test the creation of multiple streams in only one json
 %% Returns: ok | {error, term()}
@@ -494,6 +494,62 @@ add_multiple_streams_test() ->
 	?assertEqual(false,lib_json:get_field(Body7,"results[0].ok")),
 	?assertEqual(false,lib_json:get_field(Body7,"results[1].ok")),
 	api_help:refresh().
+
+%% @doc
+%% Function: subscription_test/0
+%% Purpose: Test the subscription of streams 
+%% Returns: ok | {error, term()}
+%% @end
+-spec subscription_test() -> ok | {error, term()}.
+subscription_test() ->
+
+	{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} = httpc:request(post, {?WEBMACHINE_URL++"/users", [], "application/json", "{\"username\":\"subsUser\"}"}, [], []),
+	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(post, {?WEBMACHINE_URL++"/users", [], "application/json", "{\"username\":\"subsUser2\"}"}, [], []),
+	api_help:refresh(),
+	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {?WEBMACHINE_URL++"/streams", [], "application/json", "{\"name\":\"subsStream\",\"user_id\" : \"subsUser2\",\"private\":\"true\"}"}, [], []),
+	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {?WEBMACHINE_URL++"/streams", [], "application/json", "{\"name\":\"subsStream2\",\"user_id\" : \"subsUser2\",\"private\":\"true\"}"}, [], []),
+	api_help:refresh(),
+
+	StrId1 = lib_json:get_field(Body1,"_id"),
+	StrId2 = lib_json:get_field(Body2,"_id"),
+
+	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(put, {?WEBMACHINE_URL++"/users/subsUser/_subscribe",[], "application/json", "{\"stream_id\":\""++ lib_json:to_string(StrId1) ++"\"}"}, [], []),
+	{ok, {{_Version5, 200, _ReasonPhrase5}, _Headers5, Body5}} = httpc:request(get, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(StrId1), []}, [], []),
+
+	api_help:refresh(),
+
+	?assertEqual("subsuser",binary_to_list(lib_json:get_field(Body5,"subscribers[0].user_id"))),
+
+	{ok, {{_Version6, 200, _ReasonPhrase6}, _Headers6, Body6}} = httpc:request(put, {?WEBMACHINE_URL++"/users/subsUser2/_subscribe",[], "application/json", "{\"stream_id\":\""++ lib_json:to_string(StrId1) ++"\"}"}, [], []),
+	{ok, {{_Version7, 200, _ReasonPhrase7}, _Headers7, Body7}} = httpc:request(get, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(StrId1), []}, [], []),
+
+	api_help:refresh(),
+
+	?assertEqual("subsuser2",binary_to_list(lib_json:get_field(Body7,"subscribers[1].user_id"))),
+
+
+	{ok, {{_Version8, 200, _ReasonPhrase8}, _Headers8, Body8}} = httpc:request(put, {?WEBMACHINE_URL++"/users/subsUser/_unsubscribe",[], "application/json", "{\"stream_id\":\""++ lib_json:to_string(StrId1) ++"\"}"}, [], []),
+	{ok, {{_Version9, 200, _ReasonPhrase9}, _Headers9, Body9}} = httpc:request(get, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(StrId1), []}, [], []),
+
+	api_help:refresh(),
+
+	?assertEqual("subsuser2",binary_to_list(lib_json:get_field(Body9,"subscribers[0].user_id"))),
+
+	{ok, {{_Version10, 200, _ReasonPhrase10}, _Headers10, Body10}} = httpc:request(delete, {?WEBMACHINE_URL++"/users/subsUser2/streams", []}, [], []),
+	{ok, {{_Version11, 200, _ReasonPhrase11}, _Headers11, Body11}} = httpc:request(get, {?WEBMACHINE_URL++"/users/subsUser2" , []}, [], []),
+
+	api_help:refresh(),
+
+	?assertEqual([],lib_json:get_field(Body11,"subscriptions")).
+
+
+
+
+
+
+
+
+
 
 
 %% @doc
