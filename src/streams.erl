@@ -279,54 +279,6 @@ process_post(ReqData, State) ->
 	    process_search_post(ReqData,State)	
     end.
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 %% @doc
 %% Function: multi_json_streams/4
 %% Purpose: Used to create multiple streams from a json
