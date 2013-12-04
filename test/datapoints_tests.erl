@@ -88,7 +88,7 @@ no_timestamp_test() ->
 %% @end
 -spec update_stream_fields_test() -> ok | {error, term()}.
 update_stream_fields_test() ->
-	{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} = httpc:request(post, {?WEBMACHINE_URL++ "/users", [],"application/json", "{\"username\" : \"search\"}"}, [], []),
+	{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} = httpc:request(post, {?WEBMACHINE_URL++ "/users", [],"application/json", "{\"username\" : \"update_stream_user\"}"}, [], []),
 	UserId = lib_json:get_field(Body,"_id"),
 	api_help:refresh(),
 	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {?WEBMACHINE_URL++"/streams", [],"application/json", "{\"name\" : \"search\",\"user_id\" : \"search\", \"private\" : \"false\"}"}, [], []),
