@@ -1,4 +1,4 @@
-%% @author Anders Steinrud, Gabriel Tholsgård
+%% @author Anders Steinrud, Gabriel Tholsgård <gath5951@student.uu.se>
 %%   [www.csproj13.student.it.uu.se]
 %% @version 1.0
 %% @copyright [Copyright information]
@@ -198,6 +198,8 @@ send(Channel, Exchange, Message) ->
 	amqp_channel:cast(Channel,
 					  #'basic.publish'{exchange = Exchange},
 					  #amqp_msg{payload = Message}).
+
+
 
 
 

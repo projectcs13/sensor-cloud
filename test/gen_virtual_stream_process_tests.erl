@@ -8,7 +8,7 @@
 %%
 %% @end
 
--module(virtual_stream_process_tests).
+-module(gen_virtual_stream_process_tests).
 
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("amqp_client.hrl").
@@ -31,7 +31,13 @@
 %% ====================================================================
 
 
-
+%% virtual_stream_process_test_/0
+%% ====================================================================
+%% @doc
+%% Function: virtual_stream_process_test_/0
+%% Purpose: Runs all the tests with extended timeouts
+%% @end
+%% ====================================================================
 virtual_stream_process_test_() ->
 	S = fun() -> ok end,
 	C = fun(_) -> ok end,
@@ -52,13 +58,11 @@ virtual_stream_process_test_() ->
 %% @end
 -spec start_and_terminate(_) -> ok | {error, term()}.
 start_and_terminate(_) ->
-	Pid = spawn(virtual_stream_process, create, ["1", [], "test"]),
+	{ok, Pid} = gen_virtual_stream_process:start_link("1", [], sum),
 	Info1 = is_process_alive(Pid),
-	%%?assertNotEqual(undefined, process_info(Pid)),
 	Pid ! quit,
 	timer:sleep(1500),
 	Info2 = is_process_alive(Pid),
-	%%?assertEqual(undefined, process_info(Pid)).
 	[?_assertEqual(true, Info1),
 	 ?_assertEqual(false, Info2)].
 
@@ -322,7 +326,8 @@ create_a_stream_on_index(Index) ->
 		List :: [{Type :: string(), Id :: string()}],
 		Func :: string()) -> Pid :: pid().
 create_virtual_stream(VStreamId, List, Func) ->
-	spawn(virtual_stream_process, create, [VStreamId, List, Func]).
+	{ok, Pid} = gen_virtual_stream_process:start_link(VStreamId, List, Func),
+	Pid.
 
 
 
