@@ -262,8 +262,7 @@ process_post(ReqData, State) ->
 							    %% change ends
 						    end;		      
 						{error, {404, _}} ->
-						    Error = lib_json:set_attr(error, binary:list_to_bin("User: "++UserId++" was not found.")),
-						    {{halt,403}, wrq:set_resp_body(Error, ReqData), State};
+						    {{halt,403}, wrq:set_resp_body("Incorrect or mising user_id.", ReqData), State};
 						{error, {Code2, Body2}} ->
 							ErrorString = api_help:generate_error(Body2, Code2),
 							{{halt, Code2}, wrq:set_resp_body(ErrorString, ReqData), State}
