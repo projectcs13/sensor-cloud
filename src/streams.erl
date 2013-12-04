@@ -97,12 +97,12 @@ content_types_accepted(ReqData, State) ->
 delete_resource(ReqData, State) ->
 	case {proplists:get_value('user', wrq:path_info(ReqData)),proplists:get_value('stream', wrq:path_info(ReqData))} of
 		{UserId,undefined} ->
-			case users:delete_streams_with_user_id(UserId) of
+			case users:delete_streams_with_user_id(string:to_lower(UserId)) of
 				{error, {Code, Body}} -> 
 					ErrorString = api_help:generate_error(Body, Code),
 					{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 				{ok} ->
-					{true,wrq:set_resp_body("{\"message\":\"All streams with user_id:" ++UserId++" are now deleted\"}",ReqData),State}
+					{true,wrq:set_resp_body("{\"message\":\"All streams with user_id:" ++string:to_lower(UserId)++" are now deleted\"}",ReqData),State}
 			end;
 		{_,Id} ->
 			case delete_data_points_with_stream_id(Id) of 
@@ -173,7 +173,7 @@ process_post(ReqData, State) ->
 			undefined ->
 			    UserAdded = Stream;
 			UId ->
-			    UserAdded = api_help:add_field(Stream,"user_id",UId)
+			    UserAdded = api_help:add_field(Stream,"user_id",string:to_lower(UId))
 		    end,
 		    case lib_json:get_field(UserAdded,"user_id") of
 			undefined -> {false, wrq:set_resp_body("\"user_id missing\"",ReqData), State};
@@ -293,7 +293,7 @@ multi_json_streams([Head|Rest], ReqData ,State, Response) ->
 		undefined ->
 			UserAdded = Head;
 		UId ->
-			UserAdded = api_help:add_field(Head,"user_id",UId)
+			UserAdded = api_help:add_field(Head,"user_id",string:to_lower(UId))
 	end,
 	case Response of
 		[] ->
@@ -426,7 +426,7 @@ process_search_post(ReqData, State) ->
                 undefined ->
                         FilteredJson = filter_json(Json, From, Size);
                 UserId ->
-                        ResQuery = "\"user_id\":" ++ UserId,
+                        ResQuery = "\"user_id\":" ++ string:to_lower(UserId),
                         FilteredJson = filter_json(Json, ResQuery, From, Size)
         end,
         case erlastic_search:search_json(#erls_params{},?INDEX, "stream", FilteredJson) of % Maybe wanna take more
@@ -459,7 +459,7 @@ process_search_get(ReqData, State) ->
 			UserQuery = [],
 			UserDef = false;
 		UserId ->
-			UserQuery = "user_id:" ++ UserId,
+			UserQuery = "user_id:" ++ string:to_lower(UserId),
 			UserDef = true
 		end,
 	FullQuery = lists:append(api_help:transform(URIQuery,UserDef),UserQuery),
@@ -648,7 +648,7 @@ get_stream(ReqData, State) ->
 							UserQuery = [],
 							UserDef = false;
 						UserId ->
-							UserQuery = "\"user_id\":\"" ++ UserId ++ "\"",
+							UserQuery = "\"user_id\":\"" ++ string:to_lower(UserId) ++ "\"",
 							UserDef = true
 					end,
 					case UserDef of
