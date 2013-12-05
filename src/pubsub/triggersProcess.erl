@@ -98,13 +98,14 @@ loop(TriggerId, DataPoints, TriggerExchange, Net, Function, OutputList) ->
         receive
                 {#'basic.deliver'{}, #amqp_msg{payload = Body}} ->
                         Data = binary_to_term(Body),
+						erlang:display(Body),
                         case erlson:is_json_string(Data) of
 							%% New value from the source as a Json
 							true ->
 								Id = binary_to_list(lib_json:get_field(Data, "stream_id")),
 								NewDataPoints =
 									lists:keyreplace(Id, 1, DataPoints, {Id, Data}),
-								
+								erlang:display(NewDataPoints),
 								%% Apply function to the new values
 								TriggerList = apply_function(Function, NewDataPoints, OutputList),
 								%% Create timestamp to avoid issues with asynchronus
@@ -119,7 +120,6 @@ loop(TriggerId, DataPoints, TriggerExchange, Net, Function, OutputList) ->
                                 %% Send to standard output
                                 %% TODO: Parallelize, spawn one process for each Message?
                                 send_to_output(TriggerId, Messages),
-								
 								loop(TriggerId, NewDataPoints, TriggerExchange,Net, Function, OutputList);
 							
 							false ->
@@ -387,7 +387,7 @@ send_to_output(TriggerId, [{Value, Timestamp, StreamId, Input, [{uri,URI}|Rest]}
         {"trigger.trigger_id", list_to_binary(TriggerId)},
         {"trigger.input", Input}]),
     erlang:display(URI),
-    case httpc:request(post, {URI, [],"application/json", Message}, [], []) of
+    case httpc:request(post, {URI, [],"application/json", Message}, [{timeout, 5000}], []) of
         {ok,{{_, 200, _}, _, _}} ->
             ok;
         {ok,{{_, 204, _}, _, _}} ->
@@ -396,7 +396,9 @@ send_to_output(TriggerId, [{Value, Timestamp, StreamId, Input, [{uri,URI}|Rest]}
             erlang:display("ERROR"),
             erlang:display(Body),
             erlang:display(Code),
-            {error, {Code, Body}}
+            {error, {Code, Body}};
+		{error, Reason} ->
+			erlang:display(Reason)
     end,
     send_to_output(TriggerId, [{Value, Timestamp, StreamId, Input, Rest}|Messages]);
 send_to_output(TriggerId, [{Value, Timestamp, StreamId, Input, [_|Rest]}|Messages]) ->
