@@ -10,7 +10,7 @@
 %% @end
 
 -module(triggers).
--export([init/1, allowed_methods/2, content_types_provided/2, content_types_accepted/2, process_post/2,
+-export([init/1, allowed_methods/2, content_types_provided/2, content_types_accepted/2, get_triggers/2, process_post/2,
 		 delete_resource/2]).
 
 
@@ -18,6 +18,7 @@
 -include_lib("erlastic_search.hrl").
 -include("webmachine.hrl").
 -include("field_restrictions.hrl").
+-include("debug.hrl").
 -include_lib("amqp_client.hrl").
 
 %% @doc
@@ -38,12 +39,16 @@ init([]) ->
 
 allowed_methods(ReqData, State) ->
 	case api_help:parse_path(wrq:path(ReqData)) of
-		[{"users", _UserID},{"triggers",_Action}] ->
-			{['POST'], ReqData, State};
-		[{"triggers",_Action}] ->
-			{['POST'], ReqData, State};
-		[error] ->
-		    {[], ReqData, State} 
+	    [{"users", _UserID},{"triggers",_Action}] ->
+		{['POST'], ReqData, State};
+	    [{"users", _UserId},{"triggers"}] ->
+		{['GET'], ReqData, State};
+	    [{"triggers",_Action}] ->
+		{['POST'], ReqData, State};
+	    [{"triggers"}] ->
+		{['GET'], ReqData, State};
+	    [error] ->
+		{[], ReqData, State} 
 	end.
 
 
@@ -75,7 +80,31 @@ content_types_accepted(ReqData, State) ->
 %% Place holder, not sure if we want this to be doable
 
 get_triggers(ReqData, State) ->
-	{"ok",ReqData,State}.
+    case proplists:get_value('userid', wrq:path_info(ReqData)) of
+	undefined ->
+	    {ok, JsonStruct} = erlastic_search:search_json(#erls_params{}, ?INDEX, "trigger", "{}"),		       
+	    {lib_json:get_field(JsonStruct, "hits.hits"), ReqData, State};
+	UserName ->
+	    case erlastic_search:get_doc(?INDEX, "user", UserName) of
+		{error, {Code, Body}} ->
+		    ErrorString = api_help:generate_error(Body, Code),
+		    {{halt, Code} = wrq:set_resp_body(ErrorString, ReqData), State};
+		{ok, JsonStruct} ->
+		    ?DEBUG(poff),
+		    TriggerList = lib_json:get_field(JsonStruct, triggers),			       
+		    case proplists:get_value('stream', wrq:path_info(ReqData)) of
+			undefined ->			    
+			    {lib_json:set_attr(triggers, TriggerList),ReqData, State};
+			StreamId ->
+			    Fun = fun(X) ->
+					  StreamList = lib_json:get_field(X, streams),
+					  lists:member(StreamId, StreamList)
+				  end,
+			    StreamTriggers = lists:filter(Fun, TriggerList),
+			    {lib_json:set_attr(triggers, StreamTriggers),ReqData,State}
+		    end
+	    end
+    end.
 
 
 %% @doc
@@ -240,7 +269,7 @@ add_user(User, ReqData, State) ->
 			  end,
 	Function = case lib_json:get_field(Json, "function") of
 				   undefined ->
-					   error;
+					   "error";
 				   Value2 ->
 					   binary_to_list(Value2)
 			   end,
