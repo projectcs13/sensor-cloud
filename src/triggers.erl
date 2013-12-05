@@ -39,6 +39,8 @@ init([]) ->
 
 allowed_methods(ReqData, State) ->
 	case api_help:parse_path(wrq:path(ReqData)) of
+	    [{"users", _UserID},{"streams",_StreamId},{"triggers"}] ->
+		{['GET'], ReqData, State};
 	    [{"users", _UserID},{"triggers",_Action}] ->
 		{['POST'], ReqData, State};
 	    [{"users", _UserId},{"triggers"}] ->
