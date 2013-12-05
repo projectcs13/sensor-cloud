@@ -493,7 +493,7 @@ process_search(ReqData, State, get) ->
 
 
 %% @doc
-%% Function: id_from_path/2
+%% Function: id_from_path/2 
 %% Purpose: Retrieves the id from the path.
 %% Returns: Id
 %% @end
