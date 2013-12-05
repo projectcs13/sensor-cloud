@@ -204,7 +204,7 @@ delete_streams([StreamId|Rest]) ->
 put_user(ReqData, State) ->
 	case api_help:is_subs(ReqData) or api_help:is_unsubs(ReqData) of 
 		false ->
-		    Id = string:to_lower(id_from_path(ReqData)),
+		    Id = id_from_path(ReqData),
 			{UserJson,_,_} = api_help:json_handler(ReqData, State),
 		    %check if doc already exists
 			case {api_help:do_any_field_exist(UserJson,?RESTRCITEDUPDATEUSERS),api_help:do_only_fields_exist(UserJson,?ACCEPTEDFIELDSUSERS)} of
@@ -226,7 +226,7 @@ put_user(ReqData, State) ->
 			end;
 		true ->
 			erlang:display("SUBSCRIPTION!"),
-			Id = string:to_lower(id_from_path(ReqData)),
+			Id = id_from_path(ReqData),
 			{Json,_,_} = api_help:json_handler(ReqData,State),
 			StreamId = case lib_json:get_field(Json,"stream_id") of 
 							undefined ->
