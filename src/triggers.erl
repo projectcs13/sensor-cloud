@@ -92,7 +92,6 @@ get_triggers(ReqData, State) ->
 		    ErrorString = api_help:generate_error(Body, Code),
 		    {{halt, Code} = wrq:set_resp_body(ErrorString, ReqData), State};
 		{ok, JsonStruct} ->
-		    ?DEBUG(poff),
 		    TriggerList = lib_json:get_field(JsonStruct, triggers),			       
 		    case proplists:get_value('stream', wrq:path_info(ReqData)) of
 			undefined ->			    
