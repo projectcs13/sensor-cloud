@@ -11,6 +11,7 @@
 
 -module(triggers_tests).
 -include_lib("eunit/include/eunit.hrl").
+-include("debug.hrl").
 -include_lib("amqp_client.hrl").
 -export([]).
 
@@ -156,10 +157,10 @@ post_data_exhange_test() ->
 %% Returns: ok | {error, term()}
 %% @end
 post_data_user_test() ->
-	{ok, {{_VersionU1, 200, _ReasonPhraseU1}, _HeadersU1, BodyU1}} = httpc:request(post, {?WEBMACHINE_URL++"/users", [],"application/json", "{\"username\" : \"Tomas\"}"}, [], []),
-	{ok, {{_VersionU2, 200, _ReasonPhraseU2}, _HeadersU2, BodyU2}} = httpc:request(post, {?WEBMACHINE_URL++"/users", [],"application/json", "{\"username\" : \"Erik\"}"}, [], []),
-	User1 = lib_json:to_string(lib_json:get_field(BodyU1,"_id")),
-	User2 = lib_json:to_string(lib_json:get_field(BodyU2,"_id")),
+	User1 = "Tomas",
+	User2 = "Erik",
+    httpc:request(post, {?WEBMACHINE_URL++"/users", [],"application/json", "{\"username\" : \""++User1++"\"}"}, [], []),
+    httpc:request(post, {?WEBMACHINE_URL++"/users", [],"application/json", "{\"username\" : \""++User2++"\"}"}, [], []),
 	api_help:refresh(),
 	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {?WEBMACHINE_URL++"/streams", [],"application/json", "{\"name\" : \"Stream1\",\"user_id\":\"Tomas\"}"}, [], []),
 	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {?WEBMACHINE_URL++"/streams", [],"application/json", "{\"name\" : \"Stream2\",\"user_id\":\"Tomas\"}"}, [], []),
@@ -210,6 +211,68 @@ post_data_user_test() ->
 	?assertEqual(check_all_exist(NotificationList1,ReferenceList1),true),
 	?assertEqual(check_all_exist(NotificationList2,ReferenceList2),true).
 
+
+list_triggers_test_() ->
+    Descript1 = "Testing listing of triggers",
+    Setup1 = 
+	fun() ->
+		UserId1 = "tommy",
+		%% Create users
+		httpc:request(post,{?WEBMACHINE_URL++"/users",[],"application/json","{\"username\":\""++UserId1++"\"}"},[],[]),
+		%% Create streams
+		{ok,{{_,200,_},_,Body1}} = 
+		    httpc:request(post,{?WEBMACHINE_URL++"/streams",[],"application/json",
+					"{\"name\":\"Stream1\",\"user_id\":\""++UserId1++"\"}"},[],[]),
+		{ok,{{_,200,_},_,Body2}} = 
+		    httpc:request(post,{?WEBMACHINE_URL++"/streams",[],"application/json",
+					"{\"name\":\"Stream2\",\"user_id\":\""++UserId1++"\"}"},[],[]),
+		api_help:refresh(),
+		StreamId1 = lib_json:to_string(lib_json:get_field(Body1,"_id")),
+		StreamId2 = lib_json:to_string(lib_json:get_field(Body2,"_id")),
+		%% Create a trigger
+		{ok,{{_,200,_},_,_}} = httpc:request(post,{?WEBMACHINE_URL++"/users/"++UserId1++"/triggers/add",[],
+							       "application/json",
+							       "{\"function\" : \"less_than\",\"input\":5,\"streams\":[\"" 
+							       ++ StreamId1 ++ "\",\""++StreamId2 ++"\"]}"}, [], []),
+		{ok,{{_,200,_},_,_}} = httpc:request(post,{?WEBMACHINE_URL++"/users/"++UserId1++"/triggers/add",[],
+							       "application/json",
+							       "{\"function\" : \"less_than\",\"input\":4,\"streams\":\"" 
+							       ++ StreamId2 ++"\"}"}, [], []),
+		api_help:refresh(),
+		{UserId1, StreamId1, StreamId2}
+	end,
+    Cleanup1 =
+	fun({UserId1, StreamId1, StreamId2}) ->
+		{ok,{{_,200,_},_,_}} = httpc:request(post,{?WEBMACHINE_URL++"/users/"++UserId1++"/triggers/remove",[],
+							       "application/json",
+							       "{\"function\" : \"less_than\",\"input\":5,\"streams\":[\"" 
+							       ++ StreamId1 ++ "\",\""++StreamId2 ++"\"]}"}, [], []),
+		{ok,{{_,200,_},_,_}} = httpc:request(post,{?WEBMACHINE_URL++"/users/"++UserId1++"/triggers/remove",[],
+							       "application/json",
+							       "{\"function\" : \"less_than\",\"input\":4,\"streams\":\"" 
+							       ++StreamId2 ++"\"}"}, [], []),
+		{ok,{{_,200,_},_,_}} = httpc:request(delete,{?WEBMACHINE_URL++"/streams/"++StreamId1,[]},[],[]),
+		{ok,{{_,200,_},_,_}} = httpc:request(delete,{?WEBMACHINE_URL++"/streams/"++StreamId2,[]},[],[]),
+		{ok,{{_,200,_},_,_}} = httpc:request(delete,{?WEBMACHINE_URL++"/users/"++UserId1,[]},[],[])
+	end,
+    Tests1 = fun list_triggers/1,
+    {Descript1,{setup, Setup1, Cleanup1, Tests1}}.
+
+
+list_triggers({UserId1, StreamId1, StreamId2}) ->
+    {ok,{{_,200,_},_,Body1}} = httpc:request(get, {?WEBMACHINE_URL++"/users/"++UserId1++"/triggers", []}, [], []),
+    {ok,{{_,200,_},_,Body2}} = httpc:request(get, {?WEBMACHINE_URL++"/users/"++UserId1++"/streams/"
+							    ++StreamId2++"/triggers", []}, [], []),
+    {ok,{{_,200,_},_,Body3}} = httpc:request(get, {?WEBMACHINE_URL++"/users/"++UserId1++"/streams/"
+							    ++StreamId1++"/triggers", []}, [], []),
+    Result1 = 
+	"{\"triggers\":[{\"function\":\"less_than\",\"input\":5,\"streams\":[\""++StreamId1++"\",\""++StreamId2++"\"]},"
+	"{\"function\":\"less_than\",\"input\":4,\"streams\":[\""++StreamId2++"\"]}]}",
+    Result2 = "{\"triggers\":[{\"function\":\"less_than\",\"input\":5,\"streams\":[\""++StreamId1++"\"]}]}",
+    [?_assertEqual(Result1, Body1),
+     ?_assertEqual(Result1, Body2),
+     ?_assertEqual(Result2, Body3)].
+    
 
 %% @doc
 %% Function: post_data_test/0
