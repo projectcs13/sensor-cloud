@@ -380,4 +380,4 @@ id_from_path(RD) ->
 add_server_side_fields(Json) ->
 
         lib_json:add_values(Json,[
-            {rankings, "[]"}]).
+            {rankings, "[]"},{notifications,"[]"},{triggers,"[]"}]).

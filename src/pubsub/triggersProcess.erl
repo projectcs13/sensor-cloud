@@ -107,7 +107,6 @@ loop(TriggerId, DataPoints, TriggerExchange, Net, Function, OutputList) ->
 								
 								%% Apply function to the new values
 								TriggerList = apply_function(Function, NewDataPoints, OutputList),
-								erlang:display(TriggerList),
 								%% Create timestamp to avoid issues with asynchronus
 								%% datapoints.
 								Timestamp = ?TIME_NOW(erlang:localtime()),
@@ -373,7 +372,6 @@ send_to_output(TriggerId, [{Value, Timestamp, StreamId, Input, [{user,UserId}|Re
         {"trigger.trigger_id", list_to_binary(TriggerId)},
         {"trigger.input", Input}]),
     UpdateJson = "{\"script\":\"ctx._source.notifications += msg\",\"params\":{\"msg\":"++ Message ++"}}",
-    erlang:display(UpdateJson),
     case api_help:update_doc(?INDEX, "user", UserId, UpdateJson, []) of
         {error, {Code, Body}} ->
             {error, {Code, Body}};
