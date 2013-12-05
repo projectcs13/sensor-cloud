@@ -91,13 +91,13 @@ get_triggers(ReqData, State) ->
 		    {{halt, Code} = wrq:set_resp_body(ErrorString, ReqData), State};
 		{ok, JsonStruct} ->
 		    TriggerList = lib_json:get_field(JsonStruct, "_source.triggers"),			       
-		    case proplists:get_value('stream', wrq:path_info(ReqData)) of
+		    case proplists:get_value('streamid', wrq:path_info(ReqData)) of
 			undefined ->			    
 			    {lib_json:set_attr(triggers, TriggerList),ReqData, State};
 			StreamId ->
 			    Fun = fun(X) ->
 					  StreamList = lib_json:get_field(X, streams),
-					  lists:member(StreamId, StreamList)
+					  lists:member(binary:list_to_bin(StreamId), StreamList)
 				  end,
 			    StreamTriggers = lists:filter(Fun, TriggerList),
 			    {lib_json:set_attr(triggers, StreamTriggers),ReqData,State}
@@ -508,7 +508,8 @@ remove_user(User, ReqData, State) ->
 			   {ok,JsonStruct} ->
 				   erlang:display(binary_to_list(iolist_to_binary(lib_json:encode(JsonStruct)))),
 				   case lib_json:get_field(JsonStruct, "hits.total") of
-					   0 -> error;
+					   0 -> ?DEBUG(poff), 
+						error;
 					   1 -> lib_json:get_field(JsonStruct, "hits.hits[0]._id");
 					   X -> get_es_id(lib_json:get_field(JsonStruct, "hits.hits"),Streams)
 				   end

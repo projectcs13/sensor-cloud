@@ -97,10 +97,10 @@ create_delete_test() ->
 %% Returns: ok | {error, term()}
 %% @end
 post_data_exhange_test() ->
-	{ok, {{_VersionU1, 200, _ReasonPhraseU1}, _HeadersU1, BodyU1}} = httpc:request(post, {?WEBMACHINE_URL++"/users", [],"application/json", "{\"username\" : \"Tomas\"}"}, [], []),
-	{ok, {{_VersionU2, 200, _ReasonPhraseU2}, _HeadersU2, BodyU2}} = httpc:request(post, {?WEBMACHINE_URL++"/users", [],"application/json", "{\"username\" : \"Erik\"}"}, [], []),
-	User1 = lib_json:to_string(lib_json:get_field(BodyU1,"_id")),
-	User2 = lib_json:to_string(lib_json:get_field(BodyU2,"_id")),
+	User1 = "tomas",
+	User2 = "erik",
+        httpc:request(post, {?WEBMACHINE_URL++"/users", [],"application/json", "{\"username\" : \"Tomas\"}"}, [], []),
+        httpc:request(post, {?WEBMACHINE_URL++"/users", [],"application/json", "{\"username\" : \"Erik\"}"}, [], []),
 	api_help:refresh(),
 	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {?WEBMACHINE_URL++"/streams", [],"application/json", "{\"name\" : \"Stream1\",\"user_id\":\"Tomas\"}"}, [], []),
 	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {?WEBMACHINE_URL++"/streams", [],"application/json", "{\"name\" : \"Stream2\",\"user_id\":\"Tomas\"}"}, [], []),
@@ -157,8 +157,8 @@ post_data_exhange_test() ->
 %% Returns: ok | {error, term()}
 %% @end
 post_data_user_test() ->
-	User1 = "Tomas",
-	User2 = "Erik",
+	User1 = "tomas",
+	User2 = "erik",
     httpc:request(post, {?WEBMACHINE_URL++"/users", [],"application/json", "{\"username\" : \""++User1++"\"}"}, [], []),
     httpc:request(post, {?WEBMACHINE_URL++"/users", [],"application/json", "{\"username\" : \""++User2++"\"}"}, [], []),
 	api_help:refresh(),
@@ -244,9 +244,9 @@ list_triggers_test_() ->
     Cleanup1 =
 	fun({UserId1, StreamId1, StreamId2}) ->
 		{ok,{{_,200,_},_,_}} = httpc:request(post,{?WEBMACHINE_URL++"/users/"++UserId1++"/triggers/remove",[],
-							       "application/json",
-							       "{\"function\" : \"less_than\",\"input\":5,\"streams\":[\"" 
-							       ++ StreamId1 ++ "\",\""++StreamId2 ++"\"]}"}, [], []),
+							   "application/json",
+							   "{\"function\" : \"less_than\",\"input\":5,\"streams\":[\"" 
+							   ++ StreamId1 ++ "\",\""++StreamId2 ++"\"]}"}, [], []),
 		{ok,{{_,200,_},_,_}} = httpc:request(post,{?WEBMACHINE_URL++"/users/"++UserId1++"/triggers/remove",[],
 							       "application/json",
 							       "{\"function\" : \"less_than\",\"input\":4,\"streams\":\"" 
@@ -268,7 +268,7 @@ list_triggers({UserId1, StreamId1, StreamId2}) ->
     Result1 = 
 	"{\"triggers\":[{\"function\":\"less_than\",\"input\":5,\"streams\":[\""++StreamId1++"\",\""++StreamId2++"\"]},"
 	"{\"function\":\"less_than\",\"input\":4,\"streams\":[\""++StreamId2++"\"]}]}",
-    Result2 = "{\"triggers\":[{\"function\":\"less_than\",\"input\":5,\"streams\":[\""++StreamId1++"\"]}]}",
+    Result2 = "{\"triggers\":[{\"function\":\"less_than\",\"input\":5,\"streams\":[\""++StreamId1++"\",\""++StreamId2++"\"]}]}",
     [?_assertEqual(Result1, Body1),
      ?_assertEqual(Result1, Body2),
      ?_assertEqual(Result2, Body3)].
