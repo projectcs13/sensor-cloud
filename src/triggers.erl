@@ -288,7 +288,7 @@ add_user(User, ReqData, State) ->
 			  end,
 	Function = case lib_json:get_field(Json, "function") of
 				   undefined ->
-					   "error";
+					   error;
 				   Value2 ->
 					   binary_to_list(Value2)
 			   end,
