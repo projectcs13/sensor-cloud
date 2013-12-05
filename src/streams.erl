@@ -151,7 +151,7 @@ delete_stream_id_from_subscriptions(StreamId,[]) ->
 	ok;
 delete_stream_id_from_subscriptions(StreamId, [Head|Rest]) ->
 	case lib_json:get_field(Head, "user_id") of 
-		[] ->
+		undefined ->
 			error;
 		UserId ->
 			case erlastic_search:get_doc(?INDEX, "user", UserId) of
