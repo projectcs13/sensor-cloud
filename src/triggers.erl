@@ -47,8 +47,6 @@ allowed_methods(ReqData, State) ->
 		{['GET'], ReqData, State};
 	    [{"triggers",_Action}] ->
 		{['POST'], ReqData, State};
-	    [{"triggers"}] ->
-		{['GET'], ReqData, State};
 	    [error] ->
 		{[], ReqData, State} 
 	end.
@@ -85,14 +83,15 @@ get_triggers(ReqData, State) ->
     case proplists:get_value('userid', wrq:path_info(ReqData)) of
 	undefined ->
 	    {ok, JsonStruct} = erlastic_search:search_json(#erls_params{}, ?INDEX, "trigger", "{}"),		       
-	    {lib_json:get_field(JsonStruct, "hits.hits"), ReqData, State};
+	    {lib_json:set_attr(error, "need to supply a username"), ReqData, State};
 	UserName ->
 	    case erlastic_search:get_doc(?INDEX, "user", UserName) of
 		{error, {Code, Body}} ->
 		    ErrorString = api_help:generate_error(Body, Code),
 		    {{halt, Code} = wrq:set_resp_body(ErrorString, ReqData), State};
 		{ok, JsonStruct} ->
-		    TriggerList = lib_json:get_field(JsonStruct, triggers),			       
+		    ?DEBUG(lib_json:to_string(JsonStruct)),
+		    TriggerList = lib_json:get_field(JsonStruct, "_source.triggers"),			       
 		    case proplists:get_value('stream', wrq:path_info(ReqData)) of
 			undefined ->			    
 			    {lib_json:set_attr(triggers, TriggerList),ReqData, State};
