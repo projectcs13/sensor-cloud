@@ -139,12 +139,40 @@ is_search(ReqData) ->
 
 	%% @doc
 %% Function: is_rank/1
-%% Purpose: Used to decide if the URI specifie a rank request
+%% Purpose: Used to decide if the URI specify a rank request
 %% Returns: True if URI specifies a rank request, false otherwise
 %% @end
 -spec is_rank(ReqData::term()) -> boolean().
 is_rank(ReqData) ->
 	case string:str(wrq:path(ReqData),"_rank") of
+		0 ->
+			false;
+		_ ->
+			true
+	end.
+
+%% @doc
+%% Function: is_subs/1
+%% Purpose: Used to decide if the URI specify a subs request
+%% Returns: True if URI specifies a subs request, false otherwise
+%% @end
+-spec is_subs(ReqData::term()) -> boolean().
+is_subs(ReqData) ->
+	case string:str(wrq:path(ReqData),"_subscribe") of
+		0 ->
+			false;
+		_ ->
+			true
+	end.
+
+	%% @doc
+%% Function: is_unsubs/1
+%% Purpose: Used to decide if the URI specify a unsubs request
+%% Returns: True if URI specifies a unsubs request, false otherwise
+%% @end
+-spec is_unsubs(ReqData::term()) -> boolean().
+is_unsubs(ReqData) ->
+	case string:str(wrq:path(ReqData),"_unsubscribe") of
 		0 ->
 			false;
 		_ ->
