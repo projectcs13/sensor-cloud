@@ -638,7 +638,7 @@ get_es_id([First|Rest],Streams) ->
 %%          document contains only the streams in the list
 %%          and no more, false otherwise
 %% @end
--spec matches_exactly(DocumentStreamsList::list(),StreamsList::string()) -> bool().
+-spec matches_exactly(DocumentStreamsList::list(),StreamsList::string()) -> boolean().
 
 matches_exactly([],[]) ->
 	true;
