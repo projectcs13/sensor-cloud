@@ -94,7 +94,7 @@ process_post(ReqData, State) ->
 				undefined ->
 					add_uri(ReqData, State);
 				User ->
-					add_user(User,ReqData,State)
+					add_user(string:to_lower(User),ReqData,State)
 			end;
 		_ ->
 			{true,ReqData,State}
@@ -115,7 +115,7 @@ delete_resource(ReqData, State) ->
 				undefined ->
 					remove_uri(ReqData, State);
 				User ->
-					remove_user(User,ReqData,State)
+					remove_user(string:to_lower(User),ReqData,State)
 	end.
 
 
@@ -236,17 +236,7 @@ add_uri(ReqData, State) ->
 -spec add_user(User::string(),ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 
 add_user(User, ReqData, State) ->
-	Username = case erlastic_search:search_limit(?INDEX, "user", "username="++User,500) of
-	   {error, {Code9, Body9}} -> 
-		   {error, {Code9, Body9}};
-	   {ok,Response} ->
-		   case lib_json:get_field(Response, "hits.hits[0]._id") of
-			   Uid when is_binary(Uid) ->
-				   binary_to_list(Uid);
-			   _Error ->
-				   error
-		   end
-	end,
+	Username = User,
 	{Json,_,_} = api_help:json_handler(ReqData, State),
 	Input = lib_json:get_field(Json, "input"),
 	Streams = case lib_json:get_field(Json, "streams") of
@@ -465,17 +455,7 @@ remove_uri(ReqData, State) ->
 -spec remove_user(User::string(),ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 
 remove_user(User, ReqData, State) ->
-	Username = case erlastic_search:search_limit(?INDEX, "user", "username="++User,500) of
-				   {error, {Code9, Body9}} -> 
-					   {error, {Code9, Body9}};
-				   {ok,Response} ->
-					   case lib_json:get_field(Response, "hits.hits[0]._id") of
-						   Uid when is_binary(Uid) ->
-							   binary_to_list(Uid);
-						   _Error ->
-							   error
-					   end
-			   end,
+	Username = User,
 	{Json,_,_} = api_help:json_handler(ReqData, State),
 	Input = lib_json:get_field(Json, "input"),
 	Streams = case lib_json:get_field(Json, "streams") of
