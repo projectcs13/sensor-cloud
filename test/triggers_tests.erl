@@ -34,7 +34,7 @@ init_test() ->
 %% Purpose: Test the process_post and delete_resource functions by doing some HTTP requests
 %% Returns: ok | {error, term()}
 %% @end
-create_delete_test() ->
+create_delete_test() -> 
 	%% Create
 	{ok, {{_VersionU1, 200, _ReasonPhraseU1}, _HeadersU1, BodyU1}} = httpc:request(post, {?WEBMACHINE_URL++"/users", [],"application/json", "{\"username\" : \"Tomas\"}"}, [], []),
 	api_help:refresh(),
