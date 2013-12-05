@@ -76,22 +76,24 @@ handle_info({print, Message}, _State)->
 %% @end
 -spec handle_cast(Request :: term(), PollersInfo :: list()) -> {noreply, NewState :: list()}.
 handle_cast({create_poller, #pollerInfo{stream_id = StreamId, name = StreamName, uri = Uri, frequency = Frequency}}, PollersInfo)->
-	case {is_list(StreamId), is_list(Uri), is_integer(Frequency)} of
-		{true, true, true}->
+	case {is_list(StreamId), is_list(Uri), is_integer(Frequency), Frequency>0} of
+		{true, true, true, true}->
 			Parser = poll_help:get_parser_by_id(StreamId),
 			
 			{ok, Pid}=supervisor:start_child(polling_monitor, [#state{stream_id=StreamId, uri=Uri, parser=Parser}]),
 			%%use timer library to create scheduler for this poller
 			timer:start(),
-			{ok, TRef} = timer:send_interval(Frequency, Pid, {probe}),
+			{ok, TRef} = timer:send_interval((Frequency*1000), Pid, {probe}),
 			Record = #pollerInfo{stream_id=StreamId, name=StreamName, uri=Uri, frequency=Frequency, pid=Pid, timer_ref=TRef},
 			{noreply, [Record|PollersInfo]};
-		{false, _, _}->erlang:display("create_poller: please provide a string stream id!"),
-					   {noreply, PollersInfo};
-		{_, false, _}->erlang:display("create_poller: please provide a string uri!"),
-					   {noreply, PollersInfo};
-		{_, _, false}->erlang:display("create_poller: please provide a integer frequency!"),
-					   {noreply, PollersInfo}
+		{false, _, _, _}->erlang:display("create_poller: please provide a string stream id!"),
+					      {noreply, PollersInfo};
+		{_, false, _, _}->erlang:display("create_poller: please provide a string uri!"),
+					      {noreply, PollersInfo};
+		{_, _, false, _}->erlang:display("create_poller: please provide a integer frequency!"),
+					   	  {noreply, PollersInfo};
+		{_, _, _, false}->erlang:display("create_poller: please provide a positive frequency value!"),
+						  {noreply, PollersInfo}
 	end;
 handle_cast({terminate, StreamId}, PollersInfo)->
 	Poller = find_poller_by_id(StreamId, PollersInfo),
@@ -133,7 +135,7 @@ handle_call({rebuild, StreamId}, _Form, PollersInfo)->
 		_ ->
 			{update, StreamId, NewUri, NewFreq} = gen_server:call(Poller#pollerInfo.pid, {rebuild}),
 			{ok,  cancel} = timer:cancel(Poller#pollerInfo.timer_ref),
-			{ok, NewTRef} = timer:send_interval(NewFreq, Poller#pollerInfo.pid, {probe}), 
+			{ok, NewTRef} = timer:send_interval((NewFreq*1000), Poller#pollerInfo.pid, {probe}), 
 			%%change the url of the poller information stored
 			NewPollersInfo = update_info(PollersInfo, StreamId, NewUri, NewTRef)
 	end,

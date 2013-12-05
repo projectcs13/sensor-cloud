@@ -18,6 +18,7 @@
 -include("webmachine.hrl").
 -include("poller.hrl").
 -include("field_restrictions.hrl").
+-include("debug.hrl").
 
 %% @doc
 %% Function: init/1
@@ -96,12 +97,12 @@ content_types_accepted(ReqData, State) ->
 delete_resource(ReqData, State) ->
 	case {proplists:get_value('user', wrq:path_info(ReqData)),proplists:get_value('stream', wrq:path_info(ReqData))} of
 		{UserId,undefined} ->
-			case users:delete_streams_with_user_id(UserId) of
+			case users:delete_streams_with_user_id(string:to_lower(UserId)) of
 				{error, {Code, Body}} -> 
 					ErrorString = api_help:generate_error(Body, Code),
 					{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 				{ok} ->
-					{true,wrq:set_resp_body("{\"message\":\"All streams with user_id:" ++UserId++" are now deleted\"}",ReqData),State}
+					{true,wrq:set_resp_body("{\"message\":\"All streams with user_id:" ++string:to_lower(UserId)++" are now deleted\"}",ReqData),State}
 			end;
 		{_,Id} ->
 			case delete_data_points_with_stream_id(Id) of 
@@ -162,66 +163,193 @@ delete_data_points_with_stream_id(Id) ->
 %% successful and false otherwise.
 %% @end
 -spec process_post(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
-
 process_post(ReqData, State) ->
-	case api_help:is_search(ReqData) of 
-		false ->
-			{Stream,_,_} = api_help:json_handler(ReqData, State),
-			case proplists:get_value('user', wrq:path_info(ReqData)) of
-				undefined ->
-					UserAdded = Stream;
-				UId ->
-					UserAdded = api_help:add_field(Stream,"user_id",UId)
-			end,
-			case lib_json:get_field(UserAdded,"user_id") of
-				undefined -> {false, wrq:set_resp_body("\"user_id missing\"",ReqData), State};
-				UserId ->
-					case {api_help:do_any_field_exist(UserAdded,?RESTRCITEDCREATESTREAMS),api_help:do_only_fields_exist(UserAdded,?ACCEPTEDFIELDSSTREAMS)} of
-						{true,_} ->
-							ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDCREATESTREAMS),
-							ResFields2 = string:sub_string(ResFields1, 1, length(ResFields1)-2),
-							{{halt,409}, wrq:set_resp_body("{\"error\":\"Error caused by restricted field in document, these fields are restricted : " ++ ResFields2 ++"\"}", ReqData), State};
-						{false,false} ->
-							{{halt,403}, wrq:set_resp_body("Unsupported field(s)", ReqData), State};
-						{false,true} ->
-			%				case erlastic_search:get_doc(?INDEX, "user", UserId) of
-			%					{error,{404,_}} ->
-			%						{{halt,403}, wrq:set_resp_body("{\"error\":\"no document with resource_id given is present in the system\"}", ReqData), State};
-			%					{error,{Code,Body}} ->
-			%						ErrorString = api_help:generate_error(Body, Code),
-            %						{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-			%					{ok,_} ->
-									FieldsAdded = add_server_side_fields(UserAdded),
-									
-									FieldsAdded2 = case lib_json:get_fields(FieldsAdded, ["parser","data_type"]) of
-													   [undefined, undefined]->FieldsAdded;
-													   [undefined, _]->lib_json:rm_field(FieldsAdded, "data_type");
-													   [_, undefined]->lib_json:rm_field(FieldsAdded, "parser");
-													   [_, _]->lib_json:rm_field(lib_json:rm_field(FieldsAdded, "parser"), "data_type")
-												   end,
-									%Final = suggest:add_stream_suggestion_fields(FieldsAdded),
-									case erlastic_search:index_doc(?INDEX, "stream", FieldsAdded2) of	
-										{error,{Code,Body}} ->
-											ErrorString = api_help:generate_error(Body, Code),
-											{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-										{ok,List} -> 
-											case lib_json:get_field(Stream, "resource.resource_type") of
+    case api_help:is_search(ReqData) of 
+	false ->
+	    {Stream,_,_} = api_help:json_handler(ReqData, State),
+	    case lib_json:get_field(Stream,"multi_json") of
+		undefined ->
+		    case proplists:get_value('user', wrq:path_info(ReqData)) of
+			undefined ->
+			    UserAdded = Stream;
+			UId ->
+			    UserAdded = api_help:add_field(Stream,"user_id",string:to_lower(UId))
+		    end,
+		    case lib_json:get_field(UserAdded,"user_id") of
+			undefined -> {false, wrq:set_resp_body("\"user_id missing\"",ReqData), State};
+			UserId ->
+			    case {api_help:do_any_field_exist(UserAdded,?RESTRCITEDCREATESTREAMS),api_help:do_only_fields_exist(UserAdded,?ACCEPTEDFIELDSSTREAMS)} of
+				{true,_} ->
+				    ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDCREATESTREAMS),
+				    ResFields2 = string:sub_string(ResFields1, 1, length(ResFields1)-2),
+				    {{halt,409}, wrq:set_resp_body("{\"ok\": false, \"error\":\"Error caused by restricted field in document, these fields are restricted : " ++ ResFields2 ++"\"}", ReqData), State};
+				{false,false} ->
+				    {{halt,403}, wrq:set_resp_body("{\"ok\": false, \"error\" :  \"Unsupported field(s)\"}", ReqData), State};
+				{false,true} ->
+				    case erlastic_search:get_doc(?INDEX, "user", string:to_lower(binary_to_list(UserId))) of
+						{ok, Json} ->
+					    	FieldsAdded = add_server_side_fields(UserAdded),		      
+						    FieldsAdded2 = case lib_json:get_fields(FieldsAdded, ["parser","data_type"]) of
+								       [undefined, undefined]->FieldsAdded;
+								       [undefined, _]->lib_json:rm_field(FieldsAdded, "data_type");
+								       [_, undefined]->lib_json:rm_field(FieldsAdded, "parser");
+								       [_, _]->lib_json:rm_field(lib_json:rm_field(FieldsAdded, "parser"), "data_type")
+								   end,
+						    %%Final = suggest:add_stream_suggestion_fields(FieldsAdded),
+						    case erlastic_search:index_doc(?INDEX, "stream", FieldsAdded2) of	
+							{error,{Code,Body}} ->
+							    ErrorString = api_help:generate_error(Body, Code),
+							    {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+							{ok,List} -> 
+							    case lib_json:get_field(Stream, "resource.resource_type") of
+								undefined ->
+								    continue;
+								_ ->
+								    case resources:add_suggested_stream(Stream) of
+									{error, ErrorStr} ->
+									    erlang:display("Stream not added to the suggested streams:  " ++ ErrorStr);
+									ok ->
+									    erlang:display("New suggested stream")
+								    end	
+							    end,
+							    
+							    %% changed by lihao to add post the parser to elasticsearch
+							    case lib_json:get_fields(FieldsAdded, ["parser", "data_type"]) of
+								[undefined, undefined]->{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State};
+								[_,undefined]->{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State};
+								[undefined,_]->{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State};
+								[_, _]->
+								    Input_parser = binary_to_list(lib_json:get_field(FieldsAdded, "parser")),
+								    Input_type = binary_to_list(lib_json:get_field(FieldsAdded, "data_type")),
+								    Stream_id = binary_to_list(lib_json:get_field(lib_json:to_string(List), "_id")),
+								    Parser = "{\"stream_id\":\""++Stream_id++"\", \"input_parser\":\""++Input_parser++"\", \"input_type\":\""++Input_type++"\"}",
+								    %% since every stream has only id, so it is fine to name parser using parser_++(stream_id)
+								    case erlastic_search:index_doc_with_id(?INDEX, "parser", "parser_"++Stream_id,Parser) of
+									{error, {Code2, Body2}}->
+									    ErrorString = api_help:generate_error(Body2, Code2),
+									    {{halt, Code2}, wrq:set_resp_body(ErrorString, ReqData), State};
+									{ok, _List2}->
+									    %% create a new poller in polling system
+									    api_help:refresh(),
+									    case lib_json:get_field(FieldsAdded, "polling") of
+										false->continue;
+										undefined->continue;
+										true->
+										    case lib_json:get_fields(FieldsAdded, ["uri", "polling_freq"]) of
+											[undefined, undefined]-> erlang:display("you must provide uri and frequency for polling!");
+											[_, undefined]		  -> erlang:display("you must provide frequency for polling!");
+											[undefined, _]        -> erlang:display("you must provide uri for polling!");
+											[_, _]				  ->
+											    case whereis(polling_supervisor) of
 												undefined ->
-													continue;
+												    polling_system:start_link(),
+												    timer:sleep(1000);
 												_ ->
-													case resources:add_suggested_stream(Stream) of
-														{error, ErrorStr} ->
-															erlang:display("Stream not added to the suggested streams:  " ++ ErrorStr);
-														ok ->
-															erlang:display("New suggested stream")
-													end	
+												    continue
+											    end,
+											    NewPoller = #pollerInfo{stream_id = Stream_id,
+														    name = binary_to_list(lib_json:get_field(FieldsAdded, "name")),
+														    uri = binary_to_list(lib_json:get_field(FieldsAdded, "uri")),
+														    frequency = lib_json:get_field(FieldsAdded, "polling_freq")
+														   },
+											    gen_server:cast(polling_supervisor, {create_poller, NewPoller})
+										    end
+									    end,
+										% should return the stream`s info
+									    {true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
+								    end
+							    end
+							    %% change ends
+						    end;		      
+						{error, {404, _}} ->
+						    {{halt,403}, wrq:set_resp_body("Incorrect or mising user_id.", ReqData), State};
+						{error, {Code2, Body2}} ->
+							ErrorString = api_help:generate_error(Body2, Code2),
+							{{halt, Code2}, wrq:set_resp_body(ErrorString, ReqData), State}
+					    
+				    end
+			    end
+		    end;
+		JsonList ->
+		    multi_json_streams(JsonList,ReqData,State,[])			
+	    end;	
+	true ->
+	    process_search_post(ReqData,State)	
+    end.
+
+%% @doc
+%% Function: multi_json_streams/4
+%% Purpose: Used to create multiple streams from a json
+%%         
+%% Returns: The responses of the different posts
+%% @end
+multi_json_streams([], ReqData, State, Response) ->
+
+	{true, wrq:set_resp_body(Response ++ "]}", ReqData), State};
+multi_json_streams([Head|Rest], ReqData ,State, Response) ->
+
+	case proplists:get_value('user', wrq:path_info(ReqData)) of
+		undefined ->
+			UserAdded = Head;
+		UId ->
+			UserAdded = api_help:add_field(Head,"user_id",string:to_lower(UId))
+	end,
+	case Response of
+		[] ->
+			FinalResponse = "{\"results\" : [";
+		_ ->
+			FinalResponse = Response ++ ","
+		end,
+
+	case lib_json:get_field(UserAdded,"user_id") of
+		undefined -> {false, wrq:set_resp_body("\"user_id multi_json_streamsing\"",ReqData), State};
+		UserId ->
+			case {api_help:do_any_field_exist(UserAdded,?RESTRCITEDCREATESTREAMS),api_help:do_only_fields_exist(UserAdded,?ACCEPTEDFIELDSSTREAMS)} of
+				{true,_} ->
+					ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDCREATESTREAMS),
+					ResFields2 = string:sub_string(ResFields1, 1, length(ResFields1)-2),
+					multi_json_streams(Rest, ReqData ,State, FinalResponse ++ "{\"ok\": false, \"error\":\"Error caused by restricted field in document, these fields are restricted : " ++ ResFields2 ++"\"}");
+				{false,false} ->
+					multi_json_streams(Rest, ReqData ,State,  FinalResponse ++ "{\"ok\": false, \"error\" :  \"Unsupported field(s)\"}");
+
+				{false,true} ->
+	%				case erlastic_search:get_doc(?INDEX, "user", UserId) of
+	%					{error,{404,_}} ->
+	%						{{halt,403}, wrq:set_resp_body("{\"error\":\"no document with resource_id given is present in the system\"}", ReqData), State};
+	%					{error,{Code,Body}} ->
+	%						ErrorString = api_help:generate_error(Body, Code),
+	%						{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+	%					{ok,_} ->
+							FieldsAdded = add_server_side_fields(UserAdded),
+
+							FieldsAdded2 = case lib_json:get_fields(FieldsAdded, ["parser","data_type"]) of
+															   [undefined, undefined]->FieldsAdded;
+															   [undefined, _]->lib_json:rm_field(FieldsAdded, "data_type");
+															   [_, undefined]->lib_json:rm_field(FieldsAdded, "parser");
+															   [_, _]->lib_json:rm_field(lib_json:rm_field(FieldsAdded, "parser"), "data_type")
+														   end,
+
+
+							%Final = suggest:add_stream_suggestion_fields(FieldsAdded),
+							case erlastic_search:index_doc(?INDEX, "stream", FieldsAdded) of	
+								{error,{Code,Body}} ->
+									ErrorString = api_help:generate_error(Body, Code),
+										multi_json_streams(Rest, ReqData ,State, FinalResponse ++ ErrorString);
+								{ok,List} -> 
+									case lib_json:get_field(Head, "resource.resource_type") of
+										undefined ->
+											multi_json_streams(Rest, ReqData ,State, FinalResponse ++ [lib_json:encode(List)]);
+										_ ->
+											case resources:add_suggested_stream(Head) of
+												{error, ErrorStr} ->
+													erlang:display("Stream not added to the suggested streams:  " ++ ErrorStr);
+												ok ->
+													erlang:display("New suggested stream")
 											end,
-																						
-											%% changed by lihao to add post the parser to elasticsearch
 											case lib_json:get_fields(FieldsAdded, ["parser", "data_type"]) of
-												[undefined, undefined]->{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State};
-												[_,undefined]->{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State};
-												[undefined,_]->{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State};
+												[undefined, undefined]-> multi_json_streams(Rest, ReqData ,State, FinalResponse ++ [lib_json:encode(List)]);
+												[_,undefined]-> multi_json_streams(Rest, ReqData ,State, FinalResponse ++ [lib_json:encode(List)]);
+												[undefined,_]-> multi_json_streams(Rest, ReqData ,State, FinalResponse ++ [lib_json:encode(List)]);
 												[_, _]->
 													Input_parser = binary_to_list(lib_json:get_field(FieldsAdded, "parser")),
 													Input_type = binary_to_list(lib_json:get_field(FieldsAdded, "data_type")),
@@ -259,19 +387,17 @@ process_post(ReqData, State) ->
 																								gen_server:cast(polling_supervisor, {create_poller, NewPoller})
 																	end
 															end,
-															% should return the stream`s info
-															{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
+														%find_ranking(StreamId, Rest, NewRank, lists:append(List,[Head]))
+
+														%suggest:update_suggestion(UserAdded),
+														multi_json_streams(Rest, ReqData ,State, FinalResponse ++ [lib_json:encode(List)])
 													end
 											end
-											%% change ends
 									end
-			%				end
-					end
-			end;
-		true ->
-			process_search_post(ReqData,State)	
+							end
+	%				end
+			end
 	end.
-
 
 %% @doc
 %% Function: process_search_post/2
@@ -299,7 +425,7 @@ process_search_post(ReqData, State) ->
                 undefined ->
                         FilteredJson = filter_json(Json, From, Size);
                 UserId ->
-                        ResQuery = "\"user_id\":" ++ UserId,
+                        ResQuery = "\"user_id\":" ++ string:to_lower(UserId),
                         FilteredJson = filter_json(Json, ResQuery, From, Size)
         end,
         case erlastic_search:search_json(#erls_params{},?INDEX, "stream", FilteredJson) of % Maybe wanna take more
@@ -332,7 +458,7 @@ process_search_get(ReqData, State) ->
 			UserQuery = [],
 			UserDef = false;
 		UserId ->
-			UserQuery = "user_id:" ++ UserId,
+			UserQuery = "user_id:" ++ string:to_lower(UserId),
 			UserDef = true
 		end,
 	FullQuery = lists:append(api_help:transform(URIQuery,UserDef),UserQuery),
@@ -521,7 +647,7 @@ get_stream(ReqData, State) ->
 							UserQuery = [],
 							UserDef = false;
 						UserId ->
-							UserQuery = "\"user_id\":\"" ++ UserId ++ "\"",
+							UserQuery = "\"user_id\":\"" ++ string:to_lower(UserId) ++ "\"",
 							UserDef = true
 					end,
 					case UserDef of
@@ -568,9 +694,9 @@ get_stream(ReqData, State) ->
 	end.
 
 %% @doc
-%% Function: get_streams/2
-%% Purpose: Gets the NrValues latest datapoints for each streamid that exists in list IdList
-%% Returns: JSON string that contains the data and streamid for each streamid in IdList
+%% Function: get_streams/1
+%% Purpose: Gets the stream document for each correct stream_id that exists in list List
+%% Returns: JSON string that contains stream for each streamid in IdList
 %% @end
 get_streams([]) ->
     "{\"streams\":[]}";

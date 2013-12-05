@@ -131,15 +131,14 @@ handle_info({probe}, State)->
 										parser:parseText(Parser, Body, make_stamp(TimeList));
 									_ ->
 										%% the input type of json is wrong
-										erlang:display("the data type user provided is not correct!!")
+										{error, "Invalid data type!"}
 								end,
-					case FinalData == true of
-						false->
+					case FinalData of
+						{error, ErrMsg}->erlang:display(ErrMsg);
+						_->
 							amqp_channel:cast(State#state.channel,
 					  							#'basic.publish'{exchange = State#state.exchange},
-					  							#amqp_msg{payload = list_to_binary(FinalData)});
-						_->
-							continue
+					  							#amqp_msg{payload = list_to_binary(FinalData)})
 					end;
 
 				_ ->
@@ -183,6 +182,7 @@ terminate(_Reason, State)->
 %% Returns: string()
 %% @end
 -spec make_stamp(list()) -> string().
+make_stamp([])->[];
 make_stamp(TimeList)->
 	Day = lists:nth(2, TimeList),
 	Month = case lists:nth(3, TimeList) of
