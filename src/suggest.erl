@@ -121,7 +121,9 @@ get_suggestion(ReqData, State) ->
 								{match, _} -> 
 									Output = lib_json:set_attr("suggestions",[]);
 								_-> 
-									Output = lib_json:set_attr("suggestions",lib_json:get_field(List, "testsuggest[0].options"))
+									Output = lib_json:set_attr("suggestions",lib_json:get_field(List, "testsuggest[0].options")),
+																	erlang:display(Output)
+
 							end,
 							{lib_json:encode(Output),ReqData, State}
 					end
@@ -171,6 +173,7 @@ add_suggestion(Resource, ResourceId) ->
 						   {"suggest.payload", "{}"},
 						   {"suggest.payload.resource", ResourceId},
 						   {"suggest.payload.model", Model},
+						   {"suggest.payload.manufacturer", Manufacturer},
 						   {"suggest.weight", Weight}
 						  ]
 						 ),

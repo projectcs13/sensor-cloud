@@ -21,7 +21,7 @@ compile:
 	@$(REBAR) compile skip_deps=true
 
 ### get_libs will download and install all project libraries
-conf: compile
+conf: compile_libs
 	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) -s engine -s config
 	make compile_libs
 
@@ -57,7 +57,7 @@ all: compile
 
 ### Command: make install
 ### Downloads all dependencies and builds the entire project
-install: get_libs compile_libs conf
+install: get_libs conf
 	echo "installing npm libs"
 	(cd javascripts; npm install socket.io; npm install rabbit.js)
 	 cp -r lib/elasticsearch-servicewrapper/service lib/elasticsearch/bin/

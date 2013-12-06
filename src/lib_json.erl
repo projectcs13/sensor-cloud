@@ -456,6 +456,8 @@ field_recursion(Json, QueryParts, Value) ->
 %% @end
 field_recursion(Json, [{wildcard, Field} | Rest], Value, Query) ->
     case get_field_max_index(Json, Field) of
+	N when is_integer(N) andalso N < 0 ->
+	    undefined;
 	N when is_integer(N) ->
 	    case index_recursion(Json, [{wildcard, Field, N}| Rest], Value, Query) of
 		Value ->

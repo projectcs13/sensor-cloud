@@ -56,8 +56,8 @@ init_test() ->
 	%%insert a new stream
 	clear_stream_type(),
 	api_help:refresh(),
-    post_stream_with_id("1", "test", ?POLL_ADD, 1000, "application/json"),
-	post_stream_with_id("2", "test2", ?POLL_ADD2, 1300, "application/json"),
+    post_stream_with_id("1", "test", ?POLL_ADD, 1, "application/json"),
+	post_stream_with_id("2", "test2", ?POLL_ADD2, 2, "application/json"),
 	
     %%insert two new parsers
 	clear_parser_type(),
@@ -80,12 +80,12 @@ initialization_test()->
 	?assertEqual("1", Stream1#pollerInfo.stream_id),
 	?assertEqual("test", Stream1#pollerInfo.name),
 	?assertEqual(?POLL_ADD, Stream1#pollerInfo.uri),
-	?assertEqual(1000, Stream1#pollerInfo.frequency),
+	?assertEqual(1, Stream1#pollerInfo.frequency),
 	
 	?assertEqual("2", Stream2#pollerInfo.stream_id),
 	?assertEqual("test2", Stream2#pollerInfo.name),
 	?assertEqual(?POLL_ADD2, Stream2#pollerInfo.uri),
-	?assertEqual(1300, Stream2#pollerInfo.frequency),
+	?assertEqual(2, Stream2#pollerInfo.frequency),
 	
 	Parser1 = poll_help:get_parser_by_id("1"),
 	?assertEqual(true, is_record(Parser1, parser)),
@@ -165,8 +165,8 @@ rebuild_system_test()->
 	clear_parser_type(),
 	api_help:refresh(),
 	
-    post_stream_with_id(1, "test2", ?POLL_ADD2, 1000, "application/json"),
-	post_stream_with_id(2, "test1", ?POLL_ADD, 1300, "application/json"),
+    post_stream_with_id(1, "test2", ?POLL_ADD2, 1, "application/json"),
+	post_stream_with_id(2, "test1", ?POLL_ADD, 2, "application/json"),
 	
 	post_parser("2", "application/json","streams/temperature/value"),
 	post_parser("1", "application/json","streams/humidity/value"),
@@ -209,8 +209,8 @@ rebuild_system_test()->
 	clear_stream_type(),
 	clear_parser_type(),
 	api_help:refresh(),
-	post_stream_with_id(1, "test", ?POLL_ADD, 1000, "application/json"),
-	post_stream_with_id(2, "test2", ?POLL_ADD2, 1300, "application/json"),
+	post_stream_with_id(1, "test", ?POLL_ADD, 1, "application/json"),
+	post_stream_with_id(2, "test2", ?POLL_ADD2, 2, "application/json"),
 	
 	post_parser("1", "application/json","streams/temperature/value"),
 	post_parser("2", "application/json","streams/humidity/value"),
