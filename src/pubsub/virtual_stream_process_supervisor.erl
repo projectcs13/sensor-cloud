@@ -15,6 +15,7 @@
 -include_lib("erlastic_search.hrl").
 -include_lib("json.hrl").
 -include_lib("common.hrl").
+-include("debug.hrl").
 
 -behaviour(supervisor).
 -export([init/1]).
@@ -78,7 +79,7 @@ start_processes() ->
 				    ProcessInfoList =
 				    	[{binary_to_list(lib_json:get_field(X, "_id")),
 				    	  list_to_atom( binary_to_list(
-				    	  	lib_json:get_field(X, "_source.function") ) ),
+				    	  	lib_json:get_field(X, "_source.function[0]") ) ),
 				    	  MapFunc(
 				    	  	lib_json:get_field(X, "_source.streams_involved") )}
 				    	  || X <- VStreamList],
@@ -114,7 +115,7 @@ add_child(Id, InputIds, Function) ->
 		undefined ->
 			{error, "Start the supervisor first"};
 		_ ->
-			_ = supervisor:start_child(vstream_sup, [Id, InputIds, Function]),
+			_ = supervisor:start_child(vstream_sup, [Id, InputIds, list_to_atom(binary_to_list(lists:nth(1, Function)))]),
 			ok
 	end.
 
@@ -144,7 +145,7 @@ add_child(Id, InputIds, Function) ->
 %% ====================================================================
 init([]) ->
     {ok,{{simple_one_for_one,5,60},
-    	[{virtual_stream_process,
+    	[{gen_virtual_stream_process,
     	  {gen_virtual_stream_process, start_link, []},
     	  transient, brutal_kill, worker, [gen_virtual_stream_process]}
 		]}}.

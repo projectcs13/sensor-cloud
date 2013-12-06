@@ -20,6 +20,8 @@
 
 -include_lib("erlastic_search.hrl").
 -include("webmachine.hrl").
+-include_lib("amqp_client.hrl").
+-include_lib("pubsub.hrl").
 
 -define(INDEX, "sensorcloud").
 -define(ELASTIC_SEARCH_URL, api_help:get_elastic_search_url()).
@@ -104,13 +106,17 @@ process_post(ReqData, State) ->
 					case lists:member(binary_to_list(lists:nth(1, Function)), AllowedFunctions) of
 						true ->
 							reduce(VirtualStreamId, StreamsInvolved, TimestampFrom, Function, ReqData, State),
+							
+							StreamList = [{stream, binary_to_list(X)} || X <- StreamsInvolved],
+							virtual_stream_process_supervisor:add_child(binary_to_list(VirtualStreamId), StreamList, Function),
+							
 							{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State};
 						false ->
 							{{halt, 404}, wrq:set_resp_body("404 Function missing or not supported", ReqData), State}
 					end
 			end;
-		true ->
-			process_search(ReqData, State, post)
+				true ->
+					process_search(ReqData, State, post)
 	end.
 
 
@@ -128,17 +134,17 @@ reduce(VirtualStreamId, Streams, TimestampFrom, Function, ReqData, State) ->
 		{error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
 		{ok,JsonStruct} ->
 			%%{true,wrq:set_resp_body(lib_json:encode(FinalJson),ReqData),State},
-
+			
 			DatapointsList = lib_json:get_field(JsonStruct, "facets.statistics.entries"),
 			NewDatapoints = lists:map(fun(Json) -> 
-											FinalDatapoint = lib_json:set_attrs([
-																			   {"timestamp", list_to_atom(msToDate(lib_json:get_field(Json, "key")))},
-																			   {"stream_id", VirtualStreamId},
-																			   {"value",  lib_json:get_field(Json, binary_to_list(lists:nth(1, Function)))}
-																			  ]),
+											  FinalDatapoint = lib_json:set_attrs([
+																				   {"timestamp", list_to_atom(msToDate(lib_json:get_field(Json, "key")))},
+																				   {"stream_id", VirtualStreamId},
+																				   {"value",  lib_json:get_field(Json, binary_to_list(lists:nth(1, Function)))}
+																				  ]),
 											  erlastic_search:index_doc(?INDEX, "vsdatapoint", lib_json:to_string(FinalDatapoint)) %to add error check here
 									  end, DatapointsList),
-		{true, wrq:set_resp_body("\"status\":\"ok\"", ReqData), State} %% need to fix message returned
+			{true, wrq:set_resp_body("\"status\":\"ok\"", ReqData), State} %% need to fix message returned
 	end.
 
  

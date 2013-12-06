@@ -58,7 +58,7 @@ virtual_stream_process_test_() ->
 %% @end
 -spec start_and_terminate(_) -> ok | {error, term()}.
 start_and_terminate(_) ->
-	{ok, Pid} = gen_virtual_stream_process:start_link("1", [], sum),
+	{ok, Pid} = gen_virtual_stream_process:start_link("1", [], count),
 	Info1 = is_process_alive(Pid),
 	Pid ! quit,
 	timer:sleep(1500),
@@ -86,7 +86,7 @@ vstream_subscribe_to_a_stream(_) ->
 	StreamId = create_a_stream_on_index(?ES_INDEX),
 	
 	%% Create virtual stream listening to our stream
-	VPid = create_virtual_stream("testID", [{stream, StreamId}], sum),
+	VPid = create_virtual_stream("testID", [{stream, StreamId}], count),
 	
 	%% Create a publisher and consumer exchanges
 	OutExchange = list_to_binary("streams." ++ StreamId),
@@ -175,7 +175,7 @@ vstream_subscribe_to_streams_interval(_) ->
 	%% Create virtual stream listening to our streams
 	VPid = create_virtual_stream("testID",
 								 [{stream, StreamId1}, {stream, StreamId2}],
-								 sum),
+								 count),
 	
 	%% Create publisher and consumer exchanges
 	OutExchange1 = list_to_binary("streams." ++ StreamId1),

@@ -12,7 +12,7 @@
 %% ====================================================================
 %% API functions
 %% ====================================================================
--export([min/2,max/2,avg/2,sum/2]).
+-export([min/2,max/2,mean/2,count/2]).
 -compile({no_auto_import,[min/2]}).
 -compile({no_auto_import,[max/2]}).
 
@@ -45,8 +45,8 @@ max(DataList,StreamId) ->
 	max(DataList,StreamId,[]).
 
 %% @doc
-%% Function: avg/1
-%% Purpose: Used to calculate the avg for 
+%% Function: mean/1
+%% Purpose: Used to calculate the average for 
 %%          a given list of data points
 %%          and create data points with the given stream_id, expects a list
 %%          like [[datapoint1,datapoint2,...],[datapoint1,datapoint2,...],...]
@@ -54,12 +54,12 @@ max(DataList,StreamId) ->
 %% Returns: [datapoint1,datapoint2,...] where the first datapoint is the
 %%          one created by avg on the last list of data points
 %% @end
--spec avg(DataList::list(),StreamId::binary()) -> ResultList::list().
-avg(DataList,StreamId) ->
+-spec mean(DataList::list(),StreamId::binary()) -> ResultList::list().
+mean(DataList,StreamId) ->
 	avg(DataList,StreamId,[]).
 
 %% @doc
-%% Function: sum/1
+%% Function: count/1
 %% Purpose: Used to calculate the sum for 
 %%          a given list of data points
 %%          and create data points with the given stream_id, expects a list
@@ -68,9 +68,9 @@ avg(DataList,StreamId) ->
 %% Returns: [datapoint1,datapoint2,...] where the first datapoint is the
 %%          one created by sum on the last list of data points
 %% @end
--spec sum(DataList::list(),StreamId::binary()) -> ResultList::list().
-sum(DataList,StreamId) ->
-	sum(DataList,StreamId,[]).
+-spec count(DataList::list(),StreamId::binary()) -> ResultList::list().
+count(DataList,StreamId) ->
+	count(DataList,StreamId,[]).
 
 %% ====================================================================
 %% Internal functions
@@ -243,7 +243,7 @@ avg_internal([First|Rest],{Value,Number},TimeStamp,StreamId) ->
 
 
 %% @doc
-%% Function: sum/3
+%% Function: count/3
 %% Purpose: Used to calculate the sum for 
 %%          a given list of data points
 %%          and create data points with the given stream_id, expects a list
@@ -252,13 +252,13 @@ avg_internal([First|Rest],{Value,Number},TimeStamp,StreamId) ->
 %% Returns: [datapoint1,datapoint2,...] where the first datapoint is the
 %%          one created by sum on the last list of data points
 %% @end
--spec sum(DataList::list(), StreamId::string(), Acc::list()) -> ResultList::list().
+-spec count(DataList::list(), StreamId::string(), Acc::list()) -> ResultList::list().
 
-sum([],_StreamId,Acc) ->
+count([],_StreamId,Acc) ->
 	Acc;
-sum([First|Rest],StreamId,Acc) ->
-	DataPoint = sum_internal(First,0,none,StreamId),
-	sum(Rest,StreamId,[DataPoint|Acc]).
+count([First|Rest],StreamId,Acc) ->
+	DataPoint = count_internal(First,0,none,StreamId),
+	count(Rest,StreamId,[DataPoint|Acc]).
 
 %% @doc
 %% Function: sum_internal/4
@@ -270,12 +270,12 @@ sum([First|Rest],StreamId,Acc) ->
 %% Returns: a datapoint that contains the sum of the values in the list
 %%          as the value, and the most recent timestamp as the timestamp
 %% @end
--spec sum_internal(DataList::list(),  Acc::list(), TimeStamp::atom() | string(), StreamId::string()) -> ResultList::list().
+-spec count_internal(DataList::list(),  Acc::list(), TimeStamp::atom() | string(), StreamId::string()) -> ResultList::list().
 
 
-sum_internal([],Acc,TimeStamp,StreamId) ->
+count_internal([],Acc,TimeStamp,StreamId) ->
 	lib_json:set_attrs([{"value", Acc}, {"timestamp", TimeStamp}, {"stream_id", StreamId}]);
-sum_internal([First|Rest],Acc,TimeStamp,StreamId) ->
+count_internal([First|Rest],Acc,TimeStamp,StreamId) ->
 	case TimeStamp of
 		none ->
 			NewTimeStamp = lib_json:get_field(First, "timestamp");
@@ -287,4 +287,4 @@ sum_internal([First|Rest],Acc,TimeStamp,StreamId) ->
 					NewTimeStamp = TimeStamp
 			end
 	end,
-	sum_internal(Rest,Acc + lib_json:get_field(First, "value"),NewTimeStamp,StreamId).
+	count_internal(Rest,Acc + lib_json:get_field(First, "value"),NewTimeStamp,StreamId).
