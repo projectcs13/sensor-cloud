@@ -90,6 +90,7 @@ test: compile
 
 test_travis: compile
 	-@mkdir test-results
+	curl -XPUT localhost:9200/sensorcloud
 	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -s test run
 
 test_json: compile
