@@ -318,17 +318,13 @@ find_subscription(StreamId, [Head|Rest]) ->
 -spec add_subscriber(StreamId::string(), UserId::string()) -> ok | {error, no_model}. 
 
 add_subscriber(StreamId, UserId) ->
-	case erlastic_search:get_doc(?INDEX, "stream", StreamId) of 
-		{error, {Code, Body}} -> {error, {Code, Body}};
-		{ok,JsonStruct} -> 	 
-			NumberOfSubscribers = lib_json:get_field(JsonStruct, "_source.nr_subscribers") + 1, 
-				UpdateJson = "{\"script\" :\"{ctx._source.nr_subscribers = nr_subscribers; ctx._source.subscribers += subscriber};\",
-								\"params\":{\"nr_subscribers\":"++integer_to_list(NumberOfSubscribers)++",\"subscriber\":{ \"user_id\":\""++UserId++"\"}}}",
-			case api_help:update_doc(?INDEX, "stream",StreamId, UpdateJson,[]) of 
-					{error, {Code, Body}} -> {error, {Code, Body}};
-					{ok, _} -> 	ok
-			end
+	UpdateJson = "{\"script\" :\"{ctx._source.nr_subscribers += 1; ctx._source.subscribers += subscriber};\",
+					\"params\":{\"subscriber\":{ \"user_id\":\""++UserId++"\"}}}",
+	case api_help:update_doc(?INDEX, "stream",StreamId, UpdateJson,[]) of 
+			{error, {Code, Body}} -> {error, {Code, Body}};
+			{ok, _} -> 	ok
 	end.
+
 
 
 	%% @doc
@@ -340,17 +336,12 @@ add_subscriber(StreamId, UserId) ->
 -spec remove_subscriber(StreamId::string(), UserId::string()) -> ok | {error, no_model}. 
 
 remove_subscriber(StreamId, UserId) ->
-	case erlastic_search:get_doc(?INDEX, "stream", StreamId) of 
-		{error, {Code, Body}} -> {error, {Code, Body}};
-		{ok,JsonStruct} -> 	 
-			NumberOfSubscribers = lib_json:get_field(JsonStruct, "_source.nr_subscribers") - 1, 
-				UpdateJson = "{\"script\" :\"{ctx._source.nr_subscribers = nr_subscribers; ctx._source.subscribers.remove(subscriber)};\",
-								\"params\":{\"nr_subscribers\":"++integer_to_list(NumberOfSubscribers)++",\"subscriber\":{ \"user_id\":\""++UserId++"\"}}}",
-			case api_help:update_doc(?INDEX, "stream",StreamId, UpdateJson,[]) of 
-					{error, {Code, Body}} -> {error, {Code, Body}};
-					{ok, _} -> 	ok
-			end
-	end.
+	UpdateJson = "{\"script\" :\"{ctx._source.nr_subscribers += -1; ctx._source.subscribers.remove(subscriber)};\",
+						\"params\":{\"subscriber\":{ \"user_id\":\""++UserId++"\"}}}",
+	case api_help:update_doc(?INDEX, "stream",StreamId, UpdateJson,[]) of 
+			{error, {Code, Body}} -> {error, {Code, Body}};
+			{ok, _} -> 	ok
+	end.	
 
 %% @doc
 %% Function: process_post/2
