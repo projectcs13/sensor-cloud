@@ -303,6 +303,10 @@ start_up_triggers_test() ->
 	NotificationList = lists:map(fun(A) -> lib_json:rm_field(A, "trigger.timestamp") end,lib_json:get_field(Body4,"notifications")),
 	ReferenceList = ["{\"trigger\":{\"input\":10,\"stream_id\":\"" ++ lib_json:to_string(StreamId1) ++"\",\"trigger_id\":\"1\",\"value\":4}}",
 					 "{\"trigger\":{\"input\":5,\"stream_id\":\"" ++ lib_json:to_string(StreamId1) ++"\",\"trigger_id\":\"1\",\"value\":4}}"],
+	% Clean up
+	{ok, {{_Version5, 200, _ReasonPhrase5}, _Headers5, _Body5}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/remove", [],"application/json", "{\"function\" : \"less_than\",\"input\":5,\"streams\":\"" ++ lib_json:to_string(StreamId1) ++"\"}"}, [], []),
+	{ok, {{_Version6, 200, _ReasonPhrase6}, _Headers6, _Body6}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/remove", [],"application/json", "{\"function\" : \"less_than\",\"input\":10,\"streams\":\"" ++ lib_json:to_string(StreamId1) ++"\"}"}, [], []),
+	httpc:request(delete, {?WEBMACHINE_URL++"/users/tomas", []}, [], []),
 	?assertEqual(true, check_all_exist(NotificationList,ReferenceList)).
 	
 %% @doc
