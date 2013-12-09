@@ -58,9 +58,11 @@ all: compile
 ### Command: make install
 ### Downloads all dependencies and builds the entire project
 install: get_libs conf
-	echo "installing npm libs"
 	(cd javascripts; npm install socket.io; npm install rabbit.js)
 	 cp -r lib/elasticsearch-servicewrapper/service lib/elasticsearch/bin/
+
+install_linux_deps:
+	sudo scripts/install.sh
 
 ### Command: make run
 ### Downloads all depenedencies, bulds entire project and runs the project.
