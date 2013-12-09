@@ -62,7 +62,6 @@ install: get_libs conf
 	(cd javascripts; npm install socket.io; npm install rabbit.js)
 	 cp -r lib/elasticsearch-servicewrapper/service lib/elasticsearch/bin/
 
-
 ### Command: make run
 ### Downloads all depenedencies, bulds entire project and runs the project.
 run: compile
@@ -70,10 +69,19 @@ run: compile
 	curl -XPUT localhost:9200/sensorcloud
 	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine
 
+run_all: compile
+	sudo scripts/sensec.sh start
+
+stop_all:
+	sudo scripts/sensec.sh stop
+
 ### Command: make run_es
 ### Runs elastic search
 run_es:
 	lib/elasticsearch/bin/elasticsearch -f
+
+run_nodejs:
+	nodejs javascripts/receive.js
 
 ### Command: make run_rabbit
 ### Runs rabbitMQ server
