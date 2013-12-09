@@ -17,6 +17,7 @@
 
 -define(WEBMACHINE_URL, api_help:get_webmachine_url()).
 -define(ES_URL, api_help:get_elastic_search_url()).
+-define(INDEX, "sensorcloud").
 %% @doc
 %% Function: inti_test/0
 %% Purpose: Used to start the inets to be able to do HTTP requests
@@ -99,8 +100,8 @@ create_delete_test() ->
 post_data_exhange_test() ->
 	User1 = "tomas",
 	User2 = "erik",
-        httpc:request(post, {?WEBMACHINE_URL++"/users", [],"application/json", "{\"username\" : \"Tomas\"}"}, [], []),
-        httpc:request(post, {?WEBMACHINE_URL++"/users", [],"application/json", "{\"username\" : \"Erik\"}"}, [], []),
+    httpc:request(post, {?WEBMACHINE_URL++"/users", [],"application/json", "{\"username\" : \"Tomas\"}"}, [], []),
+    httpc:request(post, {?WEBMACHINE_URL++"/users", [],"application/json", "{\"username\" : \"Erik\"}"}, [], []),
 	api_help:refresh(),
 	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {?WEBMACHINE_URL++"/streams", [],"application/json", "{\"name\" : \"Stream1\",\"user_id\":\"Tomas\"}"}, [], []),
 	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {?WEBMACHINE_URL++"/streams", [],"application/json", "{\"name\" : \"Stream2\",\"user_id\":\"Tomas\"}"}, [], []),
@@ -272,8 +273,38 @@ list_triggers({UserId1, StreamId1, StreamId2}) ->
     [?_assertEqual(Result1, Body1),
      ?_assertEqual(Result1, Body2),
      ?_assertEqual(Result2, Body3)].
-    
 
+
+
+%% @doc
+%% Function: start_up_triggers_test/0
+%% Purpose: Test the trigger start function
+%% Returns: ok | {error, term()}
+%% @end
+
+start_up_triggers_test() ->
+	User1 = "tomas",
+    httpc:request(post, {?WEBMACHINE_URL++"/users", [],"application/json", "{\"username\" : \""++User1++"\"}"}, [], []),
+	api_help:refresh(),
+	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {?WEBMACHINE_URL++"/streams", [],"application/json", "{\"name\" : \"Stream1\",\"user_id\":\"tomas\"}"}, [], []),
+	StreamId1 = lib_json:get_field(Body1,"_id"),
+	api_help:refresh(),
+	Trigger = lib_json:set_attrs([{"function",list_to_binary("less_than")},{"streams",[StreamId1]},{"outputlist","[{}]"},{"outputlist[0].input",10},{"outputlist[0].output",["{}"]},{"outputlist[0].output[0].output_id",list_to_binary("tomas")},{"outputlist[0].output[0].output_type",list_to_binary("user")}]),
+	erlastic_search:index_doc_with_id(?INDEX,"trigger","1",Trigger),
+	api_help:refresh(),
+	api_help:refresh(),
+	triggers:start_all_triggers_in_es(),
+	timer:sleep(1000),
+	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, _Body2}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/add", [],"application/json", "{\"function\" : \"less_than\",\"input\":5,\"streams\":\"" ++ lib_json:to_string(StreamId1) ++"\"}"}, [], []),
+	api_help:refresh(),
+	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, _Body3}} = httpc:request(post, {?WEBMACHINE_URL++"/streams/"++ lib_json:to_string(StreamId1) ++ "/data" , [],"application/json", "{\"value\" : 4}"}, [], []),
+	api_help:refresh(),
+	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(get, {?WEBMACHINE_URL++"/users/tomas", []}, [], []),
+	NotificationList = lists:map(fun(A) -> lib_json:rm_field(A, "trigger.timestamp") end,lib_json:get_field(Body4,"notifications")),
+	ReferenceList = ["{\"trigger\":{\"input\":10,\"stream_id\":\"" ++ lib_json:to_string(StreamId1) ++"\",\"trigger_id\":\"1\",\"value\":4}}",
+					 "{\"trigger\":{\"input\":5,\"stream_id\":\"" ++ lib_json:to_string(StreamId1) ++"\",\"trigger_id\":\"1\",\"value\":4}}"],
+	?assertEqual(true, check_all_exist(NotificationList,ReferenceList)).
+	
 %% @doc
 %% Function: post_data_test/0
 %% Purpose: Test the triggersProcess by doing some posting for data to
