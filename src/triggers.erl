@@ -638,6 +638,16 @@ matches_exactly([First|Rest],Streams) ->
 			false
 	end.
 
+
+%% @doc
+%% Function: start_all_triggers_in_es/0
+%% Purpose: Used to start all triggers in ES
+%%          when the function is called
+%% Returns: ok if it managed to start everything
+%%          otherwise error
+%% @end
+-spec start_all_triggers_in_es() -> ok | error.
+
 start_all_triggers_in_es() ->
 	AmountQuery = "{\"query\" : {\"match_all\" : {}}}",
 	case erlastic_search:search_json(#erls_params{},?INDEX, "trigger", AmountQuery) of % Maybe wanna take more
@@ -658,6 +668,16 @@ start_all_triggers_in_es() ->
 			end
 	end.
 
+%% @doc
+%% Function: parse_triggers/2
+%% Purpose: Used to parse the triggers from
+%%          json objects to something that can
+%%          be used to start the trigger processes
+%% Returns: a list of trigger attributes, where all
+%%          attributes for a trigger is in a tuple
+%% @end
+-spec parse_triggers(TriggerList::list(),Accumelator::list()) -> list().
+
 parse_triggers([],Acc) ->
 	Acc;
 parse_triggers([{Id,Trigger}|Rest],Acc) ->
@@ -667,6 +687,15 @@ parse_triggers([{Id,Trigger}|Rest],Acc) ->
 	NewElement = {{id,Id},{function,Function},{inputlist,InputList},{streams,Streams}},
 	parse_triggers(Rest,[NewElement|Acc]).
 
+%% @doc
+%% Function: parse_outputlist/2
+%% Purpose: Used to parse the outputlist from
+%%          json objects to something that can
+%%          be used to start the trigger processes
+%% Returns: a list of outputlists
+%% @end
+-spec parse_outputlist(TriggerList::list(),Accumelator::list()) -> list().
+
 parse_outputlist([],Acc) ->
 	Acc;
 parse_outputlist([First|Rest],Acc) ->
@@ -674,6 +703,15 @@ parse_outputlist([First|Rest],Acc) ->
 	Output = lists:map(fun(A) -> {list_to_atom(lib_json:to_string(lib_json:get_field(A, "output_type"))),lib_json:to_string(lib_json:get_field(A, "output_id"))} end, lib_json:get_field(First, "output")),
 	NewElement = {Input,Output},
 	parse_outputlist(Rest,[NewElement|Acc]).
+
+
+%% @doc
+%% Function: start_processes/1
+%% Purpose: Used to start processes for the
+%%          list of triggers that it is given
+%% Returns: ok
+%% @end
+-spec start_processes(TriggerList::list()) -> ok.
 
 start_processes([]) ->
 	ok;
