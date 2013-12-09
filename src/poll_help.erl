@@ -69,8 +69,9 @@ get_parser_by_id(StreamId)->
 %% @end
 -spec get_streams_using_polling() -> [] | [json_string()] | {error, term()}.
 get_streams_using_polling() ->
-	JsonQuery = "{\"query\" : {\"filtered\" : " ++
-					"{ \"filter\" : {\"exists\" : {\"field\" : \"uri\"}}}}}",
+	% JsonQuery = "{\"query\" : {\"filtered\" : " ++
+	% 				"{ \"filter\" : {\"exists\" : {\"field\" : \"uri\"}}}}}",
+	JsonQuery = "{\"size\":10000, \"query\" : {\"term\":{\"polling\":true}}}",
 	
 	case erlastic_search:search_json(#erls_params{},
 									 ?ES_INDEX,

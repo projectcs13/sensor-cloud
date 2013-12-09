@@ -269,7 +269,7 @@ post_stream(Name, Uri, Freq) when is_integer(Freq) ->
 	F = "\"polling_freq\" : " ++ integer_to_list(Freq),
 	httpc:request(post, {api_help:get_elastic_search_url()++"/sensorcloud" ++ "/stream", [],
 						 "application/json",
-						 "{" ++ F ++ U ++ N ++ "}"
+						 "{" ++ F ++ U ++ N ++ ", \"polling\":true}"
 						},
 				  [], []).
 
@@ -351,13 +351,13 @@ post_stream(Name, "") ->
 post_stream("", Uri) ->
 	httpc:request(post, {api_help:get_elastic_search_url()++"/sensorcloud" ++ "/stream", [],
 						 "application/json",
-						 "{\"uri\" : \"" ++ Uri ++ "\" }"
+						 "{\"uri\" : \"" ++ Uri ++ "\", \"polling\":true}"
 						}, [], []);
 post_stream(Name, Uri) ->
 	httpc:request(post, {api_help:get_elastic_search_url()++"/sensorcloud" ++ "/stream", [],
 						 "application/json",
 						 "{\"name\" : \"" ++ Name ++ "\"" ++
-							 ", \"uri\" : \"" ++ Uri ++ "\" }"
+							 ", \"uri\" : \"" ++ Uri ++ "\", \"polling\":true }"
 						}, [], []).
 
 
