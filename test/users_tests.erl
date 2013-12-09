@@ -197,6 +197,7 @@ delete_user_test() ->
 	{ok, {{_Version13, 200, _ReasonPhrase13}, _Headers13, _Body13}} = httpc:request(delete, {?USERS_URL ++ "test2", []}, [], []),
 	{ok, {{_Version22, 200, _ReasonPhrase22}, _Headers22, _Body22}} = httpc:request(delete, {?USERS_URL ++ "test3", []}, [], []),
 	api_help:refresh(),
+        timer:sleep(1000),
 	{ok, {{_Version15, 200, _ReasonPhrase15}, _Headers15, Body15}} = httpc:request(get, {?USERS_URL++ "test2/streams", []}, [], []),
 	{ok, {{_Version16, 200, _ReasonPhrase16}, _Headers16, Body16}} = httpc:request(get, {?USERS_URL++ "test3/streams", []}, [], []),
 	{ok, {{_Version17, 200, _ReasonPhrase17}, _Headers17, Body17}} = httpc:request(get, {?STREAMS_URL ++ lib_json:to_string(DocId4) ++ "/data", []}, [], []),
