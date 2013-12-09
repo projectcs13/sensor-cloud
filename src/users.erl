@@ -493,7 +493,7 @@ process_search(ReqData, State, get) ->
 
 
 %% @doc
-%% Function: id_from_path/2
+%% Function: id_from_path/2 
 %% Purpose: Retrieves the id from the path.
 %% Returns: Id
 %% @end
@@ -516,7 +516,7 @@ id_from_path(RD) ->
 -spec add_server_side_fields(Json::string()) -> string().
 
 add_server_side_fields(Json) ->
+	lib_json:add_values(Json,[{rankings, "[]"},{notifications,"[]"},{triggers,"[]"},{subscriptions, "[]"}]).
 
-        lib_json:add_values(Json,[
-            {rankings, "[]"},
-            {subscriptions, "[]"}]).
+
+

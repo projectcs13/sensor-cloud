@@ -6,7 +6,7 @@ before_install:
   - sudo apt-get install r-base
 services:
   - rabbitmq
-script: "make install && make test"
+script: "make install && make test_travis"
 before_script: 
 - "curl https://raw.github.com/projectcs13/sensor-cloud/develop/scripts/travis-elasticsearch.sh  | bash"
 - "cd scripts/python/"

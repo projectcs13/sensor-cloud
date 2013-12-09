@@ -84,7 +84,12 @@ run_rabbit:
 ### Compile project resources (not libraries) and runs all eunit tests.
 test: compile
 	-@mkdir test-results
-	curl -XDELETE localhost:9200/sensorcloud
+	-@curl -XDELETE localhost:9200/sensorcloud
+	curl -XPUT localhost:9200/sensorcloud
+	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -s test run
+
+test_travis: compile
+	-@mkdir test-results
 	curl -XPUT localhost:9200/sensorcloud
 	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -s test run
 
@@ -115,13 +120,13 @@ test_users: compile
 	curl -XDELETE localhost:9200/sensorcloud
 	curl -XPUT localhost:9200/sensorcloud
 	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -eval 'test:run(users)'
-	
+
 test_poll: compile
 	-@mkdir test-results
 	curl -XDELETE localhost:9200/sensorcloud
 	curl -XPUT localhost:9200/sensorcloud
 	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -eval 'test:run(poll_help)'
-	
+
 test_poll_system: compile
 	-@mkdir test-results
 	curl -XDELETE localhost:9200/sensorcloud
@@ -133,6 +138,12 @@ test_search: compile
 	curl -XDELETE localhost:9200/sensorcloud
 	curl -XPUT localhost:9200/sensorcloud
 	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -eval 'test:run(search)'
+
+test_triggers: compile
+	-@mkdir test-results
+	curl -XDELETE localhost:9200/sensorcloud
+	curl -XPUT localhost:9200/sensorcloud
+	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -eval 'test:run(triggers)'
 
 
 test_vstreams: compile
