@@ -40,7 +40,7 @@
           Type :: atom(),
           Id :: string().
 create(TriggerId, InputIds, Function, OutputList) ->
-
+		erlang:display("Starting trigger process for id:" ++ TriggerId),
         %% Exchange name binarys.
         InputExchanges = create_input_exchanges(InputIds),
 		CommandExchange = list_to_binary("command.trigger." ++ TriggerId),
