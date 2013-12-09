@@ -58,10 +58,10 @@ all: compile
 ### Command: make install
 ### Downloads all dependencies and builds the entire project
 install: get_libs conf
-	echo "installing npm libs"
-	(cd javascripts; npm install socket.io; npm install rabbit.js)
 	 cp -r lib/elasticsearch-servicewrapper/service lib/elasticsearch/bin/
 
+install_linux_deps:
+	sudo scripts/install.sh
 
 ### Command: make run
 ### Downloads all depenedencies, bulds entire project and runs the project.
@@ -70,10 +70,20 @@ run: compile
 	curl -XPUT localhost:9200/sensorcloud
 	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine
 
+run_all:
+	sudo scripts/sensec.sh start
+
+stop_all:
+	sudo scripts/sensec.sh stop
+
 ### Command: make run_es
 ### Runs elastic search
 run_es:
 	lib/elasticsearch/bin/elasticsearch -f
+
+run_nodejs:
+	nodejs javascripts/receive.js
+
 
 ### Command: make run_rabbit
 ### Runs rabbitMQ server
@@ -84,7 +94,7 @@ run_rabbit:
 ### Compile project resources (not libraries) and runs all eunit tests.
 test: compile
 	-@mkdir test-results
-	-@curl -XDELETE localhost:9200/sensorcloud
+	curl -XDELETE localhost:9200/sensorcloud
 	curl -XPUT localhost:9200/sensorcloud
 	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -s test run
 
@@ -108,12 +118,6 @@ test_streams: compile
 	curl -XDELETE localhost:9200/sensorcloud
 	curl -XPUT localhost:9200/sensorcloud
 	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -eval 'test:run(streams)'
-
-## test_suggest: compile
-	## -@mkdir test-results
-	## curl -XDELETE localhost:9200/sensorcloud
-	## curl -XPUT localhost:9200/sensorcloud
-	## $(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -eval 'test:run(suggest)'
 
 test_users: compile
 	-@mkdir test-results
@@ -156,7 +160,7 @@ test_vstreams: compile
 ### Command: make docs
 ### Genereats all of the documentation files
 docs: all
-	./rebar skip_deps=true doc
+	./rebar doc skip_deps=true
 
 ### Command: make clean
 ### Cleans the directory of the following things:

@@ -1,9 +1,6 @@
 #!/bin/bash
 ### Author : Tommy Mattsson
 ### Purpose: Easy installation of needed software for our project that is part of the linux system rather than our own project
-
-
-
 echo "#################################################################"
 echo "Installing Erlang"
 echo "#################################################################"
@@ -15,5 +12,28 @@ rm -f erlang_solutions.asc
 sudo apt-get update
 sudo apt-get install -y erlang
 
-### Install Emacs erlang-mode
-sudo apt-get install erlang-mode
+echo "#################################################################"
+echo "Installing Nodejs together with npm"
+echo "#################################################################"
+sudo apt-get install python-software-properties python g++ make  
+sudo add-apt-repository ppa:chris-lea/node.js  
+sudo apt-get update  
+sudo apt-get install nodejs  
+(cd javascripts; npm install socket.io; npm install rabbit.js)
+
+echo "#################################################################"
+echo "Installing R"
+echo "#################################################################"
+sudo add-apt-repository "deb http://ftp.sunet.se/pub/lang/CRAN/bin/linux/ubuntu precise/"
+### If you don't have add-apt-repository you can get it via:
+
+sudo apt-get install software-properties-common
+###Then to do the actual installation:
+
+sudo apt-get update
+sudo apt-get install r-base
+
+echo "#################################################################"
+echo "Installing misc dependencies"
+echo "#################################################################"
+sudo apt-get install -qq xsltproc

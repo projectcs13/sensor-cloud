@@ -4,6 +4,7 @@ dir=`dirname $0`
 HOME_PATH=`cd  $dir;cd ..;pwd`
 LOG_DIR=priv/logs
 LOG_JS_DIR=priv/logs
+ES_PORT=9200
 
 echo "$HOME_PATH"
 #Check if user has root access
@@ -27,7 +28,7 @@ echo "$HOME_PATH"
 		sleep 7
 		echo "Starting Sensor-Cloud"
 		export R_HOME="/usr/lib/R"
-		curl -XPUT localhost:9200/sensorcloud
+		curl -XPUT localhost:$ES_PORT/sensorcloud
 		sleep 3
 		if [ -d "$LOG_DIR" ]; then
 			erl -noshell -pa $HOME_PATH/ebin/ $HOME_PATH/lib/*/ebin/ $HOME_PATH/lib/*/bin/ -boot start_sasl -s reloader -s engine -sname engine -config $HOME_PATH/config/engine.config > $LOG_DIR/sensor-cloud_log.log &
