@@ -77,15 +77,26 @@ initialization_test()->
 	Stream1 = lists:nth(1, PollerInforList),
 	Stream2 = lists:nth(2, PollerInforList), 
 	?assertEqual(2, length(PollerInforList)),
-	?assertEqual("1", Stream1#pollerInfo.stream_id),
-	?assertEqual("test", Stream1#pollerInfo.name),
-	?assertEqual(?POLL_ADD, Stream1#pollerInfo.uri),
-	?assertEqual(1, Stream1#pollerInfo.frequency),
-	
-	?assertEqual("2", Stream2#pollerInfo.stream_id),
-	?assertEqual("test2", Stream2#pollerInfo.name),
-	?assertEqual(?POLL_ADD2, Stream2#pollerInfo.uri),
-	?assertEqual(2, Stream2#pollerInfo.frequency),
+	case "1"==Stream1#pollerInfo.stream_id of
+		true->
+			?assertEqual("test", Stream1#pollerInfo.name),
+			?assertEqual(?POLL_ADD, Stream1#pollerInfo.uri),
+			?assertEqual(1, Stream1#pollerInfo.frequency),
+			
+			?assertEqual("2", Stream2#pollerInfo.stream_id),
+			?assertEqual("test2", Stream2#pollerInfo.name),
+			?assertEqual(?POLL_ADD2, Stream2#pollerInfo.uri),
+			?assertEqual(2, Stream2#pollerInfo.frequency);
+		false->
+			?assertEqual("test2", Stream1#pollerInfo.name),
+			?assertEqual(?POLL_ADD2, Stream1#pollerInfo.uri),
+			?assertEqual(2, Stream1#pollerInfo.frequency),
+			
+			?assertEqual("1", Stream2#pollerInfo.stream_id),
+			?assertEqual("test", Stream2#pollerInfo.name),
+			?assertEqual(?POLL_ADD, Stream2#pollerInfo.uri),
+			?assertEqual(1, Stream2#pollerInfo.frequency)
+	end,
 	
 	Parser1 = poll_help:get_parser_by_id("1"),
 	?assertEqual(true, is_record(Parser1, parser)),
@@ -316,7 +327,7 @@ post_stream_with_id(Id, Name, Uri, Freq, Type)->
 				", \"polling_freq\" :" ++ Freq
 		end,
 	T = ", \"data_type\":\"" ++ Type ++"\"",
-	Data = "{"++N++U++F++T++"}",
+	Data = "{"++N++U++F++T++", \"polling\":true}",
 	{ok, _} = erlastic_search:index_doc_with_id(?ES_INDEX, "stream", Id, Data).
 
 %% @doc
