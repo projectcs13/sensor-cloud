@@ -14,7 +14,6 @@
 -include("debug.hrl").
 -include("field_restrictions.hrl").
 -include("state.hrl").
--include("parser.hrl").
 
 -export([]).
 
@@ -430,29 +429,21 @@ post_stream_with_parser_test()->
 	UserId = "lihao",
         httpc:request(post, {?WEBMACHINE_URL++"/users", [],"application/json", "{\"username\" : \""++UserId++"\"}"}, [], []),
 	api_help:refresh(),
-	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {?WEBMACHINE_URL++"/streams", [], "application/json", "{\"name\":\"Private\",\"user_id\" : \"" ++ lib_json:to_string(UserId) ++ "\",\"private\":\"true\", \"data_type\":\"application/json\", \"parser\":\"streams/humidity/value\"}"
+	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {?WEBMACHINE_URL++"/streams", [], "application/json", "{\"name\":\"Private\",\"user_id\" : \"" ++ lib_json:to_string(UserId) ++ "\",\"private\":\"true\", \"data_type\":\"application/json\", \"parser\":\""++?PARSER2++"\"}"
 																					  }, [], []),
-	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {?WEBMACHINE_URL++"/streams", [], "application/json", "{\"name\":\"Public\",\"user_id\" : \"" ++ lib_json:to_string(UserId) ++ "\",\"private\":\"false\", \"data_type\":\"application/xml\", \"parser\":\"streams/temperature/value\"}"
+	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {?WEBMACHINE_URL++"/streams", [], "application/json", "{\"name\":\"Public\",\"user_id\" : \"" ++ lib_json:to_string(UserId) ++ "\",\"private\":\"false\", \"data_type\":\"application/xml\", \"parser\":\""++?PARSER1++"\"}"
 																					  }, [], []),
 	api_help:refresh(),
 	StrId1 = lib_json:get_field(Body1,"_id"),
 	StrId2 = lib_json:get_field(Body2,"_id"),
-	Parser1 = get_parser(lib_json:to_string(StrId1)),
-	Parser2 = get_parser(lib_json:to_string(StrId2)),
-	
-	?assertEqual(StrId1, lib_json:get_field(Parser1, "stream_id")),
-	?assertEqual(<<"application/json">>,lib_json:get_field(Parser1, "input_type")),
-	?assertEqual(<<"streams/humidity/value">>, lib_json:get_field(Parser1, "input_parser")),
-	?assertEqual(StrId2, lib_json:get_field(Parser2, "stream_id")),
-	?assertEqual(<<"application/xml">>, lib_json:get_field(Parser2, "input_type")),
-	?assertEqual(<<"streams/temperature/value">>, lib_json:get_field(Parser2, "input_parser")),
+
 	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(get, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(StrId1), []}, [], []),
 	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(get, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(StrId2), []}, [], []),
 	api_help:refresh(),
 	?assertEqual("application/json", binary_to_list(lib_json:get_field(Body3, "data_type"))),
-	?assertEqual("streams/humidity/value", binary_to_list(lib_json:get_field(Body3, "parser"))),
+	?assertEqual(?PARSER2, binary_to_list(lib_json:get_field(Body3, "parser"))),
 	?assertEqual("application/xml", binary_to_list(lib_json:get_field(Body4, "data_type"))),
-	?assertEqual("streams/temperature/value", binary_to_list(lib_json:get_field(Body4, "parser"))),
+	?assertEqual(?PARSER1, binary_to_list(lib_json:get_field(Body4, "parser"))),
 	
 	{ok, {{_Version5, 200, _ReasonPhrase5}, _Headers5, _Body5}} = httpc:request(delete, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(StrId1), []}, [], []),
 	{ok, {{_Version6, 200, _ReasonPhrase6}, _Headers6, _Body6}} = httpc:request(delete, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(StrId2), []}, [], []),
@@ -604,7 +595,7 @@ connect_engine_polling_test()->
 	
 	% test posting
 	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {?WEBMACHINE_URL++"/streams", [], "application/json", "{\"name\":\"Public\",\"user_id\" : \"" ++ lib_json:to_string(UserId) ++ "\",\"private\":\"false\", \"data_type\":\"application/json\", \"parser\":\""++?PARSER1++"\"
-																																				, \"uri\":\""++?POLL_ADD1++"\" ,\"polling_freq\":1300, \"polling\":true
+																																				, \"uri\":\""++?POLL_ADD1++"\" ,\"polling_freq\":2, \"polling\":true
 																																				}"
 																					  }, [], []),
 	StrId1 = lib_json:to_string(lib_json:get_field(Body1,"_id")),
@@ -619,14 +610,12 @@ connect_engine_polling_test()->
 	?assertEqual(true, is_record(State1, state)),
 	?assertEqual(StrId1, State1#state.stream_id),
 	?assertEqual(?POLL_ADD1, State1#state.uri),
-	Parser1 = State1#state.parser,
-	?assertEqual(true, is_record(Parser1, parser)),
-	?assertEqual(?PARSER1, Parser1#parser.input_parser),
-	?assertEqual("application/json", Parser1#parser.input_type),
+	?assertEqual(?PARSER1, State1#state.parser),
+	?assertEqual("application/json", State1#state.data_type),
 	
 	% test updating 
 	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(put, {?WEBMACHINE_URL++"/streams/"++StrId1, [], "application/json", "{\"name\":\"Public\",\"user_id\" : \"" ++ lib_json:to_string(UserId) ++ "\",\"private\":\"false\", \"data_type\":\"application/json\", \"parser\":\""++?PARSER2++"\"
-																																				, \"uri\":\""++?POLL_ADD2++"\" ,\"polling_freq\":1500, \"polling\":true
+																																				, \"uri\":\""++?POLL_ADD2++"\" ,\"polling_freq\":3, \"polling\":true
 																																				}"
 																					  }, [], []),
 	api_help:refresh(),
@@ -639,10 +628,8 @@ connect_engine_polling_test()->
 	?assertEqual(true, is_record(State2, state)),
 	?assertEqual(StrId1, State2#state.stream_id),
 	?assertEqual(?POLL_ADD2, State2#state.uri),
-	Parser2 = State2#state.parser,
-	?assertEqual(true, is_record(Parser2, parser)),
-	?assertEqual(?PARSER2, Parser2#parser.input_parser),
-	?assertEqual("application/json", Parser2#parser.input_type),
+	?assertEqual(?PARSER2, State2#state.parser),
+	?assertEqual("application/json", State2#state.data_type),
 	
 	% test deleting
 	{ok, {{_Version6, 200, _ReasonPhrase6}, _Headers6, _Body6}} = httpc:request(delete, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(StrId1), []}, [], []),
@@ -653,22 +640,6 @@ connect_engine_polling_test()->
 	
 	exit(whereis(polling_supervisor), "testing ends"),
 	exit(whereis(polling_monitor), "testing ends").
-
-%% @doc
-%% Function: get_parser/1
-%% Purpose: get the parser according to the stream id
-%% Returns: JSON | {error, ErrorMessage}
-%% @end
--spec get_parser(Stream_id :: string()) -> string() | tuple(). 
-get_parser(Stream_id)->
-	Parser_id = "parser_"++Stream_id,
-	case erlastic_search:get_doc(?INDEX, "parser", Parser_id) of
-		{error, {Code, Body}} ->
-	    	ErrorString = api_help:generate_error(Body, Code),
-			{error, ErrorString};
-		{ok, List} ->
-			FinalJson = lib_json:get_field(lib_json:to_string(List), "_source")
-	end.
 	
 %% @doc
 %% Function: generate_date/2

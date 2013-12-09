@@ -180,20 +180,6 @@ is_unsubs(ReqData) ->
 	end.
 
 %% @doc
-%% Function: is_parser/1
-%% Purpose: Used to decide if the URI specifie a parser request
-%% Returns: True if URI specifies a parser request, false otherwise
-%% @end
--spec is_parser(ReqData::term()) -> boolean().
-is_parser(ReqData) ->
-	case string:str(wrq:path(ReqData),"parser") of
-		0 ->
-			false;
-		_ ->
-			true
-	end.
-
-%% @doc
 %% Function: json_handler/2
 %% Purpose: Used to get the json object from the request
 %% Returns: {Json,ReqData,State}

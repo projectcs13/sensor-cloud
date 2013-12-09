@@ -9,7 +9,6 @@
 %% @end
 -module(poller).
 -behaviour(gen_server).
--include("parser.hrl").
 -include("state.hrl").
 -include("common.hrl").
 -include_lib("amqp_client.hrl").
@@ -48,7 +47,7 @@ init(State)->
 	{ok, ChannelOut} = amqp_connection:open_channel(Connection),
 	amqp_channel:call(ChannelOut, #'exchange.declare'{exchange = StreamExchange, type = <<"fanout">>}),
 	
-	{ok, #state{stream_id=State#state.stream_id, uri=State#state.uri, parser=State#state.parser, exchange=StreamExchange, channel=ChannelOut, connection=Connection}}.
+	{ok, #state{stream_id=State#state.stream_id, uri=State#state.uri, parser=State#state.parser, data_type=State#state.data_type, exchange=StreamExchange, channel=ChannelOut, connection=Connection}}.
 
 %% @doc
 %% Function: handle_call/2
@@ -75,22 +74,18 @@ handle_call({rebuild}, _Form, State)->
 		{ok,JsonStruct} ->
 		    FinalJson = lib_json:get_and_add_id(JsonStruct),
 			
-			Parser = poll_help:get_parser_by_id(StreamId), %% return a list of parsers [#parser, ...]
-			case Parser of
-				{error, ErrMsg} ->
-					{reply, {error, ErrMsg}, State};
+			NewUri = lib_json:get_field(FinalJson, "uri"),
+			NewFreq = lib_json:get_field(FinalJson, "polling_freq"),
+			NewDataType = binary_to_list(lib_json:get_field(FinalJson, "data_type")),
+			NewParser = binary_to_list(lib_json:get_field(FinalJson, "parser")),
+			case is_binary(NewUri) of
+				false->
+					FinalUri = NewUri;
 				_ ->
-					NewUri = lib_json:get_field(FinalJson, "uri"),
-					NewFreq = lib_json:get_field(FinalJson, "polling_freq"),
-					case is_binary(NewUri) of
-						false->
-							FinalUri = NewUri;
-						_ ->
-							FinalUri = binary_to_list(NewUri)
-					end,			
-					%% notify the supervisor to refresh its records
-					{reply, {update, StreamId, FinalUri, NewFreq}, #state{stream_id=StreamId, uri=FinalUri, parser=Parser, exchange=State#state.exchange, channel=State#state.channel, connection=State#state.connection}}
-			end
+					FinalUri = binary_to_list(NewUri)
+			end,			
+			%% notify the supervisor to refresh its records
+			{reply, {update, StreamId, FinalUri, NewFreq, NewDataType, NewParser}, #state{stream_id=StreamId, uri=FinalUri, parser=NewParser, data_type=NewDataType, exchange=State#state.exchange, channel=State#state.channel, connection=State#state.connection}}
 	end;
 handle_call({check_info}, _Form, State)->
 	%% return the information of poller
@@ -107,6 +102,7 @@ handle_call({check_info}, _Form, State)->
 handle_info({probe}, State)->
 	StreamId = State#state.stream_id,
 	Parser = State#state.parser,
+	DataType = State#state.data_type,
 	Uri = State#state.uri,
 	
 	%%communicate with external resources
@@ -124,11 +120,11 @@ handle_info({probe}, State)->
 										[]
 								end,
 					
-					FinalData = case Parser#parser.input_type of
+					FinalData = case DataType of
 									"application/json" ->
-										parser:parseJson(Parser, Body, make_stamp(TimeList));
+										parser:parseJson(StreamId, Parser, Body, make_stamp(TimeList));
 									"plain/text" ->
-										parser:parseText(Parser, Body, make_stamp(TimeList));
+										parser:parseText(StreamId, Parser, Body, make_stamp(TimeList));
 									_ ->
 										%% the input type of json is wrong
 										{error, "Invalid data type!"}

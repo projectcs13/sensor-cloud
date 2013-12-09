@@ -13,7 +13,6 @@
 
 -include("common.hrl").
 -include("poller.hrl").
--include("parser.hrl").
 -include("state.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("inets/include/mod_auth.hrl").
@@ -56,14 +55,8 @@ init_test() ->
 	%%insert a new stream
 	clear_stream_type(),
 	api_help:refresh(),
-    post_stream_with_id("1", "test", ?POLL_ADD, 1, "application/json"),
-	post_stream_with_id("2", "test2", ?POLL_ADD2, 2, "application/json"),
-	
-    %%insert two new parsers
-	clear_parser_type(),
-	api_help:refresh(),
-    post_parser("1", "application/json","streams/temperature/value"),
-	post_parser("2", "application/json","streams/humidity/value"),
+    post_stream_with_id("1", "test", ?POLL_ADD, 1, "application/json", "streams/temperature/value"),
+	post_stream_with_id("2", "test2", ?POLL_ADD2, 2, "application/json", "streams/humidity/value"),
 	api_help:refresh().
 
 %% @doc
@@ -82,30 +75,29 @@ initialization_test()->
 			?assertEqual("test", Stream1#pollerInfo.name),
 			?assertEqual(?POLL_ADD, Stream1#pollerInfo.uri),
 			?assertEqual(1, Stream1#pollerInfo.frequency),
+			?assertEqual("application/json", Stream1#pollerInfo.data_type),
+			?assertEqual("streams/temperature/value", Stream1#pollerInfo.parser),
 			
 			?assertEqual("2", Stream2#pollerInfo.stream_id),
 			?assertEqual("test2", Stream2#pollerInfo.name),
 			?assertEqual(?POLL_ADD2, Stream2#pollerInfo.uri),
-			?assertEqual(2, Stream2#pollerInfo.frequency);
+			?assertEqual(2, Stream2#pollerInfo.frequency),
+			?assertEqual("application/json", Stream2#pollerInfo.data_type),
+			?assertEqual("streams/humidity/value", Stream2#pollerInfo.parser);
 		false->
 			?assertEqual("test2", Stream1#pollerInfo.name),
 			?assertEqual(?POLL_ADD2, Stream1#pollerInfo.uri),
 			?assertEqual(2, Stream1#pollerInfo.frequency),
+			?assertEqual("application/json", Stream1#pollerInfo.data_type),
+			?assertEqual("streams/humidity/value", Stream1#pollerInfo.parser),
 			
 			?assertEqual("1", Stream2#pollerInfo.stream_id),
 			?assertEqual("test", Stream2#pollerInfo.name),
 			?assertEqual(?POLL_ADD, Stream2#pollerInfo.uri),
-			?assertEqual(1, Stream2#pollerInfo.frequency)
+			?assertEqual(1, Stream2#pollerInfo.frequency),
+			?assertEqual("application/json", Stream2#pollerInfo.data_type),
+			?assertEqual("streams/temperature/value", Stream2#pollerInfo.parser)
 	end,
-	
-	Parser1 = poll_help:get_parser_by_id("1"),
-	?assertEqual(true, is_record(Parser1, parser)),
-	?assertEqual("application/json", Parser1#parser.input_type),
-	?assertEqual("streams/temperature/value", Parser1#parser.input_parser),
-	Parser2 = poll_help:get_parser_by_id("2"),
-	?assertEqual(true, is_record(Parser2, parser)),
-	?assertEqual("application/json", Parser2#parser.input_type),
-	?assertEqual("streams/humidity/value", Parser2#parser.input_parser),
 	
 	%% generate threads to receive commming messages
 	register(test_rabbit_1, spawn(?MODULE, test_rabbit_messages, ["1"])),
@@ -126,8 +118,10 @@ polling_system_test()->
 	?assertEqual(2, length(ChildrenList)),
 	{_, Pid1, _, _} = lists:nth(1, ChildrenList),
 	{_, Pid2, _, _} = lists:nth(2, ChildrenList),
+	{_, Pid3, _, _} = lists:nth(3, ChildrenList),
 	{info, State1} = gen_server:call(Pid1, {check_info}),
 	{info, State2} = gen_server:call(Pid2, {check_info}),
+	{info, State3} = gen_server:call(Pid3, {check_info}),
 	
 	?assertEqual(true, is_record(State1, state)),
 	?assertEqual(true, is_record(State2, state)),
@@ -138,27 +132,23 @@ polling_system_test()->
 			?assertEqual(?POLL_ADD2, State2#state.uri),
 			?assertEqual(<<"streams.2">>, State2#state.exchange),
 			?assertNotEqual(undefined, State2#state.channel),
-			Parser2 = State2#state.parser,
-			?assertEqual("application/json", Parser2#parser.input_type),
-			?assertEqual("streams/humidity/value", Parser2#parser.input_parser),
+			?assertEqual("application/json", State2#state.data_type),
+			?assertEqual("streams/humidity/value", State2#state.parser),
 			
 			?assertEqual(?POLL_ADD, State1#state.uri),
 			?assertEqual(<<"streams.1">>, State1#state.exchange),
 			?assertNotEqual(undefined, State1#state.channel),
-			Parser1 = State1#state.parser,
-			?assertEqual("application/json", Parser1#parser.input_type),
-			?assertEqual("streams/temperature/value", Parser1#parser.input_parser);
+			?assertEqual("application/json", State1#state.data_type),
+			?assertEqual("streams/temperature/value", State1#state.parser);
 		"2"->
 			?assertEqual("1", State2#state.stream_id),
 			?assertEqual(?POLL_ADD, State2#state.uri),
-			Parser2 = State2#state.parser,
-			?assertEqual("application/json", Parser2#parser.input_type),
-			?assertEqual("streams/temperature/value", Parser2#parser.input_parser),
+			?assertEqual("application/json", State2#state.data_type),
+			?assertEqual("streams/temperature/value", State2#state.parser),
 			
 			?assertEqual(?POLL_ADD2, State1#state.uri),
-			Parser1 = State1#state.parser,
-			?assertEqual("application/json", Parser1#parser.input_type),
-			?assertEqual("streams/humidity/value", Parser1#parser.input_parser);
+			?assertEqual("application/json", State1#state.data_type),
+			?assertEqual("streams/humidity/value", State1#state.parser);
 		_->
 			?assert(false)
 	end.
@@ -173,14 +163,10 @@ rebuild_system_test()->
 
 	%% testing rebuild
 	clear_stream_type(),
-	clear_parser_type(),
 	api_help:refresh(),
 	
-    post_stream_with_id(1, "test2", ?POLL_ADD2, 1, "application/json"),
-	post_stream_with_id(2, "test1", ?POLL_ADD, 2, "application/json"),
-	
-	post_parser("2", "application/json","streams/temperature/value"),
-	post_parser("1", "application/json","streams/humidity/value"),
+    post_stream_with_id(1, "test2", ?POLL_ADD2, 1, "application/json", "streams/humidity/value"),
+	post_stream_with_id(2, "test1", ?POLL_ADD, 2, "application/json", "streams/temperature/value"),
 	
 	api_help:refresh(),
 	gen_server:call(polling_supervisor, {rebuild, "1"}),
@@ -218,13 +204,9 @@ rebuild_system_test()->
 	erlang:display("!!!!!!!!!!!!!!!!!"),
 
 	clear_stream_type(),
-	clear_parser_type(),
 	api_help:refresh(),
-	post_stream_with_id(1, "test", ?POLL_ADD, 1, "application/json"),
-	post_stream_with_id(2, "test2", ?POLL_ADD2, 2, "application/json"),
-	
-	post_parser("1", "application/json","streams/temperature/value"),
-	post_parser("2", "application/json","streams/humidity/value"),
+	post_stream_with_id(1, "test", ?POLL_ADD, 1, "application/json", "streams/temperature/value"),
+	post_stream_with_id(2, "test2", ?POLL_ADD2, 2, "application/json", "streams/humidity/value"),
 	
 	api_help:refresh(),
 	gen_server:call(polling_supervisor, {rebuild, "1"}),
@@ -296,7 +278,6 @@ clear_system_test()->
 	
 	%% clear all already stored resource in elasticsearch
 	clear_stream_type(),
-	clear_parser_type(),
 	clear_datapoint_type().
 
 %% ====================================================================
@@ -304,14 +285,14 @@ clear_system_test()->
 %% ====================================================================
 
 %% @doc
-%% Function: post_stream_with_id/5
+%% Function: post_stream_with_id/6
 %% Purpose: Post a stream using the values provided.
 %% Returns: {ok, Result} | {error, Reason}.
 %% @end
--spec post_stream_with_id(Id :: string(), Name :: string(), Uri :: string(), Freq :: integer()|string(), Type :: string()) ->
+-spec post_stream_with_id(Id :: string(), Name :: string(), Uri :: string(), Freq :: integer()|string(), Type :: string(), Parser :: string()) ->
 		  {ok, list()}
 		 |{error, string()}.
-post_stream_with_id(Id, Name, Uri, Freq, Type)->
+post_stream_with_id(Id, Name, Uri, Freq, Type, Parser)->
 	N = case Name of
 			"" -> "";
 			_ -> "\"name\" : \"" ++ Name ++ "\""
@@ -326,34 +307,16 @@ post_stream_with_id(Id, Name, Uri, Freq, Type)->
 			_->
 				", \"polling_freq\" :" ++ Freq
 		end,
-	T = ", \"data_type\":\"" ++ Type ++"\"",
-	Data = "{"++N++U++F++T++", \"polling\":true}",
+	T = case Type of
+			"" -> "";
+			_ -> ", \"data_type\":\"" ++ Type ++"\""
+		end,
+	P = case Parser of
+			"" -> "";
+			_ -> ", \"parser\":\"" ++ Parser ++ "\""
+		end,
+	Data = "{"++N++U++F++T++P++", \"polling\":true }",
 	{ok, _} = erlastic_search:index_doc_with_id(?ES_INDEX, "stream", Id, Data).
-
-%% @doc
-%% Function: post_parser/3
-%% Purpose: Post a parser using the values provided, if 'InputType' or 'InputParser' is
-%%          empty they are ignored.
-%% Returns: {ok, Result} | {ok, saved_to_file} | {error, Reason}.
-%% @end
--spec post_parser(StreamId :: string(), InputType :: string(), InputParser :: string()) ->
-		  {ok, term()}
-		| {ok, saved_to_file}
-		| {error, term()}.
-post_parser(StreamId, InputType, InputParser) when is_list(StreamId)->
-	It = case InputType of
-			 "" -> "";
-			 _ -> ", \"input_type\":\"" ++ InputType ++ "\""
-		 end,
-	Ip = case InputParser of
-			 "" -> "";
-			 _ -> ", \"input_parser\":\"" ++ InputParser ++ "\""
-		 end,
-	Si = "\""++StreamId++"\"",
-	{ok, Res} = httpc:request(post, {api_help:get_elastic_search_url() ++ "/sensorcloud" ++ "/parser", [],
-						 "application/json",
-						 "{\"stream_id\":"++Si++It++Ip++"}"
-						}, [],[]).
 
 %% @doc
 %% Function: clear_stream_type/0
@@ -366,18 +329,6 @@ post_parser(StreamId, InputType, InputParser) when is_list(StreamId)->
 		| {error, term()}.
 clear_stream_type() ->
 	httpc:request(delete, {api_help:get_elastic_search_url() ++ "/sensorcloud" ++ "/stream", []}, [], []).
-
-%% @doc
-%% Function: clear_parser_type/0
-%% Purpose: Delete all the parsers in elasticsearch.
-%% Returns: {ok, Result} | {ok, saved_to_file} | {error, Reason}.
-%% @end
--spec clear_parser_type() ->
-		  {ok, term()}
-		| {ok, saved_to_file}
-		| {error, term()}.
-clear_parser_type() ->
-	httpc:request(delete, {api_help:get_elastic_search_url() ++ "/sensorcloud" ++ "/parser", []}, [], []).
 
 %% @doc
 %% Function: clear_datapoint_type/0
