@@ -104,9 +104,6 @@ process_post(ReqData, State) ->
 									        	{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 											{ok,List} -> 
 												FinalTimeStamp = lib_json:get_field(FinalJson, "timestamp"),
-
-												erlang:display("----------------------FinalJson----------------------"),
-												erlang:display(FinalJson),
 												case update_fields_in_stream(Id,FinalTimeStamp,ReqData,State) of
 													{{halt, Code}, ReqData, State} ->
 														{{halt, Code}, ReqData, State};
