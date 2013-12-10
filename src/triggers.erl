@@ -219,7 +219,6 @@ add_uri(ReqData, State) ->
 					{true, wrq:set_resp_body(lib_json:encode(List2), ReqData), State}
 			end;
 		{EsId,_,_,_}->
-			erlang:display(EsId),
 			CommandExchange = list_to_binary("command.trigger."++ EsId),
 			Msg = term_to_binary({add,{Input,{uri,URI}}}),
 			%% Connect, now assumes local host
@@ -331,7 +330,6 @@ add_user(User, ReqData, State) ->
 					end
 			end;
 		{EsId,_,_,_}->
-			erlang:display(EsId),
 			CommandExchange = list_to_binary("command.trigger."++ EsId),
 			Msg = term_to_binary({add,{Input,{user,Username}}}),
 			%% Connect, now assumes local host
@@ -506,10 +504,8 @@ remove_user(User, ReqData, State) ->
 			   {error, {Code, Body}} -> 
 				   {error, {Code, Body}};
 			   {ok,JsonStruct} ->
-				   erlang:display(binary_to_list(iolist_to_binary(lib_json:encode(JsonStruct)))),
 				   case lib_json:get_field(JsonStruct, "hits.total") of
-					   0 -> ?DEBUG(poff), 
-						error;
+					   0 -> error;
 					   1 -> lib_json:get_field(JsonStruct, "hits.hits[0]._id");
 					   X -> get_es_id(lib_json:get_field(JsonStruct, "hits.hits"),Streams)
 				   end
