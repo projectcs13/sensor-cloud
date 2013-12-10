@@ -11,7 +11,7 @@ if [[ ("$1" = "start") || ("$1" = "test_setup") ]]; then
     cd $HOME_PATH
     echo "starting rabbit"
     make run_rabbit &
-    echo $! > $HOME_PATH/.temp.log
+    echo $! >> $HOME_PATH/.temp.log
     echo "starting ES"
     make run_es &
     echo $! >> $HOME_PATH/.temp.log
