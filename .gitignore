@@ -15,3 +15,4 @@ javascripts/node_modules
 # Do not Ignore these
 !doc/overview.edoc
 /ebin
+.temp.log
