@@ -80,11 +80,10 @@ process_post(ReqData, State) ->
 						_ ->
 							TimeStampAdded = DatapointJson
 					end,
-					NewVal = api_help:any_to_float(lib_json:get_field(TimeStampAdded, "value")),
-
-					case NewVal of
+					
+					case api_help:any_to_float(lib_json:get_field(TimeStampAdded, "value")) of
 						error -> {{halt,403}, wrq:set_resp_body("Value not convertable to type float", ReqData), State};
-						_ -> 
+						NewVal -> 
 						EnforcedFloatJson = lib_json:replace_field(TimeStampAdded, "value", NewVal),
 						FinalJson = lib_json:add_value(EnforcedFloatJson, "stream_id", binary:list_to_bin(Id)),
 						case api_help:do_only_fields_exist(FinalJson,?ACCEPTEDFIELDSDATAPOINTS) of

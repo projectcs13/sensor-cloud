@@ -628,7 +628,6 @@ get_elastic_search_url() ->
 any_to_float(Val) when is_float(Val) -> Val;
 any_to_float(Val) when is_integer(Val) -> float(Val);
 any_to_float(Val) when is_binary(Val) -> any_to_float(binary_to_list(Val));
-any_to_float(Val) when is_atom(Val) -> error;
 any_to_float(".") -> error;
 any_to_float(Val) when is_list(Val) ->
 	case lists:prefix(".", Val) of
