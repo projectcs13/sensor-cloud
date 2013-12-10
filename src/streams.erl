@@ -100,7 +100,6 @@ delete_resource(ReqData, State) ->
 					ErrorString = api_help:generate_error(Body, Code),
 					{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 				{ok} ->
-					erlang:display("succeed deleting all the streams for the user id: "++UserId),
 					{true,wrq:set_resp_body("{\"message\":\"All streams with user_id:" ++string:to_lower(UserId)++" are now deleted\"}",ReqData),State}
 			end;
 		{_,Id} ->
@@ -204,12 +203,13 @@ process_post(ReqData, State) ->
 			undefined ->
 			    UserAdded = Stream;
 			UId ->
-			    UserAdded = api_help:add_field(Stream,"user_id",string:to_lower(UId))
+			    UserAdded = api_help:add_field(Stream,"user_id",UId)
 		    end,
 		    case lib_json:get_field(UserAdded,"user_id") of
 			undefined -> {false, wrq:set_resp_body("\"user_id missing\"",ReqData), State};
 			UserId ->
-			    case {api_help:do_any_field_exist(UserAdded,?RESTRCITEDCREATESTREAMS),api_help:do_only_fields_exist(UserAdded,?ACCEPTEDFIELDSSTREAMS)} of
+				FinalUserAdded = lib_json:replace_field(UserAdded,"user_id",binary:list_to_bin(string:to_lower(binary_to_list(UserId)))),
+			    case {api_help:do_any_field_exist(FinalUserAdded,?RESTRCITEDCREATESTREAMS),api_help:do_only_fields_exist(FinalUserAdded,?ACCEPTEDFIELDSSTREAMS)} of
 				{true,_} ->
 				    ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDCREATESTREAMS),
 				    ResFields2 = string:sub_string(ResFields1, 1, length(ResFields1)-2),
@@ -226,7 +226,6 @@ process_post(ReqData, State) ->
 							    ErrorString = api_help:generate_error(Body, Code),
 							    {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 							{ok,List} -> 
-								erlang:display("succeed adding the stream: "++FieldsAdded),
 							    case lib_json:get_field(Stream, "resource.resource_type") of
 								undefined ->
 								    continue;
