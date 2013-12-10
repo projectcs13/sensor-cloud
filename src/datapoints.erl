@@ -86,7 +86,7 @@ process_post(ReqData, State) ->
 						error -> {{halt,403}, wrq:set_resp_body("Value not convertable to type float", ReqData), State};
 						_ -> 
 						EnforcedFloatJson = lib_json:replace_field(TimeStampAdded, "value", NewVal),
-						FinalJson = lib_json:add_value(EnforcedFloatJson, "stream_id", Id),
+						FinalJson = lib_json:add_value(EnforcedFloatJson, "stream_id", binary:list_to_bin(Id)),
 						case api_help:do_only_fields_exist(FinalJson,?ACCEPTEDFIELDSDATAPOINTS) of
 							false -> 
 								{{halt,403}, wrq:set_resp_body("Unsupported field(s)", ReqData), State};
