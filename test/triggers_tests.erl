@@ -100,8 +100,8 @@ create_delete_test() ->
 post_data_exhange_test() ->
 	User1 = "tomas",
 	User2 = "erik",
-    httpc:request(post, {?WEBMACHINE_URL++"/users", [],"application/json", "{\"username\" : \"tomas\"}"}, [], []),
-    httpc:request(post, {?WEBMACHINE_URL++"/users", [],"application/json", "{\"username\" : \"erik\"}"}, [], []),
+         httpc:request(post, {?WEBMACHINE_URL++"/users", [],"application/json", "{\"username\" : \"tomas\"}"}, [], []),
+         httpc:request(post, {?WEBMACHINE_URL++"/users", [],"application/json", "{\"username\" : \"erik\"}"}, [], []),
 	api_help:refresh(),
 	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {?WEBMACHINE_URL++"/streams", [],"application/json", "{\"name\" : \"Stream1\",\"user_id\":\"tomas\"}"}, [], []),
 	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {?WEBMACHINE_URL++"/streams", [],"application/json", "{\"name\" : \"Stream2\",\"user_id\":\"tomas\"}"}, [], []),
