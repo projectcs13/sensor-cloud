@@ -39,13 +39,46 @@
 %% @end
 %% ====================================================================
 virtual_stream_process_test_() ->
-	S = fun() -> ok end,
-	C = fun(_) -> ok end,
+	Children = supervisor:which_children(vstream_sup),
+	[(element(2, X)) ! quit || X <- Children],
+	timer:sleep(500),
+	S = fun() ->
+			StreamId1 = create_a_stream_on_index(?ES_INDEX),
+			StreamId2 = create_a_stream_on_index(?ES_INDEX),
+			VStreamId = create_a_virtual_stream_on_index(?ES_INDEX, [StreamId1, StreamId2]),
+			{VStreamId, StreamId1, StreamId2}
+		end,
+	C = fun({VStreamId, StreamId1, StreamId2}) ->
+			remove_stream_on_index(?ES_INDEX, StreamId1),
+			remove_stream_on_index(?ES_INDEX, StreamId2),
+			remove_virtual_stream_on_index(?ES_INDEX, VStreamId)
+		end,
 	[
+	 {timeout, 30, [{setup, S, C, fun start_supervisor/1}]},
 	 {timeout, 30, [{setup, S, C, fun start_and_terminate/1}]},
 	 {timeout, 30, [{setup, S, C, fun vstream_subscribe_to_a_stream/1}]},
-	 {timeout, 30, [{setup, S, C, fun vstream_subscribe_to_streams_interval/1}]}
+	 {timeout, 30, [{setup, S, C, fun vstream_subscribe_to_streams_interval/1}]},
+	 {timeout, 30, [{setup, S, C, fun clean_up/1}]}
 	].
+
+
+
+
+start_supervisor(_) ->
+	case whereis(vstream_sup) of
+		undefined ->
+			{ok, Pid} = virtual_stream_process_supervisor:start_link(),
+			ok;
+		Pid -> ok
+	end,
+	[?_assertEqual(true, is_process_alive(Pid))].
+
+
+
+clean_up(_) ->
+	timer:sleep(1000),
+	remove_any_vsdatapoints(?ES_INDEX),
+	[?_assertEqual(true, true)].
 
 
 
@@ -57,13 +90,24 @@ virtual_stream_process_test_() ->
 %%
 %% @end
 -spec start_and_terminate(_) -> ok | {error, term()}.
-start_and_terminate(_) ->
-	{ok, Pid} = gen_virtual_stream_process:start_link("1", [], count),
+start_and_terminate({VStreamId, StreamId1, _StreamId2}) ->
+	SupPid = whereis(vstream_sup),
+	Childrens1 = length(supervisor:which_children(vstream_sup)),
+	
+	virtual_stream_process_supervisor:add_child(VStreamId, [{stream, StreamId1}], [list_to_binary("count"), "2s"]),
+	%virtual_stream_process_supervisor:start_processes(),
+	%timer:sleep(5000),
+
+	Childrens2 = length(supervisor:which_children(vstream_sup)),
+	Pid = element(2, lists:nth(1, supervisor:which_children(vstream_sup))),
 	Info1 = is_process_alive(Pid),
 	Pid ! quit,
 	timer:sleep(1500),
 	Info2 = is_process_alive(Pid),
-	[?_assertEqual(true, Info1),
+	[?_assertEqual(true, is_pid(SupPid)),
+	 ?_assertEqual(0, Childrens1),
+	 ?_assertEqual(1, Childrens2),
+	 ?_assertEqual(true, Info1),
 	 ?_assertEqual(false, Info2)].
 
 
@@ -80,17 +124,16 @@ start_and_terminate(_) ->
 %% 
 %% @end
 -spec vstream_subscribe_to_a_stream(_) -> ok | {error, term()}.
-vstream_subscribe_to_a_stream(_) ->
-
-	%% Create a stream in ?ES_INDEX
-	StreamId = create_a_stream_on_index(?ES_INDEX),
+vstream_subscribe_to_a_stream({VStreamId, StreamId1, _StreamId2}) ->
 	
 	%% Create virtual stream listening to our stream
-	VPid = create_virtual_stream("testID", [{stream, StreamId}], count),
+	%virtual_stream_process_supervisor:start_processes(),
+	%timer:sleep(5000),
+	virtual_stream_process_supervisor:add_child(VStreamId, [{stream, StreamId1}], [list_to_binary("count"), "2s"]),
 	
 	%% Create a publisher and consumer exchanges
-	OutExchange = list_to_binary("streams." ++ StreamId),
-	InExchange = list_to_binary("vstreams.testID"),
+	OutExchange = list_to_binary("streams." ++ StreamId1),
+	InExchange = list_to_binary("vstreams." ++ VStreamId),
 	
 	%% Establish connection to RabbitMQ
 	{ok, Connection} =
@@ -110,7 +153,7 @@ vstream_subscribe_to_a_stream(_) ->
 	timer:sleep(1000),
 	
 	%% Publish a message
-	Msg = create_data_point(StreamId, 32),
+	Msg = create_data_point(StreamId1, 32),
 	amqp_channel:cast(ChannelOut,
 					  #'basic.publish'{exchange = OutExchange},
 					  #amqp_msg{payload = Msg}),	
@@ -133,21 +176,14 @@ vstream_subscribe_to_a_stream(_) ->
 		  end,
 	
 	%% Close and clean
-	VPid ! quit,
 	amqp_channel:close(ChannelIn),
 	amqp_channel:close(ChannelOut),
 	amqp_connection:close(Connection),
 	
-	case erlastic_search:delete_doc(?ES_INDEX,"stream", StreamId) of
-		{error, {Code, Body2}} ->
-			erlang:display(api_help:generate_error(Body2, Code));
-		{ok, _} -> ok
-	end,
-	
 	timer:sleep(1000),
 
-	[?_assertEqual(true, is_list(StreamId)),
-	 ?_assertEqual({32, "testID"}, Rec)].
+	[?_assertEqual(true, is_list(StreamId1)),
+	 ?_assertEqual({32, VStreamId}, Rec)].
 	
 
 
@@ -166,21 +202,17 @@ vstream_subscribe_to_a_stream(_) ->
 %% 
 %% @end
 -spec vstream_subscribe_to_streams_interval(_) -> ok | {error, term()}.
-vstream_subscribe_to_streams_interval(_) ->
-	
-	%% Create two streams in ?ES_INDEX
-	StreamId1 = create_a_stream_on_index(?ES_INDEX),
-	StreamId2 = create_a_stream_on_index(?ES_INDEX),
+vstream_subscribe_to_streams_interval({VStreamId, StreamId1, StreamId2}) ->
 
 	%% Create virtual stream listening to our streams
-	VPid = create_virtual_stream("testID",
-								 [{stream, StreamId1}, {stream, StreamId2}],
-								 count),
+	%virtual_stream_process_supervisor:start_processes(),
+	%timer:sleep(5000),
+	virtual_stream_process_supervisor:add_child(VStreamId, [{stream, StreamId1}, {stream, StreamId2}], [list_to_binary("count"), "2s"]),
 	
 	%% Create publisher and consumer exchanges
 	OutExchange1 = list_to_binary("streams." ++ StreamId1),
 	OutExchange2 = list_to_binary("streams." ++ StreamId2),
-	InExchange = list_to_binary("vstreams.testID"),
+	InExchange = list_to_binary("vstreams." ++ VStreamId),
 	
 	%% Establish connection to RabbitMQ
 	{ok, Connection} =
@@ -249,27 +281,14 @@ vstream_subscribe_to_streams_interval(_) ->
 		  end,
 	
 	%% Close and clean
-	VPid ! quit,
 	amqp_channel:close(ChannelIn),
 	amqp_channel:close(ChannelOut),
 	amqp_connection:close(Connection),
-	
-	case erlastic_search:delete_doc(?ES_INDEX,"stream", StreamId1) of
-		{error, {Code, Body3}} ->
-			erlang:display(api_help:generate_error(Body3, Code));
-		{ok, _} -> ok
-	end,
-	
-	case erlastic_search:delete_doc(?ES_INDEX,"stream", StreamId2) of
-		{error, {Code2, Body4}} ->
-			erlang:display(api_help:generate_error(Body4, Code2));
-		{ok, _} -> ok
-	end,
 
 	[?_assertEqual(true, is_list(StreamId1)),
 	 ?_assertEqual(true, is_list(StreamId2)),
-	 ?_assertEqual({32, "testID"}, Rec1),
-	 ?_assertEqual({64, "testID"}, Rec2)].
+	 ?_assertEqual({32, VStreamId}, Rec1),
+	 ?_assertEqual({64, VStreamId}, Rec2)].
 
 
 
@@ -284,7 +303,7 @@ vstream_subscribe_to_streams_interval(_) ->
 
 
 %% @doc
-%% Function: create_a_stream_on_index()/1
+%% Function: create_a_stream_on_index/1
 %% Purpose: Creates a stream in the specified ES index.
 %% Args: Index - The index into which to add the stream.
 %% Returns: StreamId | {error, Reason}.
@@ -294,7 +313,7 @@ vstream_subscribe_to_streams_interval(_) ->
 -spec create_a_stream_on_index(Index :: string()) ->
 		  StreamId :: string() | {error, Reason :: term()}.
 create_a_stream_on_index(Index) ->
-	case erlastic_search:index_doc(Index, "stream", {}) of
+	case erlastic_search:index_doc(Index, "stream", "{}") of
 		{error, Reason} -> {error, Reason};
 		{ok, Data} ->
 			binary_to_list(element(2, lists:nth(4, element(2, Data))))
@@ -302,32 +321,34 @@ create_a_stream_on_index(Index) ->
 
 
 
+remove_stream_on_index(Index, StreamId) ->
+	erlastic_search:delete_doc(Index, "stream", StreamId).
+
 
 
 %% @doc
-%% Function: create_virtual_stream/3
-%% Purpose: Creates a virtual stream subscribing to the
-%%          specified streams/virtual streams. 
-%% Args: VStreamId - The Id of the virtual stream,
-%%       List - A list specifying the type and id of the streams/virtual
-%%              streams to subscribe to,
-%%       Func - The function specifier.
-%% Returns: Pid.
-%% Side effects: Creates a virtual stream process that subscribes to the
-%%               specified streams and publish to an exchange "vstreams.'Id'".
-%% Example: > create_virtual_stream("1",
-%%                                  [{"stream", "1"}, {"vstream", "4"}],
-%%                                  "add").
-%%          > <1.32.1>
+%% Function: create_a_virtual_stream_on_index/2
+%% Purpose: Creates a virtual stream in the specified ES index.
+%% Args: Index - The index into which to add the stream,
+%%       Id - A list of stream ids' to subscribe to.
+%% Returns: VStreamId | {error, Reason}.
+%% Side effects: Creates a virtual stream on the index 'Index' in ES.
 %% 
 %% @end
--spec create_virtual_stream(
-		VStreamId :: string(),
-		List :: [{Type :: string(), Id :: string()}],
-		Func :: string()) -> Pid :: pid().
-create_virtual_stream(VStreamId, List, Func) ->
-	{ok, Pid} = gen_virtual_stream_process:start_link(VStreamId, List, Func),
-	Pid.
+-spec create_a_virtual_stream_on_index(Index :: string(), [Id :: string()]) ->
+		  VStreamId :: string() | {error, Reason :: term()}.
+create_a_virtual_stream_on_index(_Index, []) -> {error, "Not a valid VStream"};
+create_a_virtual_stream_on_index(Index, List) ->
+	Involved = "[" ++ ["\"" ++ X ++ "\"," || X <- lists:sublist(List, 1, length(List)-1)] ++ "\"" ++ lists:last(List) ++ "\"]",
+	case erlastic_search:index_doc(Index, "virtual_stream", "{\"name\":\"test\", \"streams_involved\":" ++ Involved ++ ", \"function\":[\"count\", \"2s\"]}") of
+		{error, Reason} -> {error, Reason};
+		{ok, Data} ->
+			binary_to_list(element(2, lists:nth(4, element(2, Data))))
+	end.
+
+
+remove_virtual_stream_on_index(Index, VStreamId) ->
+	erlastic_search:delete_doc(Index, "virtual_stream", VStreamId).
 
 
 
@@ -396,4 +417,19 @@ number_to_list(Value) when is_integer(Value) ->
 number_to_list(Value) when is_float(Value) ->
 	float_to_list(Value).
 
+
+
+
+
+
+remove_any_vsdatapoints(Index) ->
+	case erlastic_search:search(Index, "vsdatapoint", "*") of
+		{error, {Code, Body}} ->
+			ErrorString = api_help:generate_error(Body, Code),
+			{error, ErrorString};
+		{ok, JsonStruct} ->
+		    List = lib_json:get_field(JsonStruct, "hits.hits"),
+		    [erlastic_search:delete_doc(Index, "vsdatapoint", binary_to_list(lib_json:get_field(X, "_id"))) || X <- List]
+	end.
+		    
 
