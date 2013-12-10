@@ -391,7 +391,8 @@ process_post(ReqData, State) ->
 					ErrorString1 = api_help:generate_error(Body1, Code1),
 		            {{halt, Code1}, wrq:set_resp_body(ErrorString1, ReqData), State};
 				{true,true,_} ->
-                    FieldsAdded = add_server_side_fields(UserJson),
+					NewUserJson = lib_json:replace_field(UserJson, "username", list_to_binary(UserName)),
+                    FieldsAdded = add_server_side_fields(NewUserJson),
 					case erlastic_search:index_doc_with_id(?INDEX, "user", UserName, FieldsAdded) of
 						{error, {Code2, Body2}} -> 
 							ErrorString2 = api_help:generate_error(Body2, Code2),
