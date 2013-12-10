@@ -74,6 +74,9 @@ run: compile
 run_all: compile
 	sudo scripts/sensec.sh start
 
+test_setup: compile
+	sudo scripts/sensec.sh test_setup
+
 stop_all:
 	sudo scripts/sensec.sh stop
 
@@ -118,12 +121,6 @@ test_streams: compile
 	curl -XDELETE localhost:9200/sensorcloud
 	curl -XPUT localhost:9200/sensorcloud
 	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -eval 'test:run(streams)'
-
-## test_suggest: compile
-	## -@mkdir test-results
-	## curl -XDELETE localhost:9200/sensorcloud
-	## curl -XPUT localhost:9200/sensorcloud
-	## $(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -eval 'test:run(suggest)'
 
 test_users: compile
 	-@mkdir test-results
@@ -211,6 +208,9 @@ help:
 	@echo ""
 	@echo "'make run_all'"
 	@echo "Compiles and runs all parts of the project. Does NOT compile libraries"
+	@echo ""
+	@echo "'make test_setup'"
+	@echo "Easy setup of environment prior to running 'make test''"
 	@echo ""
 	@echo "'make stop_all'"
 	@echo "Stops all parts of the project which was started with 'make run_all'"
