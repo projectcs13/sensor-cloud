@@ -5,7 +5,7 @@
 ################################################################################
 ERL := erl
 REBAR := ./rebar
-ERL_CONFIG := -config config/engine.config
+ERL_CONFIG := -config config/engine.config -config config/sasl.config
 ERL_BOOT := -boot start_sasl -s reloader -s engine
 ERL_PA_FOLDERS := -pa ebin/ lib/*/ebin/ lib/*/bin/
 ################################################################################
