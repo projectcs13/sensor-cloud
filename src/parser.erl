@@ -47,17 +47,7 @@ parseJson(Parser, Data, Time) ->
 					_ ->
 						{"stream_id",list_to_binary(StreamId)}
 				  end,
-	FieldValue2 = case is_integer(Res) of
-		true->
-			{"value",Res};
-		_->
-			case is_float(Res) of
-				true->
-					{"value",Res};
-				_ ->
-					{"value",list_to_float(Res)}
-			end
-	end,
+	FieldValue2 = {"value", api_help:any_to_float(Res)},
 	TimeStamp = case Time of
 					[] ->
 						list_to_binary(?TIME_NOW(erlang:localtime()));
