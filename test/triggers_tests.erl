@@ -292,7 +292,6 @@ start_up_triggers_test() ->
 	Trigger = lib_json:set_attrs([{"function",list_to_binary("less_than")},{"streams",[StreamId1]},{"outputlist","[{}]"},{"outputlist[0].input",10},{"outputlist[0].output",["{}"]},{"outputlist[0].output[0].output_id",list_to_binary("tomas")},{"outputlist[0].output[0].output_type",list_to_binary("user")}]),
 	erlastic_search:index_doc_with_id(?INDEX,"trigger","1",Trigger),
 	api_help:refresh(),
-	api_help:refresh(),
 	triggers:start_all_triggers_in_es(),
 	timer:sleep(1000),
 	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, _Body2}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/add", [],"application/json", "{\"function\" : \"less_than\",\"input\":5,\"streams\":\"" ++ lib_json:to_string(StreamId1) ++"\"}"}, [], []),
@@ -305,7 +304,9 @@ start_up_triggers_test() ->
 					 "{\"trigger\":{\"input\":5,\"stream_id\":\"" ++ lib_json:to_string(StreamId1) ++"\",\"trigger_id\":\"1\",\"value\":4}}"],
 	% Clean up
 	{ok, {{_Version5, 200, _ReasonPhrase5}, _Headers5, _Body5}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/remove", [],"application/json", "{\"function\" : \"less_than\",\"input\":5,\"streams\":\"" ++ lib_json:to_string(StreamId1) ++"\"}"}, [], []),
+	api_help:refresh(),
 	{ok, {{_Version6, 200, _ReasonPhrase6}, _Headers6, _Body6}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/remove", [],"application/json", "{\"function\" : \"less_than\",\"input\":10,\"streams\":\"" ++ lib_json:to_string(StreamId1) ++"\"}"}, [], []),
+	api_help:refresh(),
 	httpc:request(delete, {?WEBMACHINE_URL++"/users/tomas", []}, [], []),
 	?assertEqual(true, check_all_exist(NotificationList,ReferenceList)).
 	
