@@ -62,7 +62,7 @@ start_link(VStreamId, InputIds, Function) ->
 
 %% spec of record state:
 %% {string(), [{atom(),string()}], binary(), {pid(), pid(), pid()}, atom()}
--record(state, {vstreamid, datapoints, exchange, network, function, log}).
+-record(state, {vstreamid, datapoints, exchange, network, function, log, history_size, last_updated}).
 
 
 
@@ -115,15 +115,45 @@ init([VStreamId, InputIds, Function]) ->
 	
 	%% Get the latest value for each datapoint.
 	DataPoints = get_latest_value_for_streams(InputIds),
-	
-	%% Create state
-	State = #state{vstreamid=VStreamId,
-				   datapoints = DataPoints,
-				   exchange = VStreamExchange,
-				   network = {Connection, ChannelIn, ChannelOut},
-				   function = Function,
-				   log = []},
-    {ok, State}.
+
+	%% Make sure we got all data points and get the history_size and last_updated.
+	case length(InputIds) == length(DataPoints) of
+		false ->
+			{stop, "Can't connect to ES"};
+		_ ->
+			case erlastic_search:get_doc(?ES_INDEX,
+										 "virtual_stream",
+										 VStreamId) of
+				{error, Reason} ->
+					{stop, Reason};
+				{ok, Result} ->
+					case lib_json:get_field(Result, "_source") of
+						undefined ->
+							{stop, "None existing virtual stream"};
+						Json ->
+							HistorySize =
+								case lib_json:get_field(Json, "history_size") of
+									undefined -> 0;
+									Size -> Size
+								end,
+							LastUpdated =
+								case lib_json:get_field(Json, "last_updated") of
+									undefined -> undefined;
+									Time -> binary_to_list(Time)
+								end,
+							%% Create state
+							State = #state{vstreamid=VStreamId,
+										   datapoints = DataPoints,
+										   exchange = VStreamExchange,
+										   network = {Connection, ChannelIn, ChannelOut},
+										   function = Function,
+										   log = [],
+										   history_size = HistorySize,
+										   last_updated = LastUpdated},
+						    {ok, State}
+					end
+			end
+	end.
 
 
 %% handle_call/3
@@ -208,19 +238,28 @@ handle_info({#'basic.deliver'{}, #amqp_msg{payload = Body}},
 					%% Store value in ES
 					Log = case erlastic_search:index_doc(?ES_INDEX,
 														 "vsdatapoint", Msg) of
-						  	{error, Reason} ->
-						  		erlang:display({error, Reason}),
+						  	{error, _Reason} ->
+						  		NewLastUpdated = State#state.last_updated,
+						  		NewHistorySize = State#state.history_size,
 						  		%% TODO Persistent storage using file?
 								[Msg | State#state.log];
 							{ok, _} ->
-								%% Try storing the log
-								store_log_in_es(State#state.log)
+								NewLastUpdated = Timestamp,
+								%% Try updating the vstream and storing the log
+								{L, S} = store_log_in_es(State#state.log, 0),
+								NewHistorySize = State#state.history_size + S + 1,
+								update_virtual_stream(State#state.vstreamid,
+													  NewHistorySize,
+													  NewLastUpdated),
+								L
 						  end,
 					%% Publish the calculated value
 					ChannelOut = element(3, Net),
 					send(ChannelOut, VStreamExchange, list_to_binary(Msg)),
 					{noreply, State#state{datapoints = NewDataPoints,
-										  log = Log}}
+										  log = Log,
+										  history_size = NewHistorySize,
+										  last_updated = NewLastUpdated}}
 			end;
 		_ ->
 			{noreply, State}
@@ -313,21 +352,25 @@ send(Channel, Exchange, Message) ->
 %% Purpose: Used to store data points into Elastic Search that previously
 %%			could not be stored.
 %% Args: Log - List of data points to store.
+%%       Stored - Number of stored data points.
 %% Returns: [] | NewLog where NewLog contain all data points that still could
 %%			not be stored.
 %% Side effects: Stores data points into Elastic Search.
 %%
 %% @end
--spec store_log_in_es([Log :: json()]) -> [] | [NewLog :: json()].
+-spec store_log_in_es([Log], Stored) -> {[], X} | {[NewLog], X} when
+	Log :: json(),
+	Stored :: integer(),
+	X :: integer(),
+	NewLog :: json().
 %% ====================================================================
-store_log_in_es([]) -> [];
-store_log_in_es([Msg | Log]) ->
+store_log_in_es([], X) -> {[], X};
+store_log_in_es([Msg | Log], X) ->
 	case erlastic_search:index_doc(?ES_INDEX, "vsdatapoint", Msg) of
-		{error, Reason} ->
-			erlang:display({error, Reason}),
-			[Msg | Log];
+		{error, _Reason} ->
+			{[Msg | Log], X};
 		{ok, _} ->
-			store_log_in_es(Log)
+			store_log_in_es(Log, X+1)
 	end.
 
 
@@ -461,6 +504,55 @@ get_latest_value_for_streams([{Type, Id} | T]) ->
 			end;
 		{error, _} -> get_latest_value_for_streams(T)
 	end.
+
+
+
+
+
+%% update_virtual_stream/3
+%% ====================================================================
+%% @doc
+%% Function: update_virtual_stream/3
+%% Purpose: Used to update a virtual streams history size and when it was last updated.
+%% Args: VStreamId - The id of the virtual stream to update,
+%%        HistorySize - The new history size of the virtual stream,
+%%        LastUpdated - The timestamp of when the virtual stream was last updated.
+%% Returns: {ok, Result} | {error, Reason}.
+%% @end
+-spec update_virtual_stream(VStreamId, HistorySize, LastUpdated) -> {ok, Result} | {error, Reason} when
+	VStreamId :: string(),
+	HistorySize :: integer(),
+	LastUpdated :: string(),
+	Result :: term(),
+	Reason :: term().
+%% ====================================================================
+update_virtual_stream(VStreamId, HistorySize, LastUpdated) ->
+	case erlastic_search:get_doc(?ES_INDEX, "virtual_stream", VStreamId) of
+		{error, Reason} ->
+			{error, Reason};
+		{ok, Result} ->
+			case lib_json:get_field(Result, "_source") of
+				undefined -> {error, "No such virtual stream"};
+				Json ->
+					Json1 =
+						case lib_json:get_field(Json, "history_size") of
+							undefined ->
+								lib_json:add_value(Json, "history_size", HistorySize);
+							_ ->
+								lib_json:replace_field(Json, "history_size", HistorySize)
+						end,
+					Json2 =
+						case lib_json:get_field(Json1, "last_updated") of
+							undefined ->
+								lib_json:add_value(Json1, "last_updated", list_to_binary(LastUpdated));
+							_ ->
+								lib_json:replace_field(Json1, "last_updated", list_to_binary(LastUpdated))
+						end,
+					Json3 = api_help:create_update(Json2),
+					api_help:update_doc(?ES_INDEX, "virtual_stream", VStreamId, Json3)
+			end
+	end.
+
 
 
 
