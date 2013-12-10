@@ -5,7 +5,7 @@
 ################################################################################
 ERL := erl
 REBAR := ./rebar
-ERL_CONFIG := -config config/engine.config
+ERL_CONFIG := -config config/engine.config -config config/sasl.config
 ERL_BOOT := -boot start_sasl -s reloader -s engine
 ERL_PA_FOLDERS := -pa ebin/ lib/*/ebin/ lib/*/bin/
 ################################################################################
@@ -58,10 +58,11 @@ all: compile
 ### Command: make install
 ### Downloads all dependencies and builds the entire project
 install: get_libs conf
-	echo "installing npm libs"
 	(cd javascripts; npm install socket.io; npm install rabbit.js)
 	 cp -r lib/elasticsearch-servicewrapper/service lib/elasticsearch/bin/
 
+install_linux_deps:
+	sudo scripts/install.sh
 
 ### Command: make run
 ### Downloads all depenedencies, bulds entire project and runs the project.
@@ -70,10 +71,22 @@ run: compile
 	curl -XPUT localhost:9200/sensorcloud
 	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine
 
+run_all: compile
+	sudo scripts/sensec.sh start
+
+test_setup: compile
+	sudo scripts/sensec.sh test_setup
+
+stop_all:
+	sudo scripts/sensec.sh stop
+
 ### Command: make run_es
 ### Runs elastic search
 run_es:
 	lib/elasticsearch/bin/elasticsearch -f
+
+run_nodejs:
+	nodejs javascripts/receive.js
 
 ### Command: make run_rabbit
 ### Runs rabbitMQ server
@@ -108,12 +121,6 @@ test_streams: compile
 	curl -XDELETE localhost:9200/sensorcloud
 	curl -XPUT localhost:9200/sensorcloud
 	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -eval 'test:run(streams)'
-
-## test_suggest: compile
-	## -@mkdir test-results
-	## curl -XDELETE localhost:9200/sensorcloud
-	## curl -XPUT localhost:9200/sensorcloud
-	## $(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -eval 'test:run(suggest)'
 
 test_users: compile
 	-@mkdir test-results
@@ -193,8 +200,20 @@ help:
 	@echo "'make install'"
 	@echo "Downloads and compiles all libraries"
 	@echo ""
+	@echo "'make install_linux_deps'"
+	@echo "Installs all Linux dependencies for the project."
+	@echo ""
 	@echo "'make run'"
 	@echo "Compiles and runs the project. Does NOT compile libraries"
+	@echo ""
+	@echo "'make run_all'"
+	@echo "Compiles and runs all parts of the project. Does NOT compile libraries"
+	@echo ""
+	@echo "'make test_setup'"
+	@echo "Easy setup of environment prior to running 'make test''"
+	@echo ""
+	@echo "'make stop_all'"
+	@echo "Stops all parts of the project which was started with 'make run_all'"
 	@echo ""
 	@echo "'make run_es'"
 	@echo "Runs the elastic search server"

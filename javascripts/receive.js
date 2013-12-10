@@ -7,6 +7,7 @@ var port = 8080,
     io = require('socket.io').listen(port),
     url = require('url');
     var streams = new Object();
+    process.setMaxListeners(0);
     // Limits debug messages that are printed by socket.io
     io.set('log level', 1); 
 

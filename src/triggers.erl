@@ -11,7 +11,7 @@
 
 -module(triggers).
 -export([init/1, allowed_methods/2, content_types_provided/2, content_types_accepted/2, get_triggers/2, process_post/2,
-		 delete_resource/2]).
+		 delete_resource/2, start_all_triggers_in_es/0]).
 
 
 -define(ELASTIC_SEARCH_URL, api_help:get_elastic_search_url()).
@@ -219,7 +219,6 @@ add_uri(ReqData, State) ->
 					{true, wrq:set_resp_body(lib_json:encode(List2), ReqData), State}
 			end;
 		{EsId,_,_,_}->
-			erlang:display(EsId),
 			CommandExchange = list_to_binary("command.trigger."++ EsId),
 			Msg = term_to_binary({add,{Input,{uri,URI}}}),
 			%% Connect, now assumes local host
@@ -331,7 +330,6 @@ add_user(User, ReqData, State) ->
 					end
 			end;
 		{EsId,_,_,_}->
-			erlang:display(EsId),
 			CommandExchange = list_to_binary("command.trigger."++ EsId),
 			Msg = term_to_binary({add,{Input,{user,Username}}}),
 			%% Connect, now assumes local host
@@ -506,10 +504,8 @@ remove_user(User, ReqData, State) ->
 			   {error, {Code, Body}} -> 
 				   {error, {Code, Body}};
 			   {ok,JsonStruct} ->
-				   erlang:display(binary_to_list(iolist_to_binary(lib_json:encode(JsonStruct)))),
 				   case lib_json:get_field(JsonStruct, "hits.total") of
-					   0 -> ?DEBUG(poff), 
-						error;
+					   0 -> error;
 					   1 -> lib_json:get_field(JsonStruct, "hits.hits[0]._id");
 					   X -> get_es_id(lib_json:get_field(JsonStruct, "hits.hits"),Streams)
 				   end
@@ -637,4 +633,88 @@ matches_exactly([First|Rest],Streams) ->
 		false ->
 			false
 	end.
+
+
+%% @doc
+%% Function: start_all_triggers_in_es/0
+%% Purpose: Used to start all triggers in ES
+%%          when the function is called
+%% Returns: ok if it managed to start everything
+%%          otherwise error
+%% @end
+-spec start_all_triggers_in_es() -> ok | error.
+
+start_all_triggers_in_es() ->
+	AmountQuery = "{\"query\" : {\"match_all\" : {}}}",
+	case erlastic_search:search_json(#erls_params{},?INDEX, "trigger", AmountQuery) of % Maybe wanna take more
+		{error, {_Code, _Body}} -> 
+			erlang:display("Error when starting up triggers"),
+			error;
+		{ok,JsonStruct} ->
+			NumberOfTriggers = lib_json:get_field(JsonStruct, "hits.total"),
+			TriggerQuery = "{\"size\": " ++ integer_to_list(NumberOfTriggers) ++ ",\"query\" : {\"match_all\" : {}}}",
+			case erlastic_search:search_json(#erls_params{},?INDEX, "trigger", TriggerQuery) of % Maybe wanna take more
+				{error, {_Code2, _Body2}} -> 
+					erlang:display("Error when starting up triggers"),
+					error;
+				{ok,JsonStruct2} ->
+					Triggers = lists:map(fun(A) -> {lib_json:to_string(lib_json:get_field(A, "_id")),lib_json:get_field(A, "_source")} end,lib_json:get_field(JsonStruct2, "hits.hits")),
+					ParsedTriggers = parse_triggers(Triggers,[]),
+					start_processes(ParsedTriggers)
+			end
+	end.
+
+%% @doc
+%% Function: parse_triggers/2
+%% Purpose: Used to parse the triggers from
+%%          json objects to something that can
+%%          be used to start the trigger processes
+%% Returns: a list of trigger attributes, where all
+%%          attributes for a trigger is in a tuple
+%% @end
+-spec parse_triggers(TriggerList::list(),Accumelator::list()) -> list().
+
+parse_triggers([],Acc) ->
+	Acc;
+parse_triggers([{Id,Trigger}|Rest],Acc) ->
+	Function = lib_json:to_string(lib_json:get_field(Trigger, "function")),
+	Streams = lists:map(fun(A) -> lib_json:to_string(A) end, lib_json:get_field(Trigger, "streams")),
+	InputList = parse_outputlist(lib_json:get_field(Trigger, "outputlist"),[]),
+	NewElement = {{id,Id},{function,Function},{inputlist,InputList},{streams,Streams}},
+	parse_triggers(Rest,[NewElement|Acc]).
+
+%% @doc
+%% Function: parse_outputlist/2
+%% Purpose: Used to parse the outputlist from
+%%          json objects to something that can
+%%          be used to start the trigger processes
+%% Returns: a list of outputlists
+%% @end
+-spec parse_outputlist(TriggerList::list(),Accumelator::list()) -> list().
+
+parse_outputlist([],Acc) ->
+	Acc;
+parse_outputlist([First|Rest],Acc) ->
+	Input = lib_json:get_field(First, "input"),
+	Output = lists:map(fun(A) -> {list_to_atom(lib_json:to_string(lib_json:get_field(A, "output_type"))),lib_json:to_string(lib_json:get_field(A, "output_id"))} end, lib_json:get_field(First, "output")),
+	NewElement = {Input,Output},
+	parse_outputlist(Rest,[NewElement|Acc]).
+
+
+%% @doc
+%% Function: start_processes/1
+%% Purpose: Used to start processes for the
+%%          list of triggers that it is given
+%% Returns: ok
+%% @end
+-spec start_processes(TriggerList::list()) -> ok.
+
+start_processes([]) ->
+	ok;
+start_processes([{{id,Id},{function,Function},{inputlist,InputList},{streams,Streams}}|Rest]) ->
+	spawn_link(fun() ->
+					   triggersProcess:create(Id, lists:map(fun(A) -> {stream,A} end,Streams), 
+											  Function, InputList)
+			   end),
+	start_processes(Rest).
 

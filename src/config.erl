@@ -199,6 +199,14 @@ engine_and_nodejs_config() ->
 				lib_file:ensure_dir_exists(Value),
 				"LOG_JS_DIR=" ++ Value ++ "\n"
 			end;
+		    OldLine = "ES_PORT"++_Line ->
+			case application:get_env(engine, es_port) of
+			    undefined ->
+				?DEBUG("Elastic search port option not defined. Using default value."),
+				OldLine;
+			    {ok, Value} ->
+				"ES_PORT=" ++ integer_to_list(Value) ++ "\n"
+			end;
 		    X ->
 			X
 		end || X <- Lines],  
