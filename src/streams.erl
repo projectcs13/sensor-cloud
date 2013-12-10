@@ -148,8 +148,6 @@ delete_resource(ReqData, State) ->
 delete_stream_id_from_subscriptions(StreamId,Subscribers) when is_list(StreamId) ->
 	delete_stream_id_from_subscriptions(binary:list_to_bin(StreamId), Subscribers);
 delete_stream_id_from_subscriptions(StreamId,[]) ->
-						erlang:display("deleted"),
-
 	ok;
 delete_stream_id_from_subscriptions(StreamId, [Head|Rest]) ->
 	case lib_json:get_field(Head, "user_id") of 

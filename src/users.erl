@@ -162,8 +162,6 @@ delete_streams([StreamId|Rest]) ->
 			{error, {Code2, Body2}} -> {error, {Code2, Body2}};
 			{ok,JsonStruct} -> 	 
 				SubsList = lib_json:get_field(JsonStruct, "_source.subscribers"),
-									erlang:display("deleting"),
-
 				streams:delete_stream_id_from_subscriptions(StreamId,SubsList)
 	end,
 	case streams:delete_data_points_with_stream_id(StreamId) of
