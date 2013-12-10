@@ -536,6 +536,9 @@ subscription_test() ->
 	?assertEqual("subsuser2",binary_to_list(lib_json:get_field(Body9,"subscribers[0].user_id"))),
 
 	{ok, {{_Version10, 200, _ReasonPhrase10}, _Headers10, Body10}} = httpc:request(delete, {?WEBMACHINE_URL++"/users/subsUser2/streams", []}, [], []),
+	
+	api_help:refresh(),
+	
 	{ok, {{_Version11, 200, _ReasonPhrase11}, _Headers11, Body11}} = httpc:request(get, {?WEBMACHINE_URL++"/users/subsUser2" , []}, [], []),
 
 	api_help:refresh(),

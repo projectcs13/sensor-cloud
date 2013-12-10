@@ -148,6 +148,8 @@ delete_resource(ReqData, State) ->
 delete_stream_id_from_subscriptions(StreamId,Subscribers) when is_list(StreamId) ->
 	delete_stream_id_from_subscriptions(binary:list_to_bin(StreamId), Subscribers);
 delete_stream_id_from_subscriptions(StreamId,[]) ->
+						erlang:display("deleted"),
+
 	ok;
 delete_stream_id_from_subscriptions(StreamId, [Head|Rest]) ->
 	case lib_json:get_field(Head, "user_id") of 
@@ -159,6 +161,8 @@ delete_stream_id_from_subscriptions(StreamId, [Head|Rest]) ->
 					erlang:display("Non-existing user"),
 					delete_stream_id_from_subscriptions(StreamId,Rest);
 				{ok,List} ->	%User exists
+					erlang:display(lib_json:to_string(List)),
+
 					UpdateJson = "{\"script\" : \"ctx._source.subscriptions.remove(subscription)\",\"params\":{\"subscription\":{ \"stream_id\":\""++binary_to_list(StreamId)++"\"}}}",
 					case api_help:update_doc(?INDEX, "user", UserId, UpdateJson,[]) of
 						{error, {Code, Body}} ->
@@ -215,12 +219,13 @@ process_post(ReqData, State) ->
 			undefined ->
 			    UserAdded = Stream;
 			UId ->
-			    UserAdded = api_help:add_field(Stream,"user_id",string:to_lower(UId))
+			    UserAdded = api_help:add_field(Stream,"user_id",UId)
 		    end,
 		    case lib_json:get_field(UserAdded,"user_id") of
 			undefined -> {false, wrq:set_resp_body("\"user_id missing\"",ReqData), State};
 			UserId ->
-			    case {api_help:do_any_field_exist(UserAdded,?RESTRCITEDCREATESTREAMS),api_help:do_only_fields_exist(UserAdded,?ACCEPTEDFIELDSSTREAMS)} of
+				FinalUserAdded = lib_json:replace_field(UserAdded,"user_id",binary:list_to_bin(string:to_lower(binary_to_list(UserId)))),
+			    case {api_help:do_any_field_exist(FinalUserAdded,?RESTRCITEDCREATESTREAMS),api_help:do_only_fields_exist(FinalUserAdded,?ACCEPTEDFIELDSSTREAMS)} of
 				{true,_} ->
 				    ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDCREATESTREAMS),
 				    ResFields2 = string:sub_string(ResFields1, 1, length(ResFields1)-2),
@@ -230,7 +235,7 @@ process_post(ReqData, State) ->
 				{false,true} ->
 				    case erlastic_search:get_doc(?INDEX, "user", string:to_lower(binary_to_list(UserId))) of
 						{ok, Json} ->
-					    	FieldsAdded = add_server_side_fields(UserAdded),		      
+					    	FieldsAdded = add_server_side_fields(FinalUserAdded),		      
 						    FieldsAdded2 = case lib_json:get_fields(FieldsAdded, ["parser","data_type"]) of
 								       [undefined, undefined]->FieldsAdded;
 								       [undefined, _]->lib_json:rm_field(FieldsAdded, "data_type");
