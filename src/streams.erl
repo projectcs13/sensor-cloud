@@ -159,8 +159,6 @@ delete_stream_id_from_subscriptions(StreamId, [Head|Rest]) ->
 					erlang:display("Non-existing user"),
 					delete_stream_id_from_subscriptions(StreamId,Rest);
 				{ok,List} ->	%User exists
-					erlang:display(lib_json:to_string(List)),
-
 					UpdateJson = "{\"script\" : \"ctx._source.subscriptions.remove(subscription)\",\"params\":{\"subscription\":{ \"stream_id\":\""++binary_to_list(StreamId)++"\"}}}",
 					case api_help:update_doc(?INDEX, "user", UserId, UpdateJson,[]) of
 						{error, {Code, Body}} ->
