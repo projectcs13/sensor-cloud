@@ -118,10 +118,8 @@ polling_system_test()->
 	?assertEqual(2, length(ChildrenList)),
 	{_, Pid1, _, _} = lists:nth(1, ChildrenList),
 	{_, Pid2, _, _} = lists:nth(2, ChildrenList),
-	{_, Pid3, _, _} = lists:nth(3, ChildrenList),
 	{info, State1} = gen_server:call(Pid1, {check_info}),
 	{info, State2} = gen_server:call(Pid2, {check_info}),
-	{info, State3} = gen_server:call(Pid3, {check_info}),
 	
 	?assertEqual(true, is_record(State1, state)),
 	?assertEqual(true, is_record(State2, state)),
