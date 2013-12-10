@@ -128,7 +128,6 @@ post_data_exhange_test() ->
 	{ok, ChannelIn} = amqp_connection:open_channel(Connection),
 	InputExchanges = [list_to_binary("trigger." ++ lib_json:to_string(TriggerId1)),list_to_binary("trigger." ++ lib_json:to_string(TriggerId2))],
 	triggersProcess:subscribe(ChannelIn, InputExchanges),
-	
 	{ok, {{_Version7, 200, _ReasonPhrase7}, _Headers7, Body7}} = httpc:request(post, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(StreamId1) ++"/data", [],"application/json", "{\"value\" : 4}"}, [], []),
 	api_help:refresh(),
 	{ok, {{_Version8, 200, _ReasonPhrase8}, _Headers8, Body8}} = httpc:request(post, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(StreamId1) ++"/data", [],"application/json", "{\"value\" : 7}"}, [], []),
