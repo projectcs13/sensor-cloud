@@ -605,4 +605,36 @@ get_elastic_search_url() ->
 	"http://"++Ip++":"++integer_to_list(Port).
     
 
-
+%% @doc
+%% Purpose: Tries really hard to convert to float
+%% Returns: float() or error
+%% 
+%% @end
+-spec any_to_float(any()) -> float().
+any_to_float(Val) when is_float(Val) -> Val;
+any_to_float(Val) when is_integer(Val) -> float(Val);
+any_to_float(Val) when is_binary(Val) -> any_to_float(binary_to_list(Val));
+any_to_float(".") -> error;
+any_to_float(Val) when is_list(Val) ->
+	case lists:prefix(".", Val) of
+		true -> PointVal = "0"++Val;
+		false -> PointVal = Val
+	end,
+	case lists:prefix("-.", PointVal) of
+		true -> NewVal = "-0"++tl(PointVal);
+		false -> NewVal = PointVal
+	end,
+    case string:to_float(NewVal) of
+        {error,no_float} -> 
+        	try
+        		case list_to_integer(NewVal) of
+        			{error, no_integer} -> error;
+        			V -> float(V)
+        		end
+        	catch error:badarg ->
+        		error
+        	end;
+        {F,_Rest} -> F
+    end;
+any_to_float(Val) ->
+	error.
