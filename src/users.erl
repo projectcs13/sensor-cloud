@@ -435,12 +435,12 @@ get_user(ReqData, State) ->
                     end;
                 Id ->
 				    %% Get specific user
-					case erlastic_search:get_doc(?INDEX, "user", string:to_lower(Id)) of
+					case erlastic_search:get_doc(?INDEX, "user", string:to_lower(Id), [{<<"fields">>, <<"password,_source">>}]) of
 						{error, {Code1, Body1}} -> 
 							ErrorString1 = api_help:generate_error(Body1, Code1),
 							{{halt, Code1}, wrq:set_resp_body(ErrorString1, ReqData), State};
 						{ok,JsonStruct} ->
-							FinalJson = lib_json:get_and_add_id(JsonStruct),
+							FinalJson = lib_json:get_and_add_password(JsonStruct),
 							{FinalJson, ReqData, State} 
 					end
             end;
