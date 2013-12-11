@@ -13,7 +13,6 @@
 
 -include("common.hrl").
 -include("poller.hrl").
--include("parser.hrl").
 -include("pubsub.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("inets/include/mod_auth.hrl").
@@ -58,12 +57,12 @@ get_streams_using_polling_test() ->
 	?assertMatch([], poll_help:get_streams_using_polling()),
 	
 	%% Test that should return a list of length one.
-	post_stream("Test Stream2", "127.0.0.1", 10),
+	post_stream("Test Stream2", "127.0.0.1", 10, "", ""),
 	api_help:refresh(),	
 	?assertMatch(1, length(poll_help:get_streams_using_polling())),
 	
 	%% Test that should return a list of length two.
-	post_stream("Test Stream3", "127.0.0.2", 20),
+	post_stream("Test Stream3", "127.0.0.2", 20, "", ""),
 	api_help:refresh(),	
 	?assertMatch(2, length(poll_help:get_streams_using_polling())),
 	
@@ -87,7 +86,7 @@ json_to_record_stream_test() ->
 	
 	%% Enter a streams with and without polling.
     post_stream("Test stream1", ""),
-	post_stream("Test stream2", "127.0.0.1", 10),
+	post_stream("Test stream2", "127.0.0.1", 10, "", ""),
 	api_help:refresh(),	
 	
 	%% Test to get the stream as json and transform it to a #pollerInfo.
@@ -112,7 +111,7 @@ json_to_record_stream_test() ->
 	?assertEqual(undefined, Rec1#pollerInfo.frequency),
 	delete_stream_from_record(Rec1),
 	
-	post_stream("", "127.0.0.1", 10), %% undefined: name
+	post_stream("", "127.0.0.1", 10, "", ""), %% undefined: name
 	api_help:refresh(),	
 	List2 = poll_help:get_streams_using_polling(),
 	Rec2 = poll_help:json_to_record_stream(lists:nth(1, List2)),
@@ -149,8 +148,8 @@ json_to_record_streams_test() ->
 	
 	%% Enter two streams with and one without polling.
     post_stream("Test stream1", ""),
-	post_stream("Test stream2", "127.0.0.1", 10),
-	post_stream("Test stream3", "127.0.0.2", 20),
+	post_stream("Test stream2", "127.0.0.1", 10, "", ""),
+	post_stream("Test stream3", "127.0.0.2", 20, "", ""),
 	api_help:refresh(),	
 	
 	%% Test to get the stream list and transform it to a #pollerInfo list.
@@ -180,30 +179,6 @@ json_to_record_streams_test() ->
 	
 	%% Clear all entered streams.
 	clear_stream_type().
-
-
-%% @doc
-%% Function: get_parser_by_id_test/0
-%% Purpose: test poll_help:get_parser_by_id_test/1 function
-%% Returns: ok | {error, term()}.
-%% @end
--spec get_parser_by_id_test() -> ok | {error, term()}.
-get_parser_by_id_test() ->
-	
-	%% Clear all parsers stored in elasticsearch
-	clear_parser_type(),
-	api_help:refresh(),
-	
-	post_parser("1", "application/json","streams/temperature/value"),
-	api_help:refresh(),
-	Parser= poll_help:get_parser_by_id("1"),
-	?assertEqual(true, is_record(Parser, parser)),
-	?assertEqual("1", Parser#parser.stream_id),
-	?assertEqual("streams/temperature/value", Parser#parser.input_parser),
-	?assertEqual("application/json", Parser#parser.input_type),
-	
-	%% Clear all entered parsers.
-	clear_parser_type().
 
 
 %% ====================================================================
@@ -236,28 +211,16 @@ clear_datapoint_type()->
 	httpc:request(delete, {api_help:get_elastic_search_url()++"/sensorcloud" ++ "/datapoint", []}, [], []).
 
 %% @doc
-%% Function: clear_parser_type/0
-%% Purpose: Delete all the parsers in elasticsearch.
-%% Returns: {ok, Result} | {ok, saved_to_file} | {error, Reason}.
-%% @end
--spec clear_parser_type() ->
-		  {ok, term()}
-		| {ok, saved_to_file}
-		| {error, term()}.
-clear_parser_type() ->
-	httpc:request(delete, {api_help:get_elastic_search_url()++"/sensorcloud" ++ "/parser", []}, [], []).
-
-%% @doc
 %% Function: post_stream/3
 %% Purpose: Post a stream using the values provided, if 'Name' or 'Uri' is
 %%          empty they are ignored.
 %% Returns: {ok, Result} | {ok, saved_to_file} | {error, Reason}.
 %% @end
--spec post_stream(Name :: string(), Url :: string(), Freq :: integer()) ->
+-spec post_stream(Name :: string(), Url :: string(), Freq :: integer(), DataType :: string(), Parser :: string()) ->
 		  {ok, term()}
 		| {ok, saved_to_file}
 		| {error, term()}.
-post_stream(Name, Uri, Freq) when is_integer(Freq) ->
+post_stream(Name, Uri, Freq, DataType, Parser) when is_integer(Freq) ->
 	N = case Name of
 			"" -> "";
 			_ -> ", \"name\" : \"" ++ Name ++ "\""
@@ -267,9 +230,17 @@ post_stream(Name, Uri, Freq) when is_integer(Freq) ->
 			_ -> ", \"uri\" : \"" ++ Uri ++ "\""
 		end,
 	F = "\"polling_freq\" : " ++ integer_to_list(Freq),
+	D = case DataType of
+			"" -> "";
+			_ -> ", \"data_type\":\"" ++ DataType ++ "\""
+		end,
+	P = case Parser of
+			"" -> "";
+			_ -> ", \"parser\":\"" ++ Parser ++ "\""
+		end,
 	httpc:request(post, {api_help:get_elastic_search_url()++"/sensorcloud" ++ "/stream", [],
 						 "application/json",
-						 "{" ++ F ++ U ++ N ++ "}"
+						 "{" ++ F ++ U ++ N ++ D ++ P ++ ", \"polling\":true}"
 						},
 				  [], []).
 
@@ -304,31 +275,6 @@ post_datapoint(StreamId, Value) when is_list(StreamId) ->
 				  [], []).
 
 %% @doc
-%% Function: post_parser/3
-%% Purpose: Post a parser using the values provided, if 'InputType' or 'InputParser' is
-%%          empty they are ignored.
-%% Returns: {ok, Result} | {ok, saved_to_file} | {error, Reason}.
-%% @end
--spec post_parser(StreamId :: string(), InputType :: string(), InputParser :: string()) ->
-		  {ok, term()}
-		| {ok, saved_to_file}
-		| {error, term()}.
-post_parser(StreamId, InputType, InputParser) when is_list(StreamId)->
-	It = case InputType of
-			 "" -> "";
-			 _ -> ", \"input_type\":\"" ++ InputType ++ "\""
-		 end,
-	Ip = case InputParser of
-			 "" -> "";
-			 _ -> ", \"input_parser\":\"" ++ InputParser ++ "\""
-		 end,
-	Si = "\""++StreamId++"\"",
-	{ok, Res} = httpc:request(post, {api_help:get_elastic_search_url()++"/sensorcloud" ++ "/parser", [],
-						 "application/json",
-						 "{\"stream_id\":"++Si++It++Ip++"}"
-						}, [],[]).
-
-%% @doc
 %% Function: post_stream/2
 %% Purpose: Post a stream using the values provided, if 'Name' or 'Uri' is
 %%          empty they are ignored.
@@ -351,13 +297,13 @@ post_stream(Name, "") ->
 post_stream("", Uri) ->
 	httpc:request(post, {api_help:get_elastic_search_url()++"/sensorcloud" ++ "/stream", [],
 						 "application/json",
-						 "{\"uri\" : \"" ++ Uri ++ "\" }"
+						 "{\"uri\" : \"" ++ Uri ++ "\", \"polling\":true}"
 						}, [], []);
 post_stream(Name, Uri) ->
 	httpc:request(post, {api_help:get_elastic_search_url()++"/sensorcloud" ++ "/stream", [],
 						 "application/json",
 						 "{\"name\" : \"" ++ Name ++ "\"" ++
-							 ", \"uri\" : \"" ++ Uri ++ "\" }"
+							 ", \"uri\" : \"" ++ Uri ++ "\", \"polling\":true }"
 						}, [], []).
 
 

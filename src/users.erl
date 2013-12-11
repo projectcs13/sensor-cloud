@@ -113,13 +113,15 @@ delete_resource(ReqData, State) ->
 
 delete_streams_with_user_id(Id) ->
 	api_help:refresh(),
-	Query = "user_id:" ++ Id, 
+	Query = "user_id:" ++ Id,
+	erlang:display("the query is: "++Query),
 	case erlastic_search:search_limit(?INDEX, "stream", Query,500) of
 		{error,Reason} -> 
 			{error,Reason};
-		{ok,List} -> 
+		{ok,List} ->
 			case get_streams(List) of
-				[] -> {ok};
+				[] -> erlang:display("the length of list is zero"),
+					  {ok};
 				Streams ->
 					case delete_streams(Streams, "stream") of
 						{error,Reason} -> {error, Reason};
@@ -173,39 +175,31 @@ delete_streams([StreamId|Rest], Type) ->
 	case Type of 
 		"stream" ->
 			case erlastic_search:get_doc(?INDEX, "stream", StreamId) of 
-					{error, {Code2, Body2}} -> {error, {Code2, Body2}};
-					{ok,JsonStruct} -> 	 
-						SubsList = lib_json:get_field(JsonStruct, "_source.subscribers"),
-						streams:delete_stream_id_from_subscriptions(StreamId,SubsList)
+				{error, {Code2, Body2}} -> {error, {Code2, Body2}};
+				{ok,JsonStruct} -> 	 
+					SubsList = lib_json:get_field(JsonStruct, "_source.subscribers"),
+					streams:delete_stream_id_from_subscriptions(StreamId,SubsList)
 			end;
 		_ -> 
 			ok
 	end,
 	case streams:delete_data_points_with_stream_id(StreamId, Type) of
-        {error,{Code, Body}} -> 
-            {error,{Code, Body}};
-        {ok} ->
+		{error,{Code, Body}} -> 
+			{error,{Code, Body}};
+		{ok} ->
 			case erlastic_search:delete_doc(?INDEX, Type, StreamId) of 
 				{error,Reason} -> {error,Reason};
 				{ok,_List} -> 
-					% delete the parser according to the stream`s id
-					% changed by lihao
-					Parser_id = "parser_"++binary_to_list(StreamId),
-					case erlastic_search:delete_doc(?INDEX, "parser", Parser_id) of
-						{error, Reason} -> {error, Reason},
-										   delete_streams(Rest, Type);
-						{ok, _List2} ->
-							% terminate the poller
-							case whereis(polling_supervisor) of
-								undefined->
-									continue;
-								_->
-									gen_server:cast(polling_supervisor, {terminate, binary_to_list(StreamId)})
-							end,
-							delete_streams(Rest, Type)
-					end
-					% change ends
+					% terminate the poller
+					case whereis(polling_supervisor) of
+						undefined->
+							continue;
+						_->
+							gen_server:cast(polling_supervisor, {terminate, binary_to_list(StreamId)})
+					end,
+					delete_streams(Rest, Type)
 			end
+	% change ends
 	end.
 
 
@@ -252,6 +246,7 @@ put_user(ReqData, State) ->
 							Stream ->
 								Stream
         				end,
+			
 			case erlastic_search:get_doc(?INDEX, "user", Id) of
 				{error, {Code, Body}} -> %User doesn't exist
 					ErrorString2 = api_help:generate_error(Body, Code),
@@ -285,7 +280,6 @@ put_user(ReqData, State) ->
 									not_found -> %User has NOT subscribed to this stream before
 										case add_subscriber(StreamId, Id) of
 											{error, {Code, Body}} ->
-
 												ErrorString3 = api_help:generate_error(Body, Code),
 				            					{{halt, Code}, wrq:set_resp_body(ErrorString3, ReqData), State};
 			            					ok ->
@@ -335,17 +329,13 @@ find_subscription(StreamId, [Head|Rest]) ->
 -spec add_subscriber(StreamId::string(), UserId::string()) -> ok | {error, no_model}. 
 
 add_subscriber(StreamId, UserId) ->
-	case erlastic_search:get_doc(?INDEX, "stream", StreamId) of 
-		{error, {Code, Body}} -> {error, {Code, Body}};
-		{ok,JsonStruct} -> 	 
-			NumberOfSubscribers = lib_json:get_field(JsonStruct, "_source.nr_subscribers") + 1, 
-				UpdateJson = "{\"script\" :\"{ctx._source.nr_subscribers = nr_subscribers; ctx._source.subscribers += subscriber};\",
-								\"params\":{\"nr_subscribers\":"++integer_to_list(NumberOfSubscribers)++",\"subscriber\":{ \"user_id\":\""++UserId++"\"}}}",
-			case api_help:update_doc(?INDEX, "stream",StreamId, UpdateJson,[]) of 
-					{error, {Code, Body}} -> {error, {Code, Body}};
-					{ok, _} -> 	ok
-			end
+	UpdateJson = "{\"script\" :\"{ctx._source.nr_subscribers += 1; ctx._source.subscribers += subscriber};\",
+					\"params\":{\"subscriber\":{ \"user_id\":\""++UserId++"\"}}}",
+	case api_help:update_doc(?INDEX, "stream",StreamId, UpdateJson,[]) of 
+			{error, {Code, Body}} -> {error, {Code, Body}};
+			{ok, _} -> 	ok
 	end.
+
 
 
 	%% @doc
@@ -357,17 +347,12 @@ add_subscriber(StreamId, UserId) ->
 -spec remove_subscriber(StreamId::string(), UserId::string()) -> ok | {error, no_model}. 
 
 remove_subscriber(StreamId, UserId) ->
-	case erlastic_search:get_doc(?INDEX, "stream", StreamId) of 
-		{error, {Code, Body}} -> {error, {Code, Body}};
-		{ok,JsonStruct} -> 	 
-			NumberOfSubscribers = lib_json:get_field(JsonStruct, "_source.nr_subscribers") - 1, 
-				UpdateJson = "{\"script\" :\"{ctx._source.nr_subscribers = nr_subscribers; ctx._source.subscribers.remove(subscriber)};\",
-								\"params\":{\"nr_subscribers\":"++integer_to_list(NumberOfSubscribers)++",\"subscriber\":{ \"user_id\":\""++UserId++"\"}}}",
-			case api_help:update_doc(?INDEX, "stream",StreamId, UpdateJson,[]) of 
-					{error, {Code, Body}} -> {error, {Code, Body}};
-					{ok, _} -> 	ok
-			end
-	end.
+	UpdateJson = "{\"script\" :\"{ctx._source.nr_subscribers += -1; ctx._source.subscribers.remove(subscriber)};\",
+						\"params\":{\"subscriber\":{ \"user_id\":\""++UserId++"\"}}}",
+	case api_help:update_doc(?INDEX, "stream",StreamId, UpdateJson,[]) of 
+			{error, {Code, Body}} -> {error, {Code, Body}};
+			{ok, _} -> 	ok
+	end.	
 
 %% @doc
 %% Function: process_post/2
@@ -417,7 +402,8 @@ process_post(ReqData, State) ->
 					ErrorString1 = api_help:generate_error(Body1, Code1),
 		            {{halt, Code1}, wrq:set_resp_body(ErrorString1, ReqData), State};
 				{true,true,_} ->
-                    FieldsAdded = add_server_side_fields(UserJson),
+					NewUserJson = lib_json:replace_field(UserJson, "username", list_to_binary(UserName)),
+                    FieldsAdded = add_server_side_fields(NewUserJson),
 					case erlastic_search:index_doc_with_id(?INDEX, "user", UserName, FieldsAdded) of
 						{error, {Code2, Body2}} -> 
 							ErrorString2 = api_help:generate_error(Body2, Code2),
@@ -510,7 +496,7 @@ process_search(ReqData, State, get) ->
 
 
 %% @doc
-%% Function: id_from_path/2
+%% Function: id_from_path/2 
 %% Purpose: Retrieves the id from the path.
 %% Returns: Id
 %% @end
@@ -519,10 +505,10 @@ id_from_path(RD) ->
     case wrq:path_info(id, RD) of
         undefined ->
             case string:tokens(wrq:disp_path(RD), "/") of
-                ["users", Id] -> string:to_lower(Id);
+                ["users", Id] ->string:to_lower(Id);
                 _ -> undefined
             end;
-        Id -> string:to_lower(Id)
+        Id ->  string:to_lower(Id)
     end.
 
 %% @doc
@@ -533,7 +519,7 @@ id_from_path(RD) ->
 -spec add_server_side_fields(Json::string()) -> string().
 
 add_server_side_fields(Json) ->
+	lib_json:add_values(Json,[{rankings, "[]"},{notifications,"[]"},{triggers,"[]"},{subscriptions, "[]"}]).
 
-        lib_json:add_values(Json,[
-            {rankings, "[]"},
-            {subscriptions, "[]"}]).
+
+

@@ -1,5 +1,5 @@
 %% @doc
-%% Author: Gabriel Tholsgård, Li Hao
+%% Author: Gabriel TholsgÃ¥rd, Li Hao
 %% [www.csproj13.student.it.uu.se]
 %% == common settings and names include file ==
 %% Provides definitions and settings for common things

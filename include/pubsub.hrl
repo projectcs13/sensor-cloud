@@ -1,3 +1,6 @@
+%% Datapoint erlang representation, that will propagate around in the pub/sub-system.
+-record(datapoint, {timestamp, id, value}).
+
 -ifndef(__PUBSUB_HRL__).
 -define(__PUBSUB_HRL__, 1).
 

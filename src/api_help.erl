@@ -180,20 +180,6 @@ is_unsubs(ReqData) ->
 	end.
 
 %% @doc
-%% Function: is_parser/1
-%% Purpose: Used to decide if the URI specifie a parser request
-%% Returns: True if URI specifies a parser request, false otherwise
-%% @end
--spec is_parser(ReqData::term()) -> boolean().
-is_parser(ReqData) ->
-	case string:str(wrq:path(ReqData),"parser") of
-		0 ->
-			false;
-		_ ->
-			true
-	end.
-
-%% @doc
 %% Function: json_handler/2
 %% Purpose: Used to get the json object from the request
 %% Returns: {Json,ReqData,State}
@@ -619,4 +605,36 @@ get_elastic_search_url() ->
 	"http://"++Ip++":"++integer_to_list(Port).
     
 
-
+%% @doc
+%% Purpose: Tries really hard to convert to float
+%% Returns: float() or error
+%% 
+%% @end
+-spec any_to_float(any()) -> float().
+any_to_float(Val) when is_float(Val) -> Val;
+any_to_float(Val) when is_integer(Val) -> float(Val);
+any_to_float(Val) when is_binary(Val) -> any_to_float(binary_to_list(Val));
+any_to_float(".") -> error;
+any_to_float(Val) when is_list(Val) ->
+	case lists:prefix(".", Val) of
+		true -> PointVal = "0"++Val;
+		false -> PointVal = Val
+	end,
+	case lists:prefix("-.", PointVal) of
+		true -> NewVal = "-0"++tl(PointVal);
+		false -> NewVal = PointVal
+	end,
+    case string:to_float(NewVal) of
+        {error,no_float} -> 
+        	try
+        		case list_to_integer(NewVal) of
+        			{error, no_integer} -> error;
+        			V -> float(V)
+        		end
+        	catch error:badarg ->
+        		error
+        	end;
+        {F,_Rest} -> F
+    end;
+any_to_float(Val) ->
+	error.
