@@ -34,3 +34,19 @@ Example use
 the above example will post '{"value": <load_avg>}' every 30 seconds to http://localhost:8000/streams/asd21/data
 
 The script posts using curl and thus requires curl to be installed.
+
+## Post streams to localhost:8000
+
+The script poststreams.py will post streams in a file to localhost:8000/streams, the example files are 
+weatherstreams, financialstreams and gamestreams. These files contains the JSON objects of a number of streams
+and they have the user_id 'andreas'. Either make sure that the user 'andreas' exists or change the user_ids in
+the files.
+
+Example usages:
+	python poststreams.py weatherstreams
+
+	python poststreams.py financialstreams
+
+	python poststreams.py gamestreams
+
+
