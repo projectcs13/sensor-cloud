@@ -88,6 +88,12 @@ run_es:
 run_nodejs:
 	nodejs javascripts/receive.js
 
+### Command: make run_fake_resource
+### Runs the fake resources for polling	
+run_fake_resource:
+	(cd scripts/python/ && python -m CGIHTTPServer 8001 &) 
+	(cd scripts/python/ && python -m CGIHTTPServer 8002)
+
 ### Command: make run_rabbit
 ### Runs rabbitMQ server
 run_rabbit:
