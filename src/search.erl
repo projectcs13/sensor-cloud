@@ -144,8 +144,16 @@ process_search_post(ReqData, State) ->
         FromParam ->
             From = FromParam
     end,
+    case wrq:get_qs_value("location",ReqData) of
+        undefined ->
+            LocationParam = false;
+        "true" ->
+            LocationParam = true;
+        _ ->
+            LocationParam = false
+    end,
     {Json,_,_} = api_help:json_handler(ReqData,State),
-    FilteredJson = filter_json(Json, From, Size, Sort),
+    FilteredJson = filter_json(Json, From, Size, Sort, LocationParam),
     case erlastic_search:search_json(#erls_params{},?INDEX, "stream", FilteredJson) of % Maybe wanna take more
             {error, Reason1} ->
                 StreamSearch = {error, Reason1};
@@ -158,7 +166,8 @@ process_search_post(ReqData, State) ->
 			end,
 			StreamSearch = lib_json:encode(List1) % May need to convert
     end,
-    case erlastic_search:search_json(#erls_params{},?INDEX, "user", lib_json:rm_field(FilteredJson, "sort")) of % Maybe wanna take more
+    FilteredJson2 = filter_json(Json, From, Size, Sort, false),
+    case erlastic_search:search_json(#erls_params{},?INDEX, "user", lib_json:rm_field(FilteredJson2, "sort")) of % Maybe wanna take more
             {error, Reason2} ->
                     UserSearch = {error, Reason2};
             {ok,List2} -> 
@@ -232,11 +241,11 @@ filter_json(Json) ->
 
 
 %% @doc
-%% Function: filter_json/3
+%% Function: filter_json/4
 %% Purpose: Used to add private filters to the json query with pagination
 %% Returns: JSON string that is updated with filter and the from size parameters
 %% @end
-filter_json(Json, From, Size, Sort) ->
+filter_json(Json, From, Size, Sort, false) ->
 	case lib_json:get_field(Json, "sort") of 
 		undefined -> 
 			UseSort = "\"" ++ Sort ++ "\"", 
@@ -253,5 +262,23 @@ filter_json(Json, From, Size, Sort) ->
 	",\"size\" : "++Size++
 	",\"sort\" : " ++UseSort++
 	",\"query\" : {\"filtered\" : "++NewJson++
-	",\"filter\" : {\"bool\" : {\"must_not\" : {\"term\" : {\"private\" : \"true\"}}}}}}}".
-
+	",\"filter\" : {\"bool\" : {\"must_not\" : {\"term\" : {\"private\" : \"true\"}}}}}}}";
+filter_json(Json, From, Size, Sort, true) ->
+    case lib_json:get_field(Json, "sort") of 
+        undefined -> 
+            UseSort = "\"" ++ Sort ++ "\"", 
+            SortJson = Json;
+        SortValue when is_binary(SortValue) -> 
+            UseSort = "\"" ++ binary_to_list(SortValue) ++ "\"",
+            SortJson = lib_json:rm_field(Json, "sort");
+        SortValue -> 
+            UseSort = SortValue,
+            SortJson = lib_json:rm_field(Json, "sort")
+    end,
+    NewJson = string:sub_string(SortJson,1,string:len(SortJson)-1),
+    "{\"script_fields\":{\"location\":{\"script\":\"doc['location'].value\"}},\"fields\":\"_source\","++
+    "\"from\" : "++From++
+    ",\"size\" : "++Size++
+    ",\"sort\" : " ++UseSort++
+    ",\"query\" : {\"filtered\" : "++NewJson++
+    ",\"filter\" : {\"bool\" : {\"must_not\" : {\"term\" : {\"private\" : \"true\"}}}}}}}".
