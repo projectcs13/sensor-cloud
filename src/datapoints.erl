@@ -283,7 +283,7 @@ update_fields_in_stream(StreamId,TimeStamp,ReqData,State) ->
 %% Function: update_fields_in_stream/2
 %% Purpose: Update the history_size field and last_update
 %%          fields in the stream that is given
-%% Returns: ok or {error, ErrorString}
+%% Returns: ok or {error, Code, ErrorString}
 %%
 %% Side effects: Updates the document with the given id in ES
 %% @end
