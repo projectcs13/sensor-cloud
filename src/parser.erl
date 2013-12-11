@@ -58,7 +58,12 @@ parseJson(StreamId, Parser, Data, Time) ->
 		{error, Reason} -> erlang:display("Failed to insert the new datapoint into the elasticsearch for this reason: "++Reason),
 						   {error, Reason};
 		{ok,_List} -> 
-			datapoints:update_fields_in_stream(StreamId, binary_to_list(TimeStamp)),
+			case datapoints:update_fields_in_stream(StreamId, binary_to_list(TimeStamp)) of
+				{error, _Code, ErrorString}->
+					erlang:display("failed to update the stream`s information: "++ErrorString);
+				_->
+					ok
+			end,
 			FinalJson
 	end.
 
