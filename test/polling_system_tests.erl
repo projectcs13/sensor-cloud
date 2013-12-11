@@ -161,7 +161,6 @@ rebuild_system_test()->
 
 	%% testing rebuild
 	clear_stream_type(),
-	api_help:refresh(),
 	
     post_stream_with_id(1, "test2", ?POLL_ADD2, 1, "application/json", "streams/humidity/value"),
 	post_stream_with_id(2, "test1", ?POLL_ADD, 2, "application/json", "streams/temperature/value"),
@@ -313,7 +312,7 @@ post_stream_with_id(Id, Name, Uri, Freq, Type, Parser)->
 			"" -> "";
 			_ -> ", \"parser\":\"" ++ Parser ++ "\""
 		end,
-	Data = "{"++N++U++F++T++P++", \"polling\":true }",
+	Data = "{"++N++U++F++T++P++", \"polling\":true, \"history_size\":0}",
 	{ok, _} = erlastic_search:index_doc_with_id(?ES_INDEX, "stream", Id, Data).
 
 %% @doc
