@@ -435,7 +435,7 @@ get_user(ReqData, State) ->
                             ErrorString = api_help:generate_error(Body, Code),
                             {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 					    {ok,JsonStruct} ->
-						    FinalJson = lib_json:get_list_and_add_id(JsonStruct, users),
+						    FinalJson = lib_json:get_list_and_add_password(JsonStruct),
 						    {FinalJson, ReqData, State}  
                     end;
                 Id ->
