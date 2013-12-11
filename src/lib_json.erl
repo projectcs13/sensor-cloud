@@ -31,7 +31,9 @@
 %% ====================================================================
 -export([get_and_add_id/1, 
 	 get_list_and_add_id/1,
-	 get_list_and_add_id/2
+	 get_list_and_add_id/2,
+     get_and_add_password/1,
+     get_list_and_add_password/1
 	]).
 
 %% ====================================================================
@@ -417,6 +419,29 @@ get_list_and_add_id(JsonStruct, JsonKey) ->
     AddedId = lists:map(fun(X) -> get_and_add_id(X) end, HitsList),
     set_attr(JsonKey, AddedId).
 
+%% @doc 
+%% Gets the 'password' from the root, gets the '_source'. Adds password as 
+%% password' in _source and return the new JSON object.
+%%
+%% TODO Move to api_help
+%% @end 
+-spec get_and_add_password(JsonStruct::mochijson()) -> json_output_value().
+get_and_add_password(JsonStruct) ->
+    Id  = get_field(JsonStruct, "fields.password"),
+    SourceJson  = get_field(JsonStruct, "_source"),
+    add_value(SourceJson, "password", Id).
+
+%% @doc 
+%% Get the search results and performs get_and_add_password/1 on each
+%% elements in the result list.
+%% 
+%% TODO Move to api_help
+%% @end 
+-spec get_list_and_add_password(JsonStruct::mochijson()) -> json_string().
+get_list_and_add_password(JsonStruct) ->
+    HitsList = get_field(JsonStruct, "hits.hits"),
+    AddedPassword = lists:map(fun(X) -> get_and_add_password(X) end, HitsList),
+    set_attr(hits, AddedPassword).
 
 %% ====================================================================
 %% Internal functions
