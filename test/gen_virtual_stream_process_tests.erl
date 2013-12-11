@@ -94,7 +94,7 @@ start_and_terminate({VStreamId, StreamId1, _StreamId2}) ->
 	SupPid = whereis(vstream_sup),
 	Childrens1 = length(supervisor:which_children(vstream_sup)),
 	
-	virtual_stream_process_supervisor:add_child(VStreamId, [{stream, StreamId1}], [list_to_binary("count"), "2s"]),
+	virtual_stream_process_supervisor:add_child(VStreamId, [{stream, StreamId1}], [list_to_binary("total"), "2s"]),
 	%virtual_stream_process_supervisor:start_processes(),
 	%timer:sleep(5000),
 
@@ -129,7 +129,7 @@ vstream_subscribe_to_a_stream({VStreamId, StreamId1, _StreamId2}) ->
 	%% Create virtual stream listening to our stream
 	%virtual_stream_process_supervisor:start_processes(),
 	%timer:sleep(5000),
-	virtual_stream_process_supervisor:add_child(VStreamId, [{stream, StreamId1}], [list_to_binary("count"), "2s"]),
+	virtual_stream_process_supervisor:add_child(VStreamId, [{stream, StreamId1}], [list_to_binary("total"), "2s"]),
 	
 	%% Create a publisher and consumer exchanges
 	OutExchange = list_to_binary("streams." ++ StreamId1),
@@ -207,7 +207,7 @@ vstream_subscribe_to_streams_interval({VStreamId, StreamId1, StreamId2}) ->
 	%% Create virtual stream listening to our streams
 	%virtual_stream_process_supervisor:start_processes(),
 	%timer:sleep(5000),
-	virtual_stream_process_supervisor:add_child(VStreamId, [{stream, StreamId1}, {stream, StreamId2}], [list_to_binary("count"), "2s"]),
+	virtual_stream_process_supervisor:add_child(VStreamId, [{stream, StreamId1}, {stream, StreamId2}], [list_to_binary("total"), "2s"]),
 	
 	%% Create publisher and consumer exchanges
 	OutExchange1 = list_to_binary("streams." ++ StreamId1),
@@ -340,7 +340,7 @@ remove_stream_on_index(Index, StreamId) ->
 create_a_virtual_stream_on_index(_Index, []) -> {error, "Not a valid VStream"};
 create_a_virtual_stream_on_index(Index, List) ->
 	Involved = "[" ++ ["\"" ++ X ++ "\"," || X <- lists:sublist(List, 1, length(List)-1)] ++ "\"" ++ lists:last(List) ++ "\"]",
-	case erlastic_search:index_doc(Index, "virtual_stream", "{\"name\":\"test\", \"streams_involved\":" ++ Involved ++ ", \"function\":[\"count\", \"2s\"]}") of
+	case erlastic_search:index_doc(Index, "virtual_stream", "{\"name\":\"test\", \"streams_involved\":" ++ Involved ++ ", \"function\":[\"total\", \"2s\"]}") of
 		{error, Reason} -> {error, Reason};
 		{ok, Data} ->
 			binary_to_list(element(2, lists:nth(4, element(2, Data))))

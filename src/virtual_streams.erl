@@ -102,7 +102,7 @@ process_post(ReqData, State) ->
 					StreamsInvolved = lib_json:get_field(VirtualStreamJson, "streams_involved"),
 					TimestampFrom = lib_json:get_field(VirtualStreamJson, "timestampfrom"),
 					Function = lib_json:get_field(VirtualStreamJson, "function"),
-					AllowedFunctions = ["min", "max", "mean", "count"],
+					AllowedFunctions = ["min", "max", "mean", "total"],
 					case lists:member(binary_to_list(lists:nth(1, Function)), AllowedFunctions) of
 						true ->
 							reduce(VirtualStreamId, StreamsInvolved, TimestampFrom, Function, ReqData, State),
@@ -126,7 +126,7 @@ process_post(ReqData, State) ->
 %% and the statistical function, it executes a query and posts the vsdatapoints returned
 %% to the current virtual stream
 %% Returns: {true, ReqData, State} || {{error, Reason}, ReqData, State}
--spec reduce(VirtualStreamId::string(), Streams::string(), TimestampFrom::string(), Function::string(), ReqData::tuple(), State::string()) -> %%should change to date type instead, also add ReqData, State
+-spec reduce(VirtualStreamId::string(), Streams::string(), TimestampFrom::string(), Function::string(), ReqData::tuple(), State::string()) -> 
 		  {true, tuple(), string()}.
 reduce(VirtualStreamId, Streams, TimestampFrom, Function, ReqData, State) ->
 	Query = create_query(Function, Streams, TimestampFrom),
@@ -144,7 +144,7 @@ reduce(VirtualStreamId, Streams, TimestampFrom, Function, ReqData, State) ->
 																				  ]),
 											  erlastic_search:index_doc(?INDEX, "vsdatapoint", lib_json:to_string(FinalDatapoint)) %to add error check here
 									  end, DatapointsList),
-			{true, wrq:set_resp_body("\"status\":\"ok\"", ReqData), State} %% need to fix message returned
+			{true, wrq:set_resp_body("\"status\":\"ok\"", ReqData), State}
 	end.
 
  
@@ -166,7 +166,8 @@ get_vstream(ReqData, State) ->
                         SizeParam ->
                             Size = list_to_integer(SizeParam)
                     end,
-					Query = "{\"size\" :" ++ integer_to_list(Size) ++",\"query\" : {\"match_all\" : {}},\"filter\" : {\"bool\":{\"must_not\":{\"term\":{\"private\":\"true\"}}}}}",
+					Query = "{\"size\" :" ++ integer_to_list(Size) ++",\"query\" : {\"match_all\" : {}},
+						\"filter\" : {\"bool\":{\"must_not\":{\"term\":{\"private\":\"true\"}}}}}",
 					case erlastic_search:search_json(#erls_params{},?INDEX, "virtual_stream", Query) of
                         {error, {Code, Body}} -> 
                             ErrorString = api_help:generate_error(Body, Code),
@@ -244,7 +245,7 @@ delete_resource(ReqData, State) ->
 create_query(Function, Streams, TimestampFrom) ->
 	%size to be passed as a variable?? but it will not work in the terms facets query...
 	Query = lib_json:set_attrs(
-		  [{size, 100},
+		  [{size, 2000},
 		   {"query", "{}"},
 		   {"query.filtered", "{}"},
 		   {"query.filtered.query", "{}"},

@@ -12,7 +12,7 @@
 %% ====================================================================
 %% API functions
 %% ====================================================================
--export([min/2,max/2,mean/2,count/2]).
+-export([min/2,max/2,mean/2,total/2]).
 -compile({no_auto_import,[min/2]}).
 -compile({no_auto_import,[max/2]}).
 
@@ -59,7 +59,7 @@ mean(DataList,StreamId) ->
 	avg(DataList,StreamId,[]).
 
 %% @doc
-%% Function: count/1
+%% Function: total/2
 %% Purpose: Used to calculate the sum for 
 %%          a given list of data points
 %%          and create data points with the given stream_id, expects a list
@@ -68,9 +68,9 @@ mean(DataList,StreamId) ->
 %% Returns: [datapoint1,datapoint2,...] where the first datapoint is the
 %%          one created by sum on the last list of data points
 %% @end
--spec count(DataList::list(),StreamId::binary()) -> ResultList::list().
-count(DataList,StreamId) ->
-	count(DataList,StreamId,[]).
+-spec total(DataList::list(),StreamId::binary()) -> ResultList::list().
+total(DataList,StreamId) ->
+	sum(DataList,StreamId,[]).
 
 %% ====================================================================
 %% Internal functions
@@ -243,7 +243,7 @@ avg_internal([First|Rest],{Value,Number},TimeStamp,StreamId) ->
 
 
 %% @doc
-%% Function: count/3
+%% Function: sum/3
 %% Purpose: Used to calculate the sum for 
 %%          a given list of data points
 %%          and create data points with the given stream_id, expects a list
@@ -252,13 +252,13 @@ avg_internal([First|Rest],{Value,Number},TimeStamp,StreamId) ->
 %% Returns: [datapoint1,datapoint2,...] where the first datapoint is the
 %%          one created by sum on the last list of data points
 %% @end
--spec count(DataList::list(), StreamId::string(), Acc::list()) -> ResultList::list().
+-spec sum(DataList::list(), StreamId::string(), Acc::list()) -> ResultList::list().
 
-count([],_StreamId,Acc) ->
+sum([],_StreamId,Acc) ->
 	Acc;
-count([First|Rest],StreamId,Acc) ->
-	DataPoint = count_internal(First,0,none,StreamId),
-	count(Rest,StreamId,[DataPoint|Acc]).
+sum([First|Rest],StreamId,Acc) ->
+	DataPoint = sum_internal(First,0,none,StreamId),
+	sum(Rest,StreamId,[DataPoint|Acc]).
 
 %% @doc
 %% Function: sum_internal/4
@@ -270,12 +270,12 @@ count([First|Rest],StreamId,Acc) ->
 %% Returns: a datapoint that contains the sum of the values in the list
 %%          as the value, and the most recent timestamp as the timestamp
 %% @end
--spec count_internal(DataList::list(),  Acc::list(), TimeStamp::atom() | string(), StreamId::string()) -> ResultList::list().
+-spec sum_internal(DataList::list(),  Acc::list(), TimeStamp::atom() | string(), StreamId::string()) -> ResultList::list().
 
 
-count_internal([],Acc,TimeStamp,StreamId) ->
+sum_internal([],Acc,TimeStamp,StreamId) ->
 	lib_json:set_attrs([{"value", Acc}, {"timestamp", TimeStamp}, {"stream_id", StreamId}]);
-count_internal([First|Rest],Acc,TimeStamp,StreamId) ->
+sum_internal([First|Rest],Acc,TimeStamp,StreamId) ->
 	case TimeStamp of
 		none ->
 			NewTimeStamp = lib_json:get_field(First, "timestamp");
@@ -287,4 +287,4 @@ count_internal([First|Rest],Acc,TimeStamp,StreamId) ->
 					NewTimeStamp = TimeStamp
 			end
 	end,
-	count_internal(Rest,Acc + lib_json:get_field(First, "value"),NewTimeStamp,StreamId).
+	sum_internal(Rest,Acc + lib_json:get_field(First, "value"),NewTimeStamp,StreamId).

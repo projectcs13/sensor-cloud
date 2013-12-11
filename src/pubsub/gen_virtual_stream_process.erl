@@ -75,7 +75,7 @@ start_link(VStreamId, InputIds, Function) ->
 %%              format: [{Type, Id}]
 %%				where Type is the atom stream or vstream and Id is a string.
 %%				Third element is the function to apply as a atom,
-%%				i.e sum, max, min, avg.
+%%				i.e total(sum), max, min, avg.
 -spec init(Args :: Data) -> Result when
 	Data :: iolist(),
 	Result :: {ok, State}

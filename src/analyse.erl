@@ -75,8 +75,6 @@ get_analysis(ReqData, State) ->
 							ErrorString = api_help:generate_error(Body, Code),
 							{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 						{ok,JsonStruct} ->
-							erlang:display("got json for vstreams"),
-							erlang:display(lib_json:to_string(JsonStruct)),
 							{forecast(lib_json:get_field(JsonStruct, "hits.hits")),ReqData,State}
 					end
 			
@@ -91,9 +89,6 @@ get_analysis(ReqData, State) ->
 					ErrorString = api_help:generate_error(Body, Code),
 					{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 				{ok,JsonStruct} ->
-					
-							erlang:display("got json for streams"),
-							erlang:display(lib_json:to_string(JsonStruct)),
 					{forecast(lib_json:get_field(JsonStruct, "hits.hits")),ReqData,State}
 			end
 	end.

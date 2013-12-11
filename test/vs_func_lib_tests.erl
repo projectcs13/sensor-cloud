@@ -108,7 +108,7 @@ avg_test() ->
 
 %% @doc
 %% Function: sum_test/0
-%% Purpose: Used test the count(sum) function
+%% Purpose: Used test the total(sum) function
 %% Returns: ok | {error, term()}
 %%
 %% @end
@@ -128,7 +128,7 @@ sum_test() ->
 			["{\"timestamp\":\"2014-11-21T10:15:56.000\",\"value\":0.0}"],
 			["{\"timestamp\":\"2014-11-21T10:15:56.000\",\"value\":5.0}",
 			 "{\"timestamp\":\"2015-11-21T10:15:56.000\",\"value\":-5.0}"]],
-	Result = vs_func_lib:count(Data,<<"adjkkvcj--sdffs">>),
+	Result = vs_func_lib:total(Data,<<"adjkkvcj--sdffs">>),
 	?assertEqual(["{\"stream_id\":\"adjkkvcj--sdffs\",\"timestamp\":\"2015-11-21T10:15:56.000\",\"value\":0.0}",
 				  "{\"stream_id\":\"adjkkvcj--sdffs\",\"timestamp\":\"2014-11-21T10:15:56.000\",\"value\":0.0}",
 				  "{\"stream_id\":\"adjkkvcj--sdffs\",\"timestamp\":\"2015-11-21T10:15:56.000\",\"value\":-15.0}",
