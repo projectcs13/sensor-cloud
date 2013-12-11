@@ -11,32 +11,27 @@
 %% @end
 
 -module(parser).
--include("parser.hrl").
 -include("common.hrl").
 -include("pubsub.hrl").
 
 %% ====================================================================
 %% API functions
 %% ====================================================================
--export([parseJson/3, parseText/3]).
+-export([parseJson/4, parseText/4]).
 
 %% @doc
 %% Function: parseJson/2
 %% Purpose: used to parse the json data.
-%% Parameters: Parser   --the parser record, defined in parser.hrl file
+%% Parameters: StreamId --the id of stream
+%% 			   Parser   --the parser record, defined in parser.hrl file
 %%             Data     --the data which is going to be parsed, should be a json string
 %%             Time 	--the time of the date area in http response header
 %% Returns: JsonData | {error, ErrMsg}
 %% Side effects: Stores the newly parsed data point in the DB
 %% @end
--spec parseJson(Parser :: tuple(), Data :: string(), Time :: list()) -> string() | {error, string()}.
-parseJson(Parser, Data, Time) ->
-
-	%%extract the data from the coming data
-	StreamId = Parser#parser.stream_id,
-	InputParser = Parser#parser.input_parser,
-	
-	ItemList = filename:split(InputParser),
+-spec parseJson(StreamId :: string(), Parser :: tuple(), Data :: string(), Time :: list()) -> string() | {error, string()}.
+parseJson(StreamId, Parser, Data, Time) ->
+	ItemList = filename:split(Parser),
 	Query = processParser(ItemList, []),
 	Res = lib_json:get_field(Data, Query),
 	
@@ -63,6 +58,12 @@ parseJson(Parser, Data, Time) ->
 		{error, Reason} -> erlang:display("Failed to insert the new datapoint into the elasticsearch for this reason: "++Reason),
 						   {error, Reason};
 		{ok,_List} -> 
+			case datapoints:update_fields_in_stream(StreamId, binary_to_list(TimeStamp)) of
+				{error, _Code, ErrorString}->
+					erlang:display("failed to update the stream`s information: "++ErrorString);
+				_->
+					ok
+			end,
 			FinalJson
 	end.
 
@@ -72,8 +73,8 @@ parseJson(Parser, Data, Time) ->
 %% Returns: JsonData | {error, ErrMsg}
 %% Side effects: Stores the newly parsed data point in the DB
 %% @end
--spec parseText(tuple(), any(), list()) -> string() | tuple().
-parseText(_Parser, _Data, _Time) ->
+-spec parseText(list(), list(), any(), list()) -> string() | tuple().
+parseText(_StreamId, _Parser, _Data, _Time) ->
 	%% extract the wanted value from the text-data and store it in the DB
 	%% return the status of the transaction, ok or {error, ErrMsg}
 	{error, "parseText function has not been implemented"}.

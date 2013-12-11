@@ -7,7 +7,7 @@
 
 -module(datapoints).
 -export([init/1, allowed_methods/2, content_types_provided/2,
-		 process_post/2, get_datapoint/2]).
+		 process_post/2, get_datapoint/2, update_fields_in_stream/2]).
 
 -include("webmachine.hrl").
 -include("field_restrictions.hrl").
@@ -267,7 +267,7 @@ id_from_path(RD) ->
 
 
 %% @doc
-%% Function: id_from_path/4
+%% Function: update_fields_in_stream/4
 %% Purpose: Update the history_size field and last_update
 %%          fields in the stream that is given
 %% Returns: ok or {{halt,ErrorCode},ReqData,State}
@@ -277,18 +277,42 @@ id_from_path(RD) ->
 -spec update_fields_in_stream(StreamId::string()|binary(),TimeStamp::string()|binary(),ReqData::term(),State::term()) -> ok | {{halt,integer()},term(),term()}.
 
 update_fields_in_stream(StreamId,TimeStamp,ReqData,State) ->
+	case update_fields_in_stream(StreamId, TimeStamp) of
+		{error, Code, ErrorString}->
+			{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+		ok->
+			ok
+	end.
+
+
+%% @doc
+%% Function: update_fields_in_stream/2
+%% Purpose: Update the history_size field and last_update
+%%          fields in the stream that is given
+%% Returns: ok or {error, Code, ErrorString}
+%%
+%% Side effects: Updates the document with the given id in ES
+%% @end
+-spec update_fields_in_stream(StreamId::string()|binary(),TimeStamp::string()|binary()) -> ok | {error, integer(), string()}.
+
+update_fields_in_stream(StreamId, TimeStamp) ->
 	case erlastic_search:get_doc(?INDEX, "stream", StreamId) of
 		{error, {Code, Body}} -> 
 			ErrorString = api_help:generate_error(Body, Code),
-            {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+            {error, Code, ErrorString};
 		{ok,StreamJson} ->
-			OldHistorySize = lib_json:get_field(StreamJson, "_source.history_size"),
+			OldHistorySize = case lib_json:get_field(StreamJson, "_source.history_size") of
+								 undefined ->
+									 0;
+								 OldSize ->
+									 OldSize
+							 end,
 			Json = lib_json:set_attrs([{"last_updated", TimeStamp} , {"history_size", OldHistorySize+1}]),
 			Update = api_help:create_update(Json),
 			case api_help:update_doc(?INDEX, "stream", StreamId, Update) of
 				{error, {Code, Body}} -> 
 					ErrorString = api_help:generate_error(Body, Code),
-					{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+					{error, Code, ErrorString};
 				{ok,_} ->
 					ok
 			end

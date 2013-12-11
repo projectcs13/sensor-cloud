@@ -113,13 +113,15 @@ delete_resource(ReqData, State) ->
 
 delete_streams_with_user_id(Id) ->
 	api_help:refresh(),
-	Query = "user_id:" ++ Id, 
+	Query = "user_id:" ++ Id,
+	erlang:display("the query is: "++Query),
 	case erlastic_search:search_limit(?INDEX, "stream", Query,500) of
 		{error,Reason} -> 
 			{error,Reason};
-		{ok,List} -> 
+		{ok,List} ->
 			case get_streams(List) of
-				[] -> {ok};
+				[] -> erlang:display("the length of list is zero"),
+					  {ok};
 				Streams ->
 					case delete_streams(Streams) of
 						{error,Reason} -> {error, Reason};
@@ -171,23 +173,14 @@ delete_streams([StreamId|Rest]) ->
 			case erlastic_search:delete_doc(?INDEX, "stream", StreamId) of 
 				{error,Reason} -> {error,Reason};
 				{ok,_List} -> 
-					% delete the parser according to the stream`s id
-					% changed by lihao
-					Parser_id = "parser_"++binary_to_list(StreamId),
-					case erlastic_search:delete_doc(?INDEX, "parser", Parser_id) of
-						{error, Reason} -> {error, Reason},
-										   delete_streams(Rest);
-						{ok, _List2} ->
-							% terminate the poller
-							case whereis(polling_supervisor) of
-								undefined->
-									continue;
-								_->
-									gen_server:cast(polling_supervisor, {terminate, binary_to_list(StreamId)})
-							end,
-							delete_streams(Rest)
-					end
-					% change ends
+					% terminate the poller
+					case whereis(polling_supervisor) of
+						undefined->
+							continue;
+						_->
+							gen_server:cast(polling_supervisor, {terminate, binary_to_list(StreamId)})
+					end,
+					delete_streams(Rest)
 			end
 	end.
 
@@ -235,6 +228,7 @@ put_user(ReqData, State) ->
 							Stream ->
 								Stream
         				end,
+			
 			case erlastic_search:get_doc(?INDEX, "user", Id) of
 				{error, {Code, Body}} -> %User doesn't exist
 					ErrorString2 = api_help:generate_error(Body, Code),
@@ -268,7 +262,6 @@ put_user(ReqData, State) ->
 									not_found -> %User has NOT subscribed to this stream before
 										case add_subscriber(StreamId, Id) of
 											{error, {Code, Body}} ->
-
 												ErrorString3 = api_help:generate_error(Body, Code),
 				            					{{halt, Code}, wrq:set_resp_body(ErrorString3, ReqData), State};
 			            					ok ->
@@ -494,10 +487,10 @@ id_from_path(RD) ->
     case wrq:path_info(id, RD) of
         undefined ->
             case string:tokens(wrq:disp_path(RD), "/") of
-                ["users", Id] -> string:to_lower(Id);
+                ["users", Id] ->string:to_lower(Id);
                 _ -> undefined
             end;
-        Id -> string:to_lower(Id)
+        Id ->  string:to_lower(Id)
     end.
 
 %% @doc
