@@ -42,6 +42,10 @@ weatherstreams, financialstreams and gamestreams. These files contains the JSON 
 and they have the user_id 'andreas'. Either make sure that the user 'andreas' exists or change the user_ids in
 the files.
 
+If you want to make your own streamfiles, make sure that each stream object is contained in ONE line and that
+there are no empty lines between objects. Also make sure that the file does not contain trailing endlines or
+whitespaces.
+
 Example usages:
 	python poststreams.py weatherstreams
 
