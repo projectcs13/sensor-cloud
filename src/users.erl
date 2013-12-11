@@ -417,23 +417,28 @@ get_user(ReqData, State) ->
                         SizeParam ->
                             Size = list_to_integer(SizeParam)
                     end,
-					Query = "{\"size\" :" ++ integer_to_list(Size) ++",\"query\" : {\"match_all\" : {}},\"filter\" : {\"bool\":{\"must_not\":{\"term\":{\"private\":\"true\"}}}}}",
+                    case wrq:get_qs_value("admin",ReqData) of 
+                        "true" ->
+                        	Query = "{\"size\" :" ++ integer_to_list(Size) ++",\"query\" : {\"match_all\" : {}},\"fields\":[\"password\",\"_source\"]}}";
+                        _ ->
+                            Query = "{\"size\" :" ++ integer_to_list(Size) ++",\"query\" : {\"match_all\" : {}},\"filter\" : {\"bool\":{\"must_not\":{\"term\":{\"private\":\"true\"}}}}}"
+                    end,
 					case erlastic_search:search_json(#erls_params{},?INDEX, "user", Query) of
                         {error, {Code, Body}} -> 
                             ErrorString = api_help:generate_error(Body, Code),
                             {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 					    {ok,JsonStruct} ->
-						    FinalJson = lib_json:get_list_and_add_id(JsonStruct, users),
+						    FinalJson = lib_json:get_list_and_add_password(JsonStruct),
 						    {FinalJson, ReqData, State}  
                     end;
                 Id ->
 				    %% Get specific user
-					case erlastic_search:get_doc(?INDEX, "user", string:to_lower(Id)) of
+					case erlastic_search:get_doc(?INDEX, "user", string:to_lower(Id), [{<<"fields">>, <<"password,_source">>}]) of
 						{error, {Code1, Body1}} -> 
 							ErrorString1 = api_help:generate_error(Body1, Code1),
 							{{halt, Code1}, wrq:set_resp_body(ErrorString1, ReqData), State};
 						{ok,JsonStruct} ->
-							FinalJson = lib_json:get_and_add_id(JsonStruct),
+							FinalJson = lib_json:get_and_add_password(JsonStruct),
 							{FinalJson, ReqData, State} 
 					end
             end;
