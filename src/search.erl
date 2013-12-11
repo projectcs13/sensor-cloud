@@ -160,9 +160,9 @@ process_search_post(ReqData, State) ->
             {ok,List1} ->
 			case lib_json:get_field(FilteredJson, "query.filtered.query.query_string.query") of
 				undefined ->
-					erlang:display("No query string text");
+					erlang:display("No query string text, cannot add a suggestion.");
 				QueryString ->
-					erlastic_search:index_doc(?INDEX,"search_query","{\"search_suggest\":{\"input\":[\""++ lib_json:to_string(QueryString) ++"\"],\"weight\":1}}")
+                    add_query_suggestion(QueryString)
 			end,
 			StreamSearch = lib_json:encode(List1) % May need to convert
     end,
@@ -226,7 +226,36 @@ parse_datapoints([Head|Rest], FinalJson) ->
     Datapoint = lib_json:rm_field(lib_json:get_field(Head, "_source"), "stream_id"),
     parse_datapoints(Rest, lib_json:add_value(FinalJson,"data",Datapoint)).
 
-
+%% @doc
+%% Function: add_query_suggestion/1
+%% Purpose: Adds the suggestion to ES if it does not exist, or adds weight to an existing
+%% suggestion.
+%% Returns: an atom, error, created or updated depending on if the search suggestion was
+%% saved, updated or gave an error
+%% @end
+add_query_suggestion(QueryString) ->
+    case erlastic_search:search_json(#erls_params{},?INDEX,"search_query","{\"query\":{\"term\":{\"search_suggest\":\""++ lib_json:to_string(QueryString) ++"\"}}}") of
+        {error,_} ->
+            error;
+        {ok,JsonStruct} ->
+            case lib_json:get_field(JsonStruct, "hits.hits[0]._id") of
+                undefined ->
+                    case erlastic_search:index_doc(?INDEX,"search_query","{\"search_suggest\":{\"input\":[\""++ lib_json:to_string(QueryString) ++"\"],\"weight\":1}}") of
+                        {error,_} ->
+                            error;
+                        {ok,_} ->
+                            created
+                    end;
+                Id ->
+                    case api_help:update_doc(?INDEX,"search_query", binary_to_list(Id), "{\"script\" : \"ctx._source.search_suggest.weight += 1\"}",[]) of
+                        {error,_} ->
+                            error;
+                        {ok,_} ->
+                            updated
+                    end
+            end
+    end.
+    
 
 
 
