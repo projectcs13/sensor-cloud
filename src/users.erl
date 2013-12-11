@@ -424,7 +424,12 @@ get_user(ReqData, State) ->
                         SizeParam ->
                             Size = list_to_integer(SizeParam)
                     end,
-					Query = "{\"size\" :" ++ integer_to_list(Size) ++",\"query\" : {\"match_all\" : {}},\"filter\" : {\"bool\":{\"must_not\":{\"term\":{\"private\":\"true\"}}}}}",
+                    case wrq:get_qs_value("admin",ReqData) of 
+                        "true" ->
+                        	Query = "{\"size\" :" ++ integer_to_list(Size) ++",\"query\" : {\"match_all\" : {}},\"fields\":[\"password\",\"_source\"]}}";
+                        _ ->
+                            Query = "{\"size\" :" ++ integer_to_list(Size) ++",\"query\" : {\"match_all\" : {}},\"filter\" : {\"bool\":{\"must_not\":{\"term\":{\"private\":\"true\"}}}}}"
+                    end,
 					case erlastic_search:search_json(#erls_params{},?INDEX, "user", Query) of
                         {error, {Code, Body}} -> 
                             ErrorString = api_help:generate_error(Body, Code),
