@@ -413,7 +413,12 @@ get_user(ReqData, State) ->
                     % Get all users
                     case wrq:get_qs_value("size",ReqData) of 
                         undefined ->
-                            Size = 100;
+							case erlastic_search:count_type(?INDEX, "user") of
+								{error, {_CountCode, _CountBody}} -> 
+									Size = 100;
+								{ok,CountJsonStruct} ->
+									Size = lib_json:get_field(CountJsonStruct,"count")
+							end;
                         SizeParam ->
                             Size = list_to_integer(SizeParam)
                     end,
