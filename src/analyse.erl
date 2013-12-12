@@ -64,17 +64,18 @@ get_analysis(ReqData, State) ->
             {{halt, 405}, wrq:set_resp_body(ErrorString, ReqData), State};
         StreamId ->
             % Get specific stream
-            NrValues = case proplists:get_value('nr_values', wrq:path_info(ReqData)) of
+            NrValues = case wrq:get_qs_value("nr_values",ReqData) of
                 undefined ->
                     50;
                 Values ->
-                    string:to_float(Values) 
+                    {Value,_} = string:to_integer(Values),
+                    Value 
             end,
-            NrPredictions = case proplists:get_value('nr_preds', wrq:path_info(ReqData)) of
+            NrPredictions = case wrq:get_qs_value("nr_preds",ReqData) of
                 undefined ->
                     25;
                 Predictions ->
-                    string:to_float(Predictions)
+                    Predictions
             end,          
             case erlastic_search:search_limit(?INDEX, "datapoint","stream_id:" ++ StreamId ++ "&sort=timestamp:desc", NrValues) of
             %case erlastic_search:search_json(#erls_params{}, ?INDEX, "datapoint", create_json(StreamId), []) of
@@ -156,15 +157,14 @@ forecast(Json, Nr) ->
         no_values ->
             "{\"predictions\": []}";
         Values ->
-            Number = lists:flatten(io_lib:format("~p", [Nr])),
             eri:eval("V <- " ++ Values),
             eri:eval("A <- auto.arima(V)"),
-            eri:eval("pred <- forecast(A, "++ Number ++ ")"),
+            eri:eval("pred <- forecast(A, "++ Nr ++ ")"),
             {ok, _, Mean} = eri:eval("data.frame(c(pred$mean))[[1]]"),
-            {ok, _, Lo80} = eri:eval("head(data.frame(c(pred$lower))[[1]], " ++ Number ++")"),
-            {ok, _, Hi80} = eri:eval("head(data.frame(c(pred$upper))[[1]], " ++ Number ++")"),
-            {ok, _, Lo95} = eri:eval("tail(data.frame(c(pred$lower))[[1]], " ++ Number ++")"),
-            {ok, _, Hi95} = eri:eval("tail(data.frame(c(pred$upper))[[1]], " ++ Number ++")"),
+            {ok, _, Lo80} = eri:eval("head(data.frame(c(pred$lower))[[1]], " ++ Nr ++")"),
+            {ok, _, Hi80} = eri:eval("head(data.frame(c(pred$upper))[[1]], " ++ Nr ++")"),
+            {ok, _, Lo95} = eri:eval("tail(data.frame(c(pred$lower))[[1]], " ++ Nr ++")"),
+            {ok, _, Hi95} = eri:eval("tail(data.frame(c(pred$upper))[[1]], " ++ Nr ++")"),
             %eri:eval("rm(list = ls())"),
             start_format_result({Mean, Lo80, Hi80, Lo95, Hi95})
     end.
