@@ -67,32 +67,52 @@ get_analysis(ReqData, State) ->
 					ErrorString = api_help:generate_error(<<"Missing stream id">>, 405),
 					{{halt, 405}, wrq:set_resp_body(ErrorString, ReqData), State};
 				VStreamId ->
-					% Get specific virtual stream
-					% @TODO: Make sure data is sorted by timestamp!!!!!
-					case erlastic_search:search_limit(?INDEX, "vsdatapoint","stream_id:" ++ VStreamId ++ "&sort=timestamp:desc", 50) of
+					NrValues = case wrq:get_qs_value("nr_values",ReqData) of
+								   undefined ->
+									   50;
+								   Values ->
+									   {Value,_} = string:to_integer(Values),
+									   Value 
+							   end,
+					NrPredictions = case wrq:get_qs_value("nr_preds",ReqData) of
+										undefined ->
+											"25";
+										Predictions ->
+											Predictions
+									end,
+					case erlastic_search:search_limit(?INDEX, "vsdatapoint","stream_id:" ++ VStreamId ++ "&sort=timestamp:desc", NrValues) of
 						%case erlastic_search:search_json(#erls_params{}, ?INDEX, "datapoint", create_json(StreamId), []) of
 						{error,{Code, Body}} ->
 							ErrorString = api_help:generate_error(Body, Code),
 							{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 						{ok,JsonStruct} ->
-							{forecast(lib_json:get_field(JsonStruct, "hits.hits")),ReqData,State}
+							{forecast(lib_json:get_field(JsonStruct, "hits.hits"), NrPredictions),ReqData,State}
 					end
 			
 			end;
 		StreamId ->
-			% Get specific stream
-			% @TODO: Make sure data is sorted by timestamp!!!!!
-			
-			case erlastic_search:search_limit(?INDEX, "datapoint","stream_id:" ++ StreamId ++ "&sort=timestamp:desc", 50) of
+			NrValues = case wrq:get_qs_value("nr_values",ReqData) of
+						   undefined ->
+							   50;
+						   Values ->
+							   {Value,_} = string:to_integer(Values),
+							   Value 
+					   end,
+			NrPredictions = case wrq:get_qs_value("nr_preds",ReqData) of
+								undefined ->
+									"25";
+								Predictions ->
+									Predictions
+							end,
+			case erlastic_search:search_limit(?INDEX, "datapoint","stream_id:" ++ StreamId ++ "&sort=timestamp:desc", NrValues) of
 				%case erlastic_search:search_json(#erls_params{}, ?INDEX, "datapoint", create_json(StreamId), []) of
 				{error,{Code, Body}} ->
 					ErrorString = api_help:generate_error(Body, Code),
 					{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 				{ok,JsonStruct} ->
-					{forecast(lib_json:get_field(JsonStruct, "hits.hits")),ReqData,State}
+					{forecast(lib_json:get_field(JsonStruct, "hits.hits"), NrPredictions),ReqData,State}
 			end
 	end.
-
 
 create_json(StreamId) ->
         "{ \"sort\" : [{ \"timestamp\" : {\"order\" : \"asc\"}}], \"query\" : { \"term\" : { \"stream_id\" : \""++ StreamId ++ "\" }}}".
@@ -149,7 +169,6 @@ this() ->
 %% @end
 -spec forecast(JSON::string()) -> JSON::string().
 forecast(Json) ->
-        eri:eval("library(forecast)"),
         forecast(Json, 25).
 
 %% @doc
@@ -159,19 +178,19 @@ forecast(Json) ->
 %% @end        
 -spec forecast(JSON::string(), Nr::integer()) -> JSON::string().
 forecast(Json, Nr) ->
+    eri:eval("library(forecast)"),
     case get_time_series(Json) of
         no_values ->
             "{\"predictions\": []}";
         Values ->
-            Number = lists:flatten(io_lib:format("~p", [Nr])),
             eri:eval("V <- " ++ Values),
             eri:eval("A <- auto.arima(V)"),
-            eri:eval("pred <- forecast(A, "++ Number ++ ")"),
+            eri:eval("pred <- forecast(A, "++ Nr ++ ")"),
             {ok, _, Mean} = eri:eval("data.frame(c(pred$mean))[[1]]"),
-            {ok, _, Lo80} = eri:eval("head(data.frame(c(pred$lower))[[1]], " ++ Number ++")"),
-            {ok, _, Hi80} = eri:eval("head(data.frame(c(pred$upper))[[1]], " ++ Number ++")"),
-            {ok, _, Lo95} = eri:eval("tail(data.frame(c(pred$lower))[[1]], " ++ Number ++")"),
-            {ok, _, Hi95} = eri:eval("tail(data.frame(c(pred$upper))[[1]], " ++ Number ++")"),
+            {ok, _, Lo80} = eri:eval("head(data.frame(c(pred$lower))[[1]], " ++ Nr ++")"),
+            {ok, _, Hi80} = eri:eval("head(data.frame(c(pred$upper))[[1]], " ++ Nr ++")"),
+            {ok, _, Lo95} = eri:eval("tail(data.frame(c(pred$lower))[[1]], " ++ Nr ++")"),
+            {ok, _, Hi95} = eri:eval("tail(data.frame(c(pred$upper))[[1]], " ++ Nr ++")"),
             %eri:eval("rm(list = ls())"),
             start_format_result({Mean, Lo80, Hi80, Lo95, Hi95})
     end.
