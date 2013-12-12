@@ -7,7 +7,7 @@
 
 -module(datapoints).
 -export([init/1, allowed_methods/2, content_types_provided/2,
-		 process_post/2, get_datapoint/2, update_fields_in_stream/2]).
+		 process_post/2, get_datapoint/2, update_fields_in_stream/4]).
 
 -include("webmachine.hrl").
 -include("field_restrictions.hrl").
@@ -91,7 +91,7 @@ process_post(ReqData, State) ->
 							TimeStampAdded = api_help:add_field(DatapointJson, "timestamp", TimeStamp);
 						_ ->
 							TimeStampAdded = DatapointJson
-					end,		
+					end,
 					case api_help:any_to_float(lib_json:get_field(TimeStampAdded, "value")) of
 						error -> {{halt,403}, wrq:set_resp_body("Value not convertable to type float", ReqData), State};
 						NewVal -> 
@@ -103,7 +103,7 @@ process_post(ReqData, State) ->
 							true ->
 								case erlastic_search:get_doc(?INDEX, StreamType, Id) of
 							 		{error,{404,_}} ->
-								 		{{halt,409}, wrq:set_resp_body("{\"error\":\"no document with stream_id given is present in the system\"}", ReqData), State};
+								 		{{halt,409}, wrq:set_resp_body("{\"error\":\"no document with streamid given is present in the system\"}", ReqData), State};
 	                         		{error,{Code,Body}} ->
 	                             		ErrorString = api_help:generate_error(Body, Code),
 	                             		{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
@@ -118,7 +118,7 @@ process_post(ReqData, State) ->
 													{{halt, Code}, ReqData, State} ->
 														{{halt, Code}, ReqData, State};
 													ok ->
-														Msg = term_to_binary(FinalJson),
+														Msg = list_to_binary(FinalJson),
 														StreamExchange = list_to_binary(StreamType ++ "s." ++Id),
 	                                   					%% Connect
 	                                   					{ok, Connection} =
@@ -138,8 +138,8 @@ process_post(ReqData, State) ->
 						end
 					end
 			end;
-		true ->
-			process_search(ReqData,State, post)	
+			true ->
+				process_search(ReqData,State, post)	
 	end.
 
 

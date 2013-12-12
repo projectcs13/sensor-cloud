@@ -175,18 +175,18 @@ delete_streams([StreamId|Rest], Type) ->
 	case Type of 
 		"stream" ->
 			case erlastic_search:get_doc(?INDEX, "stream", StreamId) of 
-					{error, {Code2, Body2}} -> {error, {Code2, Body2}};
-					{ok,JsonStruct} -> 	 
-						SubsList = lib_json:get_field(JsonStruct, "_source.subscribers"),
-						streams:delete_stream_id_from_subscriptions(StreamId,SubsList)
+				{error, {Code2, Body2}} -> {error, {Code2, Body2}};
+				{ok,JsonStruct} -> 	 
+					SubsList = lib_json:get_field(JsonStruct, "_source.subscribers"),
+					streams:delete_stream_id_from_subscriptions(StreamId,SubsList)
 			end;
 		_ -> 
 			ok
 	end,
 	case streams:delete_data_points_with_stream_id(StreamId, Type) of
-        {error,{Code, Body}} -> 
-            {error,{Code, Body}};
-        {ok} ->
+		{error,{Code, Body}} -> 
+			{error,{Code, Body}};
+		{ok} ->
 			case erlastic_search:delete_doc(?INDEX, Type, StreamId) of 
 				{error,Reason} -> {error,Reason};
 				{ok,_List} -> 
@@ -199,6 +199,7 @@ delete_streams([StreamId|Rest], Type) ->
 					end,
 					delete_streams(Rest, Type)
 			end
+	% change ends
 	end.
 
 
