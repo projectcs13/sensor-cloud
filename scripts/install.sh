@@ -1,7 +1,11 @@
 #!/bin/bash
 ### Author : Tommy Mattsson
 ### Purpose: Easy installation of needed software for our project that is part of the linux system rather than our own project
-
+echo "#################################################################"
+echo "Installing misc dependencies"
+echo "#################################################################"
+sudo apt-get install -qq xsltproc
+sudo apt-get install software-properties-common
 
 
 echo "#################################################################"
@@ -11,9 +15,20 @@ grep -q -e 'deb http://packages.erlang-solutions.com/debian '$(lsb_release -sc)'
 sudo wget http://packages.erlang-solutions.com/debian/erlang_solutions.asc
 sudo apt-key add erlang_solutions.asc
 rm -f erlang_solutions.asc
-
 sudo apt-get update
 sudo apt-get install -y erlang
 
-### Install Emacs erlang-mode
-sudo apt-get install erlang-mode
+echo "#################################################################"
+echo "Installing Nodejs together with npm"
+echo "#################################################################"
+sudo apt-get install python-software-properties python g++ make  
+sudo add-apt-repository ppa:chris-lea/node.js  
+sudo apt-get update  
+sudo apt-get install nodejs  
+
+echo "#################################################################"
+echo "Installing R"
+echo "#################################################################"
+sudo add-apt-repository "deb http://ftp.sunet.se/pub/lang/CRAN/bin/linux/ubuntu precise/"
+sudo apt-get update
+sudo apt-get install r-base

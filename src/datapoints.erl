@@ -7,7 +7,7 @@
 
 -module(datapoints).
 -export([init/1, allowed_methods/2, content_types_provided/2,
-		 process_post/2, get_datapoint/2]).
+		 process_post/2, get_datapoint/2, update_fields_in_stream/2]).
 
 -include("webmachine.hrl").
 -include("field_restrictions.hrl").
@@ -91,46 +91,51 @@ process_post(ReqData, State) ->
 							TimeStampAdded = api_help:add_field(DatapointJson, "timestamp", TimeStamp);
 						_ ->
 							TimeStampAdded = DatapointJson
-					end,
-					FinalJson = api_help:add_field(TimeStampAdded, "stream_id", Id),
-					case api_help:do_only_fields_exist(FinalJson,?ACCEPTEDFIELDSDATAPOINTS) of
-						false -> 
-							{{halt,403}, wrq:set_resp_body("Unsupported field(s)", ReqData), State};
-						true ->
-							case erlastic_search:get_doc(?INDEX, StreamType, Id) of
-						 		{error,{404,_}} ->
-							 		{{halt,409}, wrq:set_resp_body("{\"error\":\"no document with streamid given is present in the system\"}", ReqData), State};
-                         		{error,{Code,Body}} ->
-                             		ErrorString = api_help:generate_error(Body, Code),
-                             		{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-                        		 {ok,_} ->
-							 		case erlastic_search:index_doc(?INDEX, DataType, FinalJson) of
-										{error, {Code, Body}} -> 
-								        	ErrorString = api_help:generate_error(Body, Code),
-								        	{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-										{ok,List} -> 
-											FinalTimeStamp = lib_json:get_field(FinalJson, "timestamp"),
-											case update_fields_in_stream(Id,FinalTimeStamp,ReqData,State) of
-												{{halt, Code}, ReqData, State} ->
-													{{halt, Code}, ReqData, State};
-												ok ->
-													Msg = list_to_binary(FinalJson),
-													StreamExchange = list_to_binary(StreamType ++ "s." ++Id),
-                                   					%% Connect
-                                   					{ok, Connection} =
-                                       					 amqp_connection:start(#amqp_params_network{host = "localhost"}),
-                                    				%% Open channel
-                                    				{ok, Channel} = amqp_connection:open_channel(Connection),
-                                    				%% Declare exchange
-                                    				amqp_channel:call(Channel, #'exchange.declare'{exchange = StreamExchange, type = <<"fanout">>}),        
-                                    				%% Send
-                                   					amqp_channel:cast(Channel, #'basic.publish'{exchange = StreamExchange}, #amqp_msg{payload = Msg}),
-                                   					ok = amqp_channel:close(Channel),
-							                       	ok = amqp_connection:close(Connection),
-													{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
-											end
-									end
-							end
+					end,		
+					case api_help:any_to_float(lib_json:get_field(TimeStampAdded, "value")) of
+						error -> {{halt,403}, wrq:set_resp_body("Value not convertable to type float", ReqData), State};
+						NewVal -> 
+						EnforcedFloatJson = lib_json:replace_field(TimeStampAdded, "value", NewVal),
+						FinalJson = lib_json:add_value(EnforcedFloatJson, "stream_id", binary:list_to_bin(Id)),
+						case api_help:do_only_fields_exist(FinalJson,?ACCEPTEDFIELDSDATAPOINTS) of
+							false -> 
+								{{halt,403}, wrq:set_resp_body("Unsupported field(s)", ReqData), State};
+							true ->
+								case erlastic_search:get_doc(?INDEX, StreamType, Id) of
+							 		{error,{404,_}} ->
+								 		{{halt,409}, wrq:set_resp_body("{\"error\":\"no document with stream_id given is present in the system\"}", ReqData), State};
+	                         		{error,{Code,Body}} ->
+	                             		ErrorString = api_help:generate_error(Body, Code),
+	                             		{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+	                        		 {ok,_} ->
+								 		case erlastic_search:index_doc(?INDEX, DataType, FinalJson) of
+											{error, {Code, Body}} -> 
+									        	ErrorString = api_help:generate_error(Body, Code),
+									        	{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+											{ok,List} -> 
+												FinalTimeStamp = lib_json:get_field(FinalJson, "timestamp"),
+												case update_fields_in_stream(Id,FinalTimeStamp,ReqData,State) of
+													{{halt, Code}, ReqData, State} ->
+														{{halt, Code}, ReqData, State};
+													ok ->
+														Msg = term_to_binary(FinalJson),
+														StreamExchange = list_to_binary(StreamType ++ "s." ++Id),
+	                                   					%% Connect
+	                                   					{ok, Connection} =
+	                                       					 amqp_connection:start(#amqp_params_network{host = "localhost"}),
+	                                    				%% Open channel
+	                                    				{ok, Channel} = amqp_connection:open_channel(Connection),
+	                                    				%% Declare exchange
+	                                    				amqp_channel:call(Channel, #'exchange.declare'{exchange = StreamExchange, type = <<"fanout">>}),        
+	                                    				%% Send
+	                                   					amqp_channel:cast(Channel, #'basic.publish'{exchange = StreamExchange}, #amqp_msg{payload = Msg}),
+	                                   					ok = amqp_channel:close(Channel),
+								                       	ok = amqp_connection:close(Connection),
+														{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
+												end
+										end
+								end
+						end
 					end
 			end;
 		true ->
@@ -292,7 +297,7 @@ is_virtual(ReqData) ->
 	end.
 		 
 %% @doc
-%% Function: id_from_path/4
+%% Function: update_fields_in_stream/4
 %% Purpose: Update the history_size field and last_update
 %%          fields in the stream that is given
 %% Returns: ok or {{halt,ErrorCode},ReqData,State}
@@ -306,18 +311,42 @@ update_fields_in_stream(StreamId,TimeStamp,ReqData,State) ->
 				   true -> "vstream";
 				   false -> "stream"
 			   end,
+	case update_fields_in_stream({StreamType, StreamId}, TimeStamp) of
+		{error, Code, ErrorString}->
+			{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+		ok->
+			ok
+	end.
+
+
+%% @doc
+%% Function: update_fields_in_stream/2
+%% Purpose: Update the history_size field and last_update
+%%          fields in the stream that is given
+%% Returns: ok or {error, Code, ErrorString}
+%%
+%% Side effects: Updates the document with the given id in ES
+%% @end
+-spec update_fields_in_stream(StreamId::string()|binary(),TimeStamp::string()|binary()) -> ok | {error, integer(), string()}.
+
+update_fields_in_stream({StreamType, StreamId}, TimeStamp) ->
 	case erlastic_search:get_doc(?INDEX, StreamType, StreamId) of
 		{error, {Code, Body}} -> 
 			ErrorString = api_help:generate_error(Body, Code),
-            {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+            {error, Code, ErrorString};
 		{ok,StreamJson} ->
-			OldHistorySize = lib_json:get_field(StreamJson, "_source.history_size"),
+			OldHistorySize = case lib_json:get_field(StreamJson, "_source.history_size") of
+								 undefined ->
+									 0;
+								 OldSize ->
+									 OldSize
+							 end,
 			Json = lib_json:set_attrs([{"last_updated", TimeStamp} , {"history_size", OldHistorySize+1}]),
 			Update = api_help:create_update(Json),
 			case api_help:update_doc(?INDEX, StreamType, StreamId, Update) of
 				{error, {Code, Body}} -> 
 					ErrorString = api_help:generate_error(Body, Code),
-					{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+					{error, Code, ErrorString};
 				{ok,_} ->
 					ok
 			end

@@ -15,52 +15,18 @@
 -include("erlson.hrl").
 -include("json.hrl").
 -include("poller.hrl").
--include("parser.hrl").
 -include("pubsub.hrl").
 
 -export([get_streams_using_polling/0,
 		 json_to_record_streams/1,
-		 json_to_record_stream/1,
-		 get_parser_by_id/1]).
+		 json_to_record_stream/1]).
 
 
 
 
 %% ====================================================================
 %% API functions
-%% ====================================================================
-
-
-
-%% @doc
-%% Function: get_parser_by_id/1
-%% Purpose: get parser according to specific stream id 
-%% Returns: {error, ErrMsg} | #parser
-%% @end
--spec get_parser_by_id(StreamId :: string()) -> {error, string()} | record().
-get_parser_by_id(StreamId)->	
-	case erlastic_search:search_limit(?ES_INDEX, "parser", "stream_id:\"" ++ StreamId++"\"", 100) of
-		{ok, Result} ->
-			EncodedResult = lib_json:encode(Result),
-			case re:run(EncodedResult, "\"max_score\":null", [{capture, first, list}]) of
-				{match, _} -> {error, "the parser not found"};
-				nomatch -> FinalJsonList = lib_json:get_field(lib_json:get_list_and_add_id(Result), "hits"),
-						   case length(FinalJsonList) of
-							   1 ->
-								   Item = lists:nth(1, FinalJsonList),
-								   #parser{stream_id = binary_to_list(lib_json:get_field(Item, "stream_id")),
-				  						input_parser = binary_to_list(lib_json:get_field(Item, "input_parser")),
-				  						input_type = binary_to_list(lib_json:get_field(Item, "input_type"))
-										 };
-							   _ ->
-								   erlang:display("multiple parsers exist for this stream id"),
-								   {error, "multiple parsers exit for this stream id"}
-						   end
-			end;
-		_ ->
-			erlang:display("an error happens: the parser not found"),
-			{error, "parsers not found!!"}
-	end. 
+%% ==================================================================== 
 
 %% @doc
 %% Function: get_streams_using_polling/0
@@ -69,8 +35,8 @@ get_parser_by_id(StreamId)->
 %% @end
 -spec get_streams_using_polling() -> [] | [json_string()] | {error, term()}.
 get_streams_using_polling() ->
-	JsonQuery = "{\"query\" : {\"filtered\" : " ++
-					"{ \"filter\" : {\"exists\" : {\"field\" : \"uri\"}}}}}",
+	JsonQuery = "{\"size\":10000, \"query\": {\"term\":{\"polling\":true}}, "++
+								 "\"filter\": {\"exists\": {\"field\":\"uri\"}}}",
 	
 	case erlastic_search:search_json(#erls_params{},
 									 ?ES_INDEX,
@@ -112,10 +78,21 @@ json_to_record_stream(Stream) ->
 			  undefined -> undefined;
 			  U -> binary_to_list(U)
 		  end,
+	DataType = case lib_json:get_field(Stream, "_source.data_type") of
+				   undefined -> undefined;
+				   D -> binary_to_list(D)
+			   end,
+	ParserString = case lib_json:get_field(Stream, "_source.parser") of
+					   undefined -> undefined;
+					   P -> binary_to_list(P)
+				   end,
 	#pollerInfo{stream_id = binary_to_list(lib_json:get_field(Stream, "_id")),
 				name = Name,
 				uri = Uri,
-				frequency = lib_json:get_field(Stream, "_source.polling_freq")}.
+				frequency = lib_json:get_field(Stream, "_source.polling_freq"),
+				data_type = DataType,
+				parser = ParserString
+			   }.
 
 
 %% ====================================================================
