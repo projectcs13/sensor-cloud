@@ -7,7 +7,7 @@
 
 -module(datapoints).
 -export([init/1, allowed_methods/2, content_types_provided/2,
-		 process_post/2, get_datapoint/2, update_fields_in_stream/4]).
+		 process_post/2, get_datapoint/2, update_fields_in_stream/4, update_fields_in_stream/2]).
 
 -include("webmachine.hrl").
 -include("field_restrictions.hrl").
