@@ -64,15 +64,25 @@ get_analysis(ReqData, State) ->
             {{halt, 405}, wrq:set_resp_body(ErrorString, ReqData), State};
         StreamId ->
             % Get specific stream
-            % @TODO: Make sure data is sorted by timestamp!!!!!
-                    
-            case erlastic_search:search_limit(?INDEX, "datapoint","stream_id:" ++ StreamId ++ "&sort=timestamp:desc", 50) of
+            NrValues = case proplists:get_value('nr_values', wrq:path_info(ReqData)) of
+                undefined ->
+                    50;
+                Values ->
+                    string:to_float(Values) 
+            end,
+            NrPredictions = case proplists:get_value('nr_preds', wrq:path_info(ReqData)) of
+                undefined ->
+                    25;
+                Predictions ->
+                    string:to_float(Predictions)
+            end,          
+            case erlastic_search:search_limit(?INDEX, "datapoint","stream_id:" ++ StreamId ++ "&sort=timestamp:desc", NrValues) of
             %case erlastic_search:search_json(#erls_params{}, ?INDEX, "datapoint", create_json(StreamId), []) of
                     {error,{Code, Body}} ->
                             ErrorString = api_help:generate_error(Body, Code),
                             {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
                     {ok,JsonStruct} ->
-                            {forecast(lib_json:get_field(JsonStruct, "hits.hits")),ReqData,State}
+                            {forecast(lib_json:get_field(JsonStruct, "hits.hits"),NrPredictions),ReqData,State}
             end
     end.
 
@@ -132,7 +142,6 @@ this() ->
 %% @end
 -spec forecast(JSON::string()) -> JSON::string().
 forecast(Json) ->
-        eri:eval("library(forecast)"),
         forecast(Json, 25).
 
 %% @doc
@@ -142,6 +151,7 @@ forecast(Json) ->
 %% @end        
 -spec forecast(JSON::string(), Nr::integer()) -> JSON::string().
 forecast(Json, Nr) ->
+    eri:eval("library(forecast)"),
     case get_time_series(Json) of
         no_values ->
             "{\"predictions\": []}";
