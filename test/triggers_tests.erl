@@ -204,17 +204,17 @@ post_data_user_test() ->
 	{ok, {{_VersionU6, 200, _ReasonPhraseU6}, _HeadersU6, BodyU6}} = httpc:request(delete, {?WEBMACHINE_URL++"/users/erik", []}, [], []),
 	NotificationList1 = lists:map(fun(A) -> lib_json:rm_field(A, "trigger.timestamp") end,lib_json:get_field(BodyU3,"notifications")),
 	NotificationList2 = lists:map(fun(A) -> lib_json:rm_field(A, "trigger.timestamp") end,lib_json:get_field(BodyU4,"notifications")),
-	ReferenceList1 = ["{\"trigger\":{\"input\":10,\"stream_id\":\"" ++ lib_json:to_string(StreamId1) ++"\",\"trigger_id\":\"" ++ lib_json:to_string(TriggerId1) ++ "\",\"value\":4}}",
-					  "{\"trigger\":{\"input\":5,\"stream_id\":\"" ++ lib_json:to_string(StreamId1) ++"\",\"trigger_id\":\"" ++ lib_json:to_string(TriggerId1) ++ "\",\"value\":4}}",
-					  "{\"trigger\":{\"input\":10,\"stream_id\":\"" ++ lib_json:to_string(StreamId1) ++"\",\"trigger_id\":\"" ++ lib_json:to_string(TriggerId1) ++ "\",\"value\":7}}",
-					  "{\"trigger\":{\"input\":6,\"stream_id\":\"" ++ lib_json:to_string(StreamId2) ++"\",\"trigger_id\":\"" ++ lib_json:to_string(TriggerId2) ++ "\",\"value\":4}}",
-					  "{\"trigger\":{\"input\":6,\"stream_id\":\"" ++ lib_json:to_string(StreamId1) ++"\",\"trigger_id\":\"" ++ lib_json:to_string(TriggerId2) ++ "\",\"value\":4}}",
-					  "{\"trigger\":{\"input\":6,\"stream_id\":\"" ++ lib_json:to_string(StreamId2) ++"\",\"trigger_id\":\"" ++ lib_json:to_string(TriggerId2) ++ "\",\"value\":4}}",
-					  "{\"trigger\":{\"input\":6,\"stream_id\":\"" ++ lib_json:to_string(StreamId2) ++"\",\"trigger_id\":\"" ++ lib_json:to_string(TriggerId2) ++ "\",\"value\":4}}"],
-	ReferenceList2 = ["{\"trigger\":{\"input\":5,\"stream_id\":\"" ++ lib_json:to_string(StreamId1) ++"\",\"trigger_id\":\"" ++ lib_json:to_string(TriggerId1) ++ "\",\"value\":4}}"],
+	ReferenceList1 = ["{\"trigger\":{\"input\":10,\"stream_id\":\"" ++ lib_json:to_string(StreamId1) ++"\",\"trigger_id\":\"" ++ lib_json:to_string(TriggerId1) ++ "\",\"value\":4.0}}",
+					  "{\"trigger\":{\"input\":5,\"stream_id\":\"" ++ lib_json:to_string(StreamId1) ++"\",\"trigger_id\":\"" ++ lib_json:to_string(TriggerId1) ++ "\",\"value\":4.0}}",
+					  "{\"trigger\":{\"input\":10,\"stream_id\":\"" ++ lib_json:to_string(StreamId1) ++"\",\"trigger_id\":\"" ++ lib_json:to_string(TriggerId1) ++ "\",\"value\":7.0}}",
+					  "{\"trigger\":{\"input\":6,\"stream_id\":\"" ++ lib_json:to_string(StreamId2) ++"\",\"trigger_id\":\"" ++ lib_json:to_string(TriggerId2) ++ "\",\"value\":4.0}}",
+					  "{\"trigger\":{\"input\":6,\"stream_id\":\"" ++ lib_json:to_string(StreamId1) ++"\",\"trigger_id\":\"" ++ lib_json:to_string(TriggerId2) ++ "\",\"value\":4.0}}",
+					  "{\"trigger\":{\"input\":6,\"stream_id\":\"" ++ lib_json:to_string(StreamId2) ++"\",\"trigger_id\":\"" ++ lib_json:to_string(TriggerId2) ++ "\",\"value\":4.0}}",
+					  "{\"trigger\":{\"input\":6,\"stream_id\":\"" ++ lib_json:to_string(StreamId2) ++"\",\"trigger_id\":\"" ++ lib_json:to_string(TriggerId2) ++ "\",\"value\":4.0}}"],
+	ReferenceList2 = ["{\"trigger\":{\"input\":5,\"stream_id\":\"" ++ lib_json:to_string(StreamId1) ++"\",\"trigger_id\":\"" ++ lib_json:to_string(TriggerId1) ++ "\",\"value\":4.0}}"],
+
 	?assertEqual(true, check_all_exist(NotificationList1,ReferenceList1)),
 	?assertEqual(true, check_all_exist(NotificationList2,ReferenceList2)).
-
 
 list_triggers_test_() ->
     Descript1 = "Testing listing of triggers",
@@ -303,8 +303,8 @@ start_up_triggers_test() ->
 	api_help:refresh(),
 	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(get, {?WEBMACHINE_URL++"/users/tomas", []}, [], []),
 	NotificationList = lists:map(fun(A) -> lib_json:rm_field(A, "trigger.timestamp") end,lib_json:get_field(Body4,"notifications")),
-	ReferenceList = ["{\"trigger\":{\"input\":10,\"stream_id\":\"" ++ lib_json:to_string(StreamId1) ++"\",\"trigger_id\":\"1\",\"value\":4}}",
-					 "{\"trigger\":{\"input\":5,\"stream_id\":\"" ++ lib_json:to_string(StreamId1) ++"\",\"trigger_id\":\"1\",\"value\":4}}"],
+	ReferenceList = ["{\"trigger\":{\"input\":10,\"stream_id\":\"" ++ lib_json:to_string(StreamId1) ++"\",\"trigger_id\":\"1\",\"value\":4.0}}",
+					 "{\"trigger\":{\"input\":5,\"stream_id\":\"" ++ lib_json:to_string(StreamId1) ++"\",\"trigger_id\":\"1\",\"value\":4.0}}"],
 	% Clean up
 	{ok, {{_Version5, 200, _ReasonPhrase5}, _Headers5, _Body5}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/remove", [],"application/json", "{\"function\" : \"less_than\",\"input\":5,\"streams\":\"" ++ lib_json:to_string(StreamId1) ++"\"}"}, [], []),
 	api_help:refresh(),
