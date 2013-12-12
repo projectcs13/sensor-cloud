@@ -441,7 +441,7 @@ get_and_add_password(JsonStruct) ->
 get_list_and_add_password(JsonStruct) ->
     HitsList = get_field(JsonStruct, "hits.hits"),
     AddedPassword = lists:map(fun(X) -> get_and_add_password(X) end, HitsList),
-    set_attr(hits, AddedPassword).
+    set_attr(users, AddedPassword).
 
 %% ====================================================================
 %% Internal functions
