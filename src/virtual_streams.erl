@@ -245,7 +245,7 @@ delete_resource(ReqData, State) ->
 create_query(Function, Streams, TimestampFrom) ->
 	%size to be passed as a variable?? but it will not work in the terms facets query...
 	Query = lib_json:set_attrs(
-		  [{size, 2000},
+		  [{size, 100000},
 		   {"query", "{}"},
 		   {"query.filtered", "{}"},
 		   {"query.filtered.query", "{}"},
