@@ -73,7 +73,7 @@ get_analysis(ReqData, State) ->
             end,
             NrPredictions = case wrq:get_qs_value("nr_preds",ReqData) of
                 undefined ->
-                    25;
+                    "25";
                 Predictions ->
                     Predictions
             end,          
