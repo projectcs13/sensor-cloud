@@ -137,6 +137,17 @@ is_search(ReqData) ->
 	URIList = string:tokens(wrq:path(ReqData), "/"),
 	(string:sub_string(lists:nth(length(URIList),URIList),1,7) == "_search").
 
+%% @doc
+%% Function: is_polling_history/1
+%% Purpose: Used to deiced if the URI specify a polling_history
+%% Returns: True if URI specify a pollinghistory, false otherwise
+%% @end
+-spec is_polling_history(ReqData::term()) -> boolean().
+
+is_polling_history(ReqData) ->
+	URIList = string:tokens(wrq:path(ReqData), "/"),
+	lists:member("pollinghistory",URIList).
+
 	%% @doc
 %% Function: is_rank/1
 %% Purpose: Used to decide if the URI specify a rank request

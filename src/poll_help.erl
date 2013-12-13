@@ -16,10 +16,14 @@
 -include("json.hrl").
 -include("poller.hrl").
 -include("pubsub.hrl").
+-include("field_restrictions.hrl").
 
 -export([get_streams_using_polling/0,
 		 json_to_record_streams/1,
-		 json_to_record_stream/1]).
+		 json_to_record_stream/1,
+		 create_poller_history/1,
+		 add_sucess/1,
+		 add_failed/2]).
 
 
 
@@ -94,6 +98,99 @@ json_to_record_stream(Stream) ->
 				parser = ParserString
 			   }.
 
+%% @doc
+%% Function: create_poller_history/1
+%% Purpose: creates an empty polling history for
+%%          the given stream
+%% Returns: ok or {Code,Body} if there was an error in ES
+%% @end
+-spec create_poller_history(StreamId::string()) -> ok | {integer(),string()}.
+
+create_poller_history(StreamId) ->
+	NewHistory = lib_json:set_attrs([{"history","[]"}]),
+	case erlastic_search:index_doc_with_id(?INDEX, "pollinghistory", StreamId, NewHistory) of	
+		{error,{Code,Body}} ->
+			{Code,Body};
+		{ok,_List} -> 
+			ok
+	end.
+
+%% @doc
+%% Function: add_failed/1
+%% Purpose: Updates the polling history with an error message
+%% Returns: ok or {error,{Code,Body}} if there was an error in ES
+%% @end
+-spec add_failed(StreamId::string(),Error::atom()) -> ok | {atom(),{integer(),string()}}.
+
+add_failed(StreamId,connection_error) ->
+	Time = ?TIME_NOW(erlang:localtime()),
+	UserId = case erlastic_search:get_doc(?INDEX, "stream", StreamId) of
+				 {error, Reason} -> 
+					 error;
+				 {ok,List} -> 
+					 lib_json:get_field(List, "_source.user_id")
+			 end,
+	Message = lib_json:set_attrs([{"polling","{}"},{"polling.stream",list_to_binary(StreamId)},{"polling.action",list_to_binary("error")},{"polling.message",list_to_binary("Connection Error")},{"polling.timestamp",list_to_binary(Time)}]),
+    UpdateJson = "{\"script\":\"ctx._source.notifications += msg\",\"params\":{\"msg\":"++ Message ++"}}",
+    case api_help:update_doc(?INDEX, "user", UserId, UpdateJson, []) of
+        {error, {Code, Body}} ->
+            {error, {Code, Body}};
+        {ok, Response} ->
+            ok
+    end,
+	UpdateJson2 = "{\"script\":\"if (ctx._source.history.size() == 100){ctx._source.history.remove((Object) ctx._source.history[0]);ctx._source.history += msg}{ctx._source.history += msg} \",\"params\":{\"msg\":"++ Message ++"}}",
+	case api_help:update_doc(?INDEX, "pollinghistory", StreamId, UpdateJson2, []) of
+        {error, {Code2, Body2}} ->
+			erlang:display("Error when updateing pollinghistory for " ++ StreamId),
+            {error, {Code2, Body2}};
+        {ok, Response2} ->
+            ok
+    end;
+
+add_failed(StreamId,elasticsearch_error) ->
+	Time = ?TIME_NOW(erlang:localtime()),
+	UserId = case erlastic_search:get_doc(?INDEX, "stream", StreamId) of
+				 {error, Reason} -> 
+					 error;
+				 {ok,List} -> 
+					 lib_json:get_field(List, "_source.user_id")
+			 end,
+	Message = lib_json:set_attrs([{"polling","{}"},{"polling.stream",list_to_binary(StreamId)},{"polling.message",list_to_binary("Could not save datapoint")},{"polling.action",list_to_binary("error")},{"polling.timestamp",list_to_binary(Time)}]),
+	UpdateJson = "{\"script\":\"ctx._source.notifications += msg\",\"params\":{\"msg\":"++ Message ++"}}",
+    case api_help:update_doc(?INDEX, "user", UserId, UpdateJson, []) of
+        {error, {Code, Body}} ->
+            {error, {Code, Body}};
+        {ok, Response} ->
+            ok
+    end,
+	UpdateJson2 = "{\"script\":\"if (ctx._source.history.size() == 100){ctx._source.history.remove((Object) ctx._source.history[0]);ctx._source.history += msg}{ctx._source.history += msg} \",\"params\":{\"msg\":"++ Message ++"}}",
+	case api_help:update_doc(?INDEX, "pollinghistory", StreamId, UpdateJson2, []) of
+        {error, {Code2, Body2}} ->
+			erlang:display("Error when updateing pollinghistory for " ++ StreamId),
+            {error, {Code2, Body2}};
+        {ok, Response2} ->
+            ok
+    end.
+
+
+%% @doc
+%% Function: add_success/1
+%% Purpose: Updates the polling history with a created datapoint message
+%% Returns: ok or {error,{Code,Body}} if there was an error in ES
+%% @end
+-spec add_success(StreamId::string()) -> ok | {atom(),{integer(),string()}}.
+
+add_success(StreamId) ->
+	Time = ?TIME_NOW(erlang:localtime()),
+	Message = lib_json:set_attrs([{"polling","{}"},{"polling.stream",list_to_binary(StreamId)},{"polling.message",list_to_binary("Created new datapoint")},{"polling.action",list_to_binary("create")},{"polling.timestamp",list_to_binary(Time)}]),
+	UpdateJson = "{\"script\":\"if (ctx._source.history.size() == 100){ctx._source.history.remove((Object) ctx._source.history[0]);ctx._source.history += msg}{ctx._source.history += msg} \",\"params\":{\"msg\":"++ Message ++"}}",
+	case api_help:update_doc(?INDEX, "pollinghistory", StreamId, UpdateJson, []) of
+        {error, {Code, Body}} ->
+			erlang:display("Error when updateing pollinghistory for " ++ StreamId),
+            {error, {Code, Body}};
+        {ok, Response} ->
+            ok
+    end.
 
 %% ====================================================================
 %% Internal functions

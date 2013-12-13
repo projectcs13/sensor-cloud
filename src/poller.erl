@@ -139,6 +139,7 @@ handle_info({probe}, State)->
 
 				_ ->
 					%%polling fails
+					poll_help:add_failed(StreamId,connection_error),
 					erlang:display("polling failed")
 			end,
 			{noreply, State};

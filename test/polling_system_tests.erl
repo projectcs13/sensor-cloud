@@ -26,6 +26,7 @@
 -ifndef(POLL_ADD2).
 -define(POLL_ADD2 ,"http://localhost:8002/cgi-bin/humidity.py").
 -endif.
+-define(WEBMACHINE_URL, api_help:get_webmachine_url()).
 
 -export([test_rabbit_messages/1]).
 
@@ -147,6 +148,29 @@ polling_system_test()->
 		_->
 			?assert(false)
 	end.
+
+
+%% @doc
+%% Function: polling_history_test/0
+%% Purpose: Test that the polling history gets created and updated
+%% Returns: ok | {error, term()}
+%% @end
+-spec polling_history_test() -> ok | {error, term()}.
+polling_history_test()->
+	UserId = "tomas",
+    httpc:request(post, {?WEBMACHINE_URL++"/users", [],"application/json", "{\"username\" : \""++UserId++"\"}"}, [], []),
+	api_help:refresh(),
+	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {?WEBMACHINE_URL++"/streams", [], "application/json", "{\"name\":\"Private\",\"user_id\" : \"" ++ lib_json:to_string(UserId) ++ "\",\"polling\":true, \"data_type\":\"application/json\", \"parser\":\"response.player_count\",\"polling_freq\":1,\"uri\":\"http://api.steampowered.com/ISteamUserStats/GetNumberOfCurrentPlayers/v1?appid=570\"}"
+																					  }, [], []),
+	api_help:refresh(),
+	timer:sleep(1500),
+	StrId1 = lib_json:get_field(Body1,"_id"),
+
+	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(get, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(StrId1) ++ "/pollinghistory", []}, [], []),
+	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, _Body3}} = httpc:request(delete, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(StrId1), []}, [], []),
+	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, _Body4}} = httpc:request(delete, {?WEBMACHINE_URL++"/users/tomas", []}, [], []),
+	api_help:refresh(),
+	?assertNotEqual([],lib_json:get_field(Body2, "history")).
 
 %% @doc
 %% Function: rebuild_system_test/0

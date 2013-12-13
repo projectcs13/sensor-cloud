@@ -40,6 +40,8 @@ allowed_methods(ReqData, State) ->
 	case api_help:parse_path(wrq:path(ReqData)) of
 		[{"streams", _StreamID}, {"_rank"}] ->
 			{['PUT'], ReqData, State};
+		[{"streams", _StreamID}, {"pollinghistory"}] ->
+			{['GET'], ReqData, State};
 		[{"streams", "_search"}] ->
 			{['POST', 'GET'], ReqData, State};
 		[{"users", _UserID}, {"streams","_search"}] ->
@@ -277,7 +279,8 @@ process_post(ReqData, State) ->
 														data_type = binary_to_list(lib_json:get_field(FieldsAdded, "data_type")),
 														parser = binary_to_list(lib_json:get_field(FieldsAdded, "parser"))
 													   },
-										    gen_server:cast(polling_supervisor, {create_poller, NewPoller})
+										    gen_server:cast(polling_supervisor, {create_poller, NewPoller}),
+											poll_help:create_poller_history(Stream_id)
 									end
 								end,
 								{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
@@ -587,9 +590,10 @@ put_stream(ReqData, State) ->
 
 
 get_stream(ReqData, State) ->
-	case api_help:is_search(ReqData) of
-		true -> process_search_get(ReqData,State);
-		false ->
+	case {api_help:is_search(ReqData),api_help:is_polling_history(ReqData)} of
+		{true,_} -> process_search_get(ReqData,State);
+		{_,true} -> get_polling_history(ReqData, State);
+		{false,false} ->
 			case proplists:get_value('stream', wrq:path_info(ReqData)) of
 				undefined ->
 				% List streams based on URI
@@ -661,6 +665,24 @@ get_streams(List) ->
              JsonStruct
     end.
 
+%% @doc
+%% Function: get_polling_history/2
+%% Purpose: get the polling history according to stream id
+%% Returns: {PollingHistory, ReqData, State} | {{halt, ErrorCode}, ErrorResponse}
+%% @end
+-spec get_polling_history(ReqData :: term(), State :: term()) -> {{halt, Code :: integer()}, term()} | {TempJson :: string(), ReqData :: term(), State :: term()}.
+
+get_polling_history(ReqData, State) ->
+	Id = proplists:get_value('stream', wrq:path_info(ReqData)),
+	case erlastic_search:get_doc(?INDEX, "pollinghistory", Id) of 
+		{error, {Code, Body}} -> 
+			ErrorString = api_help:generate_error(Body, Code),
+			{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+		{ok,JsonStruct} -> 	 
+			TempJson = lib_json:get_and_add_id(JsonStruct),
+			{TempJson, ReqData, State}
+	end.
+	
 
 %% @doc
 %% Function: filter_json/1

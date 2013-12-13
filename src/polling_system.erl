@@ -12,6 +12,7 @@
 -behaviour(gen_server).
 -include("poller.hrl").
 -include("state.hrl").
+-include("field_restrictions.hrl").
 
 %% ====================================================================
 %% API functions
@@ -100,6 +101,7 @@ handle_cast({terminate, StreamId}, PollersInfo)->
 		_ ->
 			supervisor:terminate_child(polling_monitor, Poller#pollerInfo.pid),
 			supervisor:delete_child(polling_monitor, Poller#pollerInfo.pid),
+			erlastic_search:delete_doc(?INDEX,"pollinghistory", StreamId),
 			{noreply, delete_info(PollersInfo, StreamId)}
 	end.
 	
