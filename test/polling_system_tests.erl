@@ -18,10 +18,7 @@
 -include_lib("inets/include/mod_auth.hrl").
 -include_lib("amqp_client.hrl").
 
-%% before running this testing code, please change the following address to your address
-%% the python server code locates in scripts/python/cgi-bin folder
-%% under the python folder, run the following command:
-%% python -m CGIHTTPServer 8001
+%% before running the polling system test cases, please make run_fake_resource in the project folder.
 -ifndef(POLL_ADD).
 -define(POLL_ADD, "http://localhost:8001/cgi-bin/temperature.py").
 -endif.
@@ -232,7 +229,8 @@ rebuild_system_test()->
 		_->
 			erlang:display("the stream id of state21: "++State21#state.stream_id),
 			?assert(false)
-	end.
+	end,
+	timer:sleep(2500).
 
 %% @doc
 %% Function: terminate_system_test/0
