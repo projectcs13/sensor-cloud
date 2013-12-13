@@ -105,7 +105,7 @@ delete_resource(ReqData, State) ->
 
 %% @doc
 %% Function: delete_streams_with_user_id/1
-%% Purpose: Deletes the streams with the given user id
+%% Purpose: Deletes the streams and/or virtual streams with the given user id,
 %% Returns:  ERROR = {error,Errorcode}
 %%			 OK = {ok}
 %% @end
@@ -123,8 +123,21 @@ delete_streams_with_user_id(Id) ->
 				[] -> erlang:display("the length of list is zero"),
 					  {ok};
 				Streams ->
-					case delete_streams(Streams) of
+					case delete_streams(Streams, "stream") of
 						{error,Reason} -> {error, Reason};
+						{ok} -> {ok}
+					end
+			end
+	end,
+	case erlastic_search:search_limit(?INDEX, "virtual_stream", Query, 500) of
+		{error,Reason2} -> 
+			{error,Reason2};
+		{ok,List2} ->
+			case get_streams(List2) of
+				[] -> {ok};
+				VStreams ->
+					case delete_streams(VStreams, "virtual_stream") of
+						{error,Reason2} -> {error, Reason2};
 						{ok} -> {ok}
 					end
 			end
@@ -153,24 +166,28 @@ get_streams([JSON | Tl]) ->
 
 
 %% @doc
-%% Function: delete_streams/1
+%% Function: delete_streams/2
 %% Purpose: Deletes all streams in the given list, the list elements are streamIds as binaries
 %% Returns:  ok, or {{error,_Reason}, StreamId, Rest} where StreamId is the binary Id of the stream for which deletion failed
 %% @end
-
-delete_streams([]) -> {ok};
-delete_streams([StreamId|Rest]) ->
-	case erlastic_search:get_doc(?INDEX, "stream", StreamId) of 
-			{error, {Code2, Body2}} -> {error, {Code2, Body2}};
-			{ok,JsonStruct} -> 	 
-				SubsList = lib_json:get_field(JsonStruct, "_source.subscribers"),
-				streams:delete_stream_id_from_subscriptions(StreamId,SubsList)
+delete_streams([], Type) -> {ok};
+delete_streams([StreamId|Rest], Type) ->
+	case Type of 
+		"stream" ->
+			case erlastic_search:get_doc(?INDEX, "stream", StreamId) of 
+				{error, {Code2, Body2}} -> {error, {Code2, Body2}};
+				{ok,JsonStruct} -> 	 
+					SubsList = lib_json:get_field(JsonStruct, "_source.subscribers"),
+					streams:delete_stream_id_from_subscriptions(StreamId,SubsList)
+			end;
+		_ -> 
+			ok
 	end,
-	case streams:delete_data_points_with_stream_id(StreamId) of
-        {error,{Code, Body}} -> 
-            {error,{Code, Body}};
-        {ok} ->
-			case erlastic_search:delete_doc(?INDEX, "stream", StreamId) of 
+	case streams:delete_data_points_with_stream_id(StreamId, Type) of
+		{error,{Code, Body}} -> 
+			{error,{Code, Body}};
+		{ok} ->
+			case erlastic_search:delete_doc(?INDEX, Type, StreamId) of 
 				{error,Reason} -> {error,Reason};
 				{ok,_List} -> 
 					% terminate the poller
@@ -180,8 +197,9 @@ delete_streams([StreamId|Rest]) ->
 						_->
 							gen_server:cast(polling_supervisor, {terminate, binary_to_list(StreamId)})
 					end,
-					delete_streams(Rest)
+					delete_streams(Rest, Type)
 			end
+	% change ends
 	end.
 
 

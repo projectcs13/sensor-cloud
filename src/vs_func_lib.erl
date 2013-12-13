@@ -12,7 +12,7 @@
 %% ====================================================================
 %% API functions
 %% ====================================================================
--export([min/2,max/2,avg/2,sum/2]).
+-export([min/2,max/2,mean/2,total/2]).
 -compile({no_auto_import,[min/2]}).
 -compile({no_auto_import,[max/2]}).
 
@@ -45,8 +45,8 @@ max(DataList,StreamId) ->
 	max(DataList,StreamId,[]).
 
 %% @doc
-%% Function: avg/1
-%% Purpose: Used to calculate the avg for 
+%% Function: mean/1
+%% Purpose: Used to calculate the average for 
 %%          a given list of data points
 %%          and create data points with the given stream_id, expects a list
 %%          like [[datapoint1,datapoint2,...],[datapoint1,datapoint2,...],...]
@@ -54,12 +54,12 @@ max(DataList,StreamId) ->
 %% Returns: [datapoint1,datapoint2,...] where the first datapoint is the
 %%          one created by avg on the last list of data points
 %% @end
--spec avg(DataList::list(),StreamId::binary()) -> ResultList::list().
-avg(DataList,StreamId) ->
+-spec mean(DataList::list(),StreamId::binary()) -> ResultList::list().
+mean(DataList,StreamId) ->
 	avg(DataList,StreamId,[]).
 
 %% @doc
-%% Function: sum/1
+%% Function: total/2
 %% Purpose: Used to calculate the sum for 
 %%          a given list of data points
 %%          and create data points with the given stream_id, expects a list
@@ -68,8 +68,8 @@ avg(DataList,StreamId) ->
 %% Returns: [datapoint1,datapoint2,...] where the first datapoint is the
 %%          one created by sum on the last list of data points
 %% @end
--spec sum(DataList::list(),StreamId::binary()) -> ResultList::list().
-sum(DataList,StreamId) ->
+-spec total(DataList::list(),StreamId::binary()) -> ResultList::list().
+total(DataList,StreamId) ->
 	sum(DataList,StreamId,[]).
 
 %% ====================================================================

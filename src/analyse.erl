@@ -21,6 +21,8 @@ allowed_methods(ReqData, State) ->
         case api_help:parse_path(wrq:path(ReqData)) of
                 [{"streams", _StreamID}, {"_analyse"}] ->
                          {['GET'], ReqData, State};
+                [{"vstreams", _VStreamID}, {"_analyse"}] ->
+                         {['GET'], ReqData, State};
                 [{"users", _UserID}, {"streams", _StreamID}, {"_analyse"}] ->
                          {['GET'], ReqData, State};
                 [error] ->
@@ -58,35 +60,59 @@ content_types_accepted(ReqData, State) ->
 %% @end
 -spec get_analysis(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 get_analysis(ReqData, State) ->
-    case proplists:get_value('streamid', wrq:path_info(ReqData)) of
-        undefined ->
-            ErrorString = api_help:generate_error(<<"Missing stream id">>, 405),
-            {{halt, 405}, wrq:set_resp_body(ErrorString, ReqData), State};
-        StreamId ->
-            % Get specific stream
-            NrValues = case wrq:get_qs_value("nr_values",ReqData) of
-                undefined ->
-                    50;
-                Values ->
-                    {Value,_} = string:to_integer(Values),
-                    Value 
-            end,
-            NrPredictions = case wrq:get_qs_value("nr_preds",ReqData) of
-                undefined ->
-                    "25";
-                Predictions ->
-                    Predictions
-            end,          
-            case erlastic_search:search_limit(?INDEX, "datapoint","stream_id:" ++ StreamId ++ "&sort=timestamp:desc", NrValues) of
-            %case erlastic_search:search_json(#erls_params{}, ?INDEX, "datapoint", create_json(StreamId), []) of
-                    {error,{Code, Body}} ->
-                            ErrorString = api_help:generate_error(Body, Code),
-                            {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-                    {ok,JsonStruct} ->
-                            {forecast(lib_json:get_field(JsonStruct, "hits.hits"),NrPredictions),ReqData,State}
-            end
-    end.
-
+	case proplists:get_value('streamid', wrq:path_info(ReqData)) of
+		undefined ->
+			case proplists:get_value('vstreamid', wrq:path_info(ReqData)) of
+				undefined ->
+					ErrorString = api_help:generate_error(<<"Missing stream id">>, 405),
+					{{halt, 405}, wrq:set_resp_body(ErrorString, ReqData), State};
+				VStreamId ->
+					NrValues = case wrq:get_qs_value("nr_values",ReqData) of
+								   undefined ->
+									   50;
+								   Values ->
+									   {Value,_} = string:to_integer(Values),
+									   Value 
+							   end,
+					NrPredictions = case wrq:get_qs_value("nr_preds",ReqData) of
+										undefined ->
+											"25";
+										Predictions ->
+											Predictions
+									end,
+					case erlastic_search:search_limit(?INDEX, "vsdatapoint","stream_id:" ++ VStreamId ++ "&sort=timestamp:desc", NrValues) of
+						%case erlastic_search:search_json(#erls_params{}, ?INDEX, "datapoint", create_json(StreamId), []) of
+						{error,{Code, Body}} ->
+							ErrorString = api_help:generate_error(Body, Code),
+							{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+						{ok,JsonStruct} ->
+							{forecast(lib_json:get_field(JsonStruct, "hits.hits"), NrPredictions),ReqData,State}
+					end
+			
+			end;
+		StreamId ->
+			NrValues = case wrq:get_qs_value("nr_values",ReqData) of
+						   undefined ->
+							   50;
+						   Values ->
+							   {Value,_} = string:to_integer(Values),
+							   Value 
+					   end,
+			NrPredictions = case wrq:get_qs_value("nr_preds",ReqData) of
+								undefined ->
+									"25";
+								Predictions ->
+									Predictions
+							end,
+			case erlastic_search:search_limit(?INDEX, "datapoint","stream_id:" ++ StreamId ++ "&sort=timestamp:desc", NrValues) of
+				%case erlastic_search:search_json(#erls_params{}, ?INDEX, "datapoint", create_json(StreamId), []) of
+				{error,{Code, Body}} ->
+					ErrorString = api_help:generate_error(Body, Code),
+					{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+				{ok,JsonStruct} ->
+					{forecast(lib_json:get_field(JsonStruct, "hits.hits"), NrPredictions),ReqData,State}
+			end
+	end.
 
 create_json(StreamId) ->
         "{ \"sort\" : [{ \"timestamp\" : {\"order\" : \"asc\"}}], \"query\" : { \"term\" : { \"stream_id\" : \""++ StreamId ++ "\" }}}".
