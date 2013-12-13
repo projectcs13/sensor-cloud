@@ -144,7 +144,8 @@ reduce(VirtualStreamId, Streams, TimestampFrom, Function, ReqData, State) ->
 																				   {"stream_id", VirtualStreamId},
 																				   {"value",  lib_json:get_field(Json, binary_to_list(lists:nth(1, Function)))}
 																				  ]),
-											  erlastic_search:index_doc(?INDEX, "vsdatapoint", lib_json:to_string(FinalDatapoint)) %to add error check here
+											  erlastic_search:index_doc(?INDEX, "vsdatapoint", lib_json:to_string(FinalDatapoint)),
+											  datapoints:update_fields_in_stream({"virtual_stream", lib_json:to_string(VirtualStreamId)}, list_to_atom(msToDate(lib_json:get_field(Json, "key"))))
 									  end, DatapointsList),
 			{true, wrq:set_resp_body("\"status\":\"ok\"", ReqData), State}
 	end.
