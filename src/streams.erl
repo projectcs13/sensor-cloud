@@ -675,6 +675,7 @@ get_streams(List) ->
 get_polling_history(ReqData, State) ->
 	Id = proplists:get_value('stream', wrq:path_info(ReqData)),
 	case erlastic_search:get_doc(?INDEX, "pollinghistory", Id) of 
+		{error, {404, Body}} -> {"{\"history\": []}", ReqData, State};
 		{error, {Code, Body}} -> 
 			ErrorString = api_help:generate_error(Body, Code),
 			{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
