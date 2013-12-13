@@ -40,6 +40,8 @@ allowed_methods(ReqData, State) ->
 	case api_help:parse_path(wrq:path(ReqData)) of
 		[{"streams", _StreamID}, {"_rank"}] ->
 			{['PUT'], ReqData, State};
+		[{"streams", _StreamID}, {"pollinghistory"}] ->
+			{['GET'], ReqData, State};
 		[{"streams", "_search"}] ->
 			{['POST', 'GET'], ReqData, State};
 		[{"users", _UserID}, {"streams","_search"}] ->
@@ -588,9 +590,10 @@ put_stream(ReqData, State) ->
 
 
 get_stream(ReqData, State) ->
-	case api_help:is_search(ReqData) of
-		true -> process_search_get(ReqData,State);
-		false ->
+	case {api_help:is_search(ReqData),api_help:is_polling_history(ReqData)} of
+		{true,_} -> process_search_get(ReqData,State);
+		{_,true} -> get_polling_history(ReqData, State);
+		{false,false} ->
 			case proplists:get_value('stream', wrq:path_info(ReqData)) of
 				undefined ->
 				% List streams based on URI
@@ -662,6 +665,18 @@ get_streams(List) ->
              JsonStruct
     end.
 
+
+get_polling_history(ReqData, State) ->
+	Id = proplists:get_value('stream', wrq:path_info(ReqData)),
+	case erlastic_search:get_doc(?INDEX, "pollinghistory", Id) of 
+		{error, {Code, Body}} -> 
+			ErrorString = api_help:generate_error(Body, Code),
+			{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+		{ok,JsonStruct} -> 	 
+			TempJson = lib_json:get_and_add_id(JsonStruct),
+			{TempJson, ReqData, State}
+	end.
+	
 
 %% @doc
 %% Function: filter_json/1
