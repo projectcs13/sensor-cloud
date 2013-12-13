@@ -126,7 +126,7 @@ add_failed(StreamId,connection_error) ->
 	UpdateJson2 = "{\"script\":\"if (ctx._source.history.size() == 100){ctx._source.history.remove((Object) ctx._source.history[0]);ctx._source.history += msg}{ctx._source.history += msg} \",\"params\":{\"msg\":"++ Message ++"}}",
 	case api_help:update_doc(?INDEX, "pollinghistory", StreamId, UpdateJson2, []) of
         {error, {Code2, Body2}} ->
-			erlang:display(binary_to_list(iolist_to_binary(lib_json:encode(Body2)))),
+			erlang:display("Error when updateing pollinghistory for " ++ StreamId),
             {error, {Code2, Body2}};
         {ok, Response2} ->
             ok
@@ -151,7 +151,7 @@ add_failed(StreamId,elasticsearch_error) ->
 	UpdateJson2 = "{\"script\":\"if (ctx._source.history.size() == 100){ctx._source.history.remove((Object) ctx._source.history[0]);ctx._source.history += msg}{ctx._source.history += msg} \",\"params\":{\"msg\":"++ Message ++"}}",
 	case api_help:update_doc(?INDEX, "pollinghistory", StreamId, UpdateJson2, []) of
         {error, {Code2, Body2}} ->
-			erlang:display(binary_to_list(iolist_to_binary(lib_json:encode(Body2)))),
+			erlang:display("Error when updateing pollinghistory for " ++ StreamId),
             {error, {Code2, Body2}};
         {ok, Response2} ->
             ok
@@ -163,7 +163,7 @@ add_sucess(StreamId) ->
 	UpdateJson = "{\"script\":\"if (ctx._source.history.size() == 100){ctx._source.history.remove((Object) ctx._source.history[0]);ctx._source.history += msg}{ctx._source.history += msg} \",\"params\":{\"msg\":"++ Message ++"}}",
 	case api_help:update_doc(?INDEX, "pollinghistory", StreamId, UpdateJson, []) of
         {error, {Code, Body}} ->
-			erlang:display(binary_to_list(iolist_to_binary(lib_json:encode(Body)))),
+			erlang:display("Error when updateing pollinghistory for " ++ StreamId),
             {error, {Code, Body}};
         {ok, Response} ->
             ok
