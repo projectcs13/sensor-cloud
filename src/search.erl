@@ -166,28 +166,35 @@ process_search_post(ReqData, State) ->
 			end,
 			StreamSearch = lib_json:encode(List1) % May need to convert
     end,
+    case erlastic_search:search_json(#erls_params{},?INDEX, "vstream", FilteredJson) of % Maybe wanna take more
+            {error, Reason2} ->
+                VStreamSearch = {error, Reason2};
+            {ok,List2} ->
+                VStreamSearch = lib_json:encode(List2) % May need to convert
+    end,
     FilteredJson2 = filter_json(Json, From, Size, Sort, false),
     case erlastic_search:search_json(#erls_params{},?INDEX, "user", lib_json:rm_field(FilteredJson2, "sort")) of % Maybe wanna take more
-            {error, Reason2} ->
-                    UserSearch = {error, Reason2};
-            {ok,List2} -> 
-			UserSearch = lib_json:encode(List2) % May need to convert
+            {error, Reason3} ->
+                    UserSearch = {error, Reason3};
+            {ok,List3} -> 
+    			UserSearch = lib_json:encode(List3) % May need to convert
      end,
 	% check search-results for error
-	case StreamSearch of
-		{error, {Body, Code}} ->
-		ErrorString = api_help:generate_error(Body, Code),
-		{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-		_ -> 
-		case UserSearch of
-		  {error, {Body, Code}} ->
-			ErrorString = api_help:generate_error(Body, Code),
-			{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-		  _ ->
-				SearchResults = "{\"streams\":"++ StreamSearch ++", \"users\":"++ UserSearch ++"}",
-				{true,wrq:set_resp_body(SearchResults,ReqData),State}
-		end
-	end.
+    case {StreamSearch, VStreamSearch, UserSearch} of
+        {{error, {Body, Code}},_,_} ->
+            ErrorString = api_help:generate_error(Body, Code),
+            {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+        {_,{error, {Body2, Code2}},_} ->
+            ErrorString = api_help:generate_error(Body2, Code2),
+            {{halt, Code2}, wrq:set_resp_body(ErrorString, ReqData), State};
+        {_,_,{error, {Body3, Code3}}} ->
+            ErrorString = api_help:generate_error(Body3, Code3),
+            {{halt, Code3}, wrq:set_resp_body(ErrorString, ReqData), State};
+        _ ->
+            SearchResults = "{\"streams\":"++ StreamSearch ++",\"vstreams\":"++ VStreamSearch ++",\"users\":"++ UserSearch ++"}",
+            {true,wrq:set_resp_body(SearchResults,ReqData),State}
+    end.
+	   
 %% GROUPS ARE NOT IMPLEMENTED
 %%         case erlastic_search:search_json(#erls_params{},?INDEX, "group", FilteredJson) of % Maybe wanna take more
 %%                 {error,Reason} -> {{halt,Reason}, ReqData, State};
