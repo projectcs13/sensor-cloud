@@ -277,7 +277,8 @@ process_post(ReqData, State) ->
 														data_type = binary_to_list(lib_json:get_field(FieldsAdded, "data_type")),
 														parser = binary_to_list(lib_json:get_field(FieldsAdded, "parser"))
 													   },
-										    gen_server:cast(polling_supervisor, {create_poller, NewPoller})
+										    gen_server:cast(polling_supervisor, {create_poller, NewPoller}),
+											poll_help:create_poller_history(Stream_id)
 									end
 								end,
 								{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}

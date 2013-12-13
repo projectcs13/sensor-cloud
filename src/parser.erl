@@ -56,8 +56,10 @@ parseJson(StreamId, Parser, Data, Time) ->
 	
 	case erlastic_search:index_doc(?ES_INDEX, "datapoint", FinalJson) of
 		{error, Reason} -> erlang:display("Failed to insert the new datapoint into the elasticsearch for this reason: "++Reason),
+						   poll_help:add_failed(StreamId,elasticsearch_error),
 						   {error, Reason};
 		{ok,_List} -> 
+			poll_help:add_sucess(StreamId),
 			case datapoints:update_fields_in_stream({"stream", StreamId}, binary_to_list(TimeStamp)) of
 				{error, _Code, ErrorString}->
 					erlang:display("failed to update the stream`s information: "++ErrorString);
@@ -105,3 +107,5 @@ processParser([Item|Tail], Res)->
 					processParser(Tail, Res++Item++".")
 			end
 	end.
+
+
