@@ -346,7 +346,13 @@ update_fields_in_stream({StreamType, StreamId}, TimeStamp) ->
 								 OldSize ->
 									 OldSize
 							 end,
-			Json = lib_json:set_attrs([{"last_updated", TimeStamp} , {"history_size", OldHistorySize+1}]),
+			Time = case is_list(TimeStamp) of
+					   true->
+						   list_to_binary(TimeStamp);
+					   _->
+						   TimeStamp
+				   end,
+			Json = lib_json:set_attrs([{"last_updated", Time} , {"history_size", OldHistorySize+1}]),
 			Update = api_help:create_update(Json),
 			case api_help:update_doc(?INDEX, StreamType, StreamId, Update) of
 				{error, {Code, Body}} -> 
