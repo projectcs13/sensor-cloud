@@ -98,6 +98,14 @@ json_to_record_stream(Stream) ->
 				parser = ParserString
 			   }.
 
+%% @doc
+%% Function: create_poller_history/1
+%% Purpose: creates an empty polling history for
+%%          the given stream
+%% Returns: ok or {Code,Body} if there was an error in ES
+%% @end
+-spec create_poller_history(StreamId::string()) -> ok | {integer(),string()}.
+
 create_poller_history(StreamId) ->
 	NewHistory = lib_json:set_attrs([{"history","[]"}]),
 	case erlastic_search:index_doc_with_id(?INDEX, "pollinghistory", StreamId, NewHistory) of	
@@ -106,6 +114,13 @@ create_poller_history(StreamId) ->
 		{ok,_List} -> 
 			ok
 	end.
+
+%% @doc
+%% Function: add_failed/1
+%% Purpose: Updates the polling history with an error message
+%% Returns: ok or {error,{Code,Body}} if there was an error in ES
+%% @end
+-spec add_failed(StreamId::string(),Error::atom()) -> ok | {atom(),{integer(),string()}}.
 
 add_failed(StreamId,connection_error) ->
 	Time = ?TIME_NOW(erlang:localtime()),
@@ -156,6 +171,14 @@ add_failed(StreamId,elasticsearch_error) ->
         {ok, Response2} ->
             ok
     end.
+
+
+%% @doc
+%% Function: add_failed/1
+%% Purpose: Updates the polling history with a created datapoint message
+%% Returns: ok or {error,{Code,Body}} if there was an error in ES
+%% @end
+-spec add_sucess(StreamId::string()) -> ok | {atom(),{integer(),string()}}.
 
 add_sucess(StreamId) ->
 	Time = ?TIME_NOW(erlang:localtime()),
