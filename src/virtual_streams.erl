@@ -49,6 +49,8 @@ allowed_methods(ReqData, State) ->
 			{['POST', 'PUT', 'DELETE', 'GET'], ReqData, State};
 		[{"vstreams", "_search"}] ->
 			{['POST', 'GET'], ReqData, State};
+		[{"users", _UserID}, {"vstreams"}] ->
+			{['GET'], ReqData, State};
 		[error] ->
 			{[], ReqData, State}
 	end.
@@ -158,14 +160,16 @@ reduce(VirtualStreamId, Streams, TimestampFrom, Function, ReqData, State) ->
 %% @end
 -spec get_vstream(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 get_vstream(ReqData, State) ->
-	case id_from_path(ReqData) of
+	case wrq:get_qs_value("size",ReqData) of 
+            undefined ->
+                Size = 100;
+            SizeParam ->
+                Size = list_to_integer(SizeParam)
+    end,
+	case proplists:get_value('user', wrq:path_info(ReqData)) of
+		undefined ->
+			case id_from_path(ReqData) of
                 undefined ->
-                    case wrq:get_qs_value("size",ReqData) of 
-                        undefined ->
-                            Size = 100;
-                        SizeParam ->
-                            Size = list_to_integer(SizeParam)
-                    end,
 					Query = "{\"size\" :" ++ integer_to_list(Size) ++",\"query\" : {\"match_all\" : {}},
 						\"filter\" : {\"bool\":{\"must_not\":{\"term\":{\"private\":\"true\"}}}}}",
 					case erlastic_search:search_json(#erls_params{},?INDEX, "virtual_stream", Query) of
@@ -185,7 +189,18 @@ get_vstream(ReqData, State) ->
                             FinalJson = lib_json:get_and_add_id(JsonStruct),
                             {FinalJson, ReqData, State} 
                     end
-            end.
+            end;
+		UserId -> 
+			Query = "{\"size\" :" ++ integer_to_list(Size) ++",\"query\" : {\"term\" : { \"user_id\":\"" ++ UserId ++ "\"}}}",
+			case erlastic_search:search_json(#erls_params{},?INDEX, "virtual_stream", Query) of
+                {error, {Code, Body}} -> 
+                    ErrorString = api_help:generate_error(Body, Code),
+                    {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+			    {ok,JsonStruct} ->
+				    FinalJson = lib_json:get_list_and_add_id(JsonStruct, users),
+				    {FinalJson, ReqData, State}  
+        end
+	end.
 
 	
 %% @doc
