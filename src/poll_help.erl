@@ -22,7 +22,7 @@
 		 json_to_record_streams/1,
 		 json_to_record_stream/1,
 		 create_poller_history/1,
-		 add_sucess/1,
+		 add_success/1,
 		 add_failed/2]).
 
 
