@@ -174,13 +174,13 @@ add_failed(StreamId,elasticsearch_error) ->
 
 
 %% @doc
-%% Function: add_failed/1
+%% Function: add_success/1
 %% Purpose: Updates the polling history with a created datapoint message
 %% Returns: ok or {error,{Code,Body}} if there was an error in ES
 %% @end
--spec add_sucess(StreamId::string()) -> ok | {atom(),{integer(),string()}}.
+-spec add_success(StreamId::string()) -> ok | {atom(),{integer(),string()}}.
 
-add_sucess(StreamId) ->
+add_success(StreamId) ->
 	Time = ?TIME_NOW(erlang:localtime()),
 	Message = lib_json:set_attrs([{"polling","{}"},{"polling.stream",list_to_binary(StreamId)},{"polling.message",list_to_binary("Created new datapoint")},{"polling.action",list_to_binary("create")},{"polling.timestamp",list_to_binary(Time)}]),
 	UpdateJson = "{\"script\":\"if (ctx._source.history.size() == 100){ctx._source.history.remove((Object) ctx._source.history[0]);ctx._source.history += msg}{ctx._source.history += msg} \",\"params\":{\"msg\":"++ Message ++"}}",

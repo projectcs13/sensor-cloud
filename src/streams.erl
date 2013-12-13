@@ -665,6 +665,12 @@ get_streams(List) ->
              JsonStruct
     end.
 
+%% @doc
+%% Function: get_polling_history/2
+%% Purpose: get the polling history according to stream id
+%% Returns: {PollingHistory, ReqData, State} | {{halt, ErrorCode}, ErrorResponse}
+%% @end
+-spec get_polling_history(ReqData :: term(), State :: term()) -> {{halt, Code :: integer()}, term()} | {TempJson :: string(), ReqData :: term(), State :: term()}.
 
 get_polling_history(ReqData, State) ->
 	Id = proplists:get_value('stream', wrq:path_info(ReqData)),

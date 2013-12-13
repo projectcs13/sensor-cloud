@@ -59,7 +59,7 @@ parseJson(StreamId, Parser, Data, Time) ->
 						   poll_help:add_failed(StreamId,elasticsearch_error),
 						   {error, Reason};
 		{ok,_List} -> 
-			poll_help:add_sucess(StreamId),
+			poll_help:add_success(StreamId),
 			case datapoints:update_fields_in_stream({"stream", StreamId}, binary_to_list(TimeStamp)) of
 				{error, _Code, ErrorString}->
 					erlang:display("failed to update the stream`s information: "++ErrorString);
