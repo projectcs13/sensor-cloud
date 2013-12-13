@@ -36,7 +36,7 @@ main(Id, Val) ->
     amqp_channel:cast(Channel,
                       #'basic.publish'{exchange = Exchange},
                       #amqp_msg{payload = Message}),
-    io:format(" [x] Sent to ~p:~p~n", [StreamId, Message]),
+    io:format(" [x] Sent to ~p:~p~n", ["streams." ++ StreamId, Message]),
     ok = amqp_channel:close(Channel),
     ok = amqp_connection:close(Connection),
     ok.

@@ -97,7 +97,7 @@ create(TriggerId, InputIds, Function, OutputList) ->
 loop(TriggerId, DataPoints, TriggerExchange, Net, Function, OutputList) ->
         receive
                 {#'basic.deliver'{}, #amqp_msg{payload = Body}} ->
-                        Data = binary_to_term(Body),
+                        Data = binary_to_list(Body),
 						erlang:display(Body),
                         case erlson:is_json_string(Data) of
 							%% New value from the source as a Json
@@ -123,8 +123,9 @@ loop(TriggerId, DataPoints, TriggerExchange, Net, Function, OutputList) ->
 								loop(TriggerId, NewDataPoints, TriggerExchange,Net, Function, OutputList);
 							
 							false ->
-								erlang:display(Data),
-								case handle_command(Data,OutputList) of
+								Command = binary_to_term(Body),
+								erlang:display(Command),
+								case handle_command(Command,OutputList) of
 									[] ->
 										case erlastic_search:delete_doc(?INDEX,"trigger", TriggerId) of
 											{error, _} -> 

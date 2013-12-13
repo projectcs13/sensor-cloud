@@ -163,7 +163,7 @@ test_vstreams: compile
 	-@mkdir test-results
 	curl -XDELETE localhost:9200/sensorcloud
 	curl -XPUT localhost:9200/sensorcloud
-	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -eval 'test:run(virtual_stream_process)'
+	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -eval 'test:run(gen_virtual_stream_process)'
 
 
 ### Command: make docs
