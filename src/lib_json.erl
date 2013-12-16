@@ -26,15 +26,6 @@
 	 set_attr/2,
 	 set_attrs/1,
 	 to_string/1]).
-%% ====================================================================
-%% Specialized functions - Exports
-%% ====================================================================
--export([get_and_add_id/1, 
-	 get_list_and_add_id/1,
-	 get_list_and_add_id/2,
-     get_and_add_password/1,
-     get_list_and_add_password/1
-	]).
 
 %% ====================================================================
 %% API functions
