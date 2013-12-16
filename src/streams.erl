@@ -169,19 +169,8 @@ end.
 %% FIX: This function relies on direct contact with elastic search at localhost:9200
 %% @end
 -spec delete_data_points_with_stream_id(Id::string(), Type::string() | binary()) -> term().
-
 delete_data_points_with_stream_id(Id, Type) when is_binary(Id) ->
-	case Type of
-		"stream" -> DatapointType = "datapoint";
-		"virtual_stream" -> DatapointType = "vsdatapoint"
-	end,
-	{ok, {{_Version, Code, _ReasonPhrase}, _Headers, Body}} = httpc:request(delete, {?ELASTIC_SEARCH_URL++"/sensorcloud/" ++ DatapointType ++ "/_query?q=stream_id:" ++ binary_to_list(Id), []}, [], []),
-	case Code of
-		200 ->
-			{ok};
-		Code ->
-			{error,{Code, Body}}
-	end;
+    delete_data_points_with_stream_id(binary:bin_to_list(Id), Type) ;
 delete_data_points_with_stream_id(Id, Type) ->
 	case Type of
 		"stream" -> DatapointType = "datapoint";
