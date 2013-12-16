@@ -1,6 +1,7 @@
 %% @author Tomas Sävström <tosa7943@student.uu.se>, Li Hao <hali2222@student.uu.se>
 %%   [www.csproj13.student.it.uu.se]
 %% @version 1.0
+%% @headerfile "json.hrl"
 %% @copyright [Copyright information]
 %%
 %% @doc == api_help ==
@@ -8,16 +9,12 @@
 %% api files 
 %%
 %% @end
-
 -module(api_help).
-
+-include_lib("erlastic_search.hrl").
+-include("json.hrl").
 
 %% should export all
 -compile(export_all).
-
--include_lib("erlastic_search.hrl").
-
-
 
 %% @doc
 %% Function: generate_timpestamp/2
@@ -451,24 +448,6 @@ remove_object([First|Rest],Val) ->
 	end.
 
 %% @doc
-%% Function: convert_binary_to_string/1
-%% Purpose: convert binary parts of the list to string
-%% Returns: Returns the list with the binary parts converted to strings
-%% @end
--spec convert_binary_to_string(JSONString::string()) -> string().
-
-convert_binary_to_string([]) ->
-	[];
-convert_binary_to_string([First|Rest]) ->
-	case is_binary(First) of
-		true -> binary_to_list(First) ++ convert_binary_to_string(Rest);
-		false -> case is_list(First) of
-					 true -> convert_binary_to_string(First) ++ convert_binary_to_string(Rest);
-					 false -> [First] ++ convert_binary_to_string(Rest)
-				 end
-	end.
-
-%% @doc
 %% Function: do_any_field_exist/2
 %% Purpose: Used to check if a JSON contains any of the given fields
 %% Returns: True if at least one of the given fields exist, false otherwise
@@ -497,10 +476,10 @@ do_only_fields_exist(Json,List) ->
 	NumFields = count_fields(lib_json:to_string(Json)),
 	Values = lib_json:get_fields(Json, List),
 	NumCorrectFields = lists:foldl(fun(X, Sum) -> case X of 
-													  undefined -> Sum;
-													  _ -> Sum + 1
-												  end
-								   end, 0, Values),
+							  undefined -> Sum;
+							  _ -> Sum + 1
+						      end
+				       end, 0, Values),
 	NumFields == NumCorrectFields.
 
 %% @doc
@@ -509,7 +488,6 @@ do_only_fields_exist(Json,List) ->
 %% Returns: The number of fields in the given JSON
 %% @end
 -spec count_fields(Json::string()) -> integer().
-
 count_fields(Json) ->
 	count_fields(Json,1).
 
@@ -520,7 +498,6 @@ count_fields(Json) ->
 %% Returns: The number of fields in the given JSON
 %% @end
 -spec count_fields(Json::string(),Position::integer()) -> integer().
-
 count_fields(Json,Pos) ->
 	case Pos == length(Json) of
 		true -> 0;
@@ -632,8 +609,6 @@ any_to_float(Val) when is_list(Val) ->
 any_to_float(Val) ->
 	error.
 
-
-
 %% @doc 
 %% Get the search results and performs get_and_add_id/1 on each
 %% elements in the result list.
@@ -666,9 +641,9 @@ get_list_and_add_id(JsonStruct, JsonKey) ->
 %% @end 
 -spec get_and_add_id(JsonStruct::mochijson()) -> json_output_value().
 get_and_add_id(JsonStruct) ->
-    Id  = get_field(JsonStruct, "_id"),
-    SourceJson  = get_field(JsonStruct, "_source"),
-    add_value(SourceJson, "id", Id).
+    Id  = lib_json:get_field(JsonStruct, "_id"),
+    SourceJson  = lib_json:get_field(JsonStruct, "_source"),
+    lib_json:add_value(SourceJson, "id", Id).
 
 %% @doc 
 %% Gets the 'password' from the root, gets the '_source'. Adds password as 
@@ -677,9 +652,9 @@ get_and_add_id(JsonStruct) ->
 %% @end 
 -spec get_and_add_password(JsonStruct::mochijson()) -> json_output_value().
 get_and_add_password(JsonStruct) ->
-    Id  = get_field(JsonStruct, "fields.password"),
-    SourceJson  = get_field(JsonStruct, "_source"),
-    add_value(SourceJson, "password", Id).
+    Id  = lib_json:get_field(JsonStruct, "fields.password"),
+    SourceJson  = lib_json:get_field(JsonStruct, "_source"),
+    lib_json:add_value(SourceJson, "password", Id).
 
 %% @doc 
 %% Get the search results and performs get_and_add_password/1 on each
@@ -688,6 +663,6 @@ get_and_add_password(JsonStruct) ->
 %% @end 
 -spec get_list_and_add_password(JsonStruct::mochijson()) -> json_string().
 get_list_and_add_password(JsonStruct) ->
-    HitsList = get_field(JsonStruct, "hits.hits"),
+    HitsList = lib_json:get_field(JsonStruct, "hits.hits"),
     AddedPassword = lists:map(fun(X) -> get_and_add_password(X) end, HitsList),
-    set_attr(users, AddedPassword).
+    lib_json:set_attr(users, AddedPassword).
