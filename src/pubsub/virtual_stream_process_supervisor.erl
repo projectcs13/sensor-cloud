@@ -23,7 +23,7 @@
 %% ====================================================================
 %% API functions
 %% ====================================================================
--export([start_link/0, start_processes/0, add_child/3]).
+-export([start_link/0, start_processes/0, add_child/3, terminate_child/1]).
 
 
 
@@ -115,8 +115,48 @@ add_child(Id, InputIds, Function) ->
 		undefined ->
 			{error, "Start the supervisor first"};
 		_ ->
-			_ = supervisor:start_child(vstream_sup, [Id, InputIds, list_to_atom(binary_to_list(lists:nth(1, Function)))]),
-			ok
+			RegName = list_to_atom("vstream." ++ Id),
+			Res = supervisor:start_child(vstream_sup, [Id, InputIds, list_to_atom(binary_to_list(lists:nth(1, Function)))]),
+			case Res of
+				{ok, Pid} ->
+					ok;
+				{ok, Pid, _} ->
+					ok;
+				{already_started, _Pid} ->
+					{error, "Already Started"};
+				Reason ->
+					{error, Reason}
+			end
+	end.
+
+
+
+
+
+
+%% terminate_child/3
+%% ====================================================================
+%% @doc
+%% Function: terminate_child/3
+%% Purpose: Terminate a virtual stream process under supervision.
+%% Args: Id - The id of the virtual stream to terminate
+%% Return: ok | {error, Reason}.
+%% Side effects: Terminates a virtual stream processes under supervision.
+%% @end
+-spec terminate_child(Id :: string()) -> ok | {error, string()}.
+%% ====================================================================
+terminate_child(Id) ->
+	case whereis(vstream_sup) of
+		undefined ->
+			{error, "Start the supervisor first"};
+		_ ->
+			RegName = list_to_atom("vstream." ++ Id),
+			case whereis(RegName) of
+				Pid when is_pid(Pid) ->
+					Pid ! quit,
+					ok;
+				_ -> {error, "No such child"}
+			end
 	end.
 
 

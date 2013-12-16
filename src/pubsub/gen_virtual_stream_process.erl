@@ -60,9 +60,9 @@ start_link(VStreamId, InputIds, Function) ->
 
 
 
-%% spec of record state:
+%% spec of record vsstate:
 %% {string(), [{atom(),string()}], binary(), {pid(), pid(), pid()}, atom()}
--record(state, {vstreamid, datapoints, exchange, network, function, log, history_size, last_updated}).
+-record(vsstate, {vstreamid, datapoints, exchange, network, function, log, history_size, last_updated}).
 
 
 
@@ -90,6 +90,10 @@ init([VStreamId, InputIds, Function]) ->
 	%% Trap exits from parent
 	process_flag(trap_exit, true),
 	
+	% Registers the process as vstream.VStreamId
+	RegName = "vstream." ++ VStreamId,
+	register(list_to_atom(RegName), self()),
+
 	%% Exchange name binarys.
 	InputExchanges = create_input_exchanges(InputIds),
 	VStreamExchange = list_to_binary("vstreams." ++ VStreamId),
@@ -142,14 +146,14 @@ init([VStreamId, InputIds, Function]) ->
 									Time -> binary_to_list(Time)
 								end,
 							%% Create state
-							State = #state{vstreamid=VStreamId,
-										   datapoints = DataPoints,
-										   exchange = VStreamExchange,
-										   network = {Connection, ChannelIn, ChannelOut},
-										   function = Function,
-										   log = [],
-										   history_size = HistorySize,
-										   last_updated = LastUpdated},
+							State = #vsstate{vstreamid=VStreamId,
+										     datapoints = DataPoints,
+										     exchange = VStreamExchange,
+										     network = {Connection, ChannelIn, ChannelOut},
+										     function = Function,
+										     log = [],
+										     history_size = HistorySize,
+										     last_updated = LastUpdated},
 						    {ok, State}
 					end
 			end
@@ -208,22 +212,36 @@ handle_cast(_Msg, State) ->
 	Timeout :: non_neg_integer() | infinity.
 %% ====================================================================
 handle_info({#'basic.deliver'{}, #amqp_msg{payload = Body}},
-			State = #state{vstreamid = VStreamId, datapoints = DataPoints,
-						   exchange = VStreamExchange, network = Net,
-						   function = Function}) ->
+			State = #vsstate{vstreamid = VStreamId, datapoints = DataPoints,
+						     exchange = VStreamExchange, network = Net,
+						     function = Function}) ->
 	Data = binary_to_list(Body),
+
 	case erlson:is_json_string(Data) of
-		%% New value from the source as a Json
 		true ->
 			Id = binary_to_list(lib_json:get_field(Data, "stream_id")),
+
 			%% TODO Check whether it is a virtual stream or a stream before
 			%%      replacing the key, since they can have the same key.
 			NewDataPoints = lists:keyreplace(Id, 1, DataPoints, {Id, Data}),
-			
-			%% Apply function to the new values
-			[Value] = apply_function(list_to_binary(VStreamId),
-									 Function, NewDataPoints),
 
+			Value = case Function of
+						diff ->
+							case lists:keyfind(Id, 1, DataPoints) of
+								false ->
+									none;
+								{Id, undefined} ->
+									lib_json:replace_field(Data, "value", 0.0);
+								{Id, Json} ->
+									OldValue = lib_json:get_field(Json, "value"),
+									NewValue = lib_json:get_field(Data, "value"),
+									lib_json:replace_field(Json, "value", NewValue - OldValue)
+							end;
+						_ ->
+							[NewValue] = apply_function(list_to_binary(VStreamId),
+													 	Function, NewDataPoints),
+							NewValue
+						end,
 			case Value of
 				none -> {noreply, State};
 				_ ->
@@ -232,23 +250,23 @@ handle_info({#'basic.deliver'{}, #amqp_msg{payload = Body}},
 					Timestamp = ?TIME_NOW(erlang:localtime()),
 			
 					%% Create new datapoint message
-					Msg = lib_json:replace_field(Value, "timestamp",
-												 list_to_binary(Timestamp)),
+					Msg = lib_json:replace_fields(Value, [{"timestamp", list_to_binary(Timestamp)},
+														  {"stream_id", list_to_binary(VStreamId)}]),
 			
 					%% Store value in ES
 					Log = case erlastic_search:index_doc(?ES_INDEX,
 														 "vsdatapoint", Msg) of
 						  	{error, _Reason} ->
-						  		NewLastUpdated = State#state.last_updated,
-						  		NewHistorySize = State#state.history_size,
+						  		NewLastUpdated = State#vsstate.last_updated,
+						  		NewHistorySize = State#vsstate.history_size,
 						  		%% TODO Persistent storage using file?
-								[Msg | State#state.log];
+								[Msg | State#vsstate.log];
 							{ok, _} ->
 								NewLastUpdated = Timestamp,
 								%% Try updating the vstream and storing the log
-								{L, S} = store_log_in_es(State#state.log, 0),
-								NewHistorySize = State#state.history_size + S + 1,
-								update_virtual_stream(State#state.vstreamid,
+								{L, S} = store_log_in_es(State#vsstate.log, 0),
+								NewHistorySize = State#vsstate.history_size + S + 1,
+								update_virtual_stream(State#vsstate.vstreamid,
 													  NewHistorySize,
 													  NewLastUpdated),
 								L
@@ -256,10 +274,10 @@ handle_info({#'basic.deliver'{}, #amqp_msg{payload = Body}},
 					%% Publish the calculated value
 					ChannelOut = element(3, Net),
 					send(ChannelOut, VStreamExchange, list_to_binary(Msg)),
-					{noreply, State#state{datapoints = NewDataPoints,
-										  log = Log,
-										  history_size = NewHistorySize,
-										  last_updated = NewLastUpdated}}
+					{noreply, State#vsstate{datapoints = NewDataPoints,
+										    log = Log,
+										    history_size = NewHistorySize,
+										    last_updated = NewLastUpdated}}
 			end;
 		_ ->
 			{noreply, State}
@@ -282,7 +300,7 @@ handle_info(_Info, State) ->
 			| term().
 %% ====================================================================
 
-terminate(_Reason, #state{network = Net}) when Net /= undefined ->
+terminate(_Reason, #vsstate{network = Net}) when Net /= undefined ->
 	{Connection, ChannelIn, ChannelOut} = Net,
 	amqp_channel:close(ChannelIn),
 	amqp_channel:close(ChannelOut),
@@ -568,13 +586,15 @@ update_virtual_stream(VStreamId, HistorySize, LastUpdated) ->
 %%		 			 we are doing the calculation,
 %%		 Function - Specifier of a predefined function,
 %%       List - List of datapoints for streams and virtual streams.
-%% Returns: Value of the predefined function.
+%% Returns: Datapoint of the predefined function.
 %% Side effects: Applies a predefined function
 %% @end
 -spec apply_function(VStreamId :: binary(),
 					 Function :: atom(),
 					 List :: [{Id :: string(),
-							   DataPoint :: json() | undefined}]) -> [number()].
+							   DataPoint | undefined}]) -> [DataPoint]
+	when
+		DataPoint :: json().
 %% ====================================================================
 apply_function(_VStreamId, _Function, []) -> [none];
 apply_function(VStreamId, Function, DataPoints) ->

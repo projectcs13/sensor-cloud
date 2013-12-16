@@ -251,6 +251,7 @@ delete_resource(ReqData, State) ->
 							ErrorString = api_help:generate_error(Body, Code),
 							{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 						{ok,List} -> 
+							virtual_stream_process_supervisor:terminate_child(Id),
 							{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
 					end
 			end
