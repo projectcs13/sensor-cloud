@@ -168,6 +168,7 @@ generate_date([First|Rest]) ->
 %%
 %% TODO: parse Body for more accurate response text
 %%
+%% @end
 -spec generate_error(JSONString::string(), integer()) -> string().
 generate_error(Body, ErrorCode) ->
 	ErrorString = integer_to_list(ErrorCode),
