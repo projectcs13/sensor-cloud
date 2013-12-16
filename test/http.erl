@@ -26,5 +26,5 @@ post(Url, Request) ->
     {Status, Body}.
 
 put(Url, Request) ->
-    {ok,{{_Vsn,Status _Reason},_Hdrs,Body}} = httpc:request(put,{Url,[],"application/json",Request},[],[]),
+    {ok,{{_Vsn,Status,_Reason},_Hdrs,Body}} = httpc:request(put,{Url,[],"application/json",Request},[],[]),
     {Status, Body}.
