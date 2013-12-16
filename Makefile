@@ -72,22 +72,18 @@ run: compile
 	curl -XPUT localhost:9200/sensorcloud
 	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine
 
-<<<<<<< HEAD
-### Command: make stop_all
-### Runs all parts of the system in one command.
+### Command: make run_all
+### Starts all parts of the system in one command.
 run_all: compile
 	sudo scripts/sensec.sh start
 
-### Command: make stop_all
-### Stops all parts of the system in one command.
-=======
-run_all: compile
-	sudo scripts/sensec.sh start
-
+### Command: make test_setup
+### Runs all parts of the system except the erlang part. To be used prior to 'make test' for easy test setup
 test_setup: compile
 	sudo scripts/sensec.sh test_setup
 
->>>>>>> b64dc307417a438d49afe40c7fb50a50c7899cf8
+### Command: make stop_all
+### Stops all parts of the system in one command.
 stop_all:
 	sudo scripts/sensec.sh stop
 
@@ -96,18 +92,17 @@ stop_all:
 run_es:
 	lib/elasticsearch/bin/elasticsearch -f
 
+### Command: make run_nodejs
+### Runs NodeJS
 run_nodejs:
 	nodejs javascripts/receive.js
 
-<<<<<<< HEAD
-=======
 ### Command: make run_fake_resource
 ### Runs the fake resources for polling	
 run_fake_resource:
 	(cd scripts/python/ && python -m CGIHTTPServer 8001 &) 
 	(cd scripts/python/ && python -m CGIHTTPServer 8002)
 
->>>>>>> b64dc307417a438d49afe40c7fb50a50c7899cf8
 ### Command: make run_rabbit
 ### Runs rabbitMQ server
 run_rabbit:
@@ -221,11 +216,7 @@ help:
 	@echo "Downloads and compiles all libraries"
 	@echo ""
 	@echo "'make install_linux_deps'"
-<<<<<<< HEAD
 	@echo "Installs all linux dependencies needed. Should only be necessary to do once on a system."
-=======
-	@echo "Installs all Linux dependencies for the project."
->>>>>>> b64dc307417a438d49afe40c7fb50a50c7899cf8
 	@echo ""
 	@echo "'make run'"
 	@echo "Compiles and runs the otp app. Does NOT compile libraries"
