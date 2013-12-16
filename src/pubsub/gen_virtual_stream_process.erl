@@ -60,9 +60,9 @@ start_link(VStreamId, InputIds, Function) ->
 
 
 
-%% spec of record state:
+%% spec of record vsstate:
 %% {string(), [{atom(),string()}], binary(), {pid(), pid(), pid()}, atom()}
--record(state, {vstreamid, datapoints, exchange, network, function, log, history_size, last_updated}).
+-record(vsstate, {vstreamid, datapoints, exchange, network, function, log, history_size, last_updated}).
 
 
 
@@ -142,14 +142,14 @@ init([VStreamId, InputIds, Function]) ->
 									Time -> binary_to_list(Time)
 								end,
 							%% Create state
-							State = #state{vstreamid=VStreamId,
-										   datapoints = DataPoints,
-										   exchange = VStreamExchange,
-										   network = {Connection, ChannelIn, ChannelOut},
-										   function = Function,
-										   log = [],
-										   history_size = HistorySize,
-										   last_updated = LastUpdated},
+							State = #vsstate{vstreamid=VStreamId,
+										     datapoints = DataPoints,
+										     exchange = VStreamExchange,
+										     network = {Connection, ChannelIn, ChannelOut},
+										     function = Function,
+										     log = [],
+										     history_size = HistorySize,
+										     last_updated = LastUpdated},
 						    {ok, State}
 					end
 			end
@@ -208,9 +208,9 @@ handle_cast(_Msg, State) ->
 	Timeout :: non_neg_integer() | infinity.
 %% ====================================================================
 handle_info({#'basic.deliver'{}, #amqp_msg{payload = Body}},
-			State = #state{vstreamid = VStreamId, datapoints = DataPoints,
-						   exchange = VStreamExchange, network = Net,
-						   function = Function}) ->
+			State = #vsstate{vstreamid = VStreamId, datapoints = DataPoints,
+						     exchange = VStreamExchange, network = Net,
+						     function = Function}) ->
 	Data = binary_to_list(Body),
 	case erlson:is_json_string(Data) of
 		%% New value from the source as a Json
@@ -239,16 +239,16 @@ handle_info({#'basic.deliver'{}, #amqp_msg{payload = Body}},
 					Log = case erlastic_search:index_doc(?ES_INDEX,
 														 "vsdatapoint", Msg) of
 						  	{error, _Reason} ->
-						  		NewLastUpdated = State#state.last_updated,
-						  		NewHistorySize = State#state.history_size,
+						  		NewLastUpdated = State#vsstate.last_updated,
+						  		NewHistorySize = State#vsstate.history_size,
 						  		%% TODO Persistent storage using file?
-								[Msg | State#state.log];
+								[Msg | State#vsstate.log];
 							{ok, _} ->
 								NewLastUpdated = Timestamp,
 								%% Try updating the vstream and storing the log
-								{L, S} = store_log_in_es(State#state.log, 0),
-								NewHistorySize = State#state.history_size + S + 1,
-								update_virtual_stream(State#state.vstreamid,
+								{L, S} = store_log_in_es(State#vsstate.log, 0),
+								NewHistorySize = State#vsstate.history_size + S + 1,
+								update_virtual_stream(State#vsstate.vstreamid,
 													  NewHistorySize,
 													  NewLastUpdated),
 								L
@@ -256,10 +256,10 @@ handle_info({#'basic.deliver'{}, #amqp_msg{payload = Body}},
 					%% Publish the calculated value
 					ChannelOut = element(3, Net),
 					send(ChannelOut, VStreamExchange, list_to_binary(Msg)),
-					{noreply, State#state{datapoints = NewDataPoints,
-										  log = Log,
-										  history_size = NewHistorySize,
-										  last_updated = NewLastUpdated}}
+					{noreply, State#vsstate{datapoints = NewDataPoints,
+										    log = Log,
+										    history_size = NewHistorySize,
+										    last_updated = NewLastUpdated}}
 			end;
 		_ ->
 			{noreply, State}
@@ -282,7 +282,7 @@ handle_info(_Info, State) ->
 			| term().
 %% ====================================================================
 
-terminate(_Reason, #state{network = Net}) when Net /= undefined ->
+terminate(_Reason, #vsstate{network = Net}) when Net /= undefined ->
 	{Connection, ChannelIn, ChannelOut} = Net,
 	amqp_channel:close(ChannelIn),
 	amqp_channel:close(ChannelOut),
