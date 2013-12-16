@@ -90,6 +90,10 @@ init([VStreamId, InputIds, Function]) ->
 	%% Trap exits from parent
 	process_flag(trap_exit, true),
 	
+	% Registers the process as vstream.VStreamId
+	RegName = "vstream." ++ VStreamId,
+	register(list_to_atom(RegName), self()),
+
 	%% Exchange name binarys.
 	InputExchanges = create_input_exchanges(InputIds),
 	VStreamExchange = list_to_binary("vstreams." ++ VStreamId),
