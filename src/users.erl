@@ -226,7 +226,7 @@ put_user(ReqData, State) ->
 				{false,false} ->
 					{{halt,403}, wrq:set_resp_body("Unsupported field(s)", ReqData), State};
 				{false,true} ->
-					Update = api_help:create_update(UserJson), 
+					Update = lib_json:set_attr(doc,UserJson), 
 					case api_help:update_doc(?INDEX, "user", Id, Update) of
 						{error, {Code, Body}} -> 
 							ErrorString = api_help:generate_error(Body, Code),
@@ -451,7 +451,7 @@ get_user(ReqData, State) ->
                             ErrorString = api_help:generate_error(Body, Code),
                             {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 					    {ok,JsonStruct} ->
-						    FinalJson = lib_json:get_list_and_add_password(JsonStruct),
+						    FinalJson = api_help:get_list_and_add_password(JsonStruct),
 						    {FinalJson, ReqData, State}  
                     end;
                 Id ->
@@ -461,7 +461,7 @@ get_user(ReqData, State) ->
 							ErrorString1 = api_help:generate_error(Body1, Code1),
 							{{halt, Code1}, wrq:set_resp_body(ErrorString1, ReqData), State};
 						{ok,JsonStruct} ->
-							FinalJson = lib_json:get_and_add_password(JsonStruct),
+							FinalJson = api_help:get_and_add_password(JsonStruct),
 							{FinalJson, ReqData, State} 
 					end
             end;

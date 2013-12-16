@@ -267,7 +267,7 @@ update_suggestion(Stream) ->
 							NewStreamList = lib_json:add_value(Sugg,"suggest.payload.streams" , StreamInfo),
 							NewSugg = lib_json:replace_field(NewStreamList, "suggest.weight", NewWeight)
 					end,
-					Final = api_help:create_update(NewSugg),
+					Final = lib_json:set_attr(doc,NewSugg),
 					case api_help:update_doc(?INDEX, "suggestion", Id, Final) of 
 						{error, _Reason} -> erlang:display("not updated");
 						{ok, _Json} -> 

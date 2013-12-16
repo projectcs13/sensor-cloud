@@ -566,7 +566,7 @@ update_virtual_stream(VStreamId, HistorySize, LastUpdated) ->
 							_ ->
 								lib_json:replace_field(Json1, "last_updated", list_to_binary(LastUpdated))
 						end,
-					Json3 = api_help:create_update(Json2),
+					Json3 = lib_json:set_attr(doc,Json2),
 					api_help:update_doc(?ES_INDEX, "virtual_stream", VStreamId, Json3)
 			end
 	end.

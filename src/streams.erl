@@ -198,11 +198,13 @@ process_post(ReqData, State) ->
 	    {Stream,_,_} = api_help:json_handler(ReqData, State),
 	    case lib_json:get_field(Stream,"multi_json") of
 		undefined ->
-		    case proplists:get_value('user', wrq:path_info(ReqData)) of
-			undefined ->
-			    UserAdded = Stream;
-			UId ->
-			    UserAdded = api_help:add_field(Stream,"user_id",UId)
+		    UserAdded = case proplists:get_value('user', wrq:path_info(ReqData)) of
+				    undefined ->
+					Stream;
+				    UId when is_list(UId) ->
+					lib_json:add_field(Stream,"user_id",binary:list_to_bin(UId));
+				    UId ->
+					lib_json:add_field(Stream,"user_id",UId)
 		    end,
 		    case lib_json:get_field(UserAdded,"user_id") of
 			undefined -> {false, wrq:set_resp_body("\"user_id missing\"",ReqData), State};
@@ -305,7 +307,7 @@ multi_json_streams([Head|Rest], ReqData ,State, Response) ->
 		undefined ->
 			UserAdded = Head;
 		UId ->
-			UserAdded = api_help:add_field(Head,"user_id",string:to_lower(UId))
+			UserAdded = lib_json:add_field(Head,"user_id",string:to_lower(UId))
 	end,
 	case Response of
 		[] ->
@@ -482,7 +484,7 @@ put_stream(ReqData, State) ->
 							{{halt,403}, wrq:set_resp_body("Unsupported field(s)", ReqData), State};
 						{false,true} ->
 							% NewJson = suggest:add_stream_suggestion_fields(Stream),
-							Update = api_help:create_update(Stream),
+							Update = lib_json:set_attr(doc,Stream),
 							%suggest:update_stream(Stream, StreamId),
 							case api_help:update_doc(?INDEX, "stream", StreamId, Update) of 
 								{error, {Code, Body}} -> 
@@ -548,7 +550,7 @@ put_stream(ReqData, State) ->
 		            						end;
     									{OldRank, ChangedRankingList} -> %User HAS ranked this stream before
         									change_ranking(StreamId, Rank, OldRank),
-        									UpdateJson = api_help:create_update(lib_json:set_attr("rankings", ChangedRankingList)),
+        									UpdateJson = lib_json:set_attr(doc,lib_json:set_attr("rankings", ChangedRankingList)),
     										case api_help:update_doc(?INDEX, "user", User, UpdateJson,[]) of
 												{error, {Code, Body}} ->
 			            							ErrorString = api_help:generate_error(Body, Code),
@@ -616,7 +618,7 @@ get_stream(ReqData, State) ->
             				ErrorString = api_help:generate_error(Body, Code),
             				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 					    {ok,JsonStruct} ->
-						    FinalJson = lib_json:get_list_and_add_id(JsonStruct, streams),
+						    FinalJson = api_help:get_list_and_add_id(JsonStruct, streams),
 						    {FinalJson, ReqData, State}
 					end;
 				StreamString ->
@@ -627,11 +629,11 @@ get_stream(ReqData, State) ->
 		            				ErrorString = api_help:generate_error(Body, Code),
 		            				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 								{ok,JsonStruct} -> 	 
-									TempJson = lib_json:get_and_add_id(JsonStruct),
+									TempJson = api_help:get_and_add_id(JsonStruct),
 									{TempJson, ReqData, State}
 							end;
 						IdList -> % Get a list of streams
-							{lib_json:get_list_and_add_id(get_streams(IdList), streams), ReqData, State}
+							{api_help:get_list_and_add_id(get_streams(IdList), streams), ReqData, State}
 					end
 			end
 	end.
@@ -669,7 +671,7 @@ get_polling_history(ReqData, State) ->
 			ErrorString = api_help:generate_error(Body, Code),
 			{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 		{ok,JsonStruct} -> 	 
-			TempJson = lib_json:get_and_add_id(JsonStruct),
+			TempJson = api_help:get_and_add_id(JsonStruct),
 			{TempJson, ReqData, State}
 	end.
 	
@@ -756,7 +758,7 @@ change_ranking(StreamId, NewValue) ->
 				NewNumberOfRankings = NumberOfRankings + 1,
 				NewRanking = ((OldRanking * NumberOfRankings) + NewValue) / NewNumberOfRankings,
 				RankingJson = lib_json:set_attrs( [{user_ranking, "{}"}, {"user_ranking.average", NewRanking}, {"user_ranking.nr_rankings", NewNumberOfRankings} ] ),
-				case api_help:update_doc(?INDEX, "stream",StreamId, api_help:create_update(RankingJson),[]) of 
+				case api_help:update_doc(?INDEX, "stream",StreamId, lib_json:set_attr(doc,RankingJson),[]) of 
 					{error, {Code, Body}} -> {error, {Code, Body}};
 					{ok, _} -> 	ok
 				end
@@ -772,7 +774,7 @@ case erlastic_search:get_doc(?INDEX, "stream", StreamId) of
 				NumberOfRankings = lib_json:get_field(JsonStruct, "_source.user_ranking.nr_rankings"),
 				NewRanking = ((OldRanking * NumberOfRankings) + NewValue - OldValue) / NumberOfRankings,
 				RankingJson = lib_json:set_attrs( [{user_ranking, "{}"}, {"user_ranking.average", NewRanking}, {"user_ranking.nr_rankings", NumberOfRankings} ] ),
-				case api_help:update_doc(?INDEX, "stream",StreamId, api_help:create_update(RankingJson),[]) of 
+				case api_help:update_doc(?INDEX, "stream",StreamId, lib_json:set_attr(doc,RankingJson),[]) of 
 					{error, {Code, Body}} -> {error, {Code, Body}};
 					{ok, _} -> 	ok
 				end
@@ -792,26 +794,18 @@ add_server_side_fields(Json) ->
 
 	Time = api_help:generate_timestamp([Year,Month,Day,Hour,Min,Sec],0),
 
-	JSON = lib_json:add_values(Json,[
-			{creation_date, list_to_binary(Date)},
-			{last_updated, list_to_binary(Time)},
-			{quality, 1.0},
-			{nr_subscribers, 0},
-			{subscribers, "[]"},
-			{history_size, 0}, 
-			{user_ranking, "{}"},
-			{"user_ranking.average", 0.0},
-			{"user_ranking.nr_rankings", 0},
-			{active, true}]),
-	JSON.
+        lib_json:add_values(Json,
+			    [{creation_date, list_to_binary(Date)},
+			     {last_updated, list_to_binary(Time)},
+			     {quality, 1.0},
+			     {nr_subscribers, 0},
+			     {subscribers, "[]"},
+			     {history_size, 0}, 
+			     {user_ranking, "{}"},
+			     {"user_ranking.average", 0.0},
+			     {"user_ranking.nr_rankings", 0},
+			     {active, true}]).
 
 
-%%	DateAdded = api_help:add_field(Json,"creation_date",Date),
-%%	UpdateAdded = api_help:add_field(DateAdded,"last_update",Time),
-%%	QualityAdded = api_help:add_field(UpdateAdded,"quality",1.0),
-%%	UserRankingAdded = api_help:add_field(QualityAdded,"user_ranking","{}"),
-%%	UserRankingAverageAdded = api_help:add_field(UserRankingAdded,"user_ranking.average",0.0),
-%%	UserRankingNrRankingsAdded = api_help:add_field(UserRankingAverageAdded,"user_ranking.nr_rankings",0),
-%%	SubsAdded = api_help:add_field(UserRankingNrRankingsAdded,"subscribers",1),
-%%	api_help:add_field(SubsAdded,"history_size",0).
+
 

@@ -72,7 +72,7 @@ handle_call({rebuild}, _Form, State)->
 			
 			{reply, {error, Reason}, State};
 		{ok,JsonStruct} ->
-		    FinalJson = lib_json:get_and_add_id(JsonStruct),
+		    FinalJson = api_help:get_and_add_id(JsonStruct),
 			
 			NewUri = lib_json:get_field(FinalJson, "uri"),
 			NewFreq = lib_json:get_field(FinalJson, "polling_freq"),

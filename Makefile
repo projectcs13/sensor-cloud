@@ -121,6 +121,12 @@ test_travis: compile
 	curl -XPUT localhost:9200/sensorcloud
 	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -s test run
 
+test_datapoints: compile
+	-@mkdir $(TEST_RESULT_FOLDER)
+	curl -XDELETE localhost:9200/sensorcloud
+	curl -XPUT localhost:9200/sensorcloud
+	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -eval 'test:run(datapoints)'
+
 test_json: compile
 	-@mkdir $(TEST_RESULT_FOLDER)
 	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -eval 'test:run(lib_json)'

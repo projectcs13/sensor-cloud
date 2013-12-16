@@ -309,8 +309,6 @@ ranking_stream_test() ->
 
 		DocId2 = lib_json:get_field(Body2,"_id"),
 
-                ?DEBUG(Body2),
-
 		api_help:refresh(),
 
 		{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(put, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(DocId2)++ "/_rank",[], "application/json", "{\"user_id\":\""++ DocId1 ++ "\",\"ranking\":5.0}"}, [], []),

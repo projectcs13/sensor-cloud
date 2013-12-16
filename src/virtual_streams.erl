@@ -183,7 +183,7 @@ get_vstream(ReqData, State) ->
                             ErrorString = api_help:generate_error(Body, Code),
                             {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 					    {ok,JsonStruct} ->
-						    FinalJson = lib_json:get_list_and_add_id(JsonStruct, users),
+						    FinalJson = api_help:get_list_and_add_id(JsonStruct, users),
 						    {FinalJson, ReqData, State}  
                     end;
                 Id ->
@@ -192,7 +192,7 @@ get_vstream(ReqData, State) ->
                             ErrorString = api_help:generate_error(Body, Code),
                             {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
                         {ok,JsonStruct} ->
-                            FinalJson = lib_json:get_and_add_id(JsonStruct),
+                            FinalJson = api_help:get_and_add_id(JsonStruct),
                             {FinalJson, ReqData, State} 
                     end
             end;
@@ -203,7 +203,7 @@ get_vstream(ReqData, State) ->
                     ErrorString = api_help:generate_error(Body, Code),
                     {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 			    {ok,JsonStruct} ->
-				    FinalJson = lib_json:get_list_and_add_id(JsonStruct, users),
+				    FinalJson = api_help:get_list_and_add_id(JsonStruct, users),
 				    {FinalJson, ReqData, State}  
         end
 	end.
@@ -219,7 +219,7 @@ get_vstream(ReqData, State) ->
 put_stream(ReqData, State) ->
 	VStreamId = proplists:get_value('id', wrq:path_info(ReqData)),
 	{VStream,_,_} = api_help:json_handler(ReqData,State),
-	Update = api_help:create_update(VStream),
+	Update = lib_json:set_attr(doc,VStream),
 	case api_help:update_doc(?INDEX, "virtual_stream", VStreamId, Update) of 
 		{error, {Code, Body}} -> 
 			ErrorString = api_help:generate_error(Body, Code),
@@ -303,7 +303,7 @@ process_search(ReqData, State, post) ->
 				ErrorString = api_help:generate_error(Body, Code),
 				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 			{ok,JsonStruct} ->
-				FinalJson = lib_json:get_list_and_add_id(JsonStruct),
+				FinalJson = api_help:get_list_and_add_id(JsonStruct),
 				{true,wrq:set_resp_body(lib_json:encode(FinalJson),ReqData),State}
 	end.
 

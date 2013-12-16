@@ -87,8 +87,8 @@ process_post(ReqData, State) ->
 					case lib_json:get_field(DatapointJson,"timestamp") of
 						undefined ->
 							{{Year,Month,Day},{Hour,Minute,Second}} = calendar:local_time(),
-							TimeStamp = api_help:generate_timestamp([Year,Month,Day,Hour,Minute,Second],0),
-							TimeStampAdded = api_help:add_field(DatapointJson, "timestamp", TimeStamp);
+							TimeStamp = binary:list_to_bin(api_help:generate_timestamp([Year,Month,Day,Hour,Minute,Second],0)),
+							TimeStampAdded = lib_json:add_field(DatapointJson,"timestamp",TimeStamp);
 						_ ->
 							TimeStampAdded = DatapointJson
 					end,
@@ -171,7 +171,7 @@ get_datapoint(ReqData, State) ->
 			case erlastic_search:search_limit(?INDEX, DataType, "stream_id:" ++ Id, Size) of
 				{ok, Result} ->
 					EncodedResult = lib_json:encode(Result),
-					FinalJson = lib_json:get_list_and_add_id(Result, data),
+					FinalJson = api_help:get_list_and_add_id(Result, data),
 					{FinalJson, ReqData, State};
 				{error, {Code, Body}} -> 
         				ErrorString = api_help:generate_error(Body, Code),
@@ -214,7 +214,7 @@ process_search(ReqData, State, post) ->
 				ErrorString = api_help:generate_error(Body, Code),
 				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 			{ok,JsonStruct} ->
-					       FinalJson = lib_json:get_list_and_add_id(JsonStruct),
+					       FinalJson = api_help:get_list_and_add_id(JsonStruct),
 					       {true,wrq:set_resp_body(lib_json:encode(FinalJson),ReqData),State}
 	end;
 process_search(ReqData, State, get) ->
@@ -237,7 +237,7 @@ process_search(ReqData, State, get) ->
     				ErrorString = api_help:generate_error(Body, Code),
     				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
             	{ok,JsonStruct} ->
-			       FinalJson = lib_json:get_list_and_add_id(JsonStruct, data),
+			       FinalJson = api_help:get_list_and_add_id(JsonStruct, data),
 			       {FinalJson, ReqData, State}
 		 	end;
 		_ ->
@@ -247,7 +247,7 @@ process_search(ReqData, State, get) ->
     				ErrorString = api_help:generate_error(Body, Code),
     				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
             	{ok,JsonStruct} ->
-			       FinalJson = lib_json:get_list_and_add_id(JsonStruct, data),
+			       FinalJson = api_help:get_list_and_add_id(JsonStruct, data),
 			       {FinalJson, ReqData, State}
 			end
 	end.
@@ -352,8 +352,8 @@ update_fields_in_stream({StreamType, StreamId}, TimeStamp) ->
 					   _->
 						   TimeStamp
 				   end,
-			Json = lib_json:set_attrs([{"last_updated", Time} , {"history_size", OldHistorySize+1}]),
-			Update = api_help:create_update(Json),
+			Json = lib_json:set_attrs([{"last_updated", Time}, {"history_size", OldHistorySize+1}]),
+			Update = lib_json:set_attr(doc, Json),
 			case api_help:update_doc(?INDEX, StreamType, StreamId, Update) of
 				{error, {Code, Body}} -> 
 					ErrorString = api_help:generate_error(Body, Code),
