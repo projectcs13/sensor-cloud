@@ -433,7 +433,6 @@ parse_path(Path) ->
 %% Function: refresh/0
 %% Purpose: Help function to find refresh the sensorcloud index
 %% Returns: {ok/error, {{Version, Code, Reason}, Headers, Body}}
-%% FIX: This function relies on direct contact with elastic search at localhost:9200
 %% @end
 refresh() ->
     httpc:request(post, {get_elastic_search_url()++"/sensorcloud/_refresh", [],"", ""}, [], []).
@@ -461,7 +460,7 @@ transform([{Field,Value}|Rest]) ->
 %% @doc
 %% Function: transform/2
 %% Purpose: Used to create the query for search, expects more fields
-%% if AddAnd euqal to true
+%% if AddAnd equal to true
 %% Returns: The query string from given from the list
 %% were the list will be {Field,Value} tuples
 %% @end
