@@ -78,7 +78,8 @@ start_supervisor(_) ->
 clean_up(_) ->
 	timer:sleep(1000),
 	remove_any_vsdatapoints(?ES_INDEX),
-	[?_assertEqual(true, true)].
+	Children = length(supervisor:which_children(vstream_sup)),
+	[?_assertEqual(0, Children)].
 
 
 
@@ -95,14 +96,14 @@ start_and_terminate({VStreamId, StreamId1, _StreamId2}) ->
 	Childrens1 = length(supervisor:which_children(vstream_sup)),
 	
 	virtual_stream_process_supervisor:add_child(VStreamId, [{stream, StreamId1}], [list_to_binary("total"), "2s"]),
-	%virtual_stream_process_supervisor:start_processes(),
-	%timer:sleep(5000),
 
 	Childrens2 = length(supervisor:which_children(vstream_sup)),
 	Pid = element(2, lists:nth(1, supervisor:which_children(vstream_sup))),
 	Info1 = is_process_alive(Pid),
-	Pid ! quit,
+	
+	virtual_stream_process_supervisor:terminate_child(VStreamId),
 	timer:sleep(1500),
+
 	Info2 = is_process_alive(Pid),
 	[?_assertEqual(true, is_pid(SupPid)),
 	 ?_assertEqual(0, Childrens1),
@@ -127,9 +128,7 @@ start_and_terminate({VStreamId, StreamId1, _StreamId2}) ->
 vstream_subscribe_to_a_stream({VStreamId, StreamId1, _StreamId2}) ->
 	
 	%% Create virtual stream listening to our stream
-	%virtual_stream_process_supervisor:start_processes(),
-	%timer:sleep(5000),
-	virtual_stream_process_supervisor:add_child(VStreamId, [{stream, StreamId1}], [list_to_binary("total"), "2s"]),
+	virtual_stream_process_supervisor:add_child(VStreamId, [{stream, StreamId1}], [list_to_binary("diff"), "2s"]),
 	
 	%% Create a publisher and consumer exchanges
 	OutExchange = list_to_binary("streams." ++ StreamId1),
@@ -153,23 +152,71 @@ vstream_subscribe_to_a_stream({VStreamId, StreamId1, _StreamId2}) ->
 	timer:sleep(1000),
 	
 	%% Publish a message
-	Msg = create_data_point(StreamId1, 32),
+	Msg1 = create_data_point(StreamId1, 32),
 	amqp_channel:cast(ChannelOut,
 					  #'basic.publish'{exchange = OutExchange},
-					  #amqp_msg{payload = Msg}),	
+					  #amqp_msg{payload = Msg1}),	
 	
 	
 	%% Listen for the update
-	Rec = receive
-			{#'basic.deliver'{}, #amqp_msg{payload = Body}} ->
-				Data = binary_to_list(Body),
-				case erlson:is_json_string(Data) of
+	Rec1 = receive
+			{#'basic.deliver'{}, #amqp_msg{payload = Body1}} ->
+				Data1 = binary_to_list(Body1),
+				case erlson:is_json_string(Data1) of
 					%% New value from the source as a Json
 					true ->
-						Value = lib_json:get_field(Data, "value"),
-						Id = binary_to_list(
-								lib_json:get_field(Data, "stream_id")),
-						{Value, Id};
+						Value1 = lib_json:get_field(Data1, "value"),
+						Id1 = binary_to_list(
+								lib_json:get_field(Data1, "stream_id")),
+						{Value1, Id1};
+					_ -> false
+				end;
+			_ -> false
+		  end,
+
+
+	%% Publish a message
+	Msg2 = create_data_point(StreamId1, 30),
+	amqp_channel:cast(ChannelOut,
+					  #'basic.publish'{exchange = OutExchange},
+					  #amqp_msg{payload = Msg2}),	
+	
+	
+	%% Listen for the update
+	Rec2 = receive
+			{#'basic.deliver'{}, #amqp_msg{payload = Body2}} ->
+				Data2 = binary_to_list(Body2),
+				case erlson:is_json_string(Data2) of
+					%% New value from the source as a Json
+					true ->
+						Value2 = lib_json:get_field(Data2, "value"),
+						Id2 = binary_to_list(
+								lib_json:get_field(Data2, "stream_id")),
+						{Value2, Id2};
+					_ -> false
+				end;
+			_ -> false
+		  end,
+
+
+	%% Publish a message
+	Msg3 = create_data_point(StreamId1, 32),
+	amqp_channel:cast(ChannelOut,
+					  #'basic.publish'{exchange = OutExchange},
+					  #amqp_msg{payload = Msg3}),	
+	
+	
+	%% Listen for the update
+	Rec3 = receive
+			{#'basic.deliver'{}, #amqp_msg{payload = Body3}} ->
+				Data3 = binary_to_list(Body3),
+				case erlson:is_json_string(Data3) of
+					%% New value from the source as a Json
+					true ->
+						Value3 = lib_json:get_field(Data3, "value"),
+						Id3 = binary_to_list(
+								lib_json:get_field(Data3, "stream_id")),
+						{Value3, Id3};
 					_ -> false
 				end;
 			_ -> false
@@ -179,11 +226,14 @@ vstream_subscribe_to_a_stream({VStreamId, StreamId1, _StreamId2}) ->
 	amqp_channel:close(ChannelIn),
 	amqp_channel:close(ChannelOut),
 	amqp_connection:close(Connection),
+	virtual_stream_process_supervisor:terminate_child(VStreamId),
 	
 	timer:sleep(1000),
 
 	[?_assertEqual(true, is_list(StreamId1)),
-	 ?_assertEqual({32, VStreamId}, Rec)].
+	 ?_assertEqual({0.0, VStreamId}, Rec1),
+	 ?_assertEqual({-2, VStreamId}, Rec2),
+	 ?_assertEqual({2, VStreamId}, Rec3)].
 	
 
 
@@ -205,8 +255,6 @@ vstream_subscribe_to_a_stream({VStreamId, StreamId1, _StreamId2}) ->
 vstream_subscribe_to_streams_interval({VStreamId, StreamId1, StreamId2}) ->
 
 	%% Create virtual stream listening to our streams
-	%virtual_stream_process_supervisor:start_processes(),
-	%timer:sleep(5000),
 	virtual_stream_process_supervisor:add_child(VStreamId, [{stream, StreamId1}, {stream, StreamId2}], [list_to_binary("total"), "2s"]),
 	
 	%% Create publisher and consumer exchanges
@@ -284,6 +332,7 @@ vstream_subscribe_to_streams_interval({VStreamId, StreamId1, StreamId2}) ->
 	amqp_channel:close(ChannelIn),
 	amqp_channel:close(ChannelOut),
 	amqp_connection:close(Connection),
+	virtual_stream_process_supervisor:terminate_child(VStreamId),
 
 	[?_assertEqual(true, is_list(StreamId1)),
 	 ?_assertEqual(true, is_list(StreamId2)),

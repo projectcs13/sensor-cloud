@@ -216,18 +216,32 @@ handle_info({#'basic.deliver'{}, #amqp_msg{payload = Body}},
 						     exchange = VStreamExchange, network = Net,
 						     function = Function}) ->
 	Data = binary_to_list(Body),
+
 	case erlson:is_json_string(Data) of
-		%% New value from the source as a Json
 		true ->
 			Id = binary_to_list(lib_json:get_field(Data, "stream_id")),
+
 			%% TODO Check whether it is a virtual stream or a stream before
 			%%      replacing the key, since they can have the same key.
 			NewDataPoints = lists:keyreplace(Id, 1, DataPoints, {Id, Data}),
-			
-			%% Apply function to the new values
-			[Value] = apply_function(list_to_binary(VStreamId),
-									 Function, NewDataPoints),
 
+			Value = case Function of
+						diff ->
+							case lists:keyfind(Id, 1, DataPoints) of
+								false ->
+									none;
+								{Id, undefined} ->
+									lib_json:replace_field(Data, "value", 0.0);
+								{Id, Json} ->
+									OldValue = lib_json:get_field(Json, "value"),
+									NewValue = lib_json:get_field(Data, "value"),
+									lib_json:replace_field(Json, "value", NewValue - OldValue)
+							end;
+						_ ->
+							[NewValue] = apply_function(list_to_binary(VStreamId),
+													 	Function, NewDataPoints),
+							NewValue
+						end,
 			case Value of
 				none -> {noreply, State};
 				_ ->
@@ -236,8 +250,8 @@ handle_info({#'basic.deliver'{}, #amqp_msg{payload = Body}},
 					Timestamp = ?TIME_NOW(erlang:localtime()),
 			
 					%% Create new datapoint message
-					Msg = lib_json:replace_field(Value, "timestamp",
-												 list_to_binary(Timestamp)),
+					Msg = lib_json:replace_fields(Value, [{"timestamp", list_to_binary(Timestamp)},
+														  {"stream_id", list_to_binary(VStreamId)}]),
 			
 					%% Store value in ES
 					Log = case erlastic_search:index_doc(?ES_INDEX,
@@ -572,13 +586,15 @@ update_virtual_stream(VStreamId, HistorySize, LastUpdated) ->
 %%		 			 we are doing the calculation,
 %%		 Function - Specifier of a predefined function,
 %%       List - List of datapoints for streams and virtual streams.
-%% Returns: Value of the predefined function.
+%% Returns: Datapoint of the predefined function.
 %% Side effects: Applies a predefined function
 %% @end
 -spec apply_function(VStreamId :: binary(),
 					 Function :: atom(),
 					 List :: [{Id :: string(),
-							   DataPoint :: json() | undefined}]) -> [number()].
+							   DataPoint | undefined}]) -> [DataPoint]
+	when
+		DataPoint :: json().
 %% ====================================================================
 apply_function(_VStreamId, _Function, []) -> [none];
 apply_function(VStreamId, Function, DataPoints) ->
