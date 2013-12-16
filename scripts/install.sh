@@ -28,7 +28,6 @@ sudo apt-get install nodejs
 echo "#################################################################"
 echo "Installing R"
 echo "#################################################################"
-
 sudo add-apt-repository "deb http://ftp.sunet.se/pub/lang/CRAN/bin/linux/ubuntu precise/"
 sudo apt-get update
 sudo apt-get install r-base

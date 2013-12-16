@@ -10,7 +10,7 @@
 %% @end
 -module(streams).
 -export([init/1, allowed_methods/2, content_types_provided/2, content_types_accepted/2,
-		 delete_resource/2, process_post/2, put_stream/2, get_stream/2, delete_data_points_with_stream_id/1, delete_stream_id_from_subscriptions/2]).
+		 delete_resource/2, process_post/2, put_stream/2, get_stream/2, delete_data_points_with_stream_id/2, delete_stream_id_from_subscriptions/2]).
 
 
 -define(ELASTIC_SEARCH_URL, api_help:get_elastic_search_url()).
@@ -40,8 +40,8 @@ allowed_methods(ReqData, State) ->
 	case api_help:parse_path(wrq:path(ReqData)) of
 		[{"streams", _StreamID}, {"_rank"}] ->
 			{['PUT'], ReqData, State};
-		[{"streams", _StreamID}, {"parser"}] ->
-			{['PUT', 'GET'], ReqData, State};
+		[{"streams", _StreamID}, {"pollinghistory"}] ->
+			{['GET'], ReqData, State};
 		[{"streams", "_search"}] ->
 			{['POST', 'GET'], ReqData, State};
 		[{"users", _UserID}, {"streams","_search"}] ->
@@ -111,7 +111,7 @@ delete_resource(ReqData, State) ->
 				SubsList = lib_json:get_field(JsonStruct, "_source.subscribers"),
 				delete_stream_id_from_subscriptions(Id,SubsList)
 			end,
-			case delete_data_points_with_stream_id(Id) of 
+			case delete_data_points_with_stream_id(Id, "stream") of 
 				{error, {Code, Body}} -> 
 					ErrorString = api_help:generate_error(Body, Code),
             		{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
@@ -121,18 +121,8 @@ delete_resource(ReqData, State) ->
 							ErrorString = api_help:generate_error(Body, Code),
 							{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 						{ok,List} -> 
-							% changed by lihao
-							% delete the parser according to stream id
-							Parser_id = "parser_"++Id,
-							case erlastic_search:delete_doc(?INDEX, "parser", Parser_id) of
-								{error, {_Code2, _Body2}} ->
-									continue;
-								{ok, _List2} ->
-									% terminate the poller
-									gen_server:cast(polling_supervisor, {terminate, Id})
-							end,
+							gen_server:cast(polling_supervisor, {terminate, Id}),
 							{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
-							% change ends
 					end
 			end
 	end.
@@ -173,23 +163,31 @@ end.
 
 
 	%% @doc
-%% Function: delete_data_points_with_stream_id/1
+%% Function: delete_data_points_with_stream_id/2
 %% Purpose: Used to delete all data-points with the given id as parent
 %% Returns: {ok} or {error,Reason} 
 %% FIX: This function relies on direct contact with elastic search at localhost:9200
 %% @end
--spec delete_data_points_with_stream_id(Id::string() | binary()) -> term().
+-spec delete_data_points_with_stream_id(Id::string(), Type::string() | binary()) -> term().
 
-delete_data_points_with_stream_id(Id) when is_binary(Id) ->
-	{ok, {{_Version, Code, _ReasonPhrase}, _Headers, Body}} = httpc:request(delete, {?ELASTIC_SEARCH_URL++"/sensorcloud/datapoint/_query?q=stream_id:" ++ binary_to_list(Id), []}, [], []),
+delete_data_points_with_stream_id(Id, Type) when is_binary(Id) ->
+	case Type of
+		"stream" -> DatapointType = "datapoint";
+		"virtual_stream" -> DatapointType = "vsdatapoint"
+	end,
+	{ok, {{_Version, Code, _ReasonPhrase}, _Headers, Body}} = httpc:request(delete, {?ELASTIC_SEARCH_URL++"/sensorcloud/" ++ DatapointType ++ "/_query?q=stream_id:" ++ binary_to_list(Id), []}, [], []),
 	case Code of
 		200 ->
 			{ok};
 		Code ->
 			{error,{Code, Body}}
 	end;
-delete_data_points_with_stream_id(Id) ->
-	{ok, {{_Version, Code, _ReasonPhrase}, _Headers, Body}} = httpc:request(delete, {?ELASTIC_SEARCH_URL++"/sensorcloud/datapoint/_query?q=stream_id:" ++ Id, []}, [], []),
+delete_data_points_with_stream_id(Id, Type) ->
+	case Type of
+		"stream" -> DatapointType = "datapoint";
+		"virtual_stream" -> DatapointType = "vsdatapoint"
+	end,
+		{ok, {{_Version, Code, _ReasonPhrase}, _Headers, Body}} = httpc:request(delete, {?ELASTIC_SEARCH_URL++"/sensorcloud/" ++ DatapointType ++ "/_query?q=stream_id:" ++ Id, []}, [], []),
 	case Code of
 		200 ->
 			{ok};
@@ -215,12 +213,13 @@ process_post(ReqData, State) ->
 			undefined ->
 			    UserAdded = Stream;
 			UId ->
-			    UserAdded = api_help:add_field(Stream,"user_id",string:to_lower(UId))
+			    UserAdded = api_help:add_field(Stream,"user_id",UId)
 		    end,
 		    case lib_json:get_field(UserAdded,"user_id") of
 			undefined -> {false, wrq:set_resp_body("\"user_id missing\"",ReqData), State};
 			UserId ->
-			    case {api_help:do_any_field_exist(UserAdded,?RESTRCITEDCREATESTREAMS),api_help:do_only_fields_exist(UserAdded,?ACCEPTEDFIELDSSTREAMS)} of
+				FinalUserAdded = lib_json:replace_field(UserAdded,"user_id",binary:list_to_bin(string:to_lower(binary_to_list(UserId)))),
+			    case {api_help:do_any_field_exist(FinalUserAdded,?RESTRCITEDCREATESTREAMS),api_help:do_only_fields_exist(FinalUserAdded,?ACCEPTEDFIELDSSTREAMS)} of
 				{true,_} ->
 				    ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDCREATESTREAMS),
 				    ResFields2 = string:sub_string(ResFields1, 1, length(ResFields1)-2),
@@ -230,15 +229,9 @@ process_post(ReqData, State) ->
 				{false,true} ->
 				    case erlastic_search:get_doc(?INDEX, "user", string:to_lower(binary_to_list(UserId))) of
 						{ok, Json} ->
-					    	FieldsAdded = add_server_side_fields(UserAdded),		      
-						    FieldsAdded2 = case lib_json:get_fields(FieldsAdded, ["parser","data_type"]) of
-								       [undefined, undefined]->FieldsAdded;
-								       [undefined, _]->lib_json:rm_field(FieldsAdded, "data_type");
-								       [_, undefined]->lib_json:rm_field(FieldsAdded, "parser");
-								       [_, _]->lib_json:rm_field(lib_json:rm_field(FieldsAdded, "parser"), "data_type")
-								   end,
+					    	FieldsAdded = add_server_side_fields(UserAdded),
 						    %%Final = suggest:add_stream_suggestion_fields(FieldsAdded),
-						    case erlastic_search:index_doc(?INDEX, "stream", FieldsAdded2) of	
+						    case erlastic_search:index_doc(?INDEX, "stream", FieldsAdded) of	
 							{error,{Code,Body}} ->
 							    ErrorString = api_help:generate_error(Body, Code),
 							    {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
@@ -254,54 +247,43 @@ process_post(ReqData, State) ->
 									    erlang:display("New suggested stream")
 								    end	
 							    end,
-							    
-							    %% changed by lihao to add post the parser to elasticsearch
-							    case lib_json:get_fields(FieldsAdded, ["parser", "data_type"]) of
-								[undefined, undefined]->{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State};
-								[_,undefined]->{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State};
-								[undefined,_]->{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State};
-								[_, _]->
-								    Input_parser = binary_to_list(lib_json:get_field(FieldsAdded, "parser")),
-								    Input_type = binary_to_list(lib_json:get_field(FieldsAdded, "data_type")),
-								    Stream_id = binary_to_list(lib_json:get_field(lib_json:to_string(List), "_id")),
-								    Parser = "{\"stream_id\":\""++Stream_id++"\", \"input_parser\":\""++Input_parser++"\", \"input_type\":\""++Input_type++"\"}",
-								    %% since every stream has only id, so it is fine to name parser using parser_++(stream_id)
-								    case erlastic_search:index_doc_with_id(?INDEX, "parser", "parser_"++Stream_id,Parser) of
-									{error, {Code2, Body2}}->
-									    ErrorString = api_help:generate_error(Body2, Code2),
-									    {{halt, Code2}, wrq:set_resp_body(ErrorString, ReqData), State};
-									{ok, _List2}->
-									    %% create a new poller in polling system
-									    api_help:refresh(),
-									    case lib_json:get_field(FieldsAdded, "polling") of
-										false->continue;
-										undefined->continue;
-										true->
-										    case lib_json:get_fields(FieldsAdded, ["uri", "polling_freq"]) of
-											[undefined, undefined]-> erlang:display("you must provide uri and frequency for polling!");
-											[_, undefined]		  -> erlang:display("you must provide frequency for polling!");
-											[undefined, _]        -> erlang:display("you must provide uri for polling!");
-											[_, _]				  ->
-											    case whereis(polling_supervisor) of
-												undefined ->
-												    polling_system:start_link(),
-												    timer:sleep(1000);
-												_ ->
-												    continue
-											    end,
-											    NewPoller = #pollerInfo{stream_id = Stream_id,
-														    name = binary_to_list(lib_json:get_field(FieldsAdded, "name")),
-														    uri = binary_to_list(lib_json:get_field(FieldsAdded, "uri")),
-														    frequency = lib_json:get_field(FieldsAdded, "polling_freq")
-														   },
-											    gen_server:cast(polling_supervisor, {create_poller, NewPoller})
-										    end
-									    end,
-										% should return the stream`s info
-									    {true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
-								    end
-							    end
-							    %% change ends
+								
+								%% create a new poller in polling system
+								api_help:refresh(),
+								case lib_json:get_field(FieldsAdded, "polling") of
+								false->continue;
+								undefined->continue;
+								true->
+								    case lib_json:get_fields(FieldsAdded, ["uri", "polling_freq", "data_type", "parser"]) of
+										[undefined, _, _, _]-> erlang:display("you must provide uri for polling!"),
+															   {{halt,403}, wrq:set_resp_body("Incorrect or mising uri.", ReqData), State};
+										[_, undefined, _, _]-> erlang:display("you must provide frequency for polling!"),
+															   {{halt,403}, wrq:set_resp_body("Incorrect or mising polling frequency.", ReqData), State};
+										[_, _, undefined, _]-> erlang:display("you must provide data_type for polling!"),
+															   {{halt,403}, wrq:set_resp_body("Incorrect or mising data_type.", ReqData), State};
+										[_, _, _, undefined]-> erlang:display("you must provide parser for polling"),
+															   {{halt,403}, wrq:set_resp_body("Incorrect or mising parser.", ReqData), State};
+										[_, _, _, _]->
+											Stream_id = binary_to_list(lib_json:get_field(lib_json:to_string(List), "_id")),
+										    case whereis(polling_supervisor) of
+											undefined ->
+											    polling_system:start_link(),
+											    timer:sleep(1000);
+											_ ->
+											    continue
+										    end,
+										    NewPoller = #pollerInfo{stream_id = Stream_id,
+													    name = binary_to_list(lib_json:get_field(FieldsAdded, "name")),
+													    uri = binary_to_list(lib_json:get_field(FieldsAdded, "uri")),
+													    frequency = lib_json:get_field(FieldsAdded, "polling_freq"),
+														data_type = binary_to_list(lib_json:get_field(FieldsAdded, "data_type")),
+														parser = binary_to_list(lib_json:get_field(FieldsAdded, "parser"))
+													   },
+										    gen_server:cast(polling_supervisor, {create_poller, NewPoller}),
+											poll_help:create_poller_history(Stream_id)
+									end
+								end,
+								{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
 						    end;		      
 						{error, {404, _}} ->
 						    {{halt,403}, wrq:set_resp_body("Incorrect or mising user_id.", ReqData), State};
@@ -364,14 +346,6 @@ multi_json_streams([Head|Rest], ReqData ,State, Response) ->
 	%					{ok,_} ->
 							FieldsAdded = add_server_side_fields(UserAdded),
 
-							FieldsAdded2 = case lib_json:get_fields(FieldsAdded, ["parser","data_type"]) of
-															   [undefined, undefined]->FieldsAdded;
-															   [undefined, _]->lib_json:rm_field(FieldsAdded, "data_type");
-															   [_, undefined]->lib_json:rm_field(FieldsAdded, "parser");
-															   [_, _]->lib_json:rm_field(lib_json:rm_field(FieldsAdded, "parser"), "data_type")
-														   end,
-
-
 							%Final = suggest:add_stream_suggestion_fields(FieldsAdded),
 							case erlastic_search:index_doc(?INDEX, "stream", FieldsAdded) of	
 								{error,{Code,Body}} ->
@@ -388,53 +362,37 @@ multi_json_streams([Head|Rest], ReqData ,State, Response) ->
 												ok ->
 													erlang:display("New suggested stream")
 											end,
-											case lib_json:get_fields(FieldsAdded, ["parser", "data_type"]) of
-												[undefined, undefined]-> multi_json_streams(Rest, ReqData ,State, FinalResponse ++ [lib_json:encode(List)]);
-												[_,undefined]-> multi_json_streams(Rest, ReqData ,State, FinalResponse ++ [lib_json:encode(List)]);
-												[undefined,_]-> multi_json_streams(Rest, ReqData ,State, FinalResponse ++ [lib_json:encode(List)]);
-												[_, _]->
-													Input_parser = binary_to_list(lib_json:get_field(FieldsAdded, "parser")),
-													Input_type = binary_to_list(lib_json:get_field(FieldsAdded, "data_type")),
-													Stream_id = binary_to_list(lib_json:get_field(lib_json:to_string(List), "_id")),
-													Parser = "{\"stream_id\":\""++Stream_id++"\", \"input_parser\":\""++Input_parser++"\", \"input_type\":\""++Input_type++"\"}",
-													%% since every stream has only id, so it is fine to name parser using parser_++(stream_id)
-													case erlastic_search:index_doc_with_id(?INDEX, "parser", "parser_"++Stream_id,Parser) of
-														{error, {Code2, Body2}}->
-															ErrorString = api_help:generate_error(Body2, Code2),
-															{{halt, Code2}, wrq:set_resp_body(ErrorString, ReqData), State};
-														{ok, _List2}->
-															%% create a new poller in polling system
-															api_help:refresh(),
-															case lib_json:get_field(FieldsAdded, "polling") of
-																false->continue;
-																undefined->continue;
-																true->
-																	case lib_json:get_fields(FieldsAdded, ["uri", "polling_freq"]) of
-																		[undefined, undefined]-> erlang:display("you must provide uri and frequency for polling!");
-																		[_, undefined]		  -> erlang:display("you must provide frequency for polling!");
-																		[undefined, _]        -> erlang:display("you must provide uri for polling!");
-																		[_, _]				  ->
-																								case whereis(polling_supervisor) of
-																									undefined ->
-																										polling_system:start_link(),
-																										timer:sleep(1000);
-																									_ ->
-																										continue
-																								end,
-																								NewPoller = #pollerInfo{stream_id = Stream_id,
-																														name = binary_to_list(lib_json:get_field(FieldsAdded, "name")),
-																														uri = binary_to_list(lib_json:get_field(FieldsAdded, "uri")),
-																														frequency = lib_json:get_field(FieldsAdded, "polling_freq")
-																														},
-																								gen_server:cast(polling_supervisor, {create_poller, NewPoller})
-																	end
-															end,
-														%find_ranking(StreamId, Rest, NewRank, lists:append(List,[Head]))
-
-														%suggest:update_suggestion(UserAdded),
-														multi_json_streams(Rest, ReqData ,State, FinalResponse ++ [lib_json:encode(List)])
+											Stream_id = binary_to_list(lib_json:get_field(lib_json:to_string(List), "_id")),
+											%% create a new poller in polling system
+											api_help:refresh(),
+											case lib_json:get_field(FieldsAdded, "polling") of
+												false->continue;
+												undefined->continue;
+												true->
+													case lib_json:get_fields(FieldsAdded, ["uri", "polling_freq", "data_type", "parser"]) of
+														[undefined, _, _, _]-> erlang:display("you must provide uri for polling!");
+														[_, undefined, _, _]-> erlang:display("you must provide polling frequency for polling!");
+														[_, _, undefined, _]-> erlang:display("you must provide data type for polling!");
+														[_, _, _, undefined]-> erlang:display("you must provide parser for polling!");
+														[_, _, _, _]   	    ->
+																				case whereis(polling_supervisor) of
+																					undefined ->
+																						polling_system:start_link(),
+																						timer:sleep(1000);
+																					_ ->
+																						continue
+																				end,
+																				NewPoller = #pollerInfo{stream_id = Stream_id,
+																										name = binary_to_list(lib_json:get_field(FieldsAdded, "name")),
+																										uri = binary_to_list(lib_json:get_field(FieldsAdded, "uri")),
+																										frequency = lib_json:get_field(FieldsAdded, "polling_freq"),
+																										data_type = binary_to_list(lib_json:get_field(FieldsAdded, "data_type")),
+																										parser = binary_to_list(lib_json:get_field(FieldsAdded, "parser"))
+																										},
+																				gen_server:cast(polling_supervisor, {create_poller, NewPoller})
 													end
-											end
+											end,
+											multi_json_streams(Rest, ReqData ,State, FinalResponse ++ [lib_json:encode(List)])
 									end
 							end
 	%				end
@@ -524,16 +482,6 @@ process_search_get(ReqData, State) ->
 put_stream(ReqData, State) ->
 	case api_help:is_rank(ReqData) of
 		false ->			
-			%% changed by lihao to update the parser
-			case api_help:is_parser(ReqData) of
-				true->
-					%% only update the parser
-					{Parser, _, _} = api_help:json_handler(ReqData, State),
-					StreamId = lib_json:get_field(Parser, "stream_id"),
-					NewParser = api_help:create_update(Parser),
-					ReqPathParser = ?INDEX ++ [$/ | "parser"] ++ [$/ | ("parser_"++StreamId) ] ++ "/_update",
-    				erls_resource:post(#erls_params{}, ReqPathParser, [], [], NewParser, []);
-				false->
 					StreamId = proplists:get_value('stream', wrq:path_info(ReqData)),
 					{Stream,_,_} = api_help:json_handler(ReqData,State),
 					case {api_help:do_any_field_exist(Stream,?RESTRCITEDUPDATESTREAMS),api_help:do_only_fields_exist(Stream,?ACCEPTEDFIELDSSTREAMS)} of
@@ -545,48 +493,18 @@ put_stream(ReqData, State) ->
 							{{halt,403}, wrq:set_resp_body("Unsupported field(s)", ReqData), State};
 						{false,true} ->
 							% NewJson = suggest:add_stream_suggestion_fields(Stream),
-							NewJson = Stream,
-							NewJson2 = case lib_json:get_fields(NewJson, ["parser", "data_type"]) of
-										   [undefined, undefined]->NewJson;
-										   [_, undefined]->lib_json:rm_field(NewJson, "parser");
-										   [undefined, _]->lib_json:rm_field(NewJson, "data_type");
-										   [_, _]->lib_json:rm_field(lib_json:rm_field(NewJson, "parser"), "data_type")
-									   end,
-							Update = api_help:create_update(NewJson2),
+							Update = api_help:create_update(Stream),
 							%suggest:update_stream(Stream, StreamId),
 							case api_help:update_doc(?INDEX, "stream", StreamId, Update) of 
 								{error, {Code, Body}} -> 
 									ErrorString = api_help:generate_error(Body, Code),
 				            		{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-								{ok,List} -> 														
-									%% update the parser
-									case lib_json:get_fields(NewJson, ["parser", "data_type"]) of
-										[undefined, undefined]-> {true, wrq:set_resp_body(lib_json:encode(List), ReqData), State};
-										[_, undefined]-> {true, wrq:set_resp_body(lib_json:encode(List), ReqData), State};
-										[undefined, _]-> {true, wrq:set_resp_body(lib_json:encode(List), ReqData), State};
-										[_, _]->
-											NewParser = lib_json:to_string(lib_json:get_field(NewJson, "parser")),
-											NewType = lib_json:to_string(lib_json:get_field(NewJson, "data_type")),
-											NewParserJson = "{\"stream_id\":\""++StreamId++"\", \"input_parser\":\""++NewParser++"\", \"input_type\":\""++NewType++"\"}",
-											ParserUpdate = api_help:create_update(NewParserJson),
-				    						ReqPathParser = ?INDEX ++ [$/ | "parser"] ++ [$/ | ("parser_"++StreamId) ] ++ "/_update",
-				    						%% erls_resource:put(#erls_params{}, ReqPathParser, [], [], ParserUpdate, []),
-											case api_help:update_doc(?INDEX, "parser", "parser_"++StreamId, ParserUpdate) of
-												{error, {Code2, Body2}} ->
-													ErrorString2 = api_help:generate_error(Body2, Code2),
-													{{halt, Code2}, wrq:set_resp_body(ErrorString2, ReqData), State};
-												{ok, List2}->
-											%% parsers` update ends
-													api_help:refresh(),
-													gen_server:call(polling_supervisor, {rebuild, StreamId}),
- 													{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
-											end
-									end
+								{ok,List} -> 	
+									api_help:refresh(),
+									gen_server:call(polling_supervisor, {rebuild, StreamId}),
+ 									{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
 							end
-					end
-			end;
-		
-			%% change ends 
+					end;
 		true ->
 			erlang:display("IN RANK!"),
 			StreamId = proplists:get_value('stream', wrq:path_info(ReqData)),
@@ -672,15 +590,21 @@ put_stream(ReqData, State) ->
 
 
 get_stream(ReqData, State) ->
-	case api_help:is_search(ReqData) of
-		true -> process_search_get(ReqData,State);
-		false ->
+	case {api_help:is_search(ReqData),api_help:is_polling_history(ReqData)} of
+		{true,_} -> process_search_get(ReqData,State);
+		{_,true} -> get_polling_history(ReqData, State);
+		{false,false} ->
 			case proplists:get_value('stream', wrq:path_info(ReqData)) of
 				undefined ->
 				% List streams based on URI
 			        case wrq:get_qs_value("size",ReqData) of 
 			            undefined ->
-			                Size = 100;
+							case erlastic_search:count_type(?INDEX, "stream") of
+								{error, {_CountCode, _CountBody}} -> 
+									Size = 100;
+								{ok,CountJsonStruct} ->
+									Size = lib_json:get_field(CountJsonStruct,"count")
+							end;
 			            SizeParam ->
 			                Size = list_to_integer(SizeParam)
 			        end,
@@ -715,19 +639,7 @@ get_stream(ReqData, State) ->
 		            				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 								{ok,JsonStruct} -> 	 
 									TempJson = lib_json:get_and_add_id(JsonStruct),
-									% Get the parser according to this stream id
-									Parser_id = "parser_"++StreamId,
-									case erlastic_search:get_doc(?INDEX, "parser", Parser_id) of
-										{error, {Code, Body}} ->
-											{TempJson, ReqData, State};
-										{ok, JsonStruct2} ->
-											SourceJson  = lib_json:get_field(JsonStruct2, "_source"),
-											Input_type = lib_json:get_field(SourceJson, "input_type"),
-											Input_parser = lib_json:get_field(SourceJson, "input_parser"),
-		    								TempJson2 = lib_json:add_value(TempJson, "data_type", Input_type),
-											FinalJson = lib_json:add_value(TempJson2, "parser", Input_parser),
-											{FinalJson, ReqData, State}
-									end
+									{TempJson, ReqData, State}
 							end;
 						IdList -> % Get a list of streams
 							{lib_json:get_list_and_add_id(get_streams(IdList), streams), ReqData, State}
@@ -753,6 +665,25 @@ get_streams(List) ->
              JsonStruct
     end.
 
+%% @doc
+%% Function: get_polling_history/2
+%% Purpose: get the polling history according to stream id
+%% Returns: {PollingHistory, ReqData, State} | {{halt, ErrorCode}, ErrorResponse}
+%% @end
+-spec get_polling_history(ReqData :: term(), State :: term()) -> {{halt, Code :: integer()}, term()} | {TempJson :: string(), ReqData :: term(), State :: term()}.
+
+get_polling_history(ReqData, State) ->
+	Id = proplists:get_value('stream', wrq:path_info(ReqData)),
+	case erlastic_search:get_doc(?INDEX, "pollinghistory", Id) of 
+		{error, {404, Body}} -> {"{\"history\": []}", ReqData, State};
+		{error, {Code, Body}} -> 
+			ErrorString = api_help:generate_error(Body, Code),
+			{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+		{ok,JsonStruct} -> 	 
+			TempJson = lib_json:get_and_add_id(JsonStruct),
+			{TempJson, ReqData, State}
+	end.
+	
 
 %% @doc
 %% Function: filter_json/1

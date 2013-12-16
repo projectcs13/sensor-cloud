@@ -105,14 +105,16 @@ process_post(ReqData, State) ->
 				{false,false} ->
 					{{halt,403}, wrq:set_resp_body("Unsupported field(s)", ReqData), State};
 				{false,true} ->
+					FieldsAdded = add_server_side_fields(Resource),		      
+
 					%% FinalResource = suggest:add_resource_suggestion_fields(Resource),
-					case erlastic_search:index_doc(?INDEX,"resource",Resource) of 
+					case erlastic_search:index_doc(?INDEX,"resource",FieldsAdded) of 
 						{error, {Code, Body}} -> 
 							ErrorString = api_help:generate_error(Body, Code),
 							{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 						{ok, Json} -> 
 							ResourceId = lib_json:get_field(Json, "_id"),
-							suggest:add_suggestion(Resource, ResourceId),
+							suggest:add_suggestion(FieldsAdded, ResourceId),
 							{true, wrq:set_resp_body(lib_json:encode(Json), ReqData), State}
 					end
 			end;
@@ -205,7 +207,12 @@ get_resource(ReqData, State) ->
 					% List resources based on URI
 				    case wrq:get_qs_value("size",ReqData) of 
 			            undefined ->
-			                Size = 100;
+							case erlastic_search:count_type(?INDEX, "resource") of
+								{error, {_CountCode, _CountBody}} -> 
+									Size = 100;
+								{ok,CountJsonStruct} ->
+									Size = lib_json:get_field(CountJsonStruct,"count")
+							end;
 			            SizeParam ->
 			                Size = list_to_integer(SizeParam)
 			        end,
@@ -351,6 +358,20 @@ filter_json(Json, UserQuery, From, Size) ->
         NewJson = string:sub_string(Json,1,string:len(Json)-1),
         "{\"from\" : "++From++", \"size\" : "++Size++", \"query\":{\"filtered\":"++NewJson++",\"filter\":{\"bool\":{\"must\":[{\"term\":{"++UserQuery++"}}]}}}}}".
 
+
+		
+%% @doc
+%% Function: add_server_side_fields/1
+%% Purpose: Used to add all the fields that should be added server side
+%% Returns: The new json with the fields added
+%% @end
+-spec add_server_side_fields(Json::string()) -> string().
+
+add_server_side_fields(Json) ->
+	JSON = lib_json:add_values(Json,[
+			{streams_suggest, "[]"}
+			]),
+	JSON.
 
 
 

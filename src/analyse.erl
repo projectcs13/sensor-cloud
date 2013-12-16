@@ -18,14 +18,16 @@
 %% @end
 -spec allowed_methods(ReqData::tuple(), State::string()) -> {list(), tuple(), string()}.
 allowed_methods(ReqData, State) ->
-        case api_help:parse_path(wrq:path(ReqData)) of
-                [{"streams", _StreamID}, {"_analyse"}] ->
-                         {['GET'], ReqData, State};
-                [{"users", _UserID}, {"streams", _StreamID}, {"_analyse"}] ->
-                         {['GET'], ReqData, State};
-                [error] ->
-                 {[], ReqData, State}
-end.
+	case api_help:parse_path(wrq:path(ReqData)) of
+		[{"streams", _StreamID}, {"_analyse"}] ->
+			{['GET'], ReqData, State};
+		[{"vstreams", _VStreamID}, {"_analyse"}] ->
+			{['GET'], ReqData, State};
+		[{"users", _UserID}, {"streams", _StreamID}, {"_analyse"}] ->
+			{['GET'], ReqData, State};
+		[error] ->
+			{[], ReqData, State}
+	end.
 
 
 %% @doc
@@ -36,7 +38,7 @@ end.
 %% @end
 -spec content_types_provided(ReqData::term(),State::term()) -> {list(), term(), term()}.
 content_types_provided(ReqData, State) ->
-        {[{"application/json", get_analysis}], ReqData, State}.
+	{[{"application/json", get_analysis}], ReqData, State}.
 
 %% @doc
 %% Function: content_types_accepted/2
@@ -46,7 +48,7 @@ content_types_provided(ReqData, State) ->
 %% @end
 -spec content_types_accepted(ReqData::tuple(), State::string()) -> {list(), tuple(), string()}.
 content_types_accepted(ReqData, State) ->
-        {[{"application/json", get_analysis}], ReqData, State}.
+	{[{"application/json", get_analysis}], ReqData, State}.
 
 %% @doc
 %% Function: get_analysis/2
@@ -58,27 +60,98 @@ content_types_accepted(ReqData, State) ->
 %% @end
 -spec get_analysis(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 get_analysis(ReqData, State) ->
-    case proplists:get_value('streamid', wrq:path_info(ReqData)) of
-        undefined ->
-            ErrorString = api_help:generate_error(<<"Missing stream id">>, 405),
-            {{halt, 405}, wrq:set_resp_body(ErrorString, ReqData), State};
-        StreamId ->
-            % Get specific stream
-            % @TODO: Make sure data is sorted by timestamp!!!!!
-                    
-            case erlastic_search:search_limit(?INDEX, "datapoint","stream_id:" ++ StreamId ++ "&sort=timestamp:desc", 50) of
-            %case erlastic_search:search_json(#erls_params{}, ?INDEX, "datapoint", create_json(StreamId), []) of
-                    {error,{Code, Body}} ->
-                            ErrorString = api_help:generate_error(Body, Code),
-                            {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-                    {ok,JsonStruct} ->
-                            {forecast(lib_json:get_field(JsonStruct, "hits.hits")),ReqData,State}
-            end
-    end.
-
+	case proplists:get_value('streamid', wrq:path_info(ReqData)) of
+		undefined ->
+			case proplists:get_value('vstreamid', wrq:path_info(ReqData)) of
+				undefined ->
+					ErrorString = api_help:generate_error(<<"Missing stream id">>, 405),
+					{{halt, 405}, wrq:set_resp_body(ErrorString, ReqData), State};
+				VStreamId ->
+					NrValues = case wrq:get_qs_value("nr_values",ReqData) of
+								   undefined ->
+									   50;
+								   Values ->
+									   {Value,_} = string:to_integer(Values),
+									   if 
+										   Value > 500 ->
+											   500;
+										   Value < 3 ->
+											   3;
+										   true ->
+											   Value 
+									   end
+							   end,
+					NrPredictions = case wrq:get_qs_value("nr_preds",ReqData) of
+										undefined ->
+											"25";
+										Predictions ->
+											{Preds,_} = string:to_integer(Predictions),
+											if 
+												Preds > 500 ->
+													"500";
+												Preds < 1 ->
+													"1";
+												true ->
+													Predictions 
+											end
+									
+									end,
+					case erlastic_search:search_limit(?INDEX, "vsdatapoint","stream_id:" ++ VStreamId ++ "&sort=timestamp:desc", NrValues) of
+						%case erlastic_search:search_json(#erls_params{}, ?INDEX, "datapoint", create_json(StreamId), []) of
+						{error,{Code, Body}} ->
+							ErrorString = api_help:generate_error(Body, Code),
+							{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+						{ok,JsonStruct} ->
+							{forecast(lib_json:get_field(JsonStruct, "hits.hits"), NrPredictions),ReqData,State}
+					end
+			
+			end;
+		StreamId ->
+			NrValues = case wrq:get_qs_value("nr_values",ReqData) of
+								   undefined ->
+									   50;
+								   Values ->
+									   {Value,_} = string:to_integer(Values),
+									   if 
+										   Value > 500 ->
+											   500;
+										   Value < 3 ->
+											   3;
+										   true ->
+											   Value 
+									   end
+							   end,
+			NrPredictions = case wrq:get_qs_value("nr_preds",ReqData) of
+								undefined ->
+									"25";
+								Predictions ->
+									{Preds,_} = string:to_integer(Predictions),
+									if 
+										Preds > 500 ->
+											"500";
+										Preds < 1 ->
+											"1";
+										true ->
+											Predictions 
+									end
+							
+							end,
+			case erlastic_search:search_limit(?INDEX, "datapoint","stream_id:" ++ StreamId ++ "&sort=timestamp:desc", NrValues) of
+				%case erlastic_search:search_json(#erls_params{}, ?INDEX, "datapoint", create_json(StreamId), []) of
+				{error,{Code, Body}} ->
+					ErrorString = api_help:generate_error(Body, Code),
+					{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+				{ok,JsonStruct} ->
+					erlang:display("NUMBER OF VALUES"),
+					erlang:display(NrValues),
+					erlang:display("NUMBER OF PREDICTIONS"),
+					erlang:display(NrPredictions),
+					{forecast(lib_json:get_field(JsonStruct, "hits.hits"), NrPredictions),ReqData,State}
+			end
+	end.
 
 create_json(StreamId) ->
-        "{ \"sort\" : [{ \"timestamp\" : {\"order\" : \"asc\"}}], \"query\" : { \"term\" : { \"stream_id\" : \""++ StreamId ++ "\" }}}".
+	"{ \"sort\" : [{ \"timestamp\" : {\"order\" : \"asc\"}}], \"query\" : { \"term\" : { \"stream_id\" : \""++ StreamId ++ "\" }}}".
 
 
 
@@ -89,9 +162,9 @@ create_json(StreamId) ->
 %% @end
 -spec start() -> ok.
 start() ->
-        Pid = eri:start(),
-        eri:connect(),
-        ok.
+	Pid = eri:start(),
+	eri:connect(),
+	ok.
 
 %% @doc
 %% Function: init/1
@@ -100,7 +173,7 @@ start() ->
 %% @end
 -spec init([]) -> {ok, undefined}.
 init([]) ->
-    {ok, undefined}.
+	{ok, undefined}.
 
 
 %% @doc
@@ -110,7 +183,7 @@ init([]) ->
 %% @end
 -spec stop() -> crash.
 stop() ->
-        eri:stop().
+	eri:stop().
 
 
 %% @doc
@@ -120,9 +193,9 @@ stop() ->
 %% @end
 -spec this() -> JSON::string().
 this() ->
-        start(),
-        forecast("[ { \"value\": 3347, \"date\": \"1995-06-09\" }, { \"value\": 1833, \"date\": \"1995-07-26\" }, { \"value\": 2470, \"date\": \"1996-11-19\" }, { \"value\": 2849, \"date\": \"1997-11-15\" }, { \"value\": 3295, \"date\": \"1998-10-01\" }, { \"value\": 2853, \"date\": \"1998-12-26\" }, { \"value\": 3924, \"date\": \"1999-11-23\" }, { \"value\": 1392, \"date\": \"2000-10-19\" }, { \"value\": 2127, \"date\": \"2001-03-09\" }, { \"value\": 2121, \"date\": \"2001-05-27\" }, { \"value\": 2817, \"date\": \"2002-05-03\" }, { \"value\": 1713, \"date\": \"2003-02-13\" }, { \"value\": 3699, \"date\": \"2003-05-25\" }, { \"value\": 2387, \"date\": \"2003-07-13\" }, { \"value\": 2409, \"date\": \"2004-01-11\" }, { \"value\": 3163, \"date\": \"2004-12-06\" }, { \"value\": 2168, \"date\": \"2005-10-05\" }, { \"value\": 1276, \"date\": \"2008-02-12\" }, { \"value\": 2597, \"date\": \"2009-12-29\" }, { \"value\": 2851, \"date\": \"2010-10-23\"}]").
-        
+	start(),
+	forecast("[ { \"value\": 3347, \"date\": \"1995-06-09\" }, { \"value\": 1833, \"date\": \"1995-07-26\" }, { \"value\": 2470, \"date\": \"1996-11-19\" }, { \"value\": 2849, \"date\": \"1997-11-15\" }, { \"value\": 3295, \"date\": \"1998-10-01\" }, { \"value\": 2853, \"date\": \"1998-12-26\" }, { \"value\": 3924, \"date\": \"1999-11-23\" }, { \"value\": 1392, \"date\": \"2000-10-19\" }, { \"value\": 2127, \"date\": \"2001-03-09\" }, { \"value\": 2121, \"date\": \"2001-05-27\" }, { \"value\": 2817, \"date\": \"2002-05-03\" }, { \"value\": 1713, \"date\": \"2003-02-13\" }, { \"value\": 3699, \"date\": \"2003-05-25\" }, { \"value\": 2387, \"date\": \"2003-07-13\" }, { \"value\": 2409, \"date\": \"2004-01-11\" }, { \"value\": 3163, \"date\": \"2004-12-06\" }, { \"value\": 2168, \"date\": \"2005-10-05\" }, { \"value\": 1276, \"date\": \"2008-02-12\" }, { \"value\": 2597, \"date\": \"2009-12-29\" }, { \"value\": 2851, \"date\": \"2010-10-23\"}]").
+
 
 
 %% @doc
@@ -132,8 +205,7 @@ this() ->
 %% @end
 -spec forecast(JSON::string()) -> JSON::string().
 forecast(Json) ->
-        eri:eval("library(forecast)"),
-        forecast(Json, 25).
+	forecast(Json, 25).
 
 %% @doc
 %% Function: forecast/2
@@ -142,22 +214,22 @@ forecast(Json) ->
 %% @end        
 -spec forecast(JSON::string(), Nr::integer()) -> JSON::string().
 forecast(Json, Nr) ->
-    case get_time_series(Json) of
-        no_values ->
-            "{\"predictions\": []}";
-        Values ->
-            Number = lists:flatten(io_lib:format("~p", [Nr])),
-            eri:eval("V <- " ++ Values),
-            eri:eval("A <- auto.arima(V)"),
-            eri:eval("pred <- forecast(A, "++ Number ++ ")"),
-            {ok, _, Mean} = eri:eval("data.frame(c(pred$mean))[[1]]"),
-            {ok, _, Lo80} = eri:eval("head(data.frame(c(pred$lower))[[1]], " ++ Number ++")"),
-            {ok, _, Hi80} = eri:eval("head(data.frame(c(pred$upper))[[1]], " ++ Number ++")"),
-            {ok, _, Lo95} = eri:eval("tail(data.frame(c(pred$lower))[[1]], " ++ Number ++")"),
-            {ok, _, Hi95} = eri:eval("tail(data.frame(c(pred$upper))[[1]], " ++ Number ++")"),
-            %eri:eval("rm(list = ls())"),
-            start_format_result({Mean, Lo80, Hi80, Lo95, Hi95})
-    end.
+	eri:eval("library(forecast)"),
+	case get_time_series(Json) of
+		no_values ->
+			"{\"predictions\": []}";
+		Values ->
+			eri:eval("V <- " ++ Values),
+			eri:eval("A <- auto.arima(V)"),
+			eri:eval("pred <- forecast(A, "++ Nr ++ ")"),
+			{ok, _, Mean} = eri:eval("data.frame(c(pred$mean))[[1]]"),
+			{ok, _, Lo80} = eri:eval("head(data.frame(c(pred$lower))[[1]], " ++ Nr ++")"),
+			{ok, _, Hi80} = eri:eval("head(data.frame(c(pred$upper))[[1]], " ++ Nr ++")"),
+			{ok, _, Lo95} = eri:eval("tail(data.frame(c(pred$lower))[[1]], " ++ Nr ++")"),
+			{ok, _, Hi95} = eri:eval("tail(data.frame(c(pred$upper))[[1]], " ++ Nr ++")"),
+			%eri:eval("rm(list = ls())"),
+			start_format_result({Mean, Lo80, Hi80, Lo95, Hi95})
+	end.
 
 
 %% @doc
@@ -167,7 +239,7 @@ forecast(Json, Nr) ->
 %% @end        
 -spec start_format_result({Mean::list(), Lo80::list(), Hi80::list(), Lo95::list(), Hi95::list()}) -> JSON::string().
 start_format_result({Mean, Lo80, Hi80, Lo95, Hi95}) ->
-        "{ \"predictions\": [" ++ format_result({Mean, Lo80, Hi80, Lo95, Hi95}).
+	"{ \"predictions\": [" ++ format_result({Mean, Lo80, Hi80, Lo95, Hi95}).
 
 %% @doc
 %% Function: format_result/1
@@ -176,18 +248,18 @@ start_format_result({Mean, Lo80, Hi80, Lo95, Hi95}) ->
 %% @end        
 -spec format_result({Mean::list(), Lo80::list(), Hi80::list(), Lo95::list(), Hi95::list()}) -> string().
 format_result({[HeadMean|[]], [HeadLo80|[]], [HeadHi80|[]],[HeadLo95|[]], [HeadHi95|[]]}) ->
-        "{ \"value\":" ++ lists:flatten(io_lib:format("~p", [HeadMean])) ++
-        ",\"lo80\":" ++ lists:flatten(io_lib:format("~p", [HeadLo80])) ++
-        ",\"hi80\":" ++ lists:flatten(io_lib:format("~p", [HeadHi80])) ++
-        ",\"lo95\":" ++ lists:flatten(io_lib:format("~p", [HeadLo95])) ++
-        ",\"hi95\":" ++ lists:flatten(io_lib:format("~p", [HeadHi95])) ++ "}]}";
+	"{ \"value\":" ++ lists:flatten(io_lib:format("~p", [HeadMean])) ++
+		",\"lo80\":" ++ lists:flatten(io_lib:format("~p", [HeadLo80])) ++
+		",\"hi80\":" ++ lists:flatten(io_lib:format("~p", [HeadHi80])) ++
+		",\"lo95\":" ++ lists:flatten(io_lib:format("~p", [HeadLo95])) ++
+		",\"hi95\":" ++ lists:flatten(io_lib:format("~p", [HeadHi95])) ++ "}]}";
 format_result({[HeadMean|Mean], [HeadLo80|Lo80], [HeadHi80|Hi80],[HeadLo95|Lo95], [HeadHi95|Hi95]}) ->
-        "{ \"value\":" ++ lists:flatten(io_lib:format("~p", [HeadMean])) ++
-        ",\"lo80\":" ++ lists:flatten(io_lib:format("~p", [HeadLo80])) ++
-        ",\"hi80\":" ++ lists:flatten(io_lib:format("~p", [HeadHi80])) ++
-        ",\"lo95\":" ++ lists:flatten(io_lib:format("~p", [HeadLo95])) ++
-        ",\"hi95\":" ++ lists:flatten(io_lib:format("~p", [HeadHi95])) ++ "},"
-         ++ format_result({Mean, Lo80, Hi80, Lo95, Hi95}).
+	"{ \"value\":" ++ lists:flatten(io_lib:format("~p", [HeadMean])) ++
+		",\"lo80\":" ++ lists:flatten(io_lib:format("~p", [HeadLo80])) ++
+		",\"hi80\":" ++ lists:flatten(io_lib:format("~p", [HeadHi80])) ++
+		",\"lo95\":" ++ lists:flatten(io_lib:format("~p", [HeadLo95])) ++
+		",\"hi95\":" ++ lists:flatten(io_lib:format("~p", [HeadHi95])) ++ "},"
+		++ format_result({Mean, Lo80, Hi80, Lo95, Hi95}).
 
 
 %% @doc
@@ -197,7 +269,7 @@ format_result({[HeadMean|Mean], [HeadLo80|Lo80], [HeadHi80|Hi80],[HeadLo95|Lo95]
 %% @end        
 -spec get_forecast_string(Values::string()) -> string().
 get_forecast_string(Values) ->
-        "forecast(auto.arima("++Values++"))".
+	"forecast(auto.arima("++Values++"))".
 
 
 %% @doc
@@ -207,9 +279,9 @@ get_forecast_string(Values) ->
 %% @end
 -spec get_time_series(JSON::string()) -> Values::string().
 get_time_series(Json) ->
-        {Values, _} = parse_json_list(Json, [], []),
-        %{Start, End} = get_times(Times, {}),
-        get_values_string(Values).
+	{Values, _} = parse_json_list(Json, [], []),
+	%{Start, End} = get_times(Times, {}),
+	get_values_string(Values).
 
 
 %% @doc
@@ -222,8 +294,8 @@ get_time_series(Json) ->
 -spec parse_json_list(Datapoint::list(), Values::list(), Times::list()) -> {Values::list(), Times::list()}.
 parse_json_list([], Values, Times) -> {lists:reverse(Values), lists:reverse(Times)};
 parse_json_list([Head|Rest], Values, Times) ->
-        Val = lib_json:get_field(Head, "_source.value"),
-        parse_json_list(Rest, [Val|Values], []).
+	Val = lib_json:get_field(Head, "_source.value"),
+	parse_json_list(Rest, [Val|Values], []).
 
 
 

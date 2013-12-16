@@ -48,6 +48,19 @@ stop() ->
     application:stop(mochiweb),
     application:stop(crypto),
     application:stop(inets),
-	exit(whereis(polling_monitor), "stop"),
-	exit(whereis(polling_supervisor), "stop"),
+    case whereis(polling_monitor) of
+        undefined -> ok;
+        P_M_Pid ->
+            exit(P_M_Pid, "stop")
+    end,
+    case whereis(polling_supervisor) of
+        undefined -> ok;
+        P_S_Pid ->
+            exit(P_S_Pid, "stop")
+    end,
+    case whereis(vstream_sup) of
+        undefined -> ok;
+        V_S_Pid ->
+            exit(V_S_Pid, "stop")
+    end,
     Res.

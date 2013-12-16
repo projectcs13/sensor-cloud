@@ -126,7 +126,7 @@ get_resource_test() ->
 %% Side effects: creates and returns documents in elasticsearch
 %% @end
 get_streams_suggested_test() ->
-    {ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/resources/", [],"application/json", "{\"name\" : \"sugg\" , \"model\" : \"model1\",\"streams_suggest\" : [] }"}, [], []),
+    {ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {"http://localhost:8000/resources/", [],"application/json", "{\"name\" : \"sugg\" , \"model\" : \"model1\", \"manufacturer\" : \"man1\"}"}, [], []),
     {ok, {{_VersionUser, 200, _ReasonPhraseUser}, _HeadersUser, _BodyUser}} = httpc:request(post, {?WEBMACHINE_URL++"/users", [], "application/json", "{\"username\":\"1\"}"}, [], []),
     api_help:refresh(),
     DocId = lib_json:get_field(Body1,"_id"),

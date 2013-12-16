@@ -104,7 +104,7 @@ get_suggestion(ReqData, State) ->
 				Term ->
 					Query = "{                   
 							\"testsuggest\" : {     
-								\"text\" : \""++Term++"\",
+								\"text\" : \""++http_uri:decode(Term)++"\",
 								\"completion\" : {                    
 								\"field\" : \""++Field++"\",
 										\"size\" : "++ Size ++"            
@@ -168,7 +168,7 @@ add_suggestion(Resource, ResourceId) ->
 						  [
 						   {resource_id, ResourceId},
 						   {suggest, "{}"},
-						   {"suggest.input", Model},
+						   {"suggest.input", [Model, Manufacturer, binary:list_to_bin(binary_to_list(Manufacturer) ++ " " ++ binary_to_list(Model))]},
 						   {"suggest.output", Model},
 						   {"suggest.payload", "{}"},
 						   {"suggest.payload.resource", ResourceId},

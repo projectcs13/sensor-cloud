@@ -7,7 +7,7 @@
 ################################################################################
 ERL := erl
 REBAR := ./rebar
-ERL_CONFIG := -config config/engine.config
+ERL_CONFIG := -config config/engine.config -config config/sasl.config
 ERL_BOOT := -boot start_sasl -s reloader -s engine
 ERL_PA_FOLDERS := -pa ebin/ lib/*/ebin/ lib/*/bin/
 TEST_RESULT_FOLDER := test-results
@@ -72,6 +72,7 @@ run: compile
 	curl -XPUT localhost:9200/sensorcloud
 	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine
 
+<<<<<<< HEAD
 ### Command: make stop_all
 ### Runs all parts of the system in one command.
 run_all: compile
@@ -79,6 +80,14 @@ run_all: compile
 
 ### Command: make stop_all
 ### Stops all parts of the system in one command.
+=======
+run_all: compile
+	sudo scripts/sensec.sh start
+
+test_setup: compile
+	sudo scripts/sensec.sh test_setup
+
+>>>>>>> b64dc307417a438d49afe40c7fb50a50c7899cf8
 stop_all:
 	sudo scripts/sensec.sh stop
 
@@ -90,6 +99,15 @@ run_es:
 run_nodejs:
 	nodejs javascripts/receive.js
 
+<<<<<<< HEAD
+=======
+### Command: make run_fake_resource
+### Runs the fake resources for polling	
+run_fake_resource:
+	(cd scripts/python/ && python -m CGIHTTPServer 8001 &) 
+	(cd scripts/python/ && python -m CGIHTTPServer 8002)
+
+>>>>>>> b64dc307417a438d49afe40c7fb50a50c7899cf8
 ### Command: make run_rabbit
 ### Runs rabbitMQ server
 run_rabbit:
@@ -159,7 +177,7 @@ test_vstreams: compile
 	-@mkdir $(TEST_RESULT_FOLDER)
 	curl -XDELETE localhost:9200/sensorcloud
 	curl -XPUT localhost:9200/sensorcloud
-	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -eval 'test:run(virtual_stream_process)'
+	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -eval 'test:run(gen_virtual_stream_process)'
 
 
 ### Command: make docs
@@ -203,7 +221,11 @@ help:
 	@echo "Downloads and compiles all libraries"
 	@echo ""
 	@echo "'make install_linux_deps'"
+<<<<<<< HEAD
 	@echo "Installs all linux dependencies needed. Should only be necessary to do once on a system."
+=======
+	@echo "Installs all Linux dependencies for the project."
+>>>>>>> b64dc307417a438d49afe40c7fb50a50c7899cf8
 	@echo ""
 	@echo "'make run'"
 	@echo "Compiles and runs the otp app. Does NOT compile libraries"
@@ -213,6 +235,15 @@ help:
 	@echo ""
 	@echo "'make stop_all'"
 	@echo "Stops all parts of the system started with 'make run_all'"
+	@echo ""
+	@echo "'make run_all'"
+	@echo "Compiles and runs all parts of the project. Does NOT compile libraries"
+	@echo ""
+	@echo "'make test_setup'"
+	@echo "Easy setup of environment prior to running 'make test''"
+	@echo ""
+	@echo "'make stop_all'"
+	@echo "Stops all parts of the project which was started with 'make run_all'"
 	@echo ""
 	@echo "'make run_es'"
 	@echo "Runs the elastic search server"
