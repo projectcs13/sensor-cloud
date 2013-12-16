@@ -71,41 +71,6 @@ generate_date([First|Rest]) ->
 	end.
 
 %% @doc
-%% Function: remove_search_part/3
-%% Purpose: Used to remove the search header of a search JSON 
-%% Returns: Returns the list of JSON objects return from the search
-%% @end
--spec remove_search_part(JSONString::string(),FoundLeft::boolean(),OpenBrackets::integer()) -> string().
-
-remove_search_part([],_,_) ->
-	[];
-remove_search_part([First|Rest],true,1) ->
-	case First of
-		$] ->
-			[First];
-		$[ ->
-			[First|remove_search_part(Rest,true,2)];
-		_ ->
-			[First|remove_search_part(Rest,true,1)]
-	end;
-remove_search_part([First|Rest],true,Val) ->
-  	case First of
-		$] ->
-			[First|remove_search_part(Rest,true,Val-1)];
-		$[ ->
-			[First|remove_search_part(Rest,true,Val+1)];
-		_ ->
-			[First|remove_search_part(Rest,true,Val)]
-	end;
-remove_search_part([First|Rest],false,Val) ->
-	case First of
-		$[ ->
-			[First|remove_search_part(Rest,true,1)];
-		_ ->
-			remove_search_part(Rest,false,Val)
-	end.
-
-%% @doc
 %% Function: is_search/1
 %% Purpose: Used to deiced if the URI specify a search
 %% Returns: True if URI specify a search, false otherwise
@@ -198,7 +163,6 @@ create_update(Stream) ->
 %% Returns: The string representation of the JSON object with the new field
 %% @end
 -spec add_field(Stream::string(),FieldName::string(),FieldValue::term()) -> string().
-
 add_field(Stream,FieldName,FieldValue) ->
 	case is_list(FieldValue) of
 		true ->
@@ -329,123 +293,6 @@ update_doc(Index, Type, Id, Json, Qs) ->
     erls_resource:post(#erls_params{}, ReqPath, [], Qs, Json, []).
 
 
-
-%% @doc
-%% Function: remove_extra_info/3
-%% Purpose: Used to remove the extra info for documents
-%% Returns: Returns the list of JSON objects without the extra info
-%% @end
--spec remove_extra_info(JSONString::string(),OpenBrackets::integer()) -> string().
-
-remove_extra_info([],_) ->
-        [];
-remove_extra_info([First|Rest],0) ->
-        case First of
-                ${ ->
-                        remove_extra_info(Rest,1);
-                _ ->
-                        [First|remove_extra_info(Rest,0)]
-        end;
-remove_extra_info([First|Rest],1) ->
-        case First of
-                $} ->
-                        remove_extra_info(Rest,0);
-                ${ ->
-                        [First|remove_extra_info(Rest,2)];
-                _ ->
-                        remove_extra_info(Rest,1)
-        end;
-remove_extra_info([First|Rest],Val) ->
-          case First of
-                $} ->
-                        [First|remove_extra_info(Rest,Val-1)];
-                ${ ->
-                        [First|remove_extra_info(Rest,Val+1)];
-                _ ->
-                        [First|remove_extra_info(Rest,Val)]
-        end.
-
-
-%% @doc
-%% Function: remove_extra_and_add_id/1
-%% Purpose: Used to remove the extra info for documents and add the id as
-%%          a field in the document
-%% Returns: Returns the list of JSON objects with id and without extra info
-%% @end
--spec remove_extra_and_add_id(JSONString::string()) -> string().
-
-remove_extra_and_add_id([]) ->
-	[];
-remove_extra_and_add_id(Json) ->
-	Id = lib_json:get_field(Json,"_id"),
-	case Id of
-		undefined -> [];
-		_->
-			NewJson = add_field(remove_extra_info(get_object(Json,0),0),"id",Id),
-			case lib_json:get_field(remove_object(Json,0),"_id") of
-				undefined ->
-					NewJson ++ remove_extra_and_add_id(remove_object(Json,0));
-				_ ->
-					NewJson ++ "," ++ remove_extra_and_add_id(remove_object(Json,0))
-			end
-	end.
-
-	
-%% @doc
-%% Function: get_object/2
-%% Purpose: Used to return the first JSON of the list
-%% Returns: Returns first JSON in the list
-%% @end
--spec get_object(JSONString::string(),OpenBrackets::integer()) -> string().
-
-get_object([],_) ->
-	[];
-get_object([First|Rest],0) ->
-	case First of
-		$, ->
-			[];
-		${ ->
-			[First|get_object(Rest,1)];
-		_ ->
-			get_object(Rest,0)
-	end;
-get_object([First|Rest],Val) ->
-	case First of
-		${ ->
-			[First|get_object(Rest,Val+1)];
-		$} ->
-			[First|get_object(Rest,Val-1)];
-		_-> 
-			[First|get_object(Rest,Val)]
-	end.
-
-%% @doc
-%% Function: remove_object/2
-%% Purpose: Used to remove one object from the list
-%% Returns: Returns the list of JSON objects left
-%% @end
--spec remove_object(JSONString::string(),OpenBrackets::integer()) -> string().
-
-remove_object([],_) ->
-	[];
-remove_object([First|Rest],0) ->
-	case First of
-		$, ->
-			Rest;
-		${ ->
-			remove_object(Rest,1);
-		_ ->
-			[First|remove_object(Rest,0)]
-	end;
-remove_object([First|Rest],Val) ->
-	case First of
-		${ ->
-			remove_object(Rest,Val+1);
-		$} ->
-			remove_object(Rest,Val-1);
-		_-> 
-			remove_object(Rest,Val)
-	end.
 
 %% @doc
 %% Function: do_any_field_exist/2
