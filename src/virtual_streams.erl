@@ -104,15 +104,20 @@ process_post(ReqData, State) ->
 					StreamsInvolved = lib_json:get_field(VirtualStreamJson, "streams_involved"),
 					TimestampFrom = lib_json:get_field(VirtualStreamJson, "timestampfrom"),
 					Function = lib_json:get_field(VirtualStreamJson, "function"),
-					AllowedFunctions = ["min", "max", "mean", "total"],
+					AllowedFunctions = ["min", "max", "mean", "total", "diff"],
 					case lists:member(binary_to_list(lists:nth(1, Function)), AllowedFunctions) of
 						true ->
-							reduce(VirtualStreamId, StreamsInvolved, TimestampFrom, Function, ReqData, State),
-							
-							StreamList = [{stream, binary_to_list(X)} || X <- StreamsInvolved],
-							virtual_stream_process_supervisor:add_child(binary_to_list(VirtualStreamId), StreamList, Function),
-							
-							{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State};
+							Func = binary_to_list(lists:nth(1, Function)),
+							if 
+							Func == "diff" andalso length(StreamsInvolved) =/= 1 -> 
+								{{halt, 404}, wrq:set_resp_body("Wrong number of streams involved for diff", ReqData), State};
+							true ->	
+								reduce(VirtualStreamId, StreamsInvolved, TimestampFrom, Function, ReqData, State),
+								StreamList = [{stream, binary_to_list(X)} || X <- StreamsInvolved],
+								virtual_stream_process_supervisor:add_child(binary_to_list(VirtualStreamId), StreamList, Function),
+								
+								{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
+							end;
 						false ->
 							{{halt, 404}, wrq:set_resp_body("404 Function missing or not supported", ReqData), State}
 					end
