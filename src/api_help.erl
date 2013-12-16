@@ -649,3 +649,63 @@ any_to_float(Val) when is_list(Val) ->
     end;
 any_to_float(Val) ->
 	error.
+
+
+
+%% @doc 
+%% Get the search results and performs get_and_add_id/1 on each
+%% elements in the result list.
+%% NOTE: Deprecated, use get_list_and_add_id/2 instead
+%%
+%% @end 
+-spec get_list_and_add_id(JsonStruct::mochijson()) -> json_string().
+get_list_and_add_id(JsonStruct) ->
+    HitsList = lib_json:get_field(JsonStruct, "hits.hits"),
+    AddedId = lists:map(fun(X) -> get_and_add_id(X) end, HitsList),
+    lib_json:set_attr(hits, AddedId).
+
+%% @doc 
+%% Get the search results and performs get_and_add_id/1 on each
+%% elements in the result list. The resulting list will be returned
+%% as a proper JSON object with the JsonKey as the attribute.
+%%
+%% Return: get_list_and_add_id(List, Attribute) -> "{\"Attribute\": List}"
+%% @end 
+-spec get_list_and_add_id(JsonStruct::mochijson(), atom()) -> json_string().
+get_list_and_add_id(JsonStruct, JsonKey) ->
+    HitsList = lib_json:get_field(JsonStruct, "hits.hits"),
+    AddedId = lists:map(fun(X) -> get_and_add_id(X) end, HitsList),
+    lib_json:set_attr(JsonKey, AddedId).
+
+%% @doc 
+%% Gets the '_id' from the root, gets the '_source'. Adds _id as 
+%% id' in _source and return the new JSON object.
+%%
+%% @end 
+-spec get_and_add_id(JsonStruct::mochijson()) -> json_output_value().
+get_and_add_id(JsonStruct) ->
+    Id  = get_field(JsonStruct, "_id"),
+    SourceJson  = get_field(JsonStruct, "_source"),
+    add_value(SourceJson, "id", Id).
+
+%% @doc 
+%% Gets the 'password' from the root, gets the '_source'. Adds password as 
+%% password' in _source and return the new JSON object.
+%%
+%% @end 
+-spec get_and_add_password(JsonStruct::mochijson()) -> json_output_value().
+get_and_add_password(JsonStruct) ->
+    Id  = get_field(JsonStruct, "fields.password"),
+    SourceJson  = get_field(JsonStruct, "_source"),
+    add_value(SourceJson, "password", Id).
+
+%% @doc 
+%% Get the search results and performs get_and_add_password/1 on each
+%% elements in the result list.
+%% 
+%% @end 
+-spec get_list_and_add_password(JsonStruct::mochijson()) -> json_string().
+get_list_and_add_password(JsonStruct) ->
+    HitsList = get_field(JsonStruct, "hits.hits"),
+    AddedPassword = lists:map(fun(X) -> get_and_add_password(X) end, HitsList),
+    set_attr(users, AddedPassword).

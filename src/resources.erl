@@ -221,7 +221,7 @@ get_resource(ReqData, State) ->
             				ErrorString = api_help:generate_error(Body, Code),
             				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 						{ok,JsonStruct} ->
-							FinalJson = lib_json:get_list_and_add_id(JsonStruct, resources),
+							FinalJson = api_help:get_list_and_add_id(JsonStruct, resources),
 							{FinalJson, ReqData, State} 
 					end;
 				ResourceId ->
@@ -231,7 +231,7 @@ get_resource(ReqData, State) ->
             				ErrorString = api_help:generate_error(Body, Code),
             				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};			
 						{ok,JsonStruct} ->
-							FinalJson = lib_json:get_and_add_id(JsonStruct),
+							FinalJson = api_help:get_and_add_id(JsonStruct),
 							{FinalJson, ReqData, State} 
 					end
 			end;
@@ -282,7 +282,7 @@ add_suggested_stream(Stream) ->
 			{error, ErrorString};
 
 		{ok,JsonStruct} ->
-			FinalJson = lib_json:get_and_add_id(JsonStruct),
+			FinalJson = api_help:get_and_add_id(JsonStruct),
 			case find_stream_type(lib_json:get_field(Stream, "type"),lib_json:get_field(FinalJson,"streams_suggest")) of
 				false ->
 			%%		Sugg = lib_json:get_field(FinalJson, "hits[0]._source"),

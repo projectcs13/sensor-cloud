@@ -171,7 +171,7 @@ get_datapoint(ReqData, State) ->
 			case erlastic_search:search_limit(?INDEX, DataType, "stream_id:" ++ Id, Size) of
 				{ok, Result} ->
 					EncodedResult = lib_json:encode(Result),
-					FinalJson = lib_json:get_list_and_add_id(Result, data),
+					FinalJson = api_help:get_list_and_add_id(Result, data),
 					{FinalJson, ReqData, State};
 				{error, {Code, Body}} -> 
         				ErrorString = api_help:generate_error(Body, Code),
@@ -214,7 +214,7 @@ process_search(ReqData, State, post) ->
 				ErrorString = api_help:generate_error(Body, Code),
 				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 			{ok,JsonStruct} ->
-					       FinalJson = lib_json:get_list_and_add_id(JsonStruct),
+					       FinalJson = api_help:get_list_and_add_id(JsonStruct),
 					       {true,wrq:set_resp_body(lib_json:encode(FinalJson),ReqData),State}
 	end;
 process_search(ReqData, State, get) ->
@@ -237,7 +237,7 @@ process_search(ReqData, State, get) ->
     				ErrorString = api_help:generate_error(Body, Code),
     				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
             	{ok,JsonStruct} ->
-			       FinalJson = lib_json:get_list_and_add_id(JsonStruct, data),
+			       FinalJson = api_help:get_list_and_add_id(JsonStruct, data),
 			       {FinalJson, ReqData, State}
 		 	end;
 		_ ->
@@ -247,7 +247,7 @@ process_search(ReqData, State, get) ->
     				ErrorString = api_help:generate_error(Body, Code),
     				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
             	{ok,JsonStruct} ->
-			       FinalJson = lib_json:get_list_and_add_id(JsonStruct, data),
+			       FinalJson = api_help:get_list_and_add_id(JsonStruct, data),
 			       {FinalJson, ReqData, State}
 			end
 	end.

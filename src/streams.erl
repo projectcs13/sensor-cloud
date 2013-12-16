@@ -616,7 +616,7 @@ get_stream(ReqData, State) ->
             				ErrorString = api_help:generate_error(Body, Code),
             				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 					    {ok,JsonStruct} ->
-						    FinalJson = lib_json:get_list_and_add_id(JsonStruct, streams),
+						    FinalJson = api_help:get_list_and_add_id(JsonStruct, streams),
 						    {FinalJson, ReqData, State}
 					end;
 				StreamString ->
@@ -627,11 +627,11 @@ get_stream(ReqData, State) ->
 		            				ErrorString = api_help:generate_error(Body, Code),
 		            				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 								{ok,JsonStruct} -> 	 
-									TempJson = lib_json:get_and_add_id(JsonStruct),
+									TempJson = api_help:get_and_add_id(JsonStruct),
 									{TempJson, ReqData, State}
 							end;
 						IdList -> % Get a list of streams
-							{lib_json:get_list_and_add_id(get_streams(IdList), streams), ReqData, State}
+							{api_help:get_list_and_add_id(get_streams(IdList), streams), ReqData, State}
 					end
 			end
 	end.
@@ -669,7 +669,7 @@ get_polling_history(ReqData, State) ->
 			ErrorString = api_help:generate_error(Body, Code),
 			{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 		{ok,JsonStruct} -> 	 
-			TempJson = lib_json:get_and_add_id(JsonStruct),
+			TempJson = api_help:get_and_add_id(JsonStruct),
 			{TempJson, ReqData, State}
 	end.
 	
