@@ -97,61 +97,85 @@ create_delete_test() ->
 %%          the streams the trigger is on
 %% Returns: ok | {error, term()}
 %% @end
-post_data_exhange_test() ->
-	User1 = "tomas",
-	User2 = "erik",
-         httpc:request(post, {?WEBMACHINE_URL++"/users", [],"application/json", "{\"username\" : \"tomas\"}"}, [], []),
-         httpc:request(post, {?WEBMACHINE_URL++"/users", [],"application/json", "{\"username\" : \"erik\"}"}, [], []),
-	api_help:refresh(),
-	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {?WEBMACHINE_URL++"/streams", [],"application/json", "{\"name\" : \"Stream1\",\"user_id\":\"tomas\"}"}, [], []),
-	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(post, {?WEBMACHINE_URL++"/streams", [],"application/json", "{\"name\" : \"Stream2\",\"user_id\":\"tomas\"}"}, [], []),
-	StreamId1 = lib_json:get_field(Body1,"_id"),
-	StreamId2 = lib_json:get_field(Body2,"_id"),
-	api_help:refresh(),
-	%% Create
-	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/add", [],"application/json", "{\"function\" : \"less_than\",\"input\":5,\"streams\":\"" ++ lib_json:to_string(StreamId1) ++"\"}"}, [], []),
-	TriggerId1 = lib_json:get_field(Body3, "_id"),
-	api_help:refresh(),
-	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(post, {?WEBMACHINE_URL++"/users/erik/triggers/add", [],"application/json", "{\"function\" : \"less_than\",\"input\":5,\"streams\":\"" ++ lib_json:to_string(StreamId1) ++"\"}"}, [], []),
-	api_help:refresh(),
-	{ok, {{_Version5, 200, _ReasonPhrase5}, _Headers5, Body5}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/add", [],"application/json", "{\"function\" : \"less_than\",\"input\":10,\"streams\":\"" ++ lib_json:to_string(StreamId1) ++"\"}"}, [], []),
-	api_help:refresh(),
-	{ok, {{_Version6, 200, _ReasonPhrase6}, _Headers6, Body6}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/add", [],"application/json", "{\"function\" : \"less_than\",\"input\":6,\"streams\":[\"" ++ lib_json:to_string(StreamId1) ++"\",\"" ++ lib_json:to_string(StreamId2) ++"\"]}"}, [], []),
-	TriggerId2 = lib_json:get_field(Body6, "_id"),
-	api_help:refresh(),
+post_data_exchange_test() ->
+    Descript = "Trigger data exchange test",
+    Setup = 
+	fun() ->
+		User1 = "tomas",
+		User2 = "erik",
+		http:post(?WEBMACHINE_URL++"/users", "{\"username\" : \""++User1++"\"}"),
+		http:post(?WEBMACHINE_URL++"/users", "{\"username\" : \""++User2++"\"}"),
+		api_help:refresh(),
+		{200, Body1} = http:post(?WEBMACHINE_URL++"/streams", "{\"name\":\"Stream1\",\"user_id\":\""++User1++"\"}"),
+		{200, Body2} = http:post(?WEBMACHINE_URL++"/streams", "{\"name\":\"Stream2\",\"user_id\":\""++User1++"\"}"),
+		api_help:refresh(),
+		StreamId1 = lib_json:to_string(lib_json:get_field(Body1,"_id")),
+		StreamId2 = lib_json:to_string(lib_json:get_field(Body2,"_id")),
+		{200, Body3} = http:post(?WEBMACHINE_URL++"/users/"++User1++"/triggers/add",
+					 "{\"function\":\"less_than\",\"input\":5,\"streams\":\""++StreamId1++"\"}"),		
+		api_help:refresh(),
+		{200, Body4} = http:post(?WEBMACHINE_URL++"/users/"++User2++"/triggers/add",
+					 "{\"function\":\"less_than\",\"input\":5,\"streams\":\""++StreamId1++"\"}"),
+		api_help:refresh(),
+		{200, Body5} = http:post(?WEBMACHINE_URL++"/users/"++User1++"/triggers/add",
+					 "{\"function\":\"less_than\",\"input\":10,\"streams\":\""++StreamId1++"\"}"),
+		api_help:refresh(),
+		{200, Body6} = http:post(?WEBMACHINE_URL++"/users/"++User1++"/triggers/add",
+					 "{\"function\":\"less_than\",\"input\":6,\"streams\":[\""
+					 ++StreamId1++"\",\""++lib_json:to_string(StreamId2)++"\"]}"),
+		TriggerId1 = lib_json:to_string(lib_json:get_field(Body3, "_id")),
+		TriggerId2 = lib_json:to_string(lib_json:get_field(Body6, "_id")),
+		api_help:refresh(),
+
+		%% Connect.
+		{ok, Connection} = amqp_connection:start(#amqp_params_network{}),
+		%% Open In and OUT channels.
+		{ok, ChannelIn} = amqp_connection:open_channel(Connection),
+		InputExchanges = [list_to_binary("trigger."++TriggerId1),
+				  list_to_binary("trigger."++TriggerId2)],		
+		triggersProcess:subscribe(ChannelIn, InputExchanges),
+		{User1, User2, StreamId1, StreamId2, ChannelIn, Connection}
+	end,
+    Test = 
+	fun({User1, User2, StreamId1, StreamId2,  _ChannelIn, _Connection}) ->
+		{200, Body7} = http:post(?WEBMACHINE_URL++"/streams/"++StreamId1++"/data", "{\"value\" : 4}"),
+		api_help:refresh(),
+		{200, Body8} = http:post(?WEBMACHINE_URL++"/streams/"++StreamId1++"/data", "{\"value\" : 7}"),
+		api_help:refresh(),
+		{200, Body9} = http:post(?WEBMACHINE_URL++"/streams/"++StreamId2++"/data", "{\"value\" : 4}"),
+		api_help:refresh(),	
+		Messages = [{4,StreamId1,5, [{user,User2},{user,User1}]},
+			    {4,StreamId1,10,[{user,User1}]},
+			    {4,StreamId1,6, [{user,User1}]},
+			    {7,StreamId1,10,[{user,User1}]},
+			    {4,StreamId2,6, [{user,User1}]}],
+		receive_loop(Messages)
+	end,
+    Cleanup = 
+	fun({User1, User2, StreamId1, StreamId2, ChannelIn, Connection}) ->
+		amqp_channel:close(ChannelIn),
+		amqp_connection:close(Connection),
+		api_help:refresh(),
+		{200, Body10} = http:post(?WEBMACHINE_URL++"/users/"++User1++"/triggers/remove", 
+					  "{\"function\" : \"less_than\",\"input\":5,\"streams\":\""++StreamId1++"\"}"),
+		api_help:refresh(),
+		{200, Body11} = http:post(?WEBMACHINE_URL++"/users/"++User2++"/triggers/remove", 
+					  "{\"function\":\"less_than\",\"input\":5,\"streams\":\""++StreamId1++"\"}"),
+		api_help:refresh(),
+		{200, Body12} = http:post(?WEBMACHINE_URL++"/users/"++User1++"/triggers/remove",
+					  "{\"function\":\"less_than\",\"input\":10,\"streams\":\""++StreamId1++"\"}"),
+		api_help:refresh(),
+		{200, Body13} = http:post(?WEBMACHINE_URL++"/users/"++User1++"/triggers/remove",
+					  "{\"function\":\"less_than\",\"input\":6,\"streams\":[\""
+					  ++StreamId1++"\",\""++StreamId2++"\"]}"),
 	
-	%% Connect.
-	{ok, Connection} =
-		amqp_connection:start(#amqp_params_network{}),
-	
-	%% Open In and OUT channels.
-	{ok, ChannelIn} = amqp_connection:open_channel(Connection),
-	InputExchanges = [list_to_binary("trigger." ++ lib_json:to_string(TriggerId1)),list_to_binary("trigger." ++ lib_json:to_string(TriggerId2))],
-	triggersProcess:subscribe(ChannelIn, InputExchanges),
-	{ok, {{_Version7, 200, _ReasonPhrase7}, _Headers7, Body7}} = httpc:request(post, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(StreamId1) ++"/data", [],"application/json", "{\"value\" : 4}"}, [], []),
-	api_help:refresh(),
-	{ok, {{_Version8, 200, _ReasonPhrase8}, _Headers8, Body8}} = httpc:request(post, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(StreamId1) ++"/data", [],"application/json", "{\"value\" : 7}"}, [], []),
-	api_help:refresh(),
-	{ok, {{_Version9, 200, _ReasonPhrase9}, _Headers9, Body9}} = httpc:request(post, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(StreamId2) ++"/data", [],"application/json", "{\"value\" : 4}"}, [], []),
-	api_help:refresh(),
-	
-	Messages = [{4,lib_json:to_string(StreamId1),5,[{user,User2},{user,User1}]},{4,lib_json:to_string(StreamId1),10,[{user,User1}]},{4,lib_json:to_string(StreamId1),6,[{user,User1}]},{7,lib_json:to_string(StreamId1),10,[{user,User1}]},{4,lib_json:to_string(StreamId2),6,[{user,User1}]}],
-	receive_loop(Messages),
-	amqp_channel:close(ChannelIn),
-	amqp_connection:close(Connection),
-	api_help:refresh(),
-	{ok, {{_Version10, 200, _ReasonPhrase10}, _Headers10, Body10}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/remove", [],"application/json", "{\"function\" : \"less_than\",\"input\":5,\"streams\":\"" ++ lib_json:to_string(StreamId1) ++"\"}"}, [], []),
-	api_help:refresh(),
-	{ok, {{_Version11, 200, _ReasonPhrase11}, _Headers11, Body11}} = httpc:request(post, {?WEBMACHINE_URL++"/users/erik/triggers/remove", [],"application/json", "{\"function\" : \"less_than\",\"input\":5,\"streams\":\"" ++ lib_json:to_string(StreamId1) ++"\"}"}, [], []),
-	api_help:refresh(),
-	{ok, {{_Version12, 200, _ReasonPhrase12}, _Headers12, Body12}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/remove", [],"application/json", "{\"function\" : \"less_than\",\"input\":10,\"streams\":\"" ++ lib_json:to_string(StreamId1) ++"\"}"}, [], []),
-	api_help:refresh(),
-	{ok, {{_Version13, 200, _ReasonPhrase13}, _Headers13, Body13}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/remove", [],"application/json", "{\"function\" : \"less_than\",\"input\":6,\"streams\":[\"" ++ lib_json:to_string(StreamId1) ++"\",\"" ++ lib_json:to_string(StreamId2) ++"\"]}"}, [], []),
-	api_help:refresh(),
-	{ok, {{_VersionU3, 200, _ReasonPhraseU3}, _HeadersU3, BodyU3}} = httpc:request(delete, {?WEBMACHINE_URL++"/users/tomas", []}, [], []),
-	api_help:refresh(),
-	{ok, {{_VersionU4, 200, _ReasonPhraseU4}, _HeadersU4, BodyU4}} = httpc:request(delete, {?WEBMACHINE_URL++"/users/erik", []}, [], []),
-	api_help:refresh().
+		api_help:refresh(),
+		{200, Body14} = http:delete(?WEBMACHINE_URL++"/users/"++User1),
+		api_help:refresh(),
+		{200, Body15} = http:delete(?WEBMACHINE_URL++"/users/"++User2),
+		api_help:refresh()
+	end,
+    {timeout, 30, [{Descript, {setup, Setup, Cleanup, Test}}]}.
 
 
 %% @doc
