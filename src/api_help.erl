@@ -157,27 +157,6 @@ create_update(Stream) ->
 	"{\n\"doc\" : " ++ Stream ++ "\n}".
 
 %% @doc
-%% Function: add_field/3
-%% Purpose: Used to add a new field to the given string representation of
-%%          of a JSON object, the field will be FieldName : FieldValue
-%% Returns: The string representation of the JSON object with the new field
-%% @end
--spec add_field(Stream::string(),FieldName::string(),FieldValue::term()) -> string().
-add_field(Stream,FieldName,FieldValue) ->
-	case is_list(FieldValue) of
-		true ->
-			string:substr(Stream,1,length(Stream)-1) ++ ",\"" ++ FieldName ++ "\":\"" ++ FieldValue ++ "\"}";
-		false ->
-			case is_integer(FieldValue) of
-				true ->
-					string:substr(Stream,1,length(Stream)-1) ++ ",\"" ++ FieldName ++ "\":" ++ integer_to_list(FieldValue) ++ "}";
-				false ->
-					string:substr(Stream,1,length(Stream)-1) ++ ",\"" ++ FieldName ++ "\":" ++ float_to_list(FieldValue,[{decimals,1}]) ++ "}"
-			end
-	end.
-			
-
-%% @doc
 %% Function: parse_path/1
 %% Purpose: Used to parse the URI path
 %% Returns: The parsed URI path as a list

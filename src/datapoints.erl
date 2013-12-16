@@ -87,8 +87,8 @@ process_post(ReqData, State) ->
 					case lib_json:get_field(DatapointJson,"timestamp") of
 						undefined ->
 							{{Year,Month,Day},{Hour,Minute,Second}} = calendar:local_time(),
-							TimeStamp = api_help:generate_timestamp([Year,Month,Day,Hour,Minute,Second],0),
-							TimeStampAdded = api_help:add_field(DatapointJson, "timestamp", TimeStamp);
+							TimeStamp = binary:list_to_bin(api_help:generate_timestamp([Year,Month,Day,Hour,Minute,Second],0)),
+							TimeStampAdded = lib_json:add_field(DatapointJson,"timestamp",TimeStamp);
 						_ ->
 							TimeStampAdded = DatapointJson
 					end,

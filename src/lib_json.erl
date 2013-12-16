@@ -10,7 +10,8 @@
 %% ====================================================================
 %% API functions - Exports
 %% ====================================================================
--export([add_value/3,
+-export([add_field/3,
+	 add_value/3,
 	 add_values/2,
 	 convert_undefined/1,
 	 decode/1, 
@@ -30,6 +31,35 @@
 %% ====================================================================
 %% API functions
 %% ====================================================================
+%% @doc 
+%% Adds a new field with the name 'Field' and the value 'Value' to a JSON object.
+%% If the field doesn't exist then it is added, but only if the Field path is valid. This 
+%% means that it can not add nested fields, but it can add a field either to the root or
+%% inside another attribute.
+%%
+%% Note: Either "{}", [] or "" is okay to use for an empty json object, both for 'Json' and 'Value'.
+%% Note: To make an attribute with no value, supply it with an empty list binary
+%% Example:
+%% ```
+%% > Json = "{\"attr1\":\"value1\"}".
+%% > Field = "attr2".
+%% > Value = <<"value2">>.
+%% > lib_json:add_field(Json, Field, Value).
+%% "{\"attr1\":\"value1\", \"attr2\":\"value2\"}"
+%% '''
+%% Example:
+%% ```
+%% > Json = "{\"attr1\":\"value1\"}".
+%% > Field = "attr2.attr3".
+%% > Value = "value2".
+%% > lib_json:add_field(Json, Field, Value).
+%% "{\"attr1\":\"value1\"}"
+%% '''
+%% @end
+-spec add_field(Json::json(), Field::field(),Value::json_input_value()) -> json_output_value().
+add_field(Json, Field, Value)  ->
+    add_value(Json, Field, Value).
+
 %% @doc 
 %% Adds a new value to a field with the name 'Field' and the value 'Value' to a JSON object.
 %% If the field doesn't exist then it is added, but only if the Field path is valid. This 

@@ -12,6 +12,7 @@
 -module(datapoints_tests).
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("stdlib/include/qlc.hrl").
+-include("debug.hrl").
 
 
 %% ====================================================================
@@ -99,8 +100,8 @@ update_stream_fields_test() ->
 	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(get, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(StreamId), []}, [], []),
 	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(get, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(StreamId) ++ "/data", []}, [], []),
 	{ok, {{_Version5, 200, _ReasonPhrase5}, _Headers5, _Body5}} = httpc:request(delete, {?WEBMACHINE_URL++"/users/update_stream_user", []}, [], []),
-	ObjectList = lib_json:get_field(Body4,"data"),
-    ?assertEqual(lib_json:get_field(Body3,"last_updated"), lib_json:get_field(lists:nth(1,ObjectList),"timestamp")),
+	%% ObjectList = lib_json:get_field(Body4,"data"),
+        ?assertEqual(lib_json:get_field(Body3,"last_updated"), lib_json:get_field(Body4,"data[0].timestamp")),
 	?assertEqual(lib_json:get_field(Body3,"history_size"),1).
 	
 %% @doc

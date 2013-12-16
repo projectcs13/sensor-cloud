@@ -198,11 +198,13 @@ process_post(ReqData, State) ->
 	    {Stream,_,_} = api_help:json_handler(ReqData, State),
 	    case lib_json:get_field(Stream,"multi_json") of
 		undefined ->
-		    case proplists:get_value('user', wrq:path_info(ReqData)) of
-			undefined ->
-			    UserAdded = Stream;
-			UId ->
-			    UserAdded = api_help:add_field(Stream,"user_id",UId)
+		    UserAdded = case proplists:get_value('user', wrq:path_info(ReqData)) of
+				    undefined ->
+					Stream;
+				    UId when is_list(UId) ->
+					lib_json:add_field(Stream,"user_id",binary:list_to_bin(UId));
+				    UId ->
+					lib_json:add_field(Stream,"user_id",UId)
 		    end,
 		    case lib_json:get_field(UserAdded,"user_id") of
 			undefined -> {false, wrq:set_resp_body("\"user_id missing\"",ReqData), State};
@@ -305,7 +307,7 @@ multi_json_streams([Head|Rest], ReqData ,State, Response) ->
 		undefined ->
 			UserAdded = Head;
 		UId ->
-			UserAdded = api_help:add_field(Head,"user_id",string:to_lower(UId))
+			UserAdded = lib_json:add_field(Head,"user_id",string:to_lower(UId))
 	end,
 	case Response of
 		[] ->
@@ -792,26 +794,18 @@ add_server_side_fields(Json) ->
 
 	Time = api_help:generate_timestamp([Year,Month,Day,Hour,Min,Sec],0),
 
-	JSON = lib_json:add_values(Json,[
-			{creation_date, list_to_binary(Date)},
-			{last_updated, list_to_binary(Time)},
-			{quality, 1.0},
-			{nr_subscribers, 0},
-			{subscribers, "[]"},
-			{history_size, 0}, 
-			{user_ranking, "{}"},
-			{"user_ranking.average", 0.0},
-			{"user_ranking.nr_rankings", 0},
-			{active, true}]),
-	JSON.
+        lib_json:add_values(Json,
+			    [{creation_date, list_to_binary(Date)},
+			     {last_updated, list_to_binary(Time)},
+			     {quality, 1.0},
+			     {nr_subscribers, 0},
+			     {subscribers, "[]"},
+			     {history_size, 0}, 
+			     {user_ranking, "{}"},
+			     {"user_ranking.average", 0.0},
+			     {"user_ranking.nr_rankings", 0},
+			     {active, true}]).
 
 
-%%	DateAdded = api_help:add_field(Json,"creation_date",Date),
-%%	UpdateAdded = api_help:add_field(DateAdded,"last_update",Time),
-%%	QualityAdded = api_help:add_field(UpdateAdded,"quality",1.0),
-%%	UserRankingAdded = api_help:add_field(QualityAdded,"user_ranking","{}"),
-%%	UserRankingAverageAdded = api_help:add_field(UserRankingAdded,"user_ranking.average",0.0),
-%%	UserRankingNrRankingsAdded = api_help:add_field(UserRankingAverageAdded,"user_ranking.nr_rankings",0),
-%%	SubsAdded = api_help:add_field(UserRankingNrRankingsAdded,"subscribers",1),
-%%	api_help:add_field(SubsAdded,"history_size",0).
+
 
