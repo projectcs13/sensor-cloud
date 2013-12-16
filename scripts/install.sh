@@ -4,8 +4,7 @@
 echo "#################################################################"
 echo "Installing misc dependencies"
 echo "#################################################################"
-sudo apt-get install -qq xsltproc
-sudo apt-get install software-properties-common
+sudo apt-get install -yq xsltproc software-properties-common
 
 echo "#################################################################"
 echo "Installing Erlang"
@@ -14,20 +13,20 @@ grep -q -e 'deb http://packages.erlang-solutions.com/debian '$(lsb_release -sc)'
 sudo wget http://packages.erlang-solutions.com/debian/erlang_solutions.asc
 sudo apt-key add erlang_solutions.asc
 rm -f erlang_solutions.asc
-sudo apt-get update
-sudo apt-get install -y erlang
+sudo apt-get update -q
+sudo apt-get install -yq erlang
 
 echo "#################################################################"
 echo "Installing Nodejs together with npm"
 echo "#################################################################"
 sudo apt-get install python-software-properties python g++ make  
 sudo add-apt-repository ppa:chris-lea/node.js  
-sudo apt-get update  
-sudo apt-get install nodejs  
+sudo apt-get update -q
+sudo apt-get install -yq nodejs  
 
 echo "#################################################################"
 echo "Installing R"
 echo "#################################################################"
 sudo add-apt-repository "deb http://ftp.sunet.se/pub/lang/CRAN/bin/linux/ubuntu precise/"
-sudo apt-get update
-sudo apt-get install r-base
+sudo apt-get update -q
+sudo apt-get install -yq r-base
