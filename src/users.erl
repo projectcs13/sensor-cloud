@@ -226,7 +226,7 @@ put_user(ReqData, State) ->
 				{false,false} ->
 					{{halt,403}, wrq:set_resp_body("Unsupported field(s)", ReqData), State};
 				{false,true} ->
-					Update = api_help:create_update(UserJson), 
+					Update = lib_json:set_attr(doc,UserJson), 
 					case api_help:update_doc(?INDEX, "user", Id, Update) of
 						{error, {Code, Body}} -> 
 							ErrorString = api_help:generate_error(Body, Code),

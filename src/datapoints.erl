@@ -352,8 +352,8 @@ update_fields_in_stream({StreamType, StreamId}, TimeStamp) ->
 					   _->
 						   TimeStamp
 				   end,
-			Json = lib_json:set_attrs([{"last_updated", Time} , {"history_size", OldHistorySize+1}]),
-			Update = api_help:create_update(Json),
+			Json = lib_json:set_attrs([{"last_updated", Time}, {"history_size", OldHistorySize+1}]),
+			Update = lib_json:set_attr(doc, Json),
 			case api_help:update_doc(?INDEX, StreamType, StreamId, Update) of
 				{error, {Code, Body}} -> 
 					ErrorString = api_help:generate_error(Body, Code),

@@ -484,7 +484,7 @@ put_stream(ReqData, State) ->
 							{{halt,403}, wrq:set_resp_body("Unsupported field(s)", ReqData), State};
 						{false,true} ->
 							% NewJson = suggest:add_stream_suggestion_fields(Stream),
-							Update = api_help:create_update(Stream),
+							Update = lib_json:set_attr(doc,Stream),
 							%suggest:update_stream(Stream, StreamId),
 							case api_help:update_doc(?INDEX, "stream", StreamId, Update) of 
 								{error, {Code, Body}} -> 
@@ -550,7 +550,7 @@ put_stream(ReqData, State) ->
 		            						end;
     									{OldRank, ChangedRankingList} -> %User HAS ranked this stream before
         									change_ranking(StreamId, Rank, OldRank),
-        									UpdateJson = api_help:create_update(lib_json:set_attr("rankings", ChangedRankingList)),
+        									UpdateJson = lib_json:set_attr(doc,lib_json:set_attr("rankings", ChangedRankingList)),
     										case api_help:update_doc(?INDEX, "user", User, UpdateJson,[]) of
 												{error, {Code, Body}} ->
 			            							ErrorString = api_help:generate_error(Body, Code),
@@ -758,7 +758,7 @@ change_ranking(StreamId, NewValue) ->
 				NewNumberOfRankings = NumberOfRankings + 1,
 				NewRanking = ((OldRanking * NumberOfRankings) + NewValue) / NewNumberOfRankings,
 				RankingJson = lib_json:set_attrs( [{user_ranking, "{}"}, {"user_ranking.average", NewRanking}, {"user_ranking.nr_rankings", NewNumberOfRankings} ] ),
-				case api_help:update_doc(?INDEX, "stream",StreamId, api_help:create_update(RankingJson),[]) of 
+				case api_help:update_doc(?INDEX, "stream",StreamId, lib_json:set_attr(doc,RankingJson),[]) of 
 					{error, {Code, Body}} -> {error, {Code, Body}};
 					{ok, _} -> 	ok
 				end
@@ -774,7 +774,7 @@ case erlastic_search:get_doc(?INDEX, "stream", StreamId) of
 				NumberOfRankings = lib_json:get_field(JsonStruct, "_source.user_ranking.nr_rankings"),
 				NewRanking = ((OldRanking * NumberOfRankings) + NewValue - OldValue) / NumberOfRankings,
 				RankingJson = lib_json:set_attrs( [{user_ranking, "{}"}, {"user_ranking.average", NewRanking}, {"user_ranking.nr_rankings", NumberOfRankings} ] ),
-				case api_help:update_doc(?INDEX, "stream",StreamId, api_help:create_update(RankingJson),[]) of 
+				case api_help:update_doc(?INDEX, "stream",StreamId, lib_json:set_attr(doc,RankingJson),[]) of 
 					{error, {Code, Body}} -> {error, {Code, Body}};
 					{ok, _} -> 	ok
 				end

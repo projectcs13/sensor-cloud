@@ -180,7 +180,7 @@ put_resource(ReqData, State) ->
 					{{halt,403}, wrq:set_resp_body("Unsupported field(s)", ReqData), State};
 				{false,true} ->
 					NewJson = suggest:add_resource_suggestion_fields(UserJson),
-					Update = api_help:create_update(NewJson),
+					Update = lib_json:set_attr(doc, NewJson),
 					case api_help:update_doc(?INDEX,"resource", Id, Update) of 
 						{error, {Code, Body}} -> 
 							ErrorString = api_help:generate_error(Body, Code),
@@ -290,7 +290,7 @@ add_suggested_stream(Stream) ->
 														Stream,"location"),"resource"),"private"),"uri"),"user_id"),
 					NewSuggestedStream = lib_json:add_value(FinalJson,"streams_suggest" , FilteredStream ),
 					FinalSuggested = lib_json:rm_field(NewSuggestedStream, "id"),
-					Final = api_help:create_update(FinalSuggested),
+					Final = lib_json:set_attr(doc, FinalSuggested),
 					case api_help:update_doc(?INDEX, "resource", lib_json:to_string(ResourceId), Final) of 
 						{error,{Code,Body}} ->
 							ErrorString = api_help:generate_error(Body, Code),
