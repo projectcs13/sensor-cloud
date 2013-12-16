@@ -77,12 +77,6 @@ any_to_float(Val) ->
 	error.
 
 %% @doc
-%% Function: update_doc/5
-%% Purpose: Used to update document in elastic search
-%% Returns: JSON response from elastic search server
-%% @end
-
-%% @doc
 %% Function: count_fields/1
 %% Purpose: Used to return the number of fields in the given JSON
 %% Returns: The number of fields in the given JSON
@@ -484,11 +478,15 @@ transform([{Field,Value}|Rest],AddAnd) ->
 %% Purpose: Used to update document in elastic search
 %% Returns: JSON response from elastic search server
 %% @end
-
 % Taken from erlasticsearch and modified to not encode
 update_doc(Index, Type, Id, Mochijson) ->
     update_doc(Index, Type, Id, Mochijson, []).
 
+%% @doc
+%% Function: update_doc/5
+%% Purpose: Used to update document in elastic search
+%% Returns: JSON response from elastic search server
+%% @end
 % Taken from erlasticsearch and modified to not encode
 update_doc(Index, Type, Id, Json, Qs) ->
     Id1 = mochiweb_util:quote_plus(Id),
