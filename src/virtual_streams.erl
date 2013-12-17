@@ -96,34 +96,38 @@ process_post(ReqData, State) ->
 			{{Year,Month,Day},{Hour,Minute,Second}} = calendar:local_time(),
 			Date = api_help:generate_date([Year,Month,Day]),
 			DateAdded = lib_json:add_values(VirtualStreamJson,[{creation_date, list_to_binary(Date)}]),
-			case erlastic_search:index_doc(?INDEX, "virtual_stream", DateAdded) of	
-				{error, Reason} ->
-					{{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
-				{ok,List} -> 
-					VirtualStreamId = lib_json:get_field(List, "_id"),
-					StreamsInvolved = lib_json:get_field(VirtualStreamJson, "streams_involved"),
-					TimestampFrom = lib_json:get_field(VirtualStreamJson, "timestampfrom"),
-					Function = lib_json:get_field(VirtualStreamJson, "function"),
-					AllowedFunctions = ["min", "max", "mean", "total", "diff"],
-					case lists:member(binary_to_list(lists:nth(1, Function)), AllowedFunctions) of
-						true ->
-							Func = binary_to_list(lists:nth(1, Function)),
-							if 
-							Func == "diff" andalso length(StreamsInvolved) =/= 1 -> 
-								{{halt, 404}, wrq:set_resp_body("Wrong number of streams involved for diff", ReqData), State};
-							true ->	
-								reduce(VirtualStreamId, StreamsInvolved, TimestampFrom, Function, ReqData, State),
-								StreamList = [{stream, binary_to_list(X)} || X <- StreamsInvolved],
-								virtual_stream_process_supervisor:add_child(binary_to_list(VirtualStreamId), StreamList, Function),
-								
-								{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
-							end;
-						false ->
-							{{halt, 404}, wrq:set_resp_body("404 Function missing or not supported", ReqData), State}
-					end
-			end;
+			StreamsInvolved = lib_json:get_field(VirtualStreamJson, "streams_involved"),
+			TimestampFrom = lib_json:get_field(VirtualStreamJson, "timestampfrom"),
+			Function = lib_json:get_field(VirtualStreamJson, "function"),
+			AllowedFunctions = ["min", "max", "mean", "total", "diff"],
+			case lists:member(binary_to_list(lists:nth(1, Function)), AllowedFunctions) of
 				true ->
-					process_search(ReqData, State, post)
+					Func = binary_to_list(lists:nth(1, Function)),
+					if 
+						Func == "diff" andalso length(StreamsInvolved) =/= 1 -> 
+							{{halt, 404}, wrq:set_resp_body("Wrong number of streams involved for diff", ReqData), State};
+						true ->	
+							case erlastic_search:index_doc(?INDEX, "virtual_stream", DateAdded) of	
+								{error, Reason} ->
+									{{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
+								{ok,List} -> 
+									VirtualStreamId = lib_json:get_field(List, "_id"),
+									if 
+										Func == "diff" ->
+											ok;
+										true ->
+											reduce(VirtualStreamId, StreamsInvolved, TimestampFrom, Function, ReqData, State)
+									end,
+									StreamList = [{stream, binary_to_list(X)} || X <- StreamsInvolved],
+									virtual_stream_process_supervisor:add_child(binary_to_list(VirtualStreamId), StreamList, Function),
+									{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
+							end
+					end;
+				false ->
+					{{halt, 404}, wrq:set_resp_body("404 Function missing or not supported", ReqData), State}
+			end;
+		true ->
+			process_search(ReqData, State, post)
 	end.
 
 
@@ -140,18 +144,16 @@ reduce(VirtualStreamId, Streams, TimestampFrom, Function, ReqData, State) ->
 	case erlastic_search:search_json(#erls_params{},?INDEX, "datapoint", lib_json:to_string(Query)) of
 		{error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
 		{ok,JsonStruct} ->
-			%%{true,wrq:set_resp_body(lib_json:encode(FinalJson),ReqData),State},
-			
 			DatapointsList = lib_json:get_field(JsonStruct, "facets.statistics.entries"),
 			NewDatapoints = lists:map(fun(Json) -> 
-											  FinalDatapoint = lib_json:set_attrs([
-																				   {"timestamp", list_to_atom(msToDate(lib_json:get_field(Json, "key")))},
-																				   {"stream_id", VirtualStreamId},
-																				   {"value",  lib_json:get_field(Json, binary_to_list(lists:nth(1, Function)))}
-																				  ]),
-											  erlastic_search:index_doc(?INDEX, "vsdatapoint", lib_json:to_string(FinalDatapoint)),
-											  datapoints:update_fields_in_stream({"virtual_stream", lib_json:to_string(VirtualStreamId)}, list_to_atom(msToDate(lib_json:get_field(Json, "key"))))
-									  end, DatapointsList),
+											FinalDatapoint = lib_json:set_attrs([
+																				{"timestamp", list_to_atom(msToDate(lib_json:get_field(Json, "key")))},
+																				{"stream_id", VirtualStreamId},
+																				{"value",  lib_json:get_field(Json, binary_to_list(lists:nth(1, Function)))}
+																				]),
+											erlastic_search:index_doc(?INDEX, "vsdatapoint", lib_json:to_string(FinalDatapoint)),
+											datapoints:update_fields_in_stream({"virtual_stream", lib_json:to_string(VirtualStreamId)}, list_to_atom(msToDate(lib_json:get_field(Json, "key"))))
+										end, DatapointsList),
 			{true, wrq:set_resp_body("\"status\":\"ok\"", ReqData), State}
 	end.
 
@@ -167,45 +169,45 @@ reduce(VirtualStreamId, Streams, TimestampFrom, Function, ReqData, State) ->
 -spec get_vstream(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 get_vstream(ReqData, State) ->
 	case wrq:get_qs_value("size",ReqData) of 
-            undefined ->
-                Size = 100;
-            SizeParam ->
-                Size = list_to_integer(SizeParam)
-    end,
+		undefined ->
+			Size = 100;
+		SizeParam ->
+			Size = list_to_integer(SizeParam)
+	end,
 	case proplists:get_value('user', wrq:path_info(ReqData)) of
 		undefined ->
 			case id_from_path(ReqData) of
-                undefined ->
+				undefined ->
 					Query = "{\"size\" :" ++ integer_to_list(Size) ++",\"query\" : {\"match_all\" : {}},
-						\"filter\" : {\"bool\":{\"must_not\":{\"term\":{\"private\":\"true\"}}}}}",
+							\"filter\" : {\"bool\":{\"must_not\":{\"term\":{\"private\":\"true\"}}}}}",
 					case erlastic_search:search_json(#erls_params{},?INDEX, "virtual_stream", Query) of
-                        {error, {Code, Body}} -> 
-                            ErrorString = api_help:generate_error(Body, Code),
-                            {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-					    {ok,JsonStruct} ->
-						    FinalJson = api_help:get_list_and_add_id(JsonStruct, users),
-						    {FinalJson, ReqData, State}  
-                    end;
-                Id ->
-                    case erlastic_search:get_doc(?INDEX, "virtual_stream", Id) of
-                        {error, {Code, Body}} -> 
-                            ErrorString = api_help:generate_error(Body, Code),
-                            {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-                        {ok,JsonStruct} ->
-                            FinalJson = api_help:get_and_add_id(JsonStruct),
-                            {FinalJson, ReqData, State} 
-                    end
-            end;
+ 					{error, {Code, Body}} -> 
+							ErrorString = api_help:generate_error(Body, Code),
+							{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+					{ok,JsonStruct} ->
+							FinalJson = api_help:get_list_and_add_id(JsonStruct, users),
+							{FinalJson, ReqData, State}  
+					end;
+				Id ->
+					case erlastic_search:get_doc(?INDEX, "virtual_stream", Id) of
+						{error, {Code, Body}} -> 
+							ErrorString = api_help:generate_error(Body, Code),
+							{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+						{ok,JsonStruct} ->
+							FinalJson = api_help:get_and_add_id(JsonStruct),
+							{FinalJson, ReqData, State} 
+					end
+			end;
 		UserId -> 
 			Query = "{\"size\" :" ++ integer_to_list(Size) ++",\"query\" : {\"term\" : { \"user_id\":\"" ++ UserId ++ "\"}}}",
 			case erlastic_search:search_json(#erls_params{},?INDEX, "virtual_stream", Query) of
-                {error, {Code, Body}} -> 
-                    ErrorString = api_help:generate_error(Body, Code),
-                    {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-			    {ok,JsonStruct} ->
-				    FinalJson = api_help:get_list_and_add_id(JsonStruct, users),
-				    {FinalJson, ReqData, State}  
-        end
+				{error, {Code, Body}} -> 
+					ErrorString = api_help:generate_error(Body, Code),
+					{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+				{ok,JsonStruct} ->
+					FinalJson = api_help:get_list_and_add_id(JsonStruct, users),
+					{FinalJson, ReqData, State}  
+		end
 	end.
 
 	
@@ -315,14 +317,14 @@ process_search(ReqData, State, post) ->
 %% @end
 -spec id_from_path(string()) -> string().
 id_from_path(RD) ->
-    case wrq:path_info(id, RD) of
-        undefined ->
-            case string:tokens(wrq:disp_path(RD), "/") of
-                ["vstreams", Id] -> Id;
-                _ -> undefined
-            end;
-        Id -> Id
-    end.
+	case wrq:path_info(id, RD) of
+		undefined ->
+			case string:tokens(wrq:disp_path(RD), "/") of
+				["vstreams", Id] -> Id;
+				_ -> undefined
+			end;
+ 		Id -> Id
+	end.
 
 
 %% @doc
@@ -332,8 +334,8 @@ id_from_path(RD) ->
 %% @end
 msToDate(Milliseconds) ->
 	BaseDate = calendar:datetime_to_gregorian_seconds({{1970,1,1},{0,0,0}}),
-   	Seconds = BaseDate + (Milliseconds div 1000),
+	Seconds = BaseDate + (Milliseconds div 1000),
 	Date = calendar:gregorian_seconds_to_datetime(Seconds),
 	{{Year,Month,Day},{Hour,Minute,Second}} = Date,
 	TimeStamp = api_help:generate_timestamp([Year,Month,Day,Hour,Minute,Second],0),
-  	TimeStamp.
+	TimeStamp.
