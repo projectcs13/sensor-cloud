@@ -17,7 +17,7 @@
 %% ====================================================================
 %% API functions
 %% ====================================================================
--export([start_link/1, init/1, handle_call/3, handle_info/2, terminate/2]).
+-export([start_link/1, init/1, handle_call/3, handle_info/2, terminate/2, code_change/3]).
 
 %% @doc
 %% Function: start_link/1
@@ -167,6 +167,19 @@ terminate(_Reason, State)->
 	Uri = State#state.uri,
 	erlang:display("the poller for "++Uri++" stops working!"),
 	application:stop(inets).
+
+%% @doc
+%% Function: code_change/3
+%% Purpose: this funciton will called when the gen_server should update its internal state during a release upgrade/downgrade.
+%% Parameter:	_OldVsn -- In the case of upgrade, the _OldVsn is the Vsn, in the case of downgrade, the _OldVsn is {down, Vsn}.  
+%%                         Vsn is defined by the vsn attribute(s) of the old version of the callback module Module. If no such attribute is defined, the
+%%                         version is the checksum of the BEAM file. 
+%%				State   -- The internal state of the gen_server. 
+%%				_Extra  -- is passed as-is from the {advanced,Extra} part of the update instruction.
+%% Returns: {ok, State}
+%% @end
+-spec code_change(_OldVsn :: term()|{down, term()}, State :: list(), _Extra :: term()) -> {ok, list()}.
+code_change(_OldVsn, State, _Extra) -> {ok, State}.
 
 %% ====================================================================
 %% Internal functions
