@@ -36,13 +36,13 @@ Welcome to the "Project CS 2013" project
         make test_setup
         sudo ./scripts/sensec.sh test_setup
         
-1a Or run each of the following commands in a separate shell
+2. Or run each of the following commands in a separate shell
 
         make run_rabbit
         make run_es
         make run_nodejs
 
-2. Run the tests
+3. Run the tests
 
         make test
 
