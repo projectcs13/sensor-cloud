@@ -167,7 +167,7 @@ process_search_post(ReqData, State) ->
 			StreamSearch = lib_json:encode(List1) % May need to convert
     end,
     FilteredJson2 = filter_json(Json, From, Size, Sort, false),
-    case erlastic_search:search_json(#erls_params{},?INDEX, "virtual_stream", FilteredJson2) of % Maybe wanna take more
+    case erlastic_search:search_json(#erls_params{},?INDEX, "virtual_stream", lib_json:rm_field(FilteredJson2, "sort")) of % Maybe wanna take more
             {error, Reason2} ->
                 VStreamSearch = {error, Reason2};
             {ok,List2} ->
