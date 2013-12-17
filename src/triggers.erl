@@ -626,8 +626,7 @@ create_stream_query([StreamId|Rest],Acc) ->
 
 input_to_string(Input) when is_list(Input) ->
 	String = lists:foldr(fun(A,Acc) -> case is_integer(A) of true -> integer_to_list(A) ++","++ Acc; false -> float_to_list(A, [{decimals, 10}, compact]) ++","++ Acc end end,[],Input),
-	Return = "[" ++ string:substr(String,1,length(String)-1) ++ "]",
-	Return;
+	"[" ++ string:substr(String,1,length(String)-1) ++ "]";
 input_to_string(Input) ->
 	lib_json:to_string(Input).
 
