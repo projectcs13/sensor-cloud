@@ -2,42 +2,47 @@
 
 Welcome to the "Project CS 2013" project
 
-## Running the project
+## Installing the project
 
-1. Download and compile the dependencies, and compile the project sources
+1. Download and compile the linux system dependencies, (only needed once per machine)
+   	make install_linux_deps
 
+2. Download and compile the project dependencies, and compile the project sources
         make install
 
-2. Run the application by using startup script
+## Running the project
 
+1. Run the application by using startup script (one of the commands below)
+
+        make run_all
         sudo ./scripts/sensec.sh start
 
-3. Alternative run (type each in separate shells)
+2. Alternative run (type each in separate shells)
 
-        make run_es
         make run_rabbit
+        make run_es
         make run_nodejs
         make run
-        
-4. To shutdown either close each individual shell or run
+   
+4. To shutdown either close each individual shell or run one of the commands below
 
+        make stop_all
         sudo ./scripts/sensec.sh stop
 
 ## Running tests
 
-1. Download and compile the dependencies, and compile the project sources
-
-        make install
+1. There are two ways of setting up the environment for testing. Either run the startup script by one of the below commands.
+   
+        make test_setup
+        sudo ./scripts/sensec.sh test_setup
         
-2. Start RabbitMQ
+1a Or run each of the following commands in a separate shell
 
         make run_rabbit
-
-3. Start Elastic Search server
-
         make run_es
+        make run_nodejs
 
-4. Run the tests
+2. Run the tests
 
         make test
 
