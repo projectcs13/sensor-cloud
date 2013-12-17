@@ -106,6 +106,8 @@ loop(TriggerId, DataPoints, TriggerExchange, Net, Function, OutputList) ->
 								NewDataPoints =
 									lists:keyreplace(Id, 1, DataPoints, {Id, Data}),
 								erlang:display(NewDataPoints),
+								erlang:display("Outputlist"),
+								erlang:display(OutputList),
 								%% Apply function to the new values
 								TriggerList = apply_function(Function, NewDataPoints, OutputList),
 								%% Create timestamp to avoid issues with asynchronus
@@ -380,7 +382,7 @@ send_to_output(TriggerId, [{Value, Timestamp, StreamId, Input, [{user,UserId}|Re
             ok
     end,
     send_to_output(TriggerId, [{Value, Timestamp, StreamId, Input, Rest}|Messages]);
-send_to_output(TriggerId, [{Value, Timestamp, StreamId, Input, [{uri,URI}|Rest]}|Messages]) ->
+send_to_output(TriggerId, [{Value, Timestamp, StreamId, Input, [{uri,{URI,_}}|Rest]}|Messages]) ->
     Message = lib_json:set_attrs([{trigger, "{}"},
         {"trigger.value", Value},
         {"trigger.timestamp", list_to_binary(Timestamp)},

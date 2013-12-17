@@ -45,8 +45,6 @@ allowed_methods(ReqData, State) ->
 		{['POST'], ReqData, State};
 	    [{"users", _UserId},{"triggers"}] ->
 		{['GET'], ReqData, State};
-	    [{"triggers",_Action}] ->
-		{['POST'], ReqData, State};
 	    [error] ->
 		{[], ReqData, State} 
 	end.
@@ -118,11 +116,13 @@ process_post(ReqData, State) ->
 	case proplists:get_value('action', wrq:path_info(ReqData)) of
 		"remove" -> delete_resource(ReqData, State);
 		"add" ->
-			case proplists:get_value('userid', wrq:path_info(ReqData)) of
+			{Json,_,_} = api_help:json_handler(ReqData, State),
+			User = proplists:get_value('userid', wrq:path_info(ReqData)),
+			case lib_json:get_field(Json, "uri") of
 				undefined ->
-					add_uri(ReqData, State);
-				User ->
-					add_user(string:to_lower(User),ReqData,State)
+					add_user(string:to_lower(User),ReqData,State);
+				URI ->
+					add_uri(string:to_lower(User),ReqData, State)
 			end;
 		_ ->
 			{true,ReqData,State}
@@ -139,24 +139,27 @@ process_post(ReqData, State) ->
 -spec delete_resource(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 
 delete_resource(ReqData, State) ->
-	case proplists:get_value('userid', wrq:path_info(ReqData)) of
+	{Json,_,_} = api_help:json_handler(ReqData, State),
+	User = proplists:get_value('userid', wrq:path_info(ReqData)),
+	case lib_json:get_field(Json, "uri") of
 				undefined ->
-					remove_uri(ReqData, State);
-				User ->
-					remove_user(string:to_lower(User),ReqData,State)
+					remove_user(string:to_lower(User),ReqData,State);
+				URI ->
+					remove_uri(string:to_lower(User),ReqData, State)
+					
 	end.
 
 
 
 %% @doc
-%% Function: add_uri/2
+%% Function: add_uri/3
 %% Purpose: Used to handle requests for adding uri's to a trigger
 %% Returns: {Success, ReqData, State}, where Success is true if delete is successful
 %% and false otherwise.
 %% @end
--spec add_uri(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
+-spec add_uri(User::string(),ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 
-add_uri(ReqData, State) ->
+add_uri(User,ReqData, State) ->
 	{Json,_,_} = api_help:json_handler(ReqData, State),
 	Input = lib_json:get_field(Json, "input"),
 	Streams = case lib_json:get_field(Json, "streams") of
@@ -205,7 +208,7 @@ add_uri(ReqData, State) ->
 			UErrorString = api_help:generate_error(UBody, UCode),
 			{{halt, UCode}, wrq:set_resp_body(UErrorString, ReqData), State};
 		{undefined,_,_,_} ->
-			NewTrigger = lib_json:set_attrs([{"function",list_to_binary(Function)},{"streams",Streams},{"outputlist","[{}]"},{"outputlist[0].input",Input},{"outputlist[0].output",["{}"]},{"outputlist[0].output[0].output_id",list_to_binary(URI)},{"outputlist[0].output[0].output_type",list_to_binary("uri")}]),
+			NewTrigger = lib_json:set_attrs([{"function",list_to_binary(Function)},{"streams",Streams},{"outputlist","[{}]"},{"outputlist[0].input",Input},{"outputlist[0].output",["{}"]},{"outputlist[0].output[0].output_id",[list_to_binary(URI),list_to_binary(User)]},{"outputlist[0].output[0].output_type",list_to_binary("uri")}]),
 			case erlastic_search:index_doc(?INDEX, "trigger", NewTrigger) of	% Create new triggger if not in the system
 				{error,{Code2,Body2}} ->
 					ErrorString2 = api_help:generate_error(Body2, Code2),
@@ -214,13 +217,23 @@ add_uri(ReqData, State) ->
 					TriggerId = lib_json:to_string(lib_json:get_field(List2, "_id")),
 					spawn_link(fun() ->
 									   triggersProcess:create(TriggerId, lists:map(fun(A) -> {stream,A} end,Streams), 
-															  Function, [{Input,[{uri,URI}]}])
+															  Function, [{Input,[{uri,{URI,User}}]}])
 							   end),
-					{true, wrq:set_resp_body(lib_json:encode(List2), ReqData), State}
+					UserUpdate = lib_json:set_attrs([{"script",list_to_binary("ctx._source.triggers += newelement")},
+													 {"params","{}"},{"params.newelement","{}"},
+													 {"params.newelement.function",list_to_binary(Function)}, {"params.newelement.input",Input},
+													 {"params.newelement.streams",Streams},{"params.newelement.output_type",list_to_binary("uri")},{"params.newelement.output_id",list_to_binary(URI)}]),
+					case api_help:update_doc(?INDEX, "user", User, UserUpdate) of
+						{error, {UPCode, UPBody}} -> 
+							UPErrorString = api_help:generate_error(UPBody, UPCode),
+							{{halt, UPCode}, wrq:set_resp_body(UPErrorString, ReqData), State};
+						{ok, _} ->
+							{true, wrq:set_resp_body(lib_json:encode(List2), ReqData), State}
+					end
 			end;
 		{EsId,_,_,_}->
 			CommandExchange = list_to_binary("command.trigger."++ EsId),
-			Msg = term_to_binary({add,{Input,{uri,URI}}}),
+			Msg = term_to_binary({add,{Input,{uri,{URI,User}}}}),
 			%% Connect, now assumes local host
 			{ok, Connection} =
 				amqp_connection:start(#amqp_params_network{host = "localhost"}),
@@ -237,16 +250,26 @@ add_uri(ReqData, State) ->
 				{ok,JsonStruct2} -> 
 					Update = case lib_json:field_value_exists(JsonStruct2, "_source.outputlist[*].input", Input) of
 								 true ->
-									 "{\"script\" : \"for(int i=0;i < ctx._source.outputlist.size(); i++){if (ctx._source.outputlist[i].input == newinput && !ctx._source.outputlist[i].output.contains(newoutput)){ctx._source.outputlist[i].output += newoutput; i = ctx._source.outputlist.size();}}\", \"params\":{\"newinput\":" ++  lib_json:to_string(Input)++ ", \"newoutput\":{\"output_id\":\""++URI++"\",\"output_type\":\"uri\"}}}";
+									 "{\"script\" : \"for(int i=0;i < ctx._source.outputlist.size(); i++){if (ctx._source.outputlist[i].input == newinput && !ctx._source.outputlist[i].output.contains(newoutput)){ctx._source.outputlist[i].output += newoutput; i = ctx._source.outputlist.size();}}\", \"params\":{\"newinput\":" ++  input_to_string(Input)++ ", \"newoutput\":{\"output_id\":[\""++URI++"\",\""++ User++"\"],\"output_type\":\"uri\"}}}";
 								 false ->
-									 "{\"script\" : \"ctx._source.outputlist += newelement\", \"params\":{\"newelement\":{\"input\" : "++ lib_json:to_string(Input) ++ ", \"output\":[{\"output_id\":\""++URI++"\",\"output_type\":\"uri\"}]}}}"
+									 "{\"script\" : \"ctx._source.outputlist += newelement\", \"params\":{\"newelement\":{\"input\" : "++ input_to_string(Input) ++ ", \"output\":[{\"output_id\":[\""++URI++"\",\""++ User++"\"],\"output_type\":\"uri\"}]}}}"
 							 end,
 					case api_help:update_doc(?INDEX, "trigger", EsId, Update) of % Update document in es with the new user
 						{error, {Code4, Body4}} -> 
 							ErrorString4 = api_help:generate_error(Body4, Code4),
 							{{halt, Code4}, wrq:set_resp_body(ErrorString4, ReqData), State};
 						{ok,List4} -> 
-							{true,wrq:set_resp_body(lib_json:encode(List4),ReqData),State}
+							UserUpdate = lib_json:set_attrs([{"script",list_to_binary("ctx._source.triggers += newelement")},
+															 {"params","{}"},{"params.newelement","{}"},
+															 {"params.newelement.function",list_to_binary(Function)}, {"params.newelement.input",Input},
+															 {"params.newelement.streams",Streams},{"params.newelement.output_type",list_to_binary("uri")},{"params.newelement.output_id",list_to_binary(URI)}]),
+							case api_help:update_doc(?INDEX, "user", User, UserUpdate) of
+								{error, {UPCode, UPBody}} -> 
+									UPErrorString = api_help:generate_error(UPBody, UPCode),
+									{{halt, UPCode}, wrq:set_resp_body(UPErrorString, ReqData), State};
+								{ok, _} ->
+									{true, wrq:set_resp_body(lib_json:encode(List4), ReqData), State}
+							end
 					end
 			end
 	
@@ -320,7 +343,7 @@ add_user(User, ReqData, State) ->
 					UserUpdate = lib_json:set_attrs([{"script",list_to_binary("ctx._source.triggers += newelement")},
 													 {"params","{}"},{"params.newelement","{}"},
 													 {"params.newelement.function",list_to_binary(Function)}, {"params.newelement.input",Input},
-													 {"params.newelement.streams",Streams}]),
+													 {"params.newelement.streams",Streams},{"params.newelement.output_type",list_to_binary("user")},{"params.newelement.output_id",list_to_binary(Username)}]),
 					case api_help:update_doc(?INDEX, "user", Username, UserUpdate) of
 						{error, {UPCode, UPBody}} -> 
 							UPErrorString = api_help:generate_error(UPBody, UPCode),
@@ -348,9 +371,9 @@ add_user(User, ReqData, State) ->
 				{ok,JsonStruct2} -> 
 					Update = case lib_json:field_value_exists(JsonStruct2, "_source.outputlist[*].input", Input) of
 								 true ->
-									 "{\"script\" : \"for(int i=0;i < ctx._source.outputlist.size(); i++){if (ctx._source.outputlist[i].input == newinput && !ctx._source.outputlist[i].output.contains(newoutput)){ctx._source.outputlist[i].output += newoutput; i = ctx._source.outputlist.size();}}\", \"params\":{\"newinput\":" ++  lib_json:to_string(Input)++ ", \"newoutput\":{\"output_id\":\""++Username++"\",\"output_type\":\"user\"}}}";
+									 "{\"script\" : \"for(int i=0;i < ctx._source.outputlist.size(); i++){if (ctx._source.outputlist[i].input == newinput && !ctx._source.outputlist[i].output.contains(newoutput)){ctx._source.outputlist[i].output += newoutput; i = ctx._source.outputlist.size();}}\", \"params\":{\"newinput\":" ++  input_to_string(Input)++ ", \"newoutput\":{\"output_id\":\""++Username++"\",\"output_type\":\"user\"}}}";
 								 false ->
-									 "{\"script\" : \"ctx._source.outputlist += newelement\", \"params\":{\"newelement\":{\"input\" : "++ lib_json:to_string(Input) ++ ", \"output\":[{\"output_id\":\""++Username++"\",\"output_type\":\"user\"}]}}}"
+									 "{\"script\" : \"ctx._source.outputlist += newelement\", \"params\":{\"newelement\":{\"input\" : "++ input_to_string(Input) ++ ", \"output\":[{\"output_id\":\""++Username++"\",\"output_type\":\"user\"}]}}}"
 							 end,
 					case api_help:update_doc(?INDEX, "trigger", EsId, Update) of % Update document in es with the new user
 						{error, {Code4, Body4}} -> 
@@ -360,7 +383,7 @@ add_user(User, ReqData, State) ->
 							UserUpdate = lib_json:set_attrs([{"script",list_to_binary("ctx._source.triggers += newelement")},
 															 {"params","{}"},{"params.newelement","{}"},
 															 {"params.newelement.function",list_to_binary(Function)}, {"params.newelement.input",Input},
-															 {"params.newelement.streams",Streams}]),
+															 {"params.newelement.streams",Streams},{"params.newelement.output_type",list_to_binary("user")},{"params.newelement.output_id",list_to_binary(Username)}]),
 							case api_help:update_doc(?INDEX, "user", Username, UserUpdate) of
 								{error, {UPCode, UPBody}} -> 
 									UPErrorString = api_help:generate_error(UPBody, UPCode),
@@ -376,14 +399,14 @@ add_user(User, ReqData, State) ->
 	
 
 %% @doc
-%% Function: remove_uri/2
+%% Function: remove_uri/3
 %% Purpose: Used to handle requests for removing uri's from a trigger
 %% Returns: {Success, ReqData, State}, where Success is true if delete is successful
 %% and false otherwise.
 %% @end
--spec remove_uri(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
+-spec remove_uri(User::string(),ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 
-remove_uri(ReqData, State) ->
+remove_uri(User,ReqData, State) ->
 	{Json,_,_} = api_help:json_handler(ReqData, State),
 	Input = lib_json:get_field(Json, "input"),
 	Streams = case lib_json:get_field(Json, "streams") of
@@ -442,7 +465,7 @@ remove_uri(ReqData, State) ->
 						 {ok,JsonStruct2} -> 	 
 							 Update = case lib_json:field_value_exists(JsonStruct2, "_source.outputlist[*].input", Input) of
 										  true ->
-											  "{\"script\" : \"for(int i=0;i < ctx._source.outputlist.size(); i++){if (ctx._source.outputlist[i].input == newinput){if (ctx._source.outputlist[i].output == newoutputlist) {ctx._source.outputlist.remove((Object) ctx._source.outputlist[i]); i = ctx._source.outputlist.size();} else {for(int k=0;k < ctx._source.outputlist[i].output.size(); k++) {if (ctx._source.outputlist[i].output[k] == newoutput) {ctx._source.outputlist[i].output.remove((Object) ctx._source.outputlist[i].output[k]); k = ctx._source.outputlist[i].output.size();}}}}}\", \"params\":{\"newinput\":\"" ++ lib_json:to_string(Input) ++ "\",  \"newoutputlist\":[{\"output_id\":\""++URI++"\",\"output_type\":\"uri\"}],  \"newoutput\":{\"output_id\":\""++URI++"\",\"output_type\":\"uri\"}}}";
+											  "{\"script\" : \"for(int i=0;i < ctx._source.outputlist.size(); i++){if (ctx._source.outputlist[i].input == newinput){if (ctx._source.outputlist[i].output == newoutputlist) {ctx._source.outputlist.remove((Object) ctx._source.outputlist[i]); i = ctx._source.outputlist.size();} else {for(int k=0;k < ctx._source.outputlist[i].output.size(); k++) {if (ctx._source.outputlist[i].output[k] == newoutput) {ctx._source.outputlist[i].output.remove((Object) ctx._source.outputlist[i].output[k]); k = ctx._source.outputlist[i].output.size();}}}}}\", \"params\":{\"newinput\":\"" ++ input_to_string(Input) ++ "\",  \"newoutputlist\":[{\"output_id\":[\""++URI++"\",\""++ User++"\"],\"output_type\":\"uri\"}],  \"newoutput\":{\"output_id\":[\""++URI++"\",\""++ User++"\"],\"output_type\":\"uri\"}}}";
 										  false ->
 											  erlang:display("Error: input not in file"),
 											  "{}"
@@ -452,11 +475,21 @@ remove_uri(ReqData, State) ->
 									 ErrorString4 = api_help:generate_error(Body4, Code4),
 									 {{halt, Code4}, wrq:set_resp_body(ErrorString4, ReqData), State};
 								 {ok,List4} -> 
-									 {true,wrq:set_resp_body(lib_json:encode(List4),ReqData),State}
+									 UserUpdate = lib_json:set_attrs([{"script",list_to_binary("for(int i=0;i < ctx._source.triggers.size(); i++){if (ctx._source.triggers[i] == newelement){ctx._source.triggers.remove((Object) ctx._source.triggers[i]); i = ctx._source.triggers.size();}}")},
+																	  {"params","{}"},{"params.newelement","{}"},
+																	  {"params.newelement.function",list_to_binary(Function)}, {"params.newelement.input",Input},
+																	  {"params.newelement.streams",Streams},{"params.newelement.output_type",list_to_binary("uri")},{"params.newelement.output_id",list_to_binary(URI)}]),
+									 case api_help:update_doc(?INDEX, "user", User, UserUpdate) of
+										 {error, {UPCode, UPBody}} -> 
+											 UPErrorString = api_help:generate_error(UPBody, UPCode),
+											 {{halt, UPCode}, wrq:set_resp_body(UPErrorString, ReqData), State};
+										 {ok, _} ->
+											 {true,wrq:set_resp_body(lib_json:encode(List4),ReqData),State}
+									 end
 							 end
 					 end,
 			CommandExchange = list_to_binary("command.trigger."++ EsId),
-			Msg = term_to_binary({remove,{Input,{uri,URI}}}),
+			Msg = term_to_binary({remove,{Input,{uri,{URI,User}}}}),
 			%% Connect, now assumes local host
 			{ok, Connection} =
 				amqp_connection:start(#amqp_params_network{host = "localhost"}),
@@ -533,7 +566,7 @@ remove_user(User, ReqData, State) ->
 						 {ok,JsonStruct2} -> 	 
 							 Update = case lib_json:field_value_exists(JsonStruct2, "_source.outputlist[*].input", Input) of
 										  true ->
-											  "{\"script\" : \"for(int i=0;i < ctx._source.outputlist.size(); i++){if (ctx._source.outputlist[i].input == newinput){if (ctx._source.outputlist[i].output == newoutputlist) {ctx._source.outputlist.remove((Object) ctx._source.outputlist[i]); i = ctx._source.outputlist.size();} else {for(int k=0;k < ctx._source.outputlist[i].output.size(); k++) {if (ctx._source.outputlist[i].output[k] == newoutput) {ctx._source.outputlist[i].output.remove((Object) ctx._source.outputlist[i].output[k]); k = ctx._source.outputlist[i].output.size();}}}}}\", \"params\":{\"newinput\":\"" ++ lib_json:to_string(Input) ++ "\",  \"newoutputlist\":[{\"output_id\":\""++Username++"\",\"output_type\":\"user\"}],  \"newoutput\":{\"output_id\":\""++Username++"\",\"output_type\":\"user\"}}}";
+											  "{\"script\" : \"for(int i=0;i < ctx._source.outputlist.size(); i++){if (ctx._source.outputlist[i].input == newinput){if (ctx._source.outputlist[i].output == newoutputlist) {ctx._source.outputlist.remove((Object) ctx._source.outputlist[i]); i = ctx._source.outputlist.size();} else {for(int k=0;k < ctx._source.outputlist[i].output.size(); k++) {if (ctx._source.outputlist[i].output[k] == newoutput) {ctx._source.outputlist[i].output.remove((Object) ctx._source.outputlist[i].output[k]); k = ctx._source.outputlist[i].output.size();}}}}}\", \"params\":{\"newinput\":\"" ++ input_to_string(Input) ++ "\",  \"newoutputlist\":[{\"output_id\":\""++Username++"\",\"output_type\":\"user\"}],  \"newoutput\":{\"output_id\":\""++Username++"\",\"output_type\":\"user\"}}}";
 										  false ->
 											  erlang:display("Error: input not in file"),
 											  "{}"
@@ -546,7 +579,7 @@ remove_user(User, ReqData, State) ->
 									 UserUpdate = lib_json:set_attrs([{"script",list_to_binary("for(int i=0;i < ctx._source.triggers.size(); i++){if (ctx._source.triggers[i] == newelement){ctx._source.triggers.remove((Object) ctx._source.triggers[i]); i = ctx._source.triggers.size();}}")},
 																	  {"params","{}"},{"params.newelement","{}"},
 																	  {"params.newelement.function",list_to_binary(Function)}, {"params.newelement.input",Input},
-																	  {"params.newelement.streams",Streams}]),
+																	  {"params.newelement.streams",Streams},{"params.newelement.output_type",list_to_binary("user")},{"params.newelement.output_id",list_to_binary(Username)}]),
 									 case api_help:update_doc(?INDEX, "user", Username, UserUpdate) of
 										 {error, {UPCode, UPBody}} -> 
 											 UPErrorString = api_help:generate_error(UPBody, UPCode),
@@ -582,6 +615,20 @@ create_stream_query([StreamId],Acc) ->
 	StreamId ++ Acc;
 create_stream_query([StreamId|Rest],Acc) ->
 	create_stream_query(Rest," " ++ StreamId ++ Acc).
+
+
+%% @doc
+%% Function: input_to_string/1
+%% Purpose: Used to create the a string from the input
+%% Returns: The created string
+%% @end
+-spec input_to_string(term()) -> string().
+
+input_to_string(Input) when is_list(Input) ->
+	String = lists:foldr(fun(A,Acc) -> case is_integer(A) of true -> integer_to_list(A) ++","++ Acc; false -> float_to_list(A, [{decimals, 10}, compact]) ++","++ Acc end end,[],Input),
+	"[" ++ string:substr(String,1,length(String)-1) ++ "]";
+input_to_string(Input) ->
+	lib_json:to_string(Input).
 
 %% @doc
 %% Function: get_es_id/2
@@ -696,11 +743,21 @@ parse_outputlist([],Acc) ->
 	Acc;
 parse_outputlist([First|Rest],Acc) ->
 	Input = lib_json:get_field(First, "input"),
-	Output = lists:map(fun(A) -> {list_to_atom(lib_json:to_string(lib_json:get_field(A, "output_type"))),lib_json:to_string(lib_json:get_field(A, "output_id"))} end, lib_json:get_field(First, "output")),
+	Output = lists:map(fun(A) -> get_output(A,lib_json:to_string(lib_json:get_field(A, "output_type"))) end, lib_json:get_field(First, "output")),
 	NewElement = {Input,Output},
 	parse_outputlist(Rest,[NewElement|Acc]).
 
+%% @doc
+%% Function: parse_outputlist/2
+%% Purpose: Used to parse the output id
+%% Returns: an tuple that is either {user,UserId} or {uri,{URI,UserId}}
+%% @end
+-spec get_output(Json::string(),OutputId::string()) -> {user,string()} | {uri,{string(),string()}}.
 
+get_output(Json,"user") ->
+	{user,lib_json:to_string(lib_json:get_field(Json, "output_id"))};
+get_output(Json,"uri") ->
+	{uri,{lib_json:to_string(lib_json:get_field(Json, "output_id[0]")),lib_json:to_string(lib_json:get_field(Json, "output_id[1]"))}}.
 %% @doc
 %% Function: start_processes/1
 %% Purpose: Used to start processes for the

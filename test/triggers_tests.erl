@@ -239,7 +239,11 @@ post_data_user_test() ->
 
 	?assertEqual(true, check_all_exist(NotificationList1,ReferenceList1)),
 	?assertEqual(true, check_all_exist(NotificationList2,ReferenceList2)).
-
+%% @doc
+%% Function: list_triggers_test_/0
+%% Purpose: Test the listing of triggers
+%% Returns: ok | {error, term()}
+%% @end
 list_triggers_test_() ->
     Descript1 = "Testing listing of triggers",
     Setup1 = 
@@ -287,6 +291,12 @@ list_triggers_test_() ->
     {Descript1,{setup, Setup1, Cleanup1, Tests1}}.
 
 
+%% @doc
+%% Function: list_triggers/0
+%% Purpose: Test the listing of triggers
+%% Returns: ok | {error, term()}
+%% @end
+
 list_triggers({UserId1, StreamId1, StreamId2}) ->
     {ok,{{_,200,_},_,Body1}} = httpc:request(get, {?WEBMACHINE_URL++"/users/"++UserId1++"/triggers", []}, [], []),
     {ok,{{_,200,_},_,Body2}} = httpc:request(get, {?WEBMACHINE_URL++"/users/"++UserId1++"/streams/"
@@ -294,9 +304,9 @@ list_triggers({UserId1, StreamId1, StreamId2}) ->
     {ok,{{_,200,_},_,Body3}} = httpc:request(get, {?WEBMACHINE_URL++"/users/"++UserId1++"/streams/"
 							    ++StreamId1++"/triggers", []}, [], []),
     Result1 = 
-	"{\"triggers\":[{\"function\":\"less_than\",\"input\":5,\"streams\":[\""++StreamId1++"\",\""++StreamId2++"\"]},"
-	"{\"function\":\"less_than\",\"input\":4,\"streams\":[\""++StreamId2++"\"]}]}",
-    Result2 = "{\"triggers\":[{\"function\":\"less_than\",\"input\":5,\"streams\":[\""++StreamId1++"\",\""++StreamId2++"\"]}]}",
+	"{\"triggers\":[{\"function\":\"less_than\",\"input\":5,\"output_id\":\""++UserId1++"\",\"output_type\":\"user\",\"streams\":[\""++StreamId1++"\",\""++StreamId2++"\"]},"
+	"{\"function\":\"less_than\",\"input\":4,\"output_id\":\""++UserId1++"\",\"output_type\":\"user\",\"streams\":[\""++StreamId2++"\"]}]}",
+    Result2 = "{\"triggers\":[{\"function\":\"less_than\",\"input\":5,\"output_id\":\""++UserId1++"\",\"output_type\":\"user\",\"streams\":[\""++StreamId1++"\",\""++StreamId2++"\"]}]}",
     [?_assertEqual(Result1, Body1),
      ?_assertEqual(Result1, Body2),
      ?_assertEqual(Result2, Body3)].
@@ -370,6 +380,11 @@ receive_loop([{Value,StreamId,Threshold,Users}|Rest]) ->
 					receive_loop([{Value,StreamId,Threshold,Users}|Rest])
 			end
 	end.
+%% @doc
+%% Function: check_all_exist/2
+%% Purpose: See if both lists contain the same elements
+%% Returns: true if both lists contain the same elements, false otherwise
+%% @end
 
 check_all_exist([],[]) ->
 	true;
