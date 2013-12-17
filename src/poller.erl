@@ -17,7 +17,7 @@
 %% ====================================================================
 %% API functions
 %% ====================================================================
--export([start_link/1, init/1, handle_call/3, handle_info/2, terminate/2, code_change/3]).
+-export([start_link/1, init/1, handle_call/3, handle_info/2, handle_cast/2, terminate/2, code_change/3]).
 
 %% @doc
 %% Function: start_link/1
@@ -48,6 +48,16 @@ init(State)->
 	amqp_channel:call(ChannelOut, #'exchange.declare'{exchange = StreamExchange, type = <<"fanout">>}),
 	
 	{ok, #state{stream_id=State#state.stream_id, uri=State#state.uri, parser=State#state.parser, data_type=State#state.data_type, exchange=StreamExchange, channel=ChannelOut, connection=Connection}}.
+
+%% @doc
+%% Function: handle_cast/2
+%% Purpose: handle asynchronous call of gen_server, could be called via: gen_server:cast(pid(), {rebuild})
+%% Parameter: Request   -- the request provided by gen_server:cast() or gen_server:multi_cast()
+%%            State     -- the current state of the gen_server, which may contain some status information.
+%% Returns: {noreply, ok, State}
+%% @end
+-spec handle_cast(_Request :: term(), State :: record()) -> {noreply, ok, State :: record()}.
+handle_cast(_Request, State) -> {noreply, ok, State}.
 
 %% @doc
 %% Function: handle_call/2
