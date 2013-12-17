@@ -202,7 +202,7 @@ process_post(ReqData, State) ->
 				    undefined ->
 					Stream;
 				    UId when is_list(UId) ->
-					lib_json:add_field(Stream,"user_id",binary:list_to_bin(UId));
+					lib_json:add_field(Stream,"user_id",binary:list_to_bin(string:to_lower(UId)));
 				    UId ->
 					lib_json:add_field(Stream,"user_id",UId)
 		    end,
