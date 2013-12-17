@@ -5,9 +5,11 @@ Welcome to the "Project CS 2013" project
 ## Installing the project
 
 1. Download and compile the linux system dependencies, (only needed once per machine)
+
    	make install_linux_deps
 
 2. Download and compile the project dependencies, and compile the project sources
+
         make install
 
 ## Running the project
