@@ -250,9 +250,9 @@ add_uri(User,ReqData, State) ->
 				{ok,JsonStruct2} -> 
 					Update = case lib_json:field_value_exists(JsonStruct2, "_source.outputlist[*].input", Input) of
 								 true ->
-									 "{\"script\" : \"for(int i=0;i < ctx._source.outputlist.size(); i++){if (ctx._source.outputlist[i].input == newinput && !ctx._source.outputlist[i].output.contains(newoutput)){ctx._source.outputlist[i].output += newoutput; i = ctx._source.outputlist.size();}}\", \"params\":{\"newinput\":" ++  lib_json:to_string(Input)++ ", \"newoutput\":{\"output_id\":[\""++URI++"\",\""++ User++"\"],\"output_type\":\"uri\"}}}";
+									 "{\"script\" : \"for(int i=0;i < ctx._source.outputlist.size(); i++){if (ctx._source.outputlist[i].input == newinput && !ctx._source.outputlist[i].output.contains(newoutput)){ctx._source.outputlist[i].output += newoutput; i = ctx._source.outputlist.size();}}\", \"params\":{\"newinput\":" ++  input_to_string(Input)++ ", \"newoutput\":{\"output_id\":[\""++URI++"\",\""++ User++"\"],\"output_type\":\"uri\"}}}";
 								 false ->
-									 "{\"script\" : \"ctx._source.outputlist += newelement\", \"params\":{\"newelement\":{\"input\" : "++ lib_json:to_string(Input) ++ ", \"output\":[{\"output_id\":[\""++URI++"\",\""++ User++"\"],\"output_type\":\"uri\"}]}}}"
+									 "{\"script\" : \"ctx._source.outputlist += newelement\", \"params\":{\"newelement\":{\"input\" : "++ input_to_string(Input) ++ ", \"output\":[{\"output_id\":[\""++URI++"\",\""++ User++"\"],\"output_type\":\"uri\"}]}}}"
 							 end,
 					case api_help:update_doc(?INDEX, "trigger", EsId, Update) of % Update document in es with the new user
 						{error, {Code4, Body4}} -> 
@@ -371,9 +371,9 @@ add_user(User, ReqData, State) ->
 				{ok,JsonStruct2} -> 
 					Update = case lib_json:field_value_exists(JsonStruct2, "_source.outputlist[*].input", Input) of
 								 true ->
-									 "{\"script\" : \"for(int i=0;i < ctx._source.outputlist.size(); i++){if (ctx._source.outputlist[i].input == newinput && !ctx._source.outputlist[i].output.contains(newoutput)){ctx._source.outputlist[i].output += newoutput; i = ctx._source.outputlist.size();}}\", \"params\":{\"newinput\":" ++  lib_json:to_string(Input)++ ", \"newoutput\":{\"output_id\":\""++Username++"\",\"output_type\":\"user\"}}}";
+									 "{\"script\" : \"for(int i=0;i < ctx._source.outputlist.size(); i++){if (ctx._source.outputlist[i].input == newinput && !ctx._source.outputlist[i].output.contains(newoutput)){ctx._source.outputlist[i].output += newoutput; i = ctx._source.outputlist.size();}}\", \"params\":{\"newinput\":" ++  input_to_string(Input)++ ", \"newoutput\":{\"output_id\":\""++Username++"\",\"output_type\":\"user\"}}}";
 								 false ->
-									 "{\"script\" : \"ctx._source.outputlist += newelement\", \"params\":{\"newelement\":{\"input\" : "++ lib_json:to_string(Input) ++ ", \"output\":[{\"output_id\":\""++Username++"\",\"output_type\":\"user\"}]}}}"
+									 "{\"script\" : \"ctx._source.outputlist += newelement\", \"params\":{\"newelement\":{\"input\" : "++ input_to_string(Input) ++ ", \"output\":[{\"output_id\":\""++Username++"\",\"output_type\":\"user\"}]}}}"
 							 end,
 					case api_help:update_doc(?INDEX, "trigger", EsId, Update) of % Update document in es with the new user
 						{error, {Code4, Body4}} -> 
@@ -465,7 +465,7 @@ remove_uri(User,ReqData, State) ->
 						 {ok,JsonStruct2} -> 	 
 							 Update = case lib_json:field_value_exists(JsonStruct2, "_source.outputlist[*].input", Input) of
 										  true ->
-											  "{\"script\" : \"for(int i=0;i < ctx._source.outputlist.size(); i++){if (ctx._source.outputlist[i].input == newinput){if (ctx._source.outputlist[i].output == newoutputlist) {ctx._source.outputlist.remove((Object) ctx._source.outputlist[i]); i = ctx._source.outputlist.size();} else {for(int k=0;k < ctx._source.outputlist[i].output.size(); k++) {if (ctx._source.outputlist[i].output[k] == newoutput) {ctx._source.outputlist[i].output.remove((Object) ctx._source.outputlist[i].output[k]); k = ctx._source.outputlist[i].output.size();}}}}}\", \"params\":{\"newinput\":\"" ++ lib_json:to_string(Input) ++ "\",  \"newoutputlist\":[{\"output_id\":[\""++URI++"\",\""++ User++"\"],\"output_type\":\"uri\"}],  \"newoutput\":{\"output_id\":[\""++URI++"\",\""++ User++"\"],\"output_type\":\"uri\"}}}";
+											  "{\"script\" : \"for(int i=0;i < ctx._source.outputlist.size(); i++){if (ctx._source.outputlist[i].input == newinput){if (ctx._source.outputlist[i].output == newoutputlist) {ctx._source.outputlist.remove((Object) ctx._source.outputlist[i]); i = ctx._source.outputlist.size();} else {for(int k=0;k < ctx._source.outputlist[i].output.size(); k++) {if (ctx._source.outputlist[i].output[k] == newoutput) {ctx._source.outputlist[i].output.remove((Object) ctx._source.outputlist[i].output[k]); k = ctx._source.outputlist[i].output.size();}}}}}\", \"params\":{\"newinput\":\"" ++ input_to_string(Input) ++ "\",  \"newoutputlist\":[{\"output_id\":[\""++URI++"\",\""++ User++"\"],\"output_type\":\"uri\"}],  \"newoutput\":{\"output_id\":[\""++URI++"\",\""++ User++"\"],\"output_type\":\"uri\"}}}";
 										  false ->
 											  erlang:display("Error: input not in file"),
 											  "{}"
@@ -566,7 +566,7 @@ remove_user(User, ReqData, State) ->
 						 {ok,JsonStruct2} -> 	 
 							 Update = case lib_json:field_value_exists(JsonStruct2, "_source.outputlist[*].input", Input) of
 										  true ->
-											  "{\"script\" : \"for(int i=0;i < ctx._source.outputlist.size(); i++){if (ctx._source.outputlist[i].input == newinput){if (ctx._source.outputlist[i].output == newoutputlist) {ctx._source.outputlist.remove((Object) ctx._source.outputlist[i]); i = ctx._source.outputlist.size();} else {for(int k=0;k < ctx._source.outputlist[i].output.size(); k++) {if (ctx._source.outputlist[i].output[k] == newoutput) {ctx._source.outputlist[i].output.remove((Object) ctx._source.outputlist[i].output[k]); k = ctx._source.outputlist[i].output.size();}}}}}\", \"params\":{\"newinput\":\"" ++ lib_json:to_string(Input) ++ "\",  \"newoutputlist\":[{\"output_id\":\""++Username++"\",\"output_type\":\"user\"}],  \"newoutput\":{\"output_id\":\""++Username++"\",\"output_type\":\"user\"}}}";
+											  "{\"script\" : \"for(int i=0;i < ctx._source.outputlist.size(); i++){if (ctx._source.outputlist[i].input == newinput){if (ctx._source.outputlist[i].output == newoutputlist) {ctx._source.outputlist.remove((Object) ctx._source.outputlist[i]); i = ctx._source.outputlist.size();} else {for(int k=0;k < ctx._source.outputlist[i].output.size(); k++) {if (ctx._source.outputlist[i].output[k] == newoutput) {ctx._source.outputlist[i].output.remove((Object) ctx._source.outputlist[i].output[k]); k = ctx._source.outputlist[i].output.size();}}}}}\", \"params\":{\"newinput\":\"" ++ input_to_string(Input) ++ "\",  \"newoutputlist\":[{\"output_id\":\""++Username++"\",\"output_type\":\"user\"}],  \"newoutput\":{\"output_id\":\""++Username++"\",\"output_type\":\"user\"}}}";
 										  false ->
 											  erlang:display("Error: input not in file"),
 											  "{}"
@@ -615,6 +615,22 @@ create_stream_query([StreamId],Acc) ->
 	StreamId ++ Acc;
 create_stream_query([StreamId|Rest],Acc) ->
 	create_stream_query(Rest," " ++ StreamId ++ Acc).
+
+
+%% @doc
+%% Function: input_to_string/1
+%% Purpose: Used to create the a string from the input
+%% Returns: The created string
+%% @end
+-spec input_to_string(term()) -> string().
+
+input_to_string(Input) when is_list(Input) ->
+	String = lists:foldr(fun(A,Acc) -> case is_integer(A) of true -> integer_to_list(A) ++","++ Acc; false -> float_to_list(A, [{decimals, 10}, compact]) ++","++ Acc end end,[],Input),
+	Return = "[" ++ string:substr(String,1,length(String)-1) ++ "]",
+	erlang:display(Return),
+	Return;
+input_to_string(Input) ->
+	lib_json:to_string(Input).
 
 %% @doc
 %% Function: get_es_id/2
