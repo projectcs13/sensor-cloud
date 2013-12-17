@@ -8,9 +8,20 @@ Welcome to the "Project CS 2013" project
 
         make install
 
-2. Run the application
+2. Run the application by using startup script
 
+        sudo ./scripts/sensec.sh start
+
+3. Alternative run (type each in separate shells)
+
+        make run_es
+        make run_rabbit
+        make run_nodejs
         make run
+        
+4. To shutdown either close each individual shell or run
+
+        sudo ./scripts/sensec.sh stop
 
 ## Running tests
 
