@@ -294,9 +294,9 @@ list_triggers({UserId1, StreamId1, StreamId2}) ->
     {ok,{{_,200,_},_,Body3}} = httpc:request(get, {?WEBMACHINE_URL++"/users/"++UserId1++"/streams/"
 							    ++StreamId1++"/triggers", []}, [], []),
     Result1 = 
-	"{\"triggers\":[{\"function\":\"less_than\",\"input\":5,\"streams\":[\""++StreamId1++"\",\""++StreamId2++"\"]},"
-	"{\"function\":\"less_than\",\"input\":4,\"streams\":[\""++StreamId2++"\"]}]}",
-    Result2 = "{\"triggers\":[{\"function\":\"less_than\",\"input\":5,\"streams\":[\""++StreamId1++"\",\""++StreamId2++"\"]}]}",
+	"{\"triggers\":[{\"function\":\"less_than\",\"input\":5,\"output_id\":\""++UserId1++"\",\"output_type\":\"user\",\"streams\":[\""++StreamId1++"\",\""++StreamId2++"\"]},"
+	"{\"function\":\"less_than\",\"input\":4,\"output_id\":\""++UserId1++"\",\"output_type\":\"user\",\"streams\":[\""++StreamId2++"\"]}]}",
+    Result2 = "{\"triggers\":[{\"function\":\"less_than\",\"input\":5,\"output_id\":\""++UserId1++"\",\"output_type\":\"user\",\"streams\":[\""++StreamId1++"\",\""++StreamId2++"\"]}]}",
     [?_assertEqual(Result1, Body1),
      ?_assertEqual(Result1, Body2),
      ?_assertEqual(Result2, Body3)].
