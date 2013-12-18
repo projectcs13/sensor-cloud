@@ -390,7 +390,6 @@ add_user(User, ReqData, State) ->
 			   _ ->
 				   "{\"filter\":{\"term\":{ \"function\":\"" ++ Function ++ "\"}},\"query\":{\"match\":{\"streams\":{\"query\":\"" ++ StreamsQuery ++"\",\"operator\":\"and\"}}},\"query\":{\"match\":{\"vstreams\":{\"query\":\"" ++ VirtualStreamsQuery ++"\",\"operator\":\"and\"}}}}"
 		   end,
-	erlang:display(Query),
 	EsId = case erlastic_search:search_json(#erls_params{},?INDEX, "trigger", Query) of % See if the trigger is already in the system
 			   {error, {Code, Body}} -> 
 				   {error, {Code, Body}};
