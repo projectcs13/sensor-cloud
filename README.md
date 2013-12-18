@@ -43,6 +43,7 @@ Welcome to the "Project CS 2013" project
         make run_rabbit
         make run_es
         make run_nodejs
+        make run_fake_resource
 
 3. Run the tests
 
