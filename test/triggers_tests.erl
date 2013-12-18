@@ -302,13 +302,17 @@ list_triggers({UserId1, StreamId1, StreamId2}) ->
 							    ++StreamId2++"/triggers", []}, [], []),
     {ok,{{_,200,_},_,Body3}} = httpc:request(get, {?WEBMACHINE_URL++"/users/"++UserId1++"/streams/"
 							    ++StreamId1++"/triggers", []}, [], []),
-    Result1 = 
-	"{\"triggers\":[{\"function\":\"less_than\",\"input\":5,\"output_id\":\""++UserId1++"\",\"output_type\":\"user\",\"streams\":[\""++StreamId1++"\",\""++StreamId2++"\"]},"
-	"{\"function\":\"less_than\",\"input\":4,\"output_id\":\""++UserId1++"\",\"output_type\":\"user\",\"streams\":[\""++StreamId2++"\"]}]}",
-    Result2 = "{\"triggers\":[{\"function\":\"less_than\",\"input\":5,\"output_id\":\""++UserId1++"\",\"output_type\":\"user\",\"streams\":[\""++StreamId1++"\",\""++StreamId2++"\"]}]}",
-    [?_assertEqual(Result1, Body1),
-     ?_assertEqual(Result1, Body2),
-     ?_assertEqual(Result2, Body3)].
+    Result11 = 
+	"{\"triggers\":[{\"function\":\"less_than\",\"input\":5,\"output_id\":\""++UserId1++"\",\"output_type\":\"user\",\"streams\":[\""++StreamId1++"\",\""++StreamId2++"\"],\"vstreams\":[]},"
+	"{\"function\":\"less_than\",\"input\":4,\"output_id\":\""++UserId1++"\",\"output_type\":\"user\",\"streams\":[\""++StreamId2++"\"],\"vstreams\":[]}]}",
+    Result21 = "{\"triggers\":[{\"function\":\"less_than\",\"input\":5,\"output_id\":\""++UserId1++"\",\"output_type\":\"user\",\"streams\":[\""++StreamId1++"\",\""++StreamId2++"\"],\"vstreams\":[]}]}",
+    Result12 = 
+	"{\"triggers\":[{\"function\":\"less_than\",\"input\":5,\"output_id\":\""++UserId1++"\",\"output_type\":\"user\",\"streams\":[\""++StreamId2++"\",\""++StreamId1++"\"],\"vstreams\":[]},"
+	"{\"function\":\"less_than\",\"input\":4,\"output_id\":\""++UserId1++"\",\"output_type\":\"user\",\"streams\":[\""++StreamId2++"\"],\"vstreams\":[]}]}",
+    Result22 = "{\"triggers\":[{\"function\":\"less_than\",\"input\":5,\"output_id\":\""++UserId1++"\",\"output_type\":\"user\",\"streams\":[\""++StreamId2++"\",\""++StreamId1++"\"],\"vstreams\":[]}]}",
+	[?_assertEqual(true,(Result11 == Body1) or (Result12 == Body1)),
+     ?_assertEqual(true,(Result11 == Body2) or (Result12 == Body2)),
+     ?_assertEqual(true,(Result21 == Body3) or (Result22 == Body3))].
 
 
 
@@ -347,6 +351,69 @@ start_up_triggers_test() ->
 
 
 	?assertEqual(true, check_all_exist(NotificationList,ReferenceList)).
+
+
+
+%% @doc
+%% Function: create_delete_test/0
+%% Purpose: Test the process_post and delete_resource functions by doing some HTTP requests
+%% Returns: ok | {error, term()}
+%% @end
+create_delete_vstream_test() -> 
+	%% Create
+	{ok, {{_VersionU1, 200, _ReasonPhraseU1}, _HeadersU1, BodyU1}} = httpc:request(post, {?WEBMACHINE_URL++"/users", [],"application/json", "{\"username\" : \"tomas\"}"}, [], []),
+	api_help:refresh(),
+	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/add", [],"application/json", "{\"function\" : \"test\",\"input\":5,\"streams\":\"\", \"vstreams\":\"test\"}"}, [], []),
+	DocId1 = lib_json:get_field(Body1,"_id"),
+	api_help:refresh(),
+	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(get, {?ES_URL++"/sensorcloud/trigger/" ++ lib_json:to_string(DocId1), []}, [], []),
+	api_help:refresh(),
+	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/add", [],"application/json", "{\"function\" : \"test\",\"input\":5,\"streams\":\"\", \"vstreams\":\"test\"}"}, [], []),
+	DocId2 = lib_json:get_field(Body3,"_id"),
+	api_help:refresh(),
+	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(get, {?ES_URL++"/sensorcloud/trigger/" ++ lib_json:to_string(DocId2), []}, [], []),
+	api_help:refresh(),
+	{ok, {{_Version5, 200, _ReasonPhrase5}, _Headers5, Body5}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/add", [],"application/json", "{\"function\" : \"test\",\"input\":6,\"streams\":\"\", \"vstreams\":\"test\"}"}, [], []),
+	DocId3 = lib_json:get_field(Body5,"_id"),
+	api_help:refresh(),
+	{ok, {{_Version6, 200, _ReasonPhrase6}, _Headers6, Body6}} = httpc:request(get, {?ES_URL++"/sensorcloud/trigger/" ++ lib_json:to_string(DocId3), []}, [], []),
+	api_help:refresh(),
+	{ok, {{_Version7, 200, _ReasonPhrase7}, _Headers7, Body7}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/add", [],"application/json", "{\"function\" : \"test\",\"input\":6,\"streams\":\"\", \"vstreams\":[\"test\",\"test2\"]}"}, [], []),
+	DocId4 = lib_json:get_field(Body7,"_id"),
+	api_help:refresh(),
+	{ok, {{_Version8, 200, _ReasonPhrase8}, _Headers8, Body8}} = httpc:request(get, {?ES_URL++"/sensorcloud/trigger/" ++ lib_json:to_string(DocId4), []}, [], []),
+	api_help:refresh(),
+	
+	%% Create tests
+	?assertEqual(lib_json:get_field(Body2,"_source"),lib_json:get_field(Body4,"_source")),
+	?assertEqual(DocId1,DocId3),
+	?assertNotEqual(DocId1,DocId4),
+	?assertEqual(true,lib_json:field_value_exists(Body6,"_source.outputlist[*].input",5)),
+	?assertEqual(true,lib_json:field_value_exists(Body6,"_source.outputlist[*].input",6)),
+	
+	
+	
+	%% Delete 
+	{ok, {{_Version9, 200, _ReasonPhrase9}, _Headers9, Body9}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/remove", [],"application/json", "{\"function\" : \"test\",\"input\":5,\"streams\":\"\", \"vstreams\":\"test\"}"}, [], []),
+	api_help:refresh(),
+	{ok, {{_Version10, 200, _ReasonPhrase10}, _Headers10, Body10}} = httpc:request(get, {?ES_URL++"/sensorcloud/trigger/" ++ lib_json:to_string(DocId1), []}, [], []),
+	api_help:refresh(),
+	{ok, {{_Version11, 200, _ReasonPhrase11}, _Headers11, Body11}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/remove", [],"application/json", "{\"function\" : \"test\",\"input\":6,\"streams\":\"\", \"vstreams\":\"test\"}"}, [], []),
+	api_help:refresh(),
+	{ok, {{_Version12, 200, _ReasonPhrase12}, _Headers12, Body12}} = httpc:request(get, {?ES_URL++"/sensorcloud/trigger/" ++ lib_json:to_string(DocId3), []}, [], []),
+	api_help:refresh(),
+	{ok, {{_Version13, 200, _ReasonPhrase13}, _Headers13, Body13}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/remove", [],"application/json", "{\"function\" : \"test\",\"input\":6,\"streams\":\"\", \"vstreams\":[\"test\",\"test2\"]}"}, [], []),
+	api_help:refresh(),
+	{ok, {{_Version14, 200, _ReasonPhrase14}, _Headers14, Body14}} = httpc:request(get, {?ES_URL++"/sensorcloud/trigger/" ++ lib_json:to_string(DocId4), []}, [], []),
+	api_help:refresh(),
+	{ok, {{_VersionU2, 200, _ReasonPhraseU2}, _HeadersU2, BodyU2}} = httpc:request(delete, {?WEBMACHINE_URL++"/users/tomas", []}, [], []),
+	api_help:refresh(),
+	%% Delete tests
+	?assertEqual(true,(lib_json:get_field(Body12,"exist") == false) or (lib_json:get_field(Body12,"_source.outputlist") == [])), %% Answer will depend on how quick messages to the triggersProcess are
+	?assertEqual(true,(lib_json:get_field(Body14,"exist") == false) or (lib_json:get_field(Body14,"_source.outputlist") == [])). %% Answer will depend on how quick messages to the triggersProcess are
+
+
+
 	
 %% @doc
 %% Function: post_data_test/0
