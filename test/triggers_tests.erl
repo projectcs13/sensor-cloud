@@ -40,22 +40,22 @@ create_delete_test() ->
 	%% Create
 	{ok, {{_VersionU1, 200, _ReasonPhraseU1}, _HeadersU1, BodyU1}} = httpc:request(post, {?WEBMACHINE_URL++"/users", [],"application/json", "{\"username\" : \"tomas\"}"}, [], []),
 	api_help:refresh(),
-	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/add", [],"application/json", "{\"function\" : \"test\",\"input\":5,\"streams\":\"test\"}"}, [], []),
+	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/add", [],"application/json", "{\"function\" : \"test\",\"input\":5,\"streams\":\"test\", \"vstreams\":\"\"}"}, [], []),
 	DocId1 = lib_json:get_field(Body1,"_id"),
 	api_help:refresh(),
 	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, Body2}} = httpc:request(get, {?ES_URL++"/sensorcloud/trigger/" ++ lib_json:to_string(DocId1), []}, [], []),
 	api_help:refresh(),
-	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/add", [],"application/json", "{\"function\" : \"test\",\"input\":5,\"streams\":\"test\"}"}, [], []),
+	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/add", [],"application/json", "{\"function\" : \"test\",\"input\":5,\"streams\":\"test\", \"vstreams\":\"\"}"}, [], []),
 	DocId2 = lib_json:get_field(Body3,"_id"),
 	api_help:refresh(),
 	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(get, {?ES_URL++"/sensorcloud/trigger/" ++ lib_json:to_string(DocId2), []}, [], []),
 	api_help:refresh(),
-	{ok, {{_Version5, 200, _ReasonPhrase5}, _Headers5, Body5}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/add", [],"application/json", "{\"function\" : \"test\",\"input\":6,\"streams\":\"test\"}"}, [], []),
+	{ok, {{_Version5, 200, _ReasonPhrase5}, _Headers5, Body5}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/add", [],"application/json", "{\"function\" : \"test\",\"input\":6,\"streams\":\"test\", \"vstreams\":\"\"}"}, [], []),
 	DocId3 = lib_json:get_field(Body5,"_id"),
 	api_help:refresh(),
 	{ok, {{_Version6, 200, _ReasonPhrase6}, _Headers6, Body6}} = httpc:request(get, {?ES_URL++"/sensorcloud/trigger/" ++ lib_json:to_string(DocId3), []}, [], []),
 	api_help:refresh(),
-	{ok, {{_Version7, 200, _ReasonPhrase7}, _Headers7, Body7}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/add", [],"application/json", "{\"function\" : \"test\",\"input\":6,\"streams\":[\"test\",\"test2\"]}"}, [], []),
+	{ok, {{_Version7, 200, _ReasonPhrase7}, _Headers7, Body7}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/add", [],"application/json", "{\"function\" : \"test\",\"input\":6,\"streams\":[\"test\",\"test2\"], \"vstreams\":\"\"}"}, [], []),
 	DocId4 = lib_json:get_field(Body7,"_id"),
 	api_help:refresh(),
 	{ok, {{_Version8, 200, _ReasonPhrase8}, _Headers8, Body8}} = httpc:request(get, {?ES_URL++"/sensorcloud/trigger/" ++ lib_json:to_string(DocId4), []}, [], []),
@@ -71,15 +71,15 @@ create_delete_test() ->
 	
 	
 	%% Delete 
-	{ok, {{_Version9, 200, _ReasonPhrase9}, _Headers9, Body9}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/remove", [],"application/json", "{\"function\" : \"test\",\"input\":5,\"streams\":\"test\"}"}, [], []),
+	{ok, {{_Version9, 200, _ReasonPhrase9}, _Headers9, Body9}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/remove", [],"application/json", "{\"function\" : \"test\",\"input\":5,\"streams\":\"test\", \"vstreams\":\"\"}"}, [], []),
 	api_help:refresh(),
 	{ok, {{_Version10, 200, _ReasonPhrase10}, _Headers10, Body10}} = httpc:request(get, {?ES_URL++"/sensorcloud/trigger/" ++ lib_json:to_string(DocId1), []}, [], []),
 	api_help:refresh(),
-	{ok, {{_Version11, 200, _ReasonPhrase11}, _Headers11, Body11}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/remove", [],"application/json", "{\"function\" : \"test\",\"input\":6,\"streams\":\"test\"}"}, [], []),
+	{ok, {{_Version11, 200, _ReasonPhrase11}, _Headers11, Body11}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/remove", [],"application/json", "{\"function\" : \"test\",\"input\":6,\"streams\":\"test\", \"vstreams\":\"\"}"}, [], []),
 	api_help:refresh(),
 	{ok, {{_Version12, 200, _ReasonPhrase12}, _Headers12, Body12}} = httpc:request(get, {?ES_URL++"/sensorcloud/trigger/" ++ lib_json:to_string(DocId3), []}, [], []),
 	api_help:refresh(),
-	{ok, {{_Version13, 200, _ReasonPhrase13}, _Headers13, Body13}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/remove", [],"application/json", "{\"function\" : \"test\",\"input\":6,\"streams\":[\"test\",\"test2\"]}"}, [], []),
+	{ok, {{_Version13, 200, _ReasonPhrase13}, _Headers13, Body13}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/remove", [],"application/json", "{\"function\" : \"test\",\"input\":6,\"streams\":[\"test\",\"test2\"], \"vstreams\":\"\"}"}, [], []),
 	api_help:refresh(),
 	{ok, {{_Version14, 200, _ReasonPhrase14}, _Headers14, Body14}} = httpc:request(get, {?ES_URL++"/sensorcloud/trigger/" ++ lib_json:to_string(DocId4), []}, [], []),
 	api_help:refresh(),
@@ -112,17 +112,17 @@ post_data_exchange_test() ->
 		StreamId1 = lib_json:to_string(lib_json:get_field(Body1,"_id")),
 		StreamId2 = lib_json:to_string(lib_json:get_field(Body2,"_id")),
 		{200, Body3} = http:post(?WEBMACHINE_URL++"/users/"++User1++"/triggers/add",
-					 "{\"function\":\"less_than\",\"input\":5,\"streams\":\""++StreamId1++"\"}"),		
+					 "{\"function\":\"less_than\",\"input\":5,\"streams\":\""++StreamId1++"\", \"vstreams\":\"\"}"),		
 		api_help:refresh(),
 		{200, Body4} = http:post(?WEBMACHINE_URL++"/users/"++User2++"/triggers/add",
-					 "{\"function\":\"less_than\",\"input\":5,\"streams\":\""++StreamId1++"\"}"),
+					 "{\"function\":\"less_than\",\"input\":5,\"streams\":\""++StreamId1++"\", \"vstreams\":\"\"}"),
 		api_help:refresh(),
 		{200, Body5} = http:post(?WEBMACHINE_URL++"/users/"++User1++"/triggers/add",
-					 "{\"function\":\"less_than\",\"input\":10,\"streams\":\""++StreamId1++"\"}"),
+					 "{\"function\":\"less_than\",\"input\":10,\"streams\":\""++StreamId1++"\", \"vstreams\":\"\"}"),
 		api_help:refresh(),
 		{200, Body6} = http:post(?WEBMACHINE_URL++"/users/"++User1++"/triggers/add",
 					 "{\"function\":\"less_than\",\"input\":6,\"streams\":[\""
-					 ++StreamId1++"\",\""++lib_json:to_string(StreamId2)++"\"]}"),
+					 ++StreamId1++"\",\""++lib_json:to_string(StreamId2)++"\"], \"vstreams\":\"\"}"),
 		TriggerId1 = lib_json:to_string(lib_json:get_field(Body3, "_id")),
 		TriggerId2 = lib_json:to_string(lib_json:get_field(Body6, "_id")),
 		api_help:refresh(),
@@ -144,11 +144,11 @@ post_data_exchange_test() ->
 		api_help:refresh(),
 		{200, Body9} = http:post(?WEBMACHINE_URL++"/streams/"++StreamId2++"/data", "{\"value\" : 4}"),
 		api_help:refresh(),	
-		Messages = [{4,StreamId1,5, [{user,User2},{user,User1}]},
-			    {4,StreamId1,10,[{user,User1}]},
-			    {4,StreamId1,6, [{user,User1}]},
-			    {7,StreamId1,10,[{user,User1}]},
-			    {4,StreamId2,6, [{user,User1}]}],
+		Messages = [{4,StreamId1,5, [{user,User2},{user,User1}], "stream"},
+			    {4,StreamId1,10,[{user,User1}], "stream"},
+			    {4,StreamId1,6, [{user,User1}], "stream"},
+			    {7,StreamId1,10,[{user,User1}], "stream"},
+			    {4,StreamId2,6, [{user,User1}], "stream"}],
 		receive_loop(Messages)
 	end,
     Cleanup = 
@@ -157,17 +157,17 @@ post_data_exchange_test() ->
 		amqp_connection:close(Connection),
 		api_help:refresh(),
 		{200, Body10} = http:post(?WEBMACHINE_URL++"/users/"++User1++"/triggers/remove", 
-					  "{\"function\" : \"less_than\",\"input\":5,\"streams\":\""++StreamId1++"\"}"),
+					  "{\"function\" : \"less_than\",\"input\":5,\"streams\":\""++StreamId1++"\", \"vstreams\":\"\"}"),
 		api_help:refresh(),
 		{200, Body11} = http:post(?WEBMACHINE_URL++"/users/"++User2++"/triggers/remove", 
-					  "{\"function\":\"less_than\",\"input\":5,\"streams\":\""++StreamId1++"\"}"),
+					  "{\"function\":\"less_than\",\"input\":5,\"streams\":\""++StreamId1++"\", \"vstreams\":\"\"}"),
 		api_help:refresh(),
 		{200, Body12} = http:post(?WEBMACHINE_URL++"/users/"++User1++"/triggers/remove",
-					  "{\"function\":\"less_than\",\"input\":10,\"streams\":\""++StreamId1++"\"}"),
+					  "{\"function\":\"less_than\",\"input\":10,\"streams\":\""++StreamId1++"\", \"vstreams\":\"\"}"),
 		api_help:refresh(),
 		{200, Body13} = http:post(?WEBMACHINE_URL++"/users/"++User1++"/triggers/remove",
 					  "{\"function\":\"less_than\",\"input\":6,\"streams\":[\""
-					  ++StreamId1++"\",\""++StreamId2++"\"]}"),
+					  ++StreamId1++"\",\""++StreamId2++"\"], \"vstreams\":\"\"}"),
 	
 		api_help:refresh(),
 		{200, Body14} = http:delete(?WEBMACHINE_URL++"/users/"++User1),
@@ -196,14 +196,14 @@ post_data_user_test() ->
 	StreamId2 = lib_json:get_field(Body2,"_id"),
 	api_help:refresh(),
 	%% Create
-	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/add", [],"application/json", "{\"function\" : \"less_than\",\"input\":5,\"streams\":\"" ++ lib_json:to_string(StreamId1) ++"\"}"}, [], []),
+	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/add", [],"application/json", "{\"function\" : \"less_than\",\"input\":5,\"streams\":\"" ++ lib_json:to_string(StreamId1) ++"\", \"vstreams\":\"\"}"}, [], []),
 	TriggerId1 = lib_json:get_field(Body3, "_id"),
 	api_help:refresh(),
-	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(post, {?WEBMACHINE_URL++"/users/erik/triggers/add", [],"application/json", "{\"function\" : \"less_than\",\"input\":5,\"streams\":\"" ++ lib_json:to_string(StreamId1) ++"\"}"}, [], []),
+	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(post, {?WEBMACHINE_URL++"/users/erik/triggers/add", [],"application/json", "{\"function\" : \"less_than\",\"input\":5,\"streams\":\"" ++ lib_json:to_string(StreamId1) ++"\", \"vstreams\":\"\"}"}, [], []),
 	api_help:refresh(),
-	{ok, {{_Version5, 200, _ReasonPhrase5}, _Headers5, Body5}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/add", [],"application/json", "{\"function\" : \"less_than\",\"input\":10,\"streams\":\"" ++ lib_json:to_string(StreamId1) ++"\"}"}, [], []),
+	{ok, {{_Version5, 200, _ReasonPhrase5}, _Headers5, Body5}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/add", [],"application/json", "{\"function\" : \"less_than\",\"input\":10,\"streams\":\"" ++ lib_json:to_string(StreamId1) ++"\", \"vstreams\":\"\"}"}, [], []),
 	api_help:refresh(),
-	{ok, {{_Version6, 200, _ReasonPhrase6}, _Headers6, Body6}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/add", [],"application/json", "{\"function\" : \"less_than\",\"input\":6,\"streams\":[\"" ++ lib_json:to_string(StreamId1) ++"\",\"" ++ lib_json:to_string(StreamId2) ++"\"]}"}, [], []),
+	{ok, {{_Version6, 200, _ReasonPhrase6}, _Headers6, Body6}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/add", [],"application/json", "{\"function\" : \"less_than\",\"input\":6,\"streams\":[\"" ++ lib_json:to_string(StreamId1) ++"\",\"" ++ lib_json:to_string(StreamId2) ++"\"], \"vstreams\":\"\"}"}, [], []),
 	TriggerId2 = lib_json:get_field(Body6, "_id"),
 	api_help:refresh(),
 	
@@ -212,13 +212,13 @@ post_data_user_test() ->
 	{ok, {{_Version8, 200, _ReasonPhrase8}, _Headers8, Body8}} = httpc:request(post, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(StreamId1) ++"/data", [],"application/json", "{\"value\" : 7.0}"}, [], []),
 	{ok, {{_Version9, 200, _ReasonPhrase9}, _Headers9, Body9}} = httpc:request(post, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(StreamId2) ++"/data", [],"application/json", "{\"value\" : 4.0}"}, [], []),
 	api_help:refresh(),
-	{ok, {{_Version10, 200, _ReasonPhrase10}, _Headers10, Body10}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/remove", [],"application/json", "{\"function\" : \"less_than\",\"input\":5,\"streams\":\"" ++ lib_json:to_string(StreamId1) ++"\"}"}, [], []),
+	{ok, {{_Version10, 200, _ReasonPhrase10}, _Headers10, Body10}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/remove", [],"application/json", "{\"function\" : \"less_than\",\"input\":5,\"streams\":\"" ++ lib_json:to_string(StreamId1) ++"\", \"vstreams\":\"\"}"}, [], []),
 	api_help:refresh(),
-	{ok, {{_Version11, 200, _ReasonPhrase11}, _Headers11, Body11}} = httpc:request(post, {?WEBMACHINE_URL++"/users/erik/triggers/remove", [],"application/json", "{\"function\" : \"less_than\",\"input\":5,\"streams\":\"" ++ lib_json:to_string(StreamId1) ++"\"}"}, [], []),
+	{ok, {{_Version11, 200, _ReasonPhrase11}, _Headers11, Body11}} = httpc:request(post, {?WEBMACHINE_URL++"/users/erik/triggers/remove", [],"application/json", "{\"function\" : \"less_than\",\"input\":5,\"streams\":\"" ++ lib_json:to_string(StreamId1) ++"\", \"vstreams\":\"\"}"}, [], []),
 	api_help:refresh(),
-	{ok, {{_Version12, 200, _ReasonPhrase12}, _Headers12, Body12}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/remove", [],"application/json", "{\"function\" : \"less_than\",\"input\":10,\"streams\":\"" ++ lib_json:to_string(StreamId1) ++"\"}"}, [], []),
+	{ok, {{_Version12, 200, _ReasonPhrase12}, _Headers12, Body12}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/remove", [],"application/json", "{\"function\" : \"less_than\",\"input\":10,\"streams\":\"" ++ lib_json:to_string(StreamId1) ++"\", \"vstreams\":\"\"}"}, [], []),
 	api_help:refresh(),
-	{ok, {{_Version13, 200, _ReasonPhrase13}, _Headers13, Body13}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/remove", [],"application/json", "{\"function\" : \"less_than\",\"input\":6,\"streams\":[\"" ++ lib_json:to_string(StreamId1) ++"\",\"" ++ lib_json:to_string(StreamId2) ++"\"]}"}, [], []),
+	{ok, {{_Version13, 200, _ReasonPhrase13}, _Headers13, Body13}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/remove", [],"application/json", "{\"function\" : \"less_than\",\"input\":6,\"streams\":[\"" ++ lib_json:to_string(StreamId1) ++"\",\"" ++ lib_json:to_string(StreamId2) ++"\"], \"vstreams\":\"\"}"}, [], []),
 	api_help:refresh(),
 	timer:sleep(3000),
 	{ok, {{_VersionU3, 200, _ReasonPhraseU3}, _HeadersU3, BodyU3}} = httpc:request(get, {?WEBMACHINE_URL++"/users/tomas", []}, [], []),
@@ -228,15 +228,14 @@ post_data_user_test() ->
 	{ok, {{_VersionU6, 200, _ReasonPhraseU6}, _HeadersU6, BodyU6}} = httpc:request(delete, {?WEBMACHINE_URL++"/users/erik", []}, [], []),
 	NotificationList1 = lists:map(fun(A) -> lib_json:rm_field(A, "trigger.timestamp") end,lib_json:get_field(BodyU3,"notifications")),
 	NotificationList2 = lists:map(fun(A) -> lib_json:rm_field(A, "trigger.timestamp") end,lib_json:get_field(BodyU4,"notifications")),
-	ReferenceList1 = ["{\"trigger\":{\"input\":10,\"stream_id\":\"" ++ lib_json:to_string(StreamId1) ++"\",\"trigger_id\":\"" ++ lib_json:to_string(TriggerId1) ++ "\",\"value\":4.0}}",
-					  "{\"trigger\":{\"input\":5,\"stream_id\":\"" ++ lib_json:to_string(StreamId1) ++"\",\"trigger_id\":\"" ++ lib_json:to_string(TriggerId1) ++ "\",\"value\":4.0}}",
-					  "{\"trigger\":{\"input\":10,\"stream_id\":\"" ++ lib_json:to_string(StreamId1) ++"\",\"trigger_id\":\"" ++ lib_json:to_string(TriggerId1) ++ "\",\"value\":7.0}}",
-					  "{\"trigger\":{\"input\":6,\"stream_id\":\"" ++ lib_json:to_string(StreamId2) ++"\",\"trigger_id\":\"" ++ lib_json:to_string(TriggerId2) ++ "\",\"value\":4.0}}",
-					  "{\"trigger\":{\"input\":6,\"stream_id\":\"" ++ lib_json:to_string(StreamId1) ++"\",\"trigger_id\":\"" ++ lib_json:to_string(TriggerId2) ++ "\",\"value\":4.0}}",
-					  "{\"trigger\":{\"input\":6,\"stream_id\":\"" ++ lib_json:to_string(StreamId2) ++"\",\"trigger_id\":\"" ++ lib_json:to_string(TriggerId2) ++ "\",\"value\":4.0}}",
-					  "{\"trigger\":{\"input\":6,\"stream_id\":\"" ++ lib_json:to_string(StreamId2) ++"\",\"trigger_id\":\"" ++ lib_json:to_string(TriggerId2) ++ "\",\"value\":4.0}}"],
-	ReferenceList2 = ["{\"trigger\":{\"input\":5,\"stream_id\":\"" ++ lib_json:to_string(StreamId1) ++"\",\"trigger_id\":\"" ++ lib_json:to_string(TriggerId1) ++ "\",\"value\":4.0}}"],
-
+	ReferenceList1 = ["{\"trigger\":{\"input\":10,\"stream_id\":\"" ++ lib_json:to_string(StreamId1) ++"\",\"trigger_id\":\"" ++ lib_json:to_string(TriggerId1) ++ "\",\"type\":\"stream\",\"value\":4.0}}",
+					  "{\"trigger\":{\"input\":5,\"stream_id\":\"" ++ lib_json:to_string(StreamId1) ++"\",\"trigger_id\":\"" ++ lib_json:to_string(TriggerId1) ++ "\",\"type\":\"stream\",\"value\":4.0}}",
+					  "{\"trigger\":{\"input\":10,\"stream_id\":\"" ++ lib_json:to_string(StreamId1) ++"\",\"trigger_id\":\"" ++ lib_json:to_string(TriggerId1) ++ "\",\"type\":\"stream\",\"value\":7.0}}",
+					  "{\"trigger\":{\"input\":6,\"stream_id\":\"" ++ lib_json:to_string(StreamId2) ++"\",\"trigger_id\":\"" ++ lib_json:to_string(TriggerId2) ++ "\",\"type\":\"stream\",\"value\":4.0}}",
+					  "{\"trigger\":{\"input\":6,\"stream_id\":\"" ++ lib_json:to_string(StreamId1) ++"\",\"trigger_id\":\"" ++ lib_json:to_string(TriggerId2) ++ "\",\"type\":\"stream\",\"value\":4.0}}",
+					  "{\"trigger\":{\"input\":6,\"stream_id\":\"" ++ lib_json:to_string(StreamId2) ++"\",\"trigger_id\":\"" ++ lib_json:to_string(TriggerId2) ++ "\",\"type\":\"stream\",\"value\":4.0}}",
+					  "{\"trigger\":{\"input\":6,\"stream_id\":\"" ++ lib_json:to_string(StreamId2) ++"\",\"trigger_id\":\"" ++ lib_json:to_string(TriggerId2) ++ "\",\"type\":\"stream\",\"value\":4.0}}"],
+	ReferenceList2 = ["{\"trigger\":{\"input\":5,\"stream_id\":\"" ++ lib_json:to_string(StreamId1) ++"\",\"trigger_id\":\"" ++ lib_json:to_string(TriggerId1) ++ "\",\"type\":\"stream\",\"value\":4.0}}"],
 	?assertEqual(true, check_all_exist(NotificationList1,ReferenceList1)),
 	?assertEqual(true, check_all_exist(NotificationList2,ReferenceList2)).
 %% @doc
@@ -265,11 +264,11 @@ list_triggers_test_() ->
 		{ok,{{_,200,_},_,_}} = httpc:request(post,{?WEBMACHINE_URL++"/users/"++UserId1++"/triggers/add",[],
 							       "application/json",
 							       "{\"function\" : \"less_than\",\"input\":5,\"streams\":[\"" 
-							       ++ StreamId1 ++ "\",\""++StreamId2 ++"\"]}"}, [], []),
+							       ++ StreamId1 ++ "\",\""++StreamId2 ++"\"], \"vstreams\":\"\"}"}, [], []),
 		{ok,{{_,200,_},_,_}} = httpc:request(post,{?WEBMACHINE_URL++"/users/"++UserId1++"/triggers/add",[],
 							       "application/json",
 							       "{\"function\" : \"less_than\",\"input\":4,\"streams\":\"" 
-							       ++ StreamId2 ++"\"}"}, [], []),
+							       ++ StreamId2 ++"\", \"vstreams\":\"\"}"}, [], []),
 		api_help:refresh(),
 		{UserId1, StreamId1, StreamId2}
 	end,
@@ -278,11 +277,11 @@ list_triggers_test_() ->
 		{ok,{{_,200,_},_,_}} = httpc:request(post,{?WEBMACHINE_URL++"/users/"++UserId1++"/triggers/remove",[],
 							   "application/json",
 							   "{\"function\" : \"less_than\",\"input\":5,\"streams\":[\"" 
-							   ++ StreamId1 ++ "\",\""++StreamId2 ++"\"]}"}, [], []),
+							   ++ StreamId1 ++ "\",\""++StreamId2 ++"\"], \"vstreams\":\"\"}"}, [], []),
 		{ok,{{_,200,_},_,_}} = httpc:request(post,{?WEBMACHINE_URL++"/users/"++UserId1++"/triggers/remove",[],
 							       "application/json",
 							       "{\"function\" : \"less_than\",\"input\":4,\"streams\":\"" 
-							       ++StreamId2 ++"\"}"}, [], []),
+							       ++StreamId2 ++"\", \"vstreams\":\"\"}"}, [], []),
 		{ok,{{_,200,_},_,_}} = httpc:request(delete,{?WEBMACHINE_URL++"/streams/"++StreamId1,[]},[],[]),
 		{ok,{{_,200,_},_,_}} = httpc:request(delete,{?WEBMACHINE_URL++"/streams/"++StreamId2,[]},[],[]),
 		{ok,{{_,200,_},_,_}} = httpc:request(delete,{?WEBMACHINE_URL++"/users/"++UserId1,[]},[],[])
@@ -326,23 +325,23 @@ start_up_triggers_test() ->
 	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {?WEBMACHINE_URL++"/streams", [],"application/json", "{\"name\" : \"Stream1\",\"user_id\":\"tomas\"}"}, [], []),
 	StreamId1 = lib_json:get_field(Body1,"_id"),
 	api_help:refresh(),
-	Trigger = lib_json:set_attrs([{"function",list_to_binary("less_than")},{"streams",[StreamId1]},{"outputlist","[{}]"},{"outputlist[0].input",10},{"outputlist[0].output",["{}"]},{"outputlist[0].output[0].output_id",list_to_binary("tomas")},{"outputlist[0].output[0].output_type",list_to_binary("user")}]),
+	Trigger = lib_json:set_attrs([{"function",list_to_binary("less_than")},{"streams",[StreamId1]},{"vstreams",[]},{"type","stream"},{"outputlist","[{}]"},{"outputlist[0].input",10},{"outputlist[0].output",["{}"]},{"outputlist[0].output[0].output_id",list_to_binary("tomas")},{"outputlist[0].output[0].output_type",list_to_binary("user")}]),
 	erlastic_search:index_doc_with_id(?INDEX,"trigger","1",Trigger),
 	api_help:refresh(),
 	triggers:start_all_triggers_in_es(),
 	timer:sleep(1000),
-	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, _Body2}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/add", [],"application/json", "{\"function\" : \"less_than\",\"input\":5,\"streams\":\"" ++ lib_json:to_string(StreamId1) ++"\"}"}, [], []),
+	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, _Body2}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/add", [],"application/json", "{\"function\" : \"less_than\",\"input\":5,\"streams\":\"" ++ lib_json:to_string(StreamId1) ++"\", \"vstreams\":\"\"}"}, [], []),
 	api_help:refresh(),
 	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, _Body3}} = httpc:request(post, {?WEBMACHINE_URL++"/streams/"++ lib_json:to_string(StreamId1) ++ "/data" , [],"application/json", "{\"value\" : 4.0}"}, [], []),
 	api_help:refresh(),
 	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(get, {?WEBMACHINE_URL++"/users/tomas", []}, [], []),
 	NotificationList = lists:map(fun(A) -> lib_json:rm_field(A, "trigger.timestamp") end,lib_json:get_field(Body4,"notifications")),
-	ReferenceList = ["{\"trigger\":{\"input\":10,\"stream_id\":\"" ++ lib_json:to_string(StreamId1) ++"\",\"trigger_id\":\"1\",\"value\":4.0}}",
-					 "{\"trigger\":{\"input\":5,\"stream_id\":\"" ++ lib_json:to_string(StreamId1) ++"\",\"trigger_id\":\"1\",\"value\":4.0}}"],
+	ReferenceList = ["{\"trigger\":{\"input\":10,\"stream_id\":\"" ++ lib_json:to_string(StreamId1) ++"\",\"trigger_id\":\"1\",\"type\":\"stream\",\"value\":4.0}}",
+					 "{\"trigger\":{\"input\":5,\"stream_id\":\"" ++ lib_json:to_string(StreamId1) ++"\",\"trigger_id\":\"1\",\"type\":\"stream\",\"value\":4.0}}"],
 	% Clean up
-	{ok, {{_Version5, 200, _ReasonPhrase5}, _Headers5, _Body5}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/remove", [],"application/json", "{\"function\" : \"less_than\",\"input\":5,\"streams\":\"" ++ lib_json:to_string(StreamId1) ++"\"}"}, [], []),
+	{ok, {{_Version5, 200, _ReasonPhrase5}, _Headers5, _Body5}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/remove", [],"application/json", "{\"function\" : \"less_than\",\"input\":5,\"streams\":\"" ++ lib_json:to_string(StreamId1) ++"\", \"vstreams\":\"\"}"}, [], []),
 	api_help:refresh(),
-	{ok, {{_Version6, 200, _ReasonPhrase6}, _Headers6, _Body6}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/remove", [],"application/json", "{\"function\" : \"less_than\",\"input\":10,\"streams\":\"" ++ lib_json:to_string(StreamId1) ++"\"}"}, [], []),
+	{ok, {{_Version6, 200, _ReasonPhrase6}, _Headers6, _Body6}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/remove", [],"application/json", "{\"function\" : \"less_than\",\"input\":10,\"streams\":\"" ++ lib_json:to_string(StreamId1) ++"\", \"vstreams\":\"\"}"}, [], []),
 	api_help:refresh(),
 	httpc:request(delete, {?WEBMACHINE_URL++"/users/tomas", []}, [], []),
 
@@ -368,16 +367,16 @@ post_data_uri_test() ->
 %% @end
 receive_loop([]) ->
 	ok;
-receive_loop([{Value,StreamId,Threshold,Users}|Rest]) ->
+receive_loop([{Value,StreamId,Threshold,Users,Type}|Rest]) ->
 	receive
 		{#'basic.deliver'{}, #amqp_msg{payload = Body}} ->
-			{Value1,_,StreamId1,Threshold1,Users1} = binary_to_term(Body),
-			case {Value1,StreamId1,Threshold1,Users1} == {Value,StreamId,Threshold,Users} of
+			{Value1,_,StreamId1,Threshold1,Users1,Type1} = binary_to_term(Body),
+			case {Value1,StreamId1,Threshold1,Users1,Type1} == {Value,StreamId,Threshold,Users,Type} of
 				true ->
 					receive_loop(Rest);
 				false ->
 					self() ! {#'basic.deliver'{}, #amqp_msg{payload = Body}},
-					receive_loop([{Value,StreamId,Threshold,Users}|Rest])
+					receive_loop([{Value,StreamId,Threshold,Users,Type}|Rest])
 			end
 	end.
 %% @doc
