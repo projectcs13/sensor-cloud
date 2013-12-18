@@ -41,6 +41,8 @@ allowed_methods(ReqData, State) ->
 	case api_help:parse_path(wrq:path(ReqData)) of
 	    [{"users", _UserID},{"streams",_StreamId},{"triggers"}] ->
 		{['GET'], ReqData, State};
+		[{"users", _UserID},{"vstreams",_VStreamId},{"triggers"}] ->
+		{['GET'], ReqData, State};
 	    [{"users", _UserID},{"triggers",_Action}] ->
 		{['POST'], ReqData, State};
 	    [{"users", _UserId},{"triggers"}] ->
@@ -88,7 +90,7 @@ get_triggers(ReqData, State) ->
 		    ErrorString = api_help:generate_error(Body, Code),
 		    {{halt, Code} = wrq:set_resp_body(ErrorString, ReqData), State};
 		{ok, JsonStruct} ->
-		    TriggerList = lib_json:get_field(JsonStruct, "_source.triggers"),			       
+		    TriggerList = lib_json:get_field(JsonStruct, "_source.triggers"),	
 		    case {proplists:get_value('streamid', wrq:path_info(ReqData)),proplists:get_value('vstreamid', wrq:path_info(ReqData))} of
 				{undefined,undefined} ->			    
 					{lib_json:set_attr(triggers, TriggerList),ReqData, State};
@@ -255,7 +257,7 @@ add_uri(User,ReqData, State) ->
 					   _ -> 
 						   "stream"
 				   end,
-			NewTrigger = lib_json:set_attrs([{"function",list_to_binary(Function)},{"type",Type},{"streams",Streams},{"vstreams",VirtualStreams},{"outputlist","[{}]"},{"outputlist[0].input",Input},{"outputlist[0].output",["{}"]},{"outputlist[0].output[0].output_id",[list_to_binary(URI),list_to_binary(User)]},{"outputlist[0].output[0].output_type",list_to_binary("uri")}]),
+			NewTrigger = lib_json:set_attrs([{"function",list_to_binary(Function)},{"streams",Streams},{"vstreams",VirtualStreams},{"type",list_to_binary(Type)},{"outputlist","[{}]"},{"outputlist[0].input",Input},{"outputlist[0].output",["{}"]},{"outputlist[0].output[0].output_id",[list_to_binary(URI),list_to_binary(User)]},{"outputlist[0].output[0].output_type",list_to_binary("uri")}]),
 			case erlastic_search:index_doc(?INDEX, "trigger", NewTrigger) of	% Create new triggger if not in the system
 				{error,{Code2,Body2}} ->
 					ErrorString2 = api_help:generate_error(Body2, Code2),
@@ -275,7 +277,7 @@ add_uri(User,ReqData, State) ->
 					UserUpdate = lib_json:set_attrs([{"script",list_to_binary("ctx._source.triggers += newelement")},
 													 {"params","{}"},{"params.newelement","{}"},
 													 {"params.newelement.function",list_to_binary(Function)}, {"params.newelement.input",Input},
-													 {"params.newelement.streams",Streams},{"params.newelement.streams",VirtualStreams},
+													 {"params.newelement.streams",Streams},{"params.newelement.vstreams",VirtualStreams},
 													 {"params.newelement.output_type",list_to_binary("uri")},{"params.newelement.output_id",list_to_binary(URI)}]),
 					case api_help:update_doc(?INDEX, "user", User, UserUpdate) of
 						{error, {UPCode, UPBody}} -> 
@@ -316,7 +318,7 @@ add_uri(User,ReqData, State) ->
 							UserUpdate = lib_json:set_attrs([{"script",list_to_binary("ctx._source.triggers += newelement")},
 															 {"params","{}"},{"params.newelement","{}"},
 															 {"params.newelement.function",list_to_binary(Function)}, {"params.newelement.input",Input},
-															 {"params.newelement.streams",Streams},{"params.newelement.streams",VirtualStreams},
+															 {"params.newelement.streams",Streams},{"params.newelement.vstreams",VirtualStreams},
 															 {"params.newelement.output_type",list_to_binary("uri")},{"params.newelement.output_id",list_to_binary(URI)}]),
 							case api_help:update_doc(?INDEX, "user", User, UserUpdate) of
 								{error, {UPCode, UPBody}} -> 
@@ -422,7 +424,7 @@ add_user(User, ReqData, State) ->
 					   _ -> 
 						   "stream"
 				   end,
-			NewTrigger = lib_json:set_attrs([{"function",list_to_binary(Function)},{"type",Type},{"streams",Streams},{"vstreams",VirtualStreams},{"outputlist","[{}]"},{"outputlist[0].input",Input},{"outputlist[0].output",["{}"]},{"outputlist[0].output[0].output_id",list_to_binary(Username)},{"outputlist[0].output[0].output_type",list_to_binary("user")}]),
+			NewTrigger = lib_json:set_attrs([{"function",list_to_binary(Function)},{"streams",Streams},{"vstreams",VirtualStreams},{"type",list_to_binary(Type)},{"outputlist","[{}]"},{"outputlist[0].input",Input},{"outputlist[0].output",["{}"]},{"outputlist[0].output[0].output_id",list_to_binary(Username)},{"outputlist[0].output[0].output_type",list_to_binary("user")}]),
 			case erlastic_search:index_doc(?INDEX, "trigger", NewTrigger) of	% Create new triggger if not in the system
 				{error,{Code2,Body2}} ->
 					ErrorString2 = api_help:generate_error(Body2, Code2),
@@ -436,7 +438,7 @@ add_user(User, ReqData, State) ->
 					UserUpdate = lib_json:set_attrs([{"script",list_to_binary("ctx._source.triggers += newelement")},
 													 {"params","{}"},{"params.newelement","{}"},
 													 {"params.newelement.function",list_to_binary(Function)}, {"params.newelement.input",Input},
-													 {"params.newelement.streams",Streams},{"params.newelement.streams",VirtualStreams},
+													 {"params.newelement.streams",Streams},{"params.newelement.vstreams",VirtualStreams},
 													 {"params.newelement.output_type",list_to_binary("user")},{"params.newelement.output_id",list_to_binary(Username)}]),
 					case api_help:update_doc(?INDEX, "user", Username, UserUpdate) of
 						{error, {UPCode, UPBody}} -> 
@@ -477,7 +479,7 @@ add_user(User, ReqData, State) ->
 							UserUpdate = lib_json:set_attrs([{"script",list_to_binary("ctx._source.triggers += newelement")},
 															 {"params","{}"},{"params.newelement","{}"},
 															 {"params.newelement.function",list_to_binary(Function)}, {"params.newelement.input",Input},
-															 {"params.newelement.streams",Streams},{"params.newelement.streams",VirtualStreams},
+															 {"params.newelement.streams",Streams},{"params.newelement.vstreams",VirtualStreams},
 															 {"params.newelement.output_type",list_to_binary("user")},{"params.newelement.output_id",list_to_binary(Username)}]),
 							case api_help:update_doc(?INDEX, "user", Username, UserUpdate) of
 								{error, {UPCode, UPBody}} -> 
@@ -605,7 +607,7 @@ remove_uri(User,ReqData, State) ->
 									 UserUpdate = lib_json:set_attrs([{"script",list_to_binary("for(int i=0;i < ctx._source.triggers.size(); i++){if (ctx._source.triggers[i] == newelement){ctx._source.triggers.remove((Object) ctx._source.triggers[i]); i = ctx._source.triggers.size();}}")},
 																	  {"params","{}"},{"params.newelement","{}"},
 																	  {"params.newelement.function",list_to_binary(Function)}, {"params.newelement.input",Input},
-																	  {"params.newelement.streams",Streams},{"params.newelement.streams",VirtualStreams},
+																	  {"params.newelement.streams",Streams},{"params.newelement.vstreams",VirtualStreams},
 																	  {"params.newelement.output_type",list_to_binary("uri")},{"params.newelement.output_id",list_to_binary(URI)}]),
 									 case api_help:update_doc(?INDEX, "user", User, UserUpdate) of
 										 {error, {UPCode, UPBody}} -> 
@@ -739,7 +741,7 @@ remove_user(User, ReqData, State) ->
 									 UserUpdate = lib_json:set_attrs([{"script",list_to_binary("for(int i=0;i < ctx._source.triggers.size(); i++){if (ctx._source.triggers[i] == newelement){ctx._source.triggers.remove((Object) ctx._source.triggers[i]); i = ctx._source.triggers.size();}}")},
 																	  {"params","{}"},{"params.newelement","{}"},
 																	  {"params.newelement.function",list_to_binary(Function)}, {"params.newelement.input",Input},
-																	  {"params.newelement.streams",Streams},{"params.newelement.streams",VirtualStreams},
+																	  {"params.newelement.streams",Streams},{"params.newelement.vstreams",VirtualStreams},
 																	  {"params.newelement.output_type",list_to_binary("user")},{"params.newelement.output_id",list_to_binary(Username)}]),
 									 case api_help:update_doc(?INDEX, "user", Username, UserUpdate) of
 										 {error, {UPCode, UPBody}} -> 
@@ -894,7 +896,7 @@ parse_triggers([{Id,Trigger}|Rest],Acc) ->
 	Streams = lists:map(fun(A) -> lib_json:to_string(A) end, lib_json:get_field(Trigger, "streams")),
 	VStreams = lists:map(fun(A) -> lib_json:to_string(A) end, lib_json:get_field(Trigger, "vstreams")),
 	InputList = parse_outputlist(lib_json:get_field(Trigger, "outputlist"),[]),
-	Type = lib_json:get_field(Trigger, "type"),
+	Type = lib_json:to_string(lib_json:get_field(Trigger, "type")),
 	NewElement = {{id,Id},{function,Function},{inputlist,InputList},{streams,Streams},{vstreams,VStreams},{type,Type}},
 	parse_triggers(Rest,[NewElement|Acc]).
 
