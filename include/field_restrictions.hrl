@@ -10,21 +10,21 @@
 -define(INDEX, "sensorcloud").
 
 %% Fields for streams
--define(RESTRCITEDUPDATESTREAMS, ["active","quality","user_ranking","subscribers","last_update","creation_date","history_size"]).
--define(RESTRCITEDCREATESTREAMS, ["active","quality","user_ranking","subscribers","nr_subscribers","last_update","creation_date","history_size"]).
--define(ACCEPTEDFIELDSSTREAMS, ["user_id","name","description", "type","tags","private","unit","accuracy","min_val","max_val","polling","uri","polling_freq","location","resource","resource.resource_type","resource.uuid","parser","data_type","location.lon","location.lat"]).
+-define(RESTRICTED_STREAMS_UPDATE, ["active","quality","user_ranking","subscribers","last_update","creation_date","history_size"]).
+-define(RESTRICTED_STREAMS_CREATE, ["active","quality","user_ranking","subscribers","nr_subscribers","last_update","creation_date","history_size"]).
+-define(ACCEPTED_STREAMS_FIELDS, ["user_id","name","description", "type","tags","private","unit","accuracy","min_val","max_val","polling","uri","polling_freq","location","resource","resource.resource_type","resource.uuid","parser","data_type","location.lon","location.lat"]).
 
 %% Fields for users
 -define(RESTRCITEDUPDATEUSERS, ["username", "subscriptions"]).
 -define(ACCEPTEDFIELDSUSERS, ["username", "email", "firstname", "lastname", "description", "password", "private"]).
 
 %% Fields for resources
--define(RESTRCITEDUPDATERESOURCES, []).
--define(RESTRCITEDCREATERESOURCES, ["streams_suggest"]).
--define(ACCEPTEDFIELDSRESOURCES, ["name","description","model","manufacturer"]).
+-define(RESTRICTED_RESOURCES_UPDATE, []).
+-define(RESTRICTED_RESOURCES_CREATE, ["streams_suggest"]).
+-define(ACCEPTED_RESOURCES_FIELDS, ["name","description","model","manufacturer"]).
 %% Fields for data-points
--define(ACCEPTEDFIELDSDATAPOINTS, ["stream_id","timestamp","value"]).
+-define(ACCEPTED_DATAPOINTS_FIELDS, ["stream_id","timestamp","value"]).
 
 %% Fields for virtual streams
--define(ACCEPTEDUPDATEFIELDSVSTREAMS, ["user_id","name","description","tags","private"]).
--define(ACCEPTEDCREATEFIELDSVSTREAMS, ["user_id","name","description","tags","private","function","streams_involved","creation_date","timestampfrom"]).
+-define(ACCEPTED_FIELDS_VSTREAMS_UPDATE, ["user_id","name","description","tags","private"]).
+-define(ACCEPTED_FIELDS_VSTREAMS_CREATE, ["user_id","name","description","tags","private","function","streams_involved","creation_date","timestampfrom"]).

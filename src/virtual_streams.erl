@@ -100,7 +100,7 @@ process_post(ReqData, State) ->
 			TimestampFrom = lib_json:get_field(VirtualStreamJson, "timestampfrom"),
 			Function = lib_json:get_field(VirtualStreamJson, "function"),
 			AllowedFunctions = ["min", "max", "mean", "total", "diff"],
-			case api_help:do_only_fields_exist(VirtualStreamJson,?ACCEPTEDCREATEFIELDSVSTREAMS) of
+			case api_help:do_only_fields_exist(VirtualStreamJson,?ACCEPTED_FIELDS_VSTREAMS_CREATE) of
 				true-> 
 					case lists:member(binary_to_list(lists:nth(1, Function)), AllowedFunctions) of
 						true ->
@@ -227,7 +227,7 @@ put_stream(ReqData, State) ->
 	VStreamId = proplists:get_value('id', wrq:path_info(ReqData)),
 	{VStream,_,_} = api_help:json_handler(ReqData,State),
 	Update = lib_json:set_attr(doc,VStream),
-	case api_help:do_only_fields_exist(VStream,?ACCEPTEDUPDATEFIELDSVSTREAMS) of
+	case api_help:do_only_fields_exist(VStream,?ACCEPTED_FIELDS_VSTREAMS_UPDATE) of
 		true-> 
 			case api_help:update_doc(?INDEX, "virtual_stream", VStreamId, Update) of 
 				{error, {Code, Body}} -> 
