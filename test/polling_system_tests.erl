@@ -69,8 +69,6 @@ initialization_test()->
 	Stream2 = lists:nth(2, PollerInforList), 
 	?assertEqual(2, length(PollerInforList)),
 	
-	?assertEqual(true, erlastic_search:does_type_exist(?ES_INDEX, "stream")),
-	?assertEqual(true, erlastic_search:does_doc_exist(?ES_INDEX, "stream", "1")),
 	case "1"==Stream1#pollerInfo.stream_id of
 		true->
 			?assertEqual("test", Stream1#pollerInfo.name),

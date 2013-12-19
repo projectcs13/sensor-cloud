@@ -156,7 +156,6 @@ process_search_post(ReqData, State) ->
     FilteredJson = filter_json(Json, From, Size, Sort, LocationParam),
     case erlastic_search:search_json(#erls_params{},?INDEX, "stream", FilteredJson) of % Maybe wanna take more
             {error, Reason1} ->
-				erlang:display(binary_to_list(Reason1)),
                 StreamSearch = {error, Reason1};
             {ok,List1} ->
 			case lib_json:get_field(FilteredJson, "query.filtered.query.query_string.query") of
