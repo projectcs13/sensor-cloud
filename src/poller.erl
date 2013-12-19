@@ -148,16 +148,13 @@ handle_info({probe}, State)->
 					end;
 
 				_ ->
-					%%polling fails
 					poll_help:add_failed(StreamId,connection_error),
-					erlang:display("polling failed")
+					erlang:display("polling failed, the response code: "++Code)
 			end,
 			{noreply, State};
-		{error, Reason}->
-			erlang:display("failed to poll external resource, "++Reason),
-			{noreply, State};
 		_ ->
-			erlang:display("failed to poll external resource"),
+			poll_help:add_failed(StreamId,connection_error),
+			erlang:display("failed to connect to the uri: "++Uri),
 			{noreply, State}
 	end.
 
