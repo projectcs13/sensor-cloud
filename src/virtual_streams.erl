@@ -109,7 +109,9 @@ process_post(ReqData, State) ->
 								Func == "diff" andalso length(StreamsInvolved) =/= 1 -> 
 									{{halt, 404}, wrq:set_resp_body("Wrong number of streams involved for diff", ReqData), State};
 								true ->	
-									case erlastic_search:index_doc(?INDEX, "virtual_stream", DateAdded) of	
+									Initialized1 = lib_json:add_field(DateAdded,"history_size",0),
+									Initialized2 = lib_json:add_field(Initialized1,"last_updated",list_to_binary(Date)),
+									case erlastic_search:index_doc(?INDEX, "virtual_stream", Initialized2) of	
 										{error, Reason} ->
 											{{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
 										{ok,List} -> 
