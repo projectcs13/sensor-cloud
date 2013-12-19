@@ -24,3 +24,7 @@
 -define(ACCEPTEDFIELDSRESOURCES, ["name","description","model","manufacturer"]).
 %% Fields for data-points
 -define(ACCEPTEDFIELDSDATAPOINTS, ["stream_id","timestamp","value"]).
+
+%% Fields for virtual streams
+-define(ACCEPTEDUPDATEFIELDSVSTREAMS, ["user_id","name","description","tags","private"]).
+-define(ACCEPTEDCREATEFIELDSVSTREAMS, ["user_id","name","description","tags","private","function","streams_involved","creation_date","timestampfrom"]).

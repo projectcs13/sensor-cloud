@@ -22,8 +22,8 @@
 -include("webmachine.hrl").
 -include_lib("amqp_client.hrl").
 -include_lib("pubsub.hrl").
+-include("field_restrictions.hrl").
 
--define(INDEX, "sensorcloud").
 -define(ELASTIC_SEARCH_URL, api_help:get_elastic_search_url()).
 
 %% @doc
@@ -100,31 +100,36 @@ process_post(ReqData, State) ->
 			TimestampFrom = lib_json:get_field(VirtualStreamJson, "timestampfrom"),
 			Function = lib_json:get_field(VirtualStreamJson, "function"),
 			AllowedFunctions = ["min", "max", "mean", "total", "diff"],
-			case lists:member(binary_to_list(lists:nth(1, Function)), AllowedFunctions) of
-				true ->
-					Func = binary_to_list(lists:nth(1, Function)),
-					if 
-						Func == "diff" andalso length(StreamsInvolved) =/= 1 -> 
-							{{halt, 404}, wrq:set_resp_body("Wrong number of streams involved for diff", ReqData), State};
-						true ->	
-							case erlastic_search:index_doc(?INDEX, "virtual_stream", DateAdded) of	
-								{error, Reason} ->
-									{{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
-								{ok,List} -> 
-									VirtualStreamId = lib_json:get_field(List, "_id"),
-									if 
-										Func == "diff" ->
-											ok;
-										true ->
-											reduce(VirtualStreamId, StreamsInvolved, TimestampFrom, Function, ReqData, State)
-									end,
-									StreamList = [{stream, binary_to_list(X)} || X <- StreamsInvolved],
-									virtual_stream_process_supervisor:add_child(binary_to_list(VirtualStreamId), StreamList, Function),
-									{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
-							end
+			case api_help:do_only_fields_exist(VirtualStreamJson,?ACCEPTEDCREATEFIELDSVSTREAMS) of
+				true-> 
+					case lists:member(binary_to_list(lists:nth(1, Function)), AllowedFunctions) of
+						true ->
+							Func = binary_to_list(lists:nth(1, Function)),
+							if 
+								Func == "diff" andalso length(StreamsInvolved) =/= 1 -> 
+									{{halt, 404}, wrq:set_resp_body("Wrong number of streams involved for diff", ReqData), State};
+								true ->	
+									case erlastic_search:index_doc(?INDEX, "virtual_stream", DateAdded) of	
+										{error, Reason} ->
+											{{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
+										{ok,List} -> 
+											VirtualStreamId = lib_json:get_field(List, "_id"),
+											if 
+												Func == "diff" ->
+													ok;
+												true ->
+													reduce(VirtualStreamId, StreamsInvolved, TimestampFrom, Function, ReqData, State)
+											end,
+											StreamList = [{stream, binary_to_list(X)} || X <- StreamsInvolved],
+											virtual_stream_process_supervisor:add_child(binary_to_list(VirtualStreamId), StreamList, Function),
+											{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
+									end
+							end;
+						false ->
+							{{halt, 404}, wrq:set_resp_body("404 Function missing or not supported", ReqData), State}
 					end;
-				false ->
-					{{halt, 404}, wrq:set_resp_body("404 Function missing or not supported", ReqData), State}
+				false->
+					{{halt,403}, wrq:set_resp_body("Unsupported field(s), virtual stream not created", ReqData), State}
 			end;
 		true ->
 			process_search(ReqData, State, post)
@@ -222,14 +227,19 @@ put_stream(ReqData, State) ->
 	VStreamId = proplists:get_value('id', wrq:path_info(ReqData)),
 	{VStream,_,_} = api_help:json_handler(ReqData,State),
 	Update = lib_json:set_attr(doc,VStream),
-	case api_help:update_doc(?INDEX, "virtual_stream", VStreamId, Update) of 
-		{error, {Code, Body}} -> 
-			ErrorString = api_help:generate_error(Body, Code),
-			{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-		{ok,List} -> 
-			{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
+	case api_help:do_only_fields_exist(VStream,?ACCEPTEDUPDATEFIELDSVSTREAMS) of
+		true-> 
+			case api_help:update_doc(?INDEX, "virtual_stream", VStreamId, Update) of 
+				{error, {Code, Body}} -> 
+					ErrorString = api_help:generate_error(Body, Code),
+					{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+				{ok,List} -> 
+					{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
+			end;
+		false ->
+			{{halt,403}, wrq:set_resp_body("Unsupported field(s)", ReqData), State}
 	end.
-	
+
 
 %% @doc
 %% Function: delete_resource/2
