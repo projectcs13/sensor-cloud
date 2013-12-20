@@ -13,7 +13,7 @@
 -include_lib("eunit/include/eunit.hrl").
 -include("debug.hrl").
 -include_lib("amqp_client.hrl").
--export([]).
+-export([post_data_user_vstream/0]).
 
 -define(WEBMACHINE_URL, api_help:get_webmachine_url()).
 -define(ES_URL, api_help:get_elastic_search_url()).
@@ -97,12 +97,12 @@ create_delete_test() ->
 %%          the streams the trigger is on
 %% Returns: ok | {error, term()}
 %% @end
-post_data_exchange_test() ->
+post_data_exchange_test_() ->
     Descript = "Trigger data exchange test",
     Setup = 
 	fun() ->
-		User1 = "tomas",
-		User2 = "erik",
+		User1 = "test1",
+		User2 = "test2",
 		http:post(?WEBMACHINE_URL++"/users", "{\"username\" : \""++User1++"\"}"),
 		http:post(?WEBMACHINE_URL++"/users", "{\"username\" : \""++User2++"\"}"),
 		api_help:refresh(),
@@ -355,8 +355,8 @@ start_up_triggers_test() ->
 
 
 %% @doc
-%% Function: create_delete_test/0
-%% Purpose: Test the process_post and delete_resource functions by doing some HTTP requests
+%% Function: create_delete_vstream_test/0
+%% Purpose: Test the process_post and delete_resource functions on virtual streams by doing some HTTP requests
 %% Returns: ok | {error, term()}
 %% @end
 create_delete_vstream_test() -> 
@@ -414,6 +414,183 @@ create_delete_vstream_test() ->
 
 
 
+%% @doc
+%% Function: post_data_vstream_test/0
+%% Purpose: Test the triggersProcess by doing some posting for data to
+%%          the virtual streams the trigger is on
+%% Returns: ok | {error, term()}
+%% @end
+post_data_exchange_vstream_test_() ->
+    Descript = "Trigger data exchange test",
+    Setup = 
+	fun() ->
+		User1 = "test1",
+		User2 = "test2",
+		http:post(?WEBMACHINE_URL++"/users", "{\"username\" : \""++User1++"\"}"),
+		http:post(?WEBMACHINE_URL++"/users", "{\"username\" : \""++User2++"\"}"),
+		api_help:refresh(),
+		{200, SBody1} = http:post(?WEBMACHINE_URL++"/streams", "{\"name\":\"Stream1\",\"user_id\":\""++User1++"\"}"),
+		{200, SBody2} = http:post(?WEBMACHINE_URL++"/streams", "{\"name\":\"Stream2\",\"user_id\":\""++User1++"\"}"),
+		api_help:refresh(),
+		StreamId1 = lib_json:to_string(lib_json:get_field(SBody1,"_id")),
+		StreamId2 = lib_json:to_string(lib_json:get_field(SBody2,"_id")),
+		api_help:refresh(),
+		{200, Body1} = http:post(?WEBMACHINE_URL++"/vstreams", "{\"user_id\":\""++User1++"\",\"name\":\"VStream1\",\"tags\":\"average,temperature,celsius,uppsala\",\"description\":\"Diff\",\"private\":\"false\",\"timestampfrom\" : \"now-1w\",\"streams_involved\": [\"" ++ StreamId1 ++ "\"],\"function\":[\"diff\", \"2s\"]}"),
+		{200, Body2} = http:post(?WEBMACHINE_URL++"/vstreams", "{\"user_id\":\""++User2++"\",\"name\":\"VStream1\",\"tags\":\"average,temperature,celsius,uppsala\",\"description\":\"Diff\",\"private\":\"false\",\"timestampfrom\" : \"now-1w\",\"streams_involved\": [\"" ++ StreamId2 ++ "\"],\"function\":[\"diff\", \"2s\"]}"),
+		api_help:refresh(),
+		VStreamId1 = lib_json:to_string(lib_json:get_field(Body1,"_id")),
+		VStreamId2 = lib_json:to_string(lib_json:get_field(Body2,"_id")),
+		{200, Body3} = http:post(?WEBMACHINE_URL++"/users/"++User1++"/triggers/add",
+					 "{\"function\":\"less_than\",\"input\":5,\"streams\":\"\", \"vstreams\":\""++VStreamId1++"\"}"),		
+		api_help:refresh(),
+		{200, Body4} = http:post(?WEBMACHINE_URL++"/users/"++User2++"/triggers/add",
+					 "{\"function\":\"less_than\",\"input\":5,\"streams\":\"\", \"vstreams\":\""++VStreamId1++"\"}"),
+		api_help:refresh(),
+		{200, Body5} = http:post(?WEBMACHINE_URL++"/users/"++User1++"/triggers/add",
+					 "{\"function\":\"less_than\",\"input\":10,\"streams\":\"\", \"vstreams\":\""++VStreamId1++"\"}"),
+		api_help:refresh(),
+		{200, Body6} = http:post(?WEBMACHINE_URL++"/users/"++User1++"/triggers/add",
+					 "{\"function\":\"less_than\",\"input\":6,\"streams\":\"\", \"vstreams\":[\""++VStreamId1++"\",\""++VStreamId2++"\"]}"),
+		TriggerId1 = lib_json:to_string(lib_json:get_field(Body3, "_id")),
+		TriggerId2 = lib_json:to_string(lib_json:get_field(Body6, "_id")),
+		api_help:refresh(),
+
+		%% Connect.
+		{ok, Connection} = amqp_connection:start(#amqp_params_network{}),
+		%% Open In and OUT channels.
+		{ok, ChannelIn} = amqp_connection:open_channel(Connection),
+		InputExchanges = [list_to_binary("trigger."++TriggerId1),
+				  list_to_binary("trigger."++TriggerId2)],		
+		triggersProcess:subscribe(ChannelIn, InputExchanges),
+		{User1, User2, StreamId1, StreamId2, ChannelIn, Connection,VStreamId1,VStreamId2}
+	end,
+    Test = 
+	fun({User1, User2, StreamId1, StreamId2,  _ChannelIn, _Connection,VStreamId1,VStreamId2}) ->
+		{200, Body7} = http:post(?WEBMACHINE_URL++"/streams/"++StreamId1++"/data", "{\"value\" : 4}"),
+		api_help:refresh(),
+		{200, Body8} = http:post(?WEBMACHINE_URL++"/streams/"++StreamId1++"/data", "{\"value\" : 7}"),
+		api_help:refresh(),
+		{200, Body9} = http:post(?WEBMACHINE_URL++"/streams/"++StreamId2++"/data", "{\"value\" : 4}"),
+		api_help:refresh(),	
+		{200, Body10} = http:post(?WEBMACHINE_URL++"/streams/"++StreamId2++"/data", "{\"value\" : 4}"),
+		api_help:refresh(),
+		Messages = [{3,VStreamId1,5, [{user,User2},{user,User1}], "vstream"},
+			    	{3,VStreamId1,10,[{user,User1}], "vstream"},
+			    	{0,VStreamId2,6, [{user,User1}], "vstream"}],
+		receive_loop(Messages)
+	end,
+    Cleanup = 
+	fun({User1, User2, StreamId1, StreamId2, ChannelIn, Connection,VStreamId1,VStreamId2}) ->
+		amqp_channel:close(ChannelIn),
+		amqp_connection:close(Connection),
+		api_help:refresh(),
+		{200, Body11} = http:post(?WEBMACHINE_URL++"/users/"++User1++"/triggers/remove",
+					 "{\"function\":\"less_than\",\"input\":5,\"streams\":\"\", \"vstreams\":\""++VStreamId1++"\"}"),		
+		api_help:refresh(),
+		{200, Body12} = http:post(?WEBMACHINE_URL++"/users/"++User2++"/triggers/remove",
+					 "{\"function\":\"less_than\",\"input\":5,\"streams\":\"\", \"vstreams\":\""++VStreamId1++"\"}"),
+		api_help:refresh(),
+		{200, Body13} = http:post(?WEBMACHINE_URL++"/users/"++User1++"/triggers/remove",
+					 "{\"function\":\"less_than\",\"input\":10,\"streams\":\"\", \"vstreams\":\""++VStreamId1++"\"}"),
+		api_help:refresh(),
+		{200, Body14} = http:post(?WEBMACHINE_URL++"/users/"++User1++"/triggers/remove",
+					 "{\"function\":\"less_than\",\"input\":6,\"streams\":\"\", \"vstreams\":[\""++VStreamId1++"\",\""++VStreamId2++"\"]}"),
+		api_help:refresh(),
+		{200, Body15} = http:delete(?WEBMACHINE_URL++"/vstreams/"++VStreamId1),
+		api_help:refresh(),
+		{200, Body16} = http:delete(?WEBMACHINE_URL++"/vstreams/"++VStreamId2),
+		api_help:refresh(),
+		{200, Body17} = http:delete(?WEBMACHINE_URL++"/users/"++User1),
+		api_help:refresh(),
+		{200, Body18} = http:delete(?WEBMACHINE_URL++"/users/"++User2),
+		api_help:refresh()
+	end,
+    {timeout, 30, [{Descript, {setup, Setup, Cleanup, Test}}]}.
+
+
+%% @doc
+%% Function: post_data_vstream_test/0
+%% Purpose: Test the triggersProcess by doing some posting for data to
+%%          the streams the trigger is on
+%% Returns: ok | {error, term()}
+%% @end
+post_data_user_vstream_test_() ->
+	{timeout,30,fun post_data_user_vstream/0}.
+
+post_data_user_vstream() ->
+	timer:sleep(2000),
+	User1 = "tomas",
+	User2 = "erik",
+    httpc:request(post, {?WEBMACHINE_URL++"/users", [],"application/json", "{\"username\" : \""++User1++"\"}"}, [], []),
+    httpc:request(post, {?WEBMACHINE_URL++"/users", [],"application/json", "{\"username\" : \""++User2++"\"}"}, [], []),
+	api_help:refresh(),
+	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, SBody1}} = httpc:request(post, {?WEBMACHINE_URL++"/streams", [],"application/json", "{\"name\" : \"Stream1\",\"user_id\":\"tomas\"}"}, [], []),
+	{ok, {{_Version2, 200, _ReasonPhrase2}, _Headers2, SBody2}} = httpc:request(post, {?WEBMACHINE_URL++"/streams", [],"application/json", "{\"name\" : \"Stream2\",\"user_id\":\"tomas\"}"}, [], []),
+	StreamId1 = lib_json:to_string(lib_json:get_field(SBody1,"_id")),
+	StreamId2 = lib_json:to_string(lib_json:get_field(SBody2,"_id")),
+	api_help:refresh(),
+	{200, Body1} = http:post(?WEBMACHINE_URL++"/vstreams", "{\"user_id\":\""++User1++"\",\"name\":\"VStream1\",\"tags\":\"average,temperature,celsius,uppsala\",\"description\":\"Diff\",\"private\":\"false\",\"timestampfrom\" : \"now-1w\",\"streams_involved\": [\"" ++ StreamId1 ++ "\"],\"function\":[\"diff\", \"2s\"]}"),
+	{200, Body2} = http:post(?WEBMACHINE_URL++"/vstreams", "{\"user_id\":\""++User2++"\",\"name\":\"VStream1\",\"tags\":\"average,temperature,celsius,uppsala\",\"description\":\"Diff\",\"private\":\"false\",\"timestampfrom\" : \"now-1w\",\"streams_involved\": [\"" ++ StreamId2 ++ "\"],\"function\":[\"diff\", \"2s\"]}"),
+	api_help:refresh(),
+	VStreamId1 = lib_json:to_string(lib_json:get_field(Body1,"_id")),
+	VStreamId2 = lib_json:to_string(lib_json:get_field(Body2,"_id")),
+	api_help:refresh(),
+	%% Create
+	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/add", [],"application/json", "{\"function\" : \"less_than\",\"input\":5,\"streams\":\"\", \"vstreams\":\"" ++ lib_json:to_string(VStreamId1) ++"\"}"}, [], []),
+	TriggerId1 = lib_json:get_field(Body3, "_id"),
+	api_help:refresh(),
+	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(post, {?WEBMACHINE_URL++"/users/erik/triggers/add", [],"application/json", "{\"function\" : \"less_than\",\"input\":5,\"streams\":\"\", \"vstreams\":\"" ++ lib_json:to_string(VStreamId1) ++"\"}"}, [], []),
+	api_help:refresh(),
+	{ok, {{_Version5, 200, _ReasonPhrase5}, _Headers5, Body5}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/add", [],"application/json", "{\"function\" : \"less_than\",\"input\":10,\"streams\":\"\", \"vstreams\":\"" ++ lib_json:to_string(VStreamId1) ++"\"}"}, [], []),
+	api_help:refresh(),
+	{ok, {{_Version6, 200, _ReasonPhrase6}, _Headers6, Body6}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/add", [],"application/json", "{\"function\" : \"less_than\",\"input\":6,\"streams\":\"\", \"vstreams\":[\"" ++ lib_json:to_string(VStreamId1) ++"\",\"" ++ lib_json:to_string(VStreamId2) ++"\"]}"}, [], []),
+	TriggerId2 = lib_json:get_field(Body6, "_id"),
+	api_help:refresh(),
+	{ok, {{_Version7, 200, _ReasonPhrase7}, _Headers7, Body7}} = httpc:request(post, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(StreamId1) ++"/data", [],"application/json", "{\"value\" : 4.0}"}, [], []),
+	{ok, {{_Version8, 200, _ReasonPhrase8}, _Headers8, Body8}} = httpc:request(post, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(StreamId1) ++"/data", [],"application/json", "{\"value\" : 7.0}"}, [], []),
+	{ok, {{_Version9, 200, _ReasonPhrase9}, _Headers9, Body9}} = httpc:request(post, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(StreamId2) ++"/data", [],"application/json", "{\"value\" : 4.0}"}, [], []),
+	{ok, {{_Version10, 200, _ReasonPhrase10}, _Headers10, Body10}} = httpc:request(post, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(StreamId2) ++"/data", [],"application/json", "{\"value\" : 4.0}"}, [], []),
+	api_help:refresh(),
+	{ok, {{_Version11, 200, _ReasonPhrase11}, _Headers11, Body11}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/remove", [],"application/json", "{\"function\" : \"less_than\",\"input\":5,\"streams\":\"\", \"vstreams\":\"" ++ lib_json:to_string(VStreamId1) ++"\"}"}, [], []),
+	api_help:refresh(),
+	{ok, {{_Version12, 200, _ReasonPhrase12}, _Headers12, Body12}} = httpc:request(post, {?WEBMACHINE_URL++"/users/erik/triggers/remove", [],"application/json", "{\"function\" : \"less_than\",\"input\":5,\"streams\":\"\", \"vstreams\":\"" ++ lib_json:to_string(VStreamId1) ++"\"}"}, [], []),
+	api_help:refresh(),
+	{ok, {{_Version13, 200, _ReasonPhrase13}, _Headers13, Body13}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/remove", [],"application/json", "{\"function\" : \"less_than\",\"input\":10,\"streams\":\"\", \"vstreams\":\"" ++ lib_json:to_string(VStreamId1) ++"\"}"}, [], []),
+	api_help:refresh(),
+	{ok, {{_Version14, 200, _ReasonPhrase14}, _Headers14, Body14}} = httpc:request(post, {?WEBMACHINE_URL++"/users/tomas/triggers/remove", [],"application/json", "{\"function\" : \"less_than\",\"input\":6,\"streams\":\"\", \"vstreams\":[\"" ++ lib_json:to_string(VStreamId1) ++"\",\"" ++ lib_json:to_string(VStreamId2) ++"\"]}"}, [], []),
+	api_help:refresh(),
+	timer:sleep(2000),
+	{ok, {{_VersionU3, 200, _ReasonPhraseU3}, _HeadersU3, BodyU3}} = httpc:request(get, {?WEBMACHINE_URL++"/users/tomas", []}, [], []),
+	{ok, {{_VersionU4, 200, _ReasonPhraseU4}, _HeadersU4, BodyU4}} = httpc:request(get, {?WEBMACHINE_URL++"/users/erik", []}, [], []),
+	api_help:refresh(),
+	{ok, {{_VersionU5, 200, _ReasonPhraseU5}, _HeadersU5, BodyU5}} = httpc:request(delete, {?WEBMACHINE_URL++"/users/tomas", []}, [], []),
+	{ok, {{_VersionU6, 200, _ReasonPhraseU6}, _HeadersU6, BodyU6}} = httpc:request(delete, {?WEBMACHINE_URL++"/users/erik", []}, [], []),
+	api_help:refresh(),
+	%{200, Body15} = http:delete(?WEBMACHINE_URL++"/vstreams/"++VStreamId1),
+	api_help:refresh(),
+	%{200, Body16} = http:delete(?WEBMACHINE_URL++"/vstreams/"++VStreamId2),
+	api_help:refresh(),
+	NotificationList1 = lists:map(fun(A) -> lib_json:rm_field(A, "trigger.timestamp") end,lib_json:get_field(BodyU3,"notifications")),
+	NotificationList2 = lists:map(fun(A) -> lib_json:rm_field(A, "trigger.timestamp") end,lib_json:get_field(BodyU4,"notifications")),
+	
+	
+	
+	ReferenceList1 = ["{\"trigger\":{\"input\":10,\"stream_id\":\"" ++ lib_json:to_string(VStreamId1) ++"\",\"trigger_id\":\"" ++ lib_json:to_string(TriggerId1) ++ "\",\"type\":\"vstream\",\"value\":0.0}}",
+					  "{\"trigger\":{\"input\":5,\"stream_id\":\"" ++ lib_json:to_string(VStreamId1) ++"\",\"trigger_id\":\"" ++ lib_json:to_string(TriggerId1) ++ "\",\"type\":\"vstream\",\"value\":0.0}}",
+					  "{\"trigger\":{\"input\":10,\"stream_id\":\"" ++ lib_json:to_string(VStreamId1) ++"\",\"trigger_id\":\"" ++ lib_json:to_string(TriggerId1) ++ "\",\"type\":\"vstream\",\"value\":3.0}}",
+					  "{\"trigger\":{\"input\":5,\"stream_id\":\"" ++ lib_json:to_string(VStreamId1) ++"\",\"trigger_id\":\"" ++ lib_json:to_string(TriggerId1) ++ "\",\"type\":\"vstream\",\"value\":3.0}}",
+					  "{\"trigger\":{\"input\":6,\"stream_id\":\"" ++ lib_json:to_string(VStreamId2) ++"\",\"trigger_id\":\"" ++ lib_json:to_string(TriggerId2) ++ "\",\"type\":\"vstream\",\"value\":0.0}}",
+					  "{\"trigger\":{\"input\":6,\"stream_id\":\"" ++ lib_json:to_string(VStreamId1) ++"\",\"trigger_id\":\"" ++ lib_json:to_string(TriggerId2) ++ "\",\"type\":\"vstream\",\"value\":0.0}}",
+					  "{\"trigger\":{\"input\":6,\"stream_id\":\"" ++ lib_json:to_string(VStreamId2) ++"\",\"trigger_id\":\"" ++ lib_json:to_string(TriggerId2) ++ "\",\"type\":\"vstream\",\"value\":0.0}}",
+					  "{\"trigger\":{\"input\":6,\"stream_id\":\"" ++ lib_json:to_string(VStreamId1) ++"\",\"trigger_id\":\"" ++ lib_json:to_string(TriggerId2) ++ "\",\"type\":\"vstream\",\"value\":3.0}}",
+					  "{\"trigger\":{\"input\":6,\"stream_id\":\"" ++ lib_json:to_string(VStreamId2) ++"\",\"trigger_id\":\"" ++ lib_json:to_string(TriggerId2) ++ "\",\"type\":\"vstream\",\"value\":0.0}}",
+					  "{\"trigger\":{\"input\":6,\"stream_id\":\"" ++ lib_json:to_string(VStreamId1) ++"\",\"trigger_id\":\"" ++ lib_json:to_string(TriggerId2) ++ "\",\"type\":\"vstream\",\"value\":3.0}}",
+					  "{\"trigger\":{\"input\":6,\"stream_id\":\"" ++ lib_json:to_string(VStreamId2) ++"\",\"trigger_id\":\"" ++ lib_json:to_string(TriggerId2) ++ "\",\"type\":\"vstream\",\"value\":0.0}}",
+					  "{\"trigger\":{\"input\":6,\"stream_id\":\"" ++ lib_json:to_string(VStreamId1) ++"\",\"trigger_id\":\"" ++ lib_json:to_string(TriggerId2) ++ "\",\"type\":\"vstream\",\"value\":3.0}}"],
+	ReferenceList2 = ["{\"trigger\":{\"input\":5,\"stream_id\":\"" ++ lib_json:to_string(VStreamId1) ++"\",\"trigger_id\":\"" ++ lib_json:to_string(TriggerId1) ++ "\",\"type\":\"vstream\",\"value\":3.0}}",
+					  "{\"trigger\":{\"input\":5,\"stream_id\":\"" ++ lib_json:to_string(VStreamId1) ++"\",\"trigger_id\":\"" ++ lib_json:to_string(TriggerId1) ++ "\",\"type\":\"vstream\",\"value\":0.0}}"],
+	?assertEqual(true, check_all_exist(NotificationList1,ReferenceList1)),
+	?assertEqual(true, check_all_exist(NotificationList2,ReferenceList2)).
 	
 %% @doc
 %% Function: post_data_test/0

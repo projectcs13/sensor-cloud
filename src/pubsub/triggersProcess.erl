@@ -116,7 +116,8 @@ loop(TriggerId, DataPoints, TriggerExchange, Net, Function, OutputList,Type) ->
 								Timestamp = ?TIME_NOW(erlang:localtime()),
 								
 								Messages = create_messages(TriggerList, Timestamp,[],Type),
-								
+								erlang:display("TriggerList for " ++ TriggerId ++ " and type " ++ Type),
+								erlang:display(TriggerList),
 								ChannelOut = element(3, Net),
                                 %% Send messages to live update
 								send_messages(TriggerExchange,ChannelOut,Messages),

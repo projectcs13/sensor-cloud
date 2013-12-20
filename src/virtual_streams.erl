@@ -185,7 +185,7 @@ get_vstream(ReqData, State) ->
 							ErrorString = api_help:generate_error(Body, Code),
 							{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 					{ok,JsonStruct} ->
-							FinalJson = api_help:get_list_and_add_id(JsonStruct, users),
+							FinalJson = api_help:get_list_and_add_id(JsonStruct, vstreams),
 							{FinalJson, ReqData, State}  
 					end;
 				Id ->
@@ -205,7 +205,7 @@ get_vstream(ReqData, State) ->
 					ErrorString = api_help:generate_error(Body, Code),
 					{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 				{ok,JsonStruct} ->
-					FinalJson = api_help:get_list_and_add_id(JsonStruct, users),
+					FinalJson = api_help:get_list_and_add_id(JsonStruct, vstreams),
 					{FinalJson, ReqData, State}  
 		end
 	end.

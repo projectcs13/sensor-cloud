@@ -235,6 +235,12 @@ add_uri(User,ReqData, State) ->
 					   X -> get_es_id(lib_json:get_field(JsonStruct, "hits.hits"),Streams++ VirtualStreams)
 				   end
 		   end,
+	Type = case Streams of 
+			   [] ->
+				   "vstream";
+			   _ -> 
+				   "stream"
+		   end,
 	case {EsId,Streams,Function,URI,VirtualStreams} of
 		{{error, {Code1, Body1}},_,_,_,_} ->
 			ErrorString1 = api_help:generate_error(Body1, Code1),
@@ -251,12 +257,6 @@ add_uri(User,ReqData, State) ->
 		{_,_,_,_,error} ->
 			{{halt, 405}, wrq:set_resp_body("Invalid virtual stream list should be a valid virtual stream id or a list of valid virtual stream ids", ReqData), State};
 		{undefined,_,_,_,_} ->
-			Type = case Streams of 
-					   [] ->
-						   "vstream";
-					   _ -> 
-						   "stream"
-				   end,
 			NewTrigger = lib_json:set_attrs([{"function",list_to_binary(Function)},{"streams",Streams},{"vstreams",VirtualStreams},{"type",list_to_binary(Type)},{"outputlist","[{}]"},{"outputlist[0].input",Input},{"outputlist[0].output",["{}"]},{"outputlist[0].output[0].output_id",[list_to_binary(URI),list_to_binary(User)]},{"outputlist[0].output[0].output_type",list_to_binary("uri")}]),
 			case erlastic_search:index_doc(?INDEX, "trigger", NewTrigger) of	% Create new triggger if not in the system
 				{error,{Code2,Body2}} ->
@@ -277,7 +277,7 @@ add_uri(User,ReqData, State) ->
 					UserUpdate = lib_json:set_attrs([{"script",list_to_binary("ctx._source.triggers += newelement")},
 													 {"params","{}"},{"params.newelement","{}"},
 													 {"params.newelement.function",list_to_binary(Function)}, {"params.newelement.input",Input},
-													 {"params.newelement.streams",Streams},{"params.newelement.vstreams",VirtualStreams},
+													 {"params.newelement.streams",Streams},{"params.newelement.vstreams",VirtualStreams},{"params.newelement.type",list_to_binary(Type)},
 													 {"params.newelement.output_type",list_to_binary("uri")},{"params.newelement.output_id",list_to_binary(URI)}]),
 					case api_help:update_doc(?INDEX, "user", User, UserUpdate) of
 						{error, {UPCode, UPBody}} -> 
@@ -318,7 +318,7 @@ add_uri(User,ReqData, State) ->
 							UserUpdate = lib_json:set_attrs([{"script",list_to_binary("ctx._source.triggers += newelement")},
 															 {"params","{}"},{"params.newelement","{}"},
 															 {"params.newelement.function",list_to_binary(Function)}, {"params.newelement.input",Input},
-															 {"params.newelement.streams",Streams},{"params.newelement.vstreams",VirtualStreams},
+															 {"params.newelement.streams",Streams},{"params.newelement.vstreams",VirtualStreams},{"params.newelement.type",list_to_binary(Type)},
 															 {"params.newelement.output_type",list_to_binary("uri")},{"params.newelement.output_id",list_to_binary(URI)}]),
 							case api_help:update_doc(?INDEX, "user", User, UserUpdate) of
 								{error, {UPCode, UPBody}} -> 
@@ -402,6 +402,12 @@ add_user(User, ReqData, State) ->
 					   X -> get_es_id(lib_json:get_field(JsonStruct, "hits.hits"),Streams++ VirtualStreams)
 				   end
 		   end,
+	Type = case Streams of 
+			   [] ->
+				   "vstream";
+			   _ -> 
+				   "stream"
+		   end,
 	case {EsId,Streams,Function,Username,VirtualStreams} of
 		{{error, {Code1, Body1}},_,_,_,_} ->
 			ErrorString1 = api_help:generate_error(Body1, Code1),
@@ -418,12 +424,6 @@ add_user(User, ReqData, State) ->
 		{_,_,_,_,error} ->
 			{{halt, 405}, wrq:set_resp_body("Invalid virtual stream list should be a valid virtual stream id or a list of valid virtual stream ids", ReqData), State};
 		{undefined,_,_,_,_} ->
-			Type = case Streams of 
-					   [] ->
-						   "vstream";
-					   _ -> 
-						   "stream"
-				   end,
 			NewTrigger = lib_json:set_attrs([{"function",list_to_binary(Function)},{"streams",Streams},{"vstreams",VirtualStreams},{"type",list_to_binary(Type)},{"outputlist","[{}]"},{"outputlist[0].input",Input},{"outputlist[0].output",["{}"]},{"outputlist[0].output[0].output_id",list_to_binary(Username)},{"outputlist[0].output[0].output_type",list_to_binary("user")}]),
 			case erlastic_search:index_doc(?INDEX, "trigger", NewTrigger) of	% Create new triggger if not in the system
 				{error,{Code2,Body2}} ->
@@ -438,7 +438,7 @@ add_user(User, ReqData, State) ->
 					UserUpdate = lib_json:set_attrs([{"script",list_to_binary("ctx._source.triggers += newelement")},
 													 {"params","{}"},{"params.newelement","{}"},
 													 {"params.newelement.function",list_to_binary(Function)}, {"params.newelement.input",Input},
-													 {"params.newelement.streams",Streams},{"params.newelement.vstreams",VirtualStreams},
+													 {"params.newelement.streams",Streams},{"params.newelement.vstreams",VirtualStreams},{"params.newelement.type",list_to_binary(Type)},
 													 {"params.newelement.output_type",list_to_binary("user")},{"params.newelement.output_id",list_to_binary(Username)}]),
 					case api_help:update_doc(?INDEX, "user", Username, UserUpdate) of
 						{error, {UPCode, UPBody}} -> 
@@ -479,7 +479,7 @@ add_user(User, ReqData, State) ->
 							UserUpdate = lib_json:set_attrs([{"script",list_to_binary("ctx._source.triggers += newelement")},
 															 {"params","{}"},{"params.newelement","{}"},
 															 {"params.newelement.function",list_to_binary(Function)}, {"params.newelement.input",Input},
-															 {"params.newelement.streams",Streams},{"params.newelement.vstreams",VirtualStreams},
+															 {"params.newelement.streams",Streams},{"params.newelement.vstreams",VirtualStreams},{"params.newelement.type",list_to_binary(Type)},
 															 {"params.newelement.output_type",list_to_binary("user")},{"params.newelement.output_id",list_to_binary(Username)}]),
 							case api_help:update_doc(?INDEX, "user", Username, UserUpdate) of
 								{error, {UPCode, UPBody}} -> 
@@ -569,6 +569,12 @@ remove_uri(User,ReqData, State) ->
 					   X -> get_es_id(lib_json:get_field(JsonStruct, "hits.hits"),Streams++ VirtualStreams)
 				   end
 		   end,
+	Type = case Streams of 
+			   [] ->
+				   "vstream";
+			   _ -> 
+				   "stream"
+		   end,
 	case {EsId,Streams,Function,URI,VirtualStreams} of
 		{{error, {Code1, Body1}},_,_,_,_} ->
 			ErrorString1 = api_help:generate_error(Body1, Code1),
@@ -607,7 +613,7 @@ remove_uri(User,ReqData, State) ->
 									 UserUpdate = lib_json:set_attrs([{"script",list_to_binary("for(int i=0;i < ctx._source.triggers.size(); i++){if (ctx._source.triggers[i] == newelement){ctx._source.triggers.remove((Object) ctx._source.triggers[i]); i = ctx._source.triggers.size();}}")},
 																	  {"params","{}"},{"params.newelement","{}"},
 																	  {"params.newelement.function",list_to_binary(Function)}, {"params.newelement.input",Input},
-																	  {"params.newelement.streams",Streams},{"params.newelement.vstreams",VirtualStreams},
+																	  {"params.newelement.streams",Streams},{"params.newelement.vstreams",VirtualStreams},{"params.newelement.type",list_to_binary(Type)},
 																	  {"params.newelement.output_type",list_to_binary("uri")},{"params.newelement.output_id",list_to_binary(URI)}]),
 									 case api_help:update_doc(?INDEX, "user", User, UserUpdate) of
 										 {error, {UPCode, UPBody}} -> 
@@ -703,6 +709,12 @@ remove_user(User, ReqData, State) ->
 					   X -> get_es_id(lib_json:get_field(JsonStruct, "hits.hits"),Streams ++ VirtualStreams)
 				   end
 		   end,
+	Type = case Streams of 
+			   [] ->
+				   "vstream";
+			   _ -> 
+				   "stream"
+		   end,
 	case {EsId,Streams,Function,Username,VirtualStreams} of
 		{{error, {Code1, Body1}},_,_,_,_} ->
 			ErrorString1 = api_help:generate_error(Body1, Code1),
@@ -741,7 +753,7 @@ remove_user(User, ReqData, State) ->
 									 UserUpdate = lib_json:set_attrs([{"script",list_to_binary("for(int i=0;i < ctx._source.triggers.size(); i++){if (ctx._source.triggers[i] == newelement){ctx._source.triggers.remove((Object) ctx._source.triggers[i]); i = ctx._source.triggers.size();}}")},
 																	  {"params","{}"},{"params.newelement","{}"},
 																	  {"params.newelement.function",list_to_binary(Function)}, {"params.newelement.input",Input},
-																	  {"params.newelement.streams",Streams},{"params.newelement.vstreams",VirtualStreams},
+																	  {"params.newelement.streams",Streams},{"params.newelement.vstreams",VirtualStreams},{"params.newelement.type",list_to_binary(Type)},
 																	  {"params.newelement.output_type",list_to_binary("user")},{"params.newelement.output_id",list_to_binary(Username)}]),
 									 case api_help:update_doc(?INDEX, "user", Username, UserUpdate) of
 										 {error, {UPCode, UPBody}} -> 
