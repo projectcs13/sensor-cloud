@@ -1,4 +1,4 @@
-%% @author Gabriel Tholsgård, Li Hao
+%% @author Gabriel Tholsgï¿½rd, Li Hao
 %%   [www.csproj13.student.it.uu.se]
 %% @version 1.0
 %% @copyright [Copyright information]
@@ -114,6 +114,14 @@ create_poller_history(StreamId) ->
 		{ok,_List} -> 
 			ok
 	end.
+create_poller_history(StreamId, Message) ->
+	NewHistory = lib_json:set_attrs([{"history","["++Message++"]"}]),
+	case erlastic_search:index_doc_with_id(?INDEX, "pollinghistory", StreamId, NewHistory) of	
+		{error,{Code,Body}} ->
+			{Code,Body};
+		{ok,_List} -> 
+			ok
+	end.
 
 %% @doc
 %% Function: add_failed/1
@@ -140,6 +148,7 @@ add_failed(StreamId,connection_error) ->
     end,
 	UpdateJson2 = "{\"script\":\"if (ctx._source.history.size() == 100){ctx._source.history.remove((Object) ctx._source.history[0]);ctx._source.history += msg}{ctx._source.history += msg} \",\"params\":{\"msg\":"++ Message ++"}}",
 	case api_help:update_doc(?INDEX, "pollinghistory", StreamId, UpdateJson2, []) of
+	{error, {404, Body2}} -> create_poller_history(StreamId, Message);
         {error, {Code2, Body2}} ->
 			erlang:display("Error when updateing pollinghistory for " ++ StreamId),
             {error, {Code2, Body2}};
@@ -165,6 +174,7 @@ add_failed(StreamId,elasticsearch_error) ->
     end,
 	UpdateJson2 = "{\"script\":\"if (ctx._source.history.size() == 100){ctx._source.history.remove((Object) ctx._source.history[0]);ctx._source.history += msg}{ctx._source.history += msg} \",\"params\":{\"msg\":"++ Message ++"}}",
 	case api_help:update_doc(?INDEX, "pollinghistory", StreamId, UpdateJson2, []) of
+	{error, {404, Body2}} -> create_poller_history(StreamId, Message);
         {error, {Code2, Body2}} ->
 			erlang:display("Error when updateing pollinghistory for " ++ StreamId),
             {error, {Code2, Body2}};
