@@ -210,9 +210,9 @@ process_post(ReqData, State) ->
 			undefined -> {false, wrq:set_resp_body("\"user_id missing\"",ReqData), State};
 			UserId ->
 				FinalUserAdded = lib_json:replace_field(UserAdded,"user_id",binary:list_to_bin(string:to_lower(binary_to_list(UserId)))),
-			    case {api_help:do_any_field_exist(FinalUserAdded,?RESTRCITEDCREATESTREAMS),api_help:do_only_fields_exist(FinalUserAdded,?ACCEPTEDFIELDSSTREAMS)} of
+			    case {api_help:do_any_field_exist(FinalUserAdded,?RESTRICTED_STREAMS_CREATE),api_help:do_only_fields_exist(FinalUserAdded,?ACCEPTED_STREAMS_FIELDS)} of
 				{true,_} ->
-				    ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDCREATESTREAMS),
+				    ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRICTED_STREAMS_CREATE),
 				    ResFields2 = string:sub_string(ResFields1, 1, length(ResFields1)-2),
 				    {{halt,409}, wrq:set_resp_body("{\"ok\": false, \"error\":\"Error caused by restricted field in document, these fields are restricted : " ++ ResFields2 ++"\"}", ReqData), State};
 				{false,false} ->
@@ -319,9 +319,9 @@ multi_json_streams([Head|Rest], ReqData ,State, Response) ->
 	case lib_json:get_field(UserAdded,"user_id") of
 		undefined -> {false, wrq:set_resp_body("\"user_id multi_json_streamsing\"",ReqData), State};
 		UserId ->
-			case {api_help:do_any_field_exist(UserAdded,?RESTRCITEDCREATESTREAMS),api_help:do_only_fields_exist(UserAdded,?ACCEPTEDFIELDSSTREAMS)} of
+			case {api_help:do_any_field_exist(UserAdded,?RESTRICTED_STREAMS_CREATE),api_help:do_only_fields_exist(UserAdded,?ACCEPTED_STREAMS_FIELDS)} of
 				{true,_} ->
-					ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDCREATESTREAMS),
+					ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRICTED_STREAMS_CREATE),
 					ResFields2 = string:sub_string(ResFields1, 1, length(ResFields1)-2),
 					multi_json_streams(Rest, ReqData ,State, FinalResponse ++ "{\"ok\": false, \"error\":\"Error caused by restricted field in document, these fields are restricted : " ++ ResFields2 ++"\"}");
 				{false,false} ->
@@ -475,9 +475,9 @@ put_stream(ReqData, State) ->
 		false ->			
 					StreamId = proplists:get_value('stream', wrq:path_info(ReqData)),
 					{Stream,_,_} = api_help:json_handler(ReqData,State),
-					case {api_help:do_any_field_exist(Stream,?RESTRCITEDUPDATESTREAMS),api_help:do_only_fields_exist(Stream,?ACCEPTEDFIELDSSTREAMS)} of
+					case {api_help:do_any_field_exist(Stream,?RESTRICTED_STREAMS_UPDATE),api_help:do_only_fields_exist(Stream,?ACCEPTED_STREAMS_FIELDS)} of
 						{true,_} -> 
-							ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDUPDATESTREAMS),
+							ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRICTED_STREAMS_UPDATE),
 							ResFields2 = string:sub_string(ResFields1, 1, length(ResFields1)-2),
 							{{halt,409}, wrq:set_resp_body("{\"error\":\"Error caused by restricted field in document, these fields are restricted : " ++ ResFields2 ++"\"}", ReqData), State};
 						{false,false} ->

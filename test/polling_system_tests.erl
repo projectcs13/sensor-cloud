@@ -68,6 +68,7 @@ initialization_test()->
 	Stream1 = lists:nth(1, PollerInforList),
 	Stream2 = lists:nth(2, PollerInforList), 
 	?assertEqual(2, length(PollerInforList)),
+	
 	case "1"==Stream1#pollerInfo.stream_id of
 		true->
 			?assertEqual("test", Stream1#pollerInfo.name),

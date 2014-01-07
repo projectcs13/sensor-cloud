@@ -97,9 +97,9 @@ process_post(ReqData, State) ->
 		false ->
 			% Create
 			{Resource,_,_} = api_help:json_handler(ReqData,State),
-			case {api_help:do_any_field_exist(Resource,?RESTRCITEDCREATERESOURCES),api_help:do_only_fields_exist(Resource,?ACCEPTEDFIELDSRESOURCES)} of
+			case {api_help:do_any_field_exist(Resource,?RESTRICTED_RESOURCES_CREATE),api_help:do_only_fields_exist(Resource,?ACCEPTED_RESOURCES_FIELDS)} of
 				{true,_} ->
-					ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDCREATERESOURCES),
+					ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRICTED_RESOURCES_CREATE),
 					ResFields2 = string:sub_string(ResFields1, 1, length(ResFields1)-2),
 					{{halt,409}, wrq:set_resp_body("{\"error\":\"Error caused by restricted field in document, these fields are restricted : " ++ ResFields2 ++"\"}", ReqData), State};
 				{false,false} ->
@@ -171,9 +171,9 @@ put_resource(ReqData, State) ->
             {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 		{ok, _} ->
 			{UserJson,_,_} = api_help:json_handler(ReqData, State),
-			case {api_help:do_any_field_exist(UserJson,?RESTRCITEDUPDATERESOURCES),api_help:do_only_fields_exist(UserJson,?ACCEPTEDFIELDSRESOURCES)} of
+			case {api_help:do_any_field_exist(UserJson,?RESTRICTED_RESOURCES_UPDATE),api_help:do_only_fields_exist(UserJson,?ACCEPTED_RESOURCES_FIELDS)} of
 				{true,_} ->
-					ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDUPDATERESOURCES),
+					ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRICTED_RESOURCES_UPDATE),
 					ResFields2 = string:sub_string(ResFields1, 1, length(ResFields1)-2),
 					{{halt,409}, wrq:set_resp_body("{\"error\":\"Error caused by restricted field in document, these fields are restricted : " ++ ResFields2 ++"\"}", ReqData), State};
 				{false,false} ->
