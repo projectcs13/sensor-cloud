@@ -195,6 +195,7 @@ add_success(StreamId) ->
 	Message = lib_json:set_attrs([{"polling","{}"},{"polling.stream",list_to_binary(StreamId)},{"polling.message",list_to_binary("Created new datapoint")},{"polling.action",list_to_binary("create")},{"polling.timestamp",list_to_binary(Time)}]),
 	UpdateJson = "{\"script\":\"if (ctx._source.history.size() == 100){ctx._source.history.remove((Object) ctx._source.history[0]);ctx._source.history += msg}{ctx._source.history += msg} \",\"params\":{\"msg\":"++ Message ++"}}",
 	case api_help:update_doc(?INDEX, "pollinghistory", StreamId, UpdateJson, []) of
+	{error, {404, Body2}} -> create_poller_history(StreamId, Message);
         {error, {Code, Body}} ->
 			erlang:display("Error when updateing pollinghistory for " ++ StreamId),
             {error, {Code, Body}};
