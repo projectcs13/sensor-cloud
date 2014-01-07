@@ -97,7 +97,7 @@ create_delete_test() ->
 %%          the streams the trigger is on
 %% Returns: ok | {error, term()}
 %% @end
-post_data_exchange_test_() ->
+post_data_exchange_test() ->
     Descript = "Trigger data exchange test",
     Setup = 
 	fun() ->
@@ -303,13 +303,13 @@ list_triggers({UserId1, StreamId1, StreamId2}) ->
     {ok,{{_,200,_},_,Body3}} = httpc:request(get, {?WEBMACHINE_URL++"/users/"++UserId1++"/streams/"
 							    ++StreamId1++"/triggers", []}, [], []),
     Result11 = 
-	"{\"triggers\":[{\"function\":\"less_than\",\"input\":5,\"output_id\":\""++UserId1++"\",\"output_type\":\"user\",\"streams\":[\""++StreamId1++"\",\""++StreamId2++"\"],\"vstreams\":[]},"
-	"{\"function\":\"less_than\",\"input\":4,\"output_id\":\""++UserId1++"\",\"output_type\":\"user\",\"streams\":[\""++StreamId2++"\"],\"vstreams\":[]}]}",
-    Result21 = "{\"triggers\":[{\"function\":\"less_than\",\"input\":5,\"output_id\":\""++UserId1++"\",\"output_type\":\"user\",\"streams\":[\""++StreamId1++"\",\""++StreamId2++"\"],\"vstreams\":[]}]}",
+	"{\"triggers\":[{\"function\":\"less_than\",\"input\":5,\"output_id\":\""++UserId1++"\",\"output_type\":\"user\",\"streams\":[\""++StreamId1++"\",\""++StreamId2++"\"],\"type\":\"stream\",\"vstreams\":[]},"
+	"{\"function\":\"less_than\",\"input\":4,\"output_id\":\""++UserId1++"\",\"output_type\":\"user\",\"streams\":[\""++StreamId2++"\"],\"type\":\"stream\",\"vstreams\":[]}]}",
+    Result21 = "{\"triggers\":[{\"function\":\"less_than\",\"input\":5,\"output_id\":\""++UserId1++"\",\"output_type\":\"user\",\"streams\":[\""++StreamId1++"\",\""++StreamId2++"\"],\"type\":\"stream\",\"vstreams\":[]}]}",
     Result12 = 
-	"{\"triggers\":[{\"function\":\"less_than\",\"input\":5,\"output_id\":\""++UserId1++"\",\"output_type\":\"user\",\"streams\":[\""++StreamId2++"\",\""++StreamId1++"\"],\"vstreams\":[]},"
-	"{\"function\":\"less_than\",\"input\":4,\"output_id\":\""++UserId1++"\",\"output_type\":\"user\",\"streams\":[\""++StreamId2++"\"],\"vstreams\":[]}]}",
-    Result22 = "{\"triggers\":[{\"function\":\"less_than\",\"input\":5,\"output_id\":\""++UserId1++"\",\"output_type\":\"user\",\"streams\":[\""++StreamId2++"\",\""++StreamId1++"\"],\"vstreams\":[]}]}",
+	"{\"triggers\":[{\"function\":\"less_than\",\"input\":5,\"output_id\":\""++UserId1++"\",\"output_type\":\"user\",\"streams\":[\""++StreamId2++"\",\""++StreamId1++"\"],\"type\":\"stream\",\"vstreams\":[]},"
+	"{\"function\":\"less_than\",\"input\":4,\"output_id\":\""++UserId1++"\",\"output_type\":\"user\",\"streams\":[\""++StreamId2++"\"],\"type\":\"stream\",\"vstreams\":[]}]}",
+    Result22 = "{\"triggers\":[{\"function\":\"less_than\",\"input\":5,\"output_id\":\""++UserId1++"\",\"output_type\":\"user\",\"streams\":[\""++StreamId2++"\",\""++StreamId1++"\"],\"type\":\"stream\",\"vstreams\":[]}]}",
 	[?_assertEqual(true,(Result11 == Body1) or (Result12 == Body1)),
      ?_assertEqual(true,(Result11 == Body2) or (Result12 == Body2)),
      ?_assertEqual(true,(Result21 == Body3) or (Result22 == Body3))].
@@ -420,7 +420,7 @@ create_delete_vstream_test() ->
 %%          the virtual streams the trigger is on
 %% Returns: ok | {error, term()}
 %% @end
-post_data_exchange_vstream_test_() ->
+post_data_exchange_vstream_test() ->
     Descript = "Trigger data exchange test",
     Setup = 
 	fun() ->
@@ -514,7 +514,7 @@ post_data_exchange_vstream_test_() ->
 %%          the streams the trigger is on
 %% Returns: ok | {error, term()}
 %% @end
-post_data_user_vstream_test_() ->
+post_data_user_vstream_test() ->
 	{timeout,30,fun post_data_user_vstream/0}.
 
 post_data_user_vstream() ->
@@ -591,15 +591,7 @@ post_data_user_vstream() ->
 					  "{\"trigger\":{\"input\":5,\"stream_id\":\"" ++ lib_json:to_string(VStreamId1) ++"\",\"trigger_id\":\"" ++ lib_json:to_string(TriggerId1) ++ "\",\"type\":\"vstream\",\"value\":0.0}}"],
 	?assertEqual(true, check_all_exist(NotificationList1,ReferenceList1)),
 	?assertEqual(true, check_all_exist(NotificationList2,ReferenceList2)).
-	
-%% @doc
-%% Function: post_data_test/0
-%% Purpose: Test the triggersProcess by doing some posting for data to
-%%          the streams the trigger is on
-%% Returns: ok | {error, term()}
-%% @end
-post_data_uri_test() ->
-	ok.
+
 
 %% @doc
 %% Function: receive_loop/1
