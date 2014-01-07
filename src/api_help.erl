@@ -490,5 +490,5 @@ update_doc(Index, Type, Id, Mochijson) ->
 % Taken from erlasticsearch and modified to not encode
 update_doc(Index, Type, Id, Json, Qs) ->
     Id1 = mochiweb_util:quote_plus(Id),
-    ReqPath = Index ++ [$/ | Type] ++ [$/ | Id1] ++ "/_update",
+    ReqPath = Index ++ [$/ | Type] ++ [$/ | Id1] ++ "/_update?retry_on_conflict=5",
     erls_resource:post(#erls_params{}, ReqPath, [], Qs, Json, []).

@@ -41,6 +41,8 @@ allowed_methods(ReqData, State) ->
 	case api_help:parse_path(wrq:path(ReqData)) of
 	    [{"users", _UserID},{"streams",_StreamId},{"triggers"}] ->
 		{['GET'], ReqData, State};
+		[{"users", _UserID},{"vstreams",_VStreamId},{"triggers"}] ->
+		{['GET'], ReqData, State};
 	    [{"users", _UserID},{"triggers",_Action}] ->
 		{['POST'], ReqData, State};
 	    [{"users", _UserId},{"triggers"}] ->
@@ -75,7 +77,7 @@ content_types_accepted(ReqData, State) ->
 
 
 
-%% Place holder, not sure if we want this to be doable
+
 
 get_triggers(ReqData, State) ->
     case proplists:get_value('userid', wrq:path_info(ReqData)) of
@@ -88,17 +90,26 @@ get_triggers(ReqData, State) ->
 		    ErrorString = api_help:generate_error(Body, Code),
 		    {{halt, Code} = wrq:set_resp_body(ErrorString, ReqData), State};
 		{ok, JsonStruct} ->
-		    TriggerList = lib_json:get_field(JsonStruct, "_source.triggers"),			       
-		    case proplists:get_value('streamid', wrq:path_info(ReqData)) of
-			undefined ->			    
-			    {lib_json:set_attr(triggers, TriggerList),ReqData, State};
-			StreamId ->
-			    Fun = fun(X) ->
-					  StreamList = lib_json:get_field(X, streams),
-					  lists:member(binary:list_to_bin(StreamId), StreamList)
-				  end,
-			    StreamTriggers = lists:filter(Fun, TriggerList),
-			    {lib_json:set_attr(triggers, StreamTriggers),ReqData,State}
+		    TriggerList = lib_json:get_field(JsonStruct, "_source.triggers"),	
+		    case {proplists:get_value('streamid', wrq:path_info(ReqData)),proplists:get_value('vstreamid', wrq:path_info(ReqData))} of
+				{undefined,undefined} ->			    
+					{lib_json:set_attr(triggers, TriggerList),ReqData, State};
+				{StreamId,undefined} ->
+					Fun = fun(X) ->
+								  StreamList = lib_json:get_field(X, streams),
+								  lists:member(binary:list_to_bin(StreamId), StreamList)
+						  end,
+					StreamTriggers = lists:filter(Fun, TriggerList),
+					{lib_json:set_attr(triggers, StreamTriggers),ReqData,State};
+				{undefined,VStreamId} ->
+					Fun = fun(X) ->
+								  VStreamList = lib_json:get_field(X, vstreams),
+								  lists:member(binary:list_to_bin(VStreamId), VStreamList)
+						  end,
+					VStreamTriggers = lists:filter(Fun, TriggerList),
+					{lib_json:set_attr(triggers, VStreamTriggers),ReqData,State};
+				_ ->
+					{lib_json:set_attr(triggers, TriggerList),ReqData, State}
 		    end
 	    end
     end.
@@ -165,11 +176,33 @@ add_uri(User,ReqData, State) ->
 	Streams = case lib_json:get_field(Json, "streams") of
 				  undefined ->
 					  error;
+				  "" ->
+					  [];
 				  Value when is_binary(Value) ->
-					  [binary_to_list(Value)];
+					  case binary_to_list(Value) of
+						  "" ->
+							  [];
+						  _ ->
+							  [binary_to_list(Value)]
+					  end;
 				  List ->
 					  lists:map(fun(A) -> binary_to_list(A) end,List)
 			  end,
+	VirtualStreams = case lib_json:get_field(Json, "vstreams") of
+						 undefiend ->
+							 error;
+						 "" ->
+							 [];
+						 VValue when is_binary(VValue) ->
+							 case binary_to_list(VValue) of
+								 "" ->
+									 [];
+								 _ ->
+									 [binary_to_list(VValue)]
+							 end;
+						 VList ->
+							 lists:map(fun(A) -> binary_to_list(A) end,VList)
+					 end,
 	Function = case lib_json:get_field(Json, "function") of
 				   undefined ->
 					   error;
@@ -183,46 +216,69 @@ add_uri(User,ReqData, State) ->
 				error
 		  end,
 	StreamsQuery = create_stream_query(Streams,[]),
-	Query = "{\"filter\":{\"term\":{ \"function\":\"" ++ Function ++ "\"}},\"query\":{\"match\":{\"streams\":{\"query\":\"" ++ StreamsQuery ++"\",\"operator\":\"and\"}}}}",	
+	VirtualStreamsQuery = create_stream_query(VirtualStreams,[]),
+	Query = case {Streams,VirtualStreams} of
+			   {[],_} ->
+				   "{\"filter\":{\"term\":{ \"function\":\"" ++ Function ++ "\"}},\"query\":{\"match\":{\"vstreams\":{\"query\":\"" ++ VirtualStreamsQuery ++"\",\"operator\":\"and\"}}}}";
+			   {_,[]} ->
+				   "{\"filter\":{\"term\":{ \"function\":\"" ++ Function ++ "\"}},\"query\":{\"match\":{\"streams\":{\"query\":\"" ++ StreamsQuery ++"\",\"operator\":\"and\"}}}}";
+			   _ ->
+				   "{\"filter\":{\"term\":{ \"function\":\"" ++ Function ++ "\"}},\"query\":{\"match\":{\"streams\":{\"query\":\"" ++ StreamsQuery ++"\",\"operator\":\"and\"}}},\"query\":{\"match\":{\"vstreams\":{\"query\":\"" ++ VirtualStreamsQuery ++"\",\"operator\":\"and\"}}}}"
+		   end,
 	EsId = case erlastic_search:search_json(#erls_params{},?INDEX, "trigger", Query) of % See if the trigger is already in the system
 			   {error, {Code, Body}} -> 
 				   {error, {Code, Body}};
 			   {ok,JsonStruct} ->
 				   case lib_json:get_field(JsonStruct, "hits.total") of
 					   0 -> undefined;
-					   1 -> lib_json:get_field(JsonStruct, "hits.hits[0]._id");
-					   X -> get_es_id(lib_json:get_field(JsonStruct, "hits.hits"),Streams)
+					   1 -> get_es_id(lib_json:get_field(JsonStruct, "hits.hits"),Streams++ VirtualStreams);
+					   X -> get_es_id(lib_json:get_field(JsonStruct, "hits.hits"),Streams++ VirtualStreams)
 				   end
 		   end,
-	case {EsId,Streams,Function,URI} of
-		{{error, {Code1, Body1}},_,_,_} ->
+	Type = case Streams of 
+			   [] ->
+				   "vstream";
+			   _ -> 
+				   "stream"
+		   end,
+	case {EsId,Streams,Function,URI,VirtualStreams} of
+		{{error, {Code1, Body1}},_,_,_,_} ->
 			ErrorString1 = api_help:generate_error(Body1, Code1),
 			{{halt, Code1}, wrq:set_resp_body(ErrorString1, ReqData), State};
-		{_,error,_,_} ->
+		{_,error,_,_,_} ->
 			{{halt, 405}, wrq:set_resp_body("Invalid stream list should be a valid stream id or a list of valid stream ids", ReqData), State};
-		{_,_,error,_} ->
+		{_,_,error,_,_} ->
 			{{halt, 405}, wrq:set_resp_body("Invalid function", ReqData), State};
-		{_,_,_,error} ->
+		{_,_,_,error,_} ->
 			{{halt, 405}, wrq:set_resp_body("Error when retriving user_id", ReqData), State};
-		{_,_,_,{error, {UCode, UBody}}} ->
+		{_,_,_,{error, {UCode, UBody}},_} ->
 			UErrorString = api_help:generate_error(UBody, UCode),
 			{{halt, UCode}, wrq:set_resp_body(UErrorString, ReqData), State};
-		{undefined,_,_,_} ->
-			NewTrigger = lib_json:set_attrs([{"function",list_to_binary(Function)},{"streams",Streams},{"outputlist","[{}]"},{"outputlist[0].input",Input},{"outputlist[0].output",["{}"]},{"outputlist[0].output[0].output_id",[list_to_binary(URI),list_to_binary(User)]},{"outputlist[0].output[0].output_type",list_to_binary("uri")}]),
+		{_,_,_,_,error} ->
+			{{halt, 405}, wrq:set_resp_body("Invalid virtual stream list should be a valid virtual stream id or a list of valid virtual stream ids", ReqData), State};
+		{undefined,_,_,_,_} ->
+			NewTrigger = lib_json:set_attrs([{"function",list_to_binary(Function)},{"streams",Streams},{"vstreams",VirtualStreams},{"type",list_to_binary(Type)},{"outputlist","[{}]"},{"outputlist[0].input",Input},{"outputlist[0].output",["{}"]},{"outputlist[0].output[0].output_id",[list_to_binary(URI),list_to_binary(User)]},{"outputlist[0].output[0].output_type",list_to_binary("uri")}]),
 			case erlastic_search:index_doc(?INDEX, "trigger", NewTrigger) of	% Create new triggger if not in the system
 				{error,{Code2,Body2}} ->
 					ErrorString2 = api_help:generate_error(Body2, Code2),
 					{{halt, Code2}, wrq:set_resp_body(ErrorString2, ReqData), State};
 				{ok,List2} -> 
 					TriggerId = lib_json:to_string(lib_json:get_field(List2, "_id")),
+					Type = case Streams of 
+							   [] ->
+								   "vstream";
+							   _ -> 
+								   "stream"
+						   end,
 					spawn_link(fun() ->
-									   triggersProcess:create(TriggerId, lists:map(fun(A) -> {stream,A} end,Streams), 
-															  Function, [{Input,[{uri,{URI,User}}]}])
+									   triggersProcess:create(TriggerId, lists:map(fun(A) -> {stream,A} end,Streams) ++ lists:map(fun(A) -> {vstream,A} end,VirtualStreams), 
+															  Function, [{Input,[{uri,{URI,User}}]}],Type)
 							   end),
 					UserUpdate = lib_json:set_attrs([{"script",list_to_binary("ctx._source.triggers += newelement")},
 													 {"params","{}"},{"params.newelement","{}"},
 													 {"params.newelement.function",list_to_binary(Function)}, {"params.newelement.input",Input},
-													 {"params.newelement.streams",Streams},{"params.newelement.output_type",list_to_binary("uri")},{"params.newelement.output_id",list_to_binary(URI)}]),
+													 {"params.newelement.streams",Streams},{"params.newelement.vstreams",VirtualStreams},{"params.newelement.type",list_to_binary(Type)},
+													 {"params.newelement.output_type",list_to_binary("uri")},{"params.newelement.output_id",list_to_binary(URI)}]),
 					case api_help:update_doc(?INDEX, "user", User, UserUpdate) of
 						{error, {UPCode, UPBody}} -> 
 							UPErrorString = api_help:generate_error(UPBody, UPCode),
@@ -231,7 +287,7 @@ add_uri(User,ReqData, State) ->
 							{true, wrq:set_resp_body(lib_json:encode(List2), ReqData), State}
 					end
 			end;
-		{EsId,_,_,_}->
+		{EsId,_,_,_,_}->
 			CommandExchange = list_to_binary("command.trigger."++ EsId),
 			Msg = term_to_binary({add,{Input,{uri,{URI,User}}}}),
 			%% Connect, now assumes local host
@@ -262,7 +318,8 @@ add_uri(User,ReqData, State) ->
 							UserUpdate = lib_json:set_attrs([{"script",list_to_binary("ctx._source.triggers += newelement")},
 															 {"params","{}"},{"params.newelement","{}"},
 															 {"params.newelement.function",list_to_binary(Function)}, {"params.newelement.input",Input},
-															 {"params.newelement.streams",Streams},{"params.newelement.output_type",list_to_binary("uri")},{"params.newelement.output_id",list_to_binary(URI)}]),
+															 {"params.newelement.streams",Streams},{"params.newelement.vstreams",VirtualStreams},{"params.newelement.type",list_to_binary(Type)},
+															 {"params.newelement.output_type",list_to_binary("uri")},{"params.newelement.output_id",list_to_binary(URI)}]),
 							case api_help:update_doc(?INDEX, "user", User, UserUpdate) of
 								{error, {UPCode, UPBody}} -> 
 									UPErrorString = api_help:generate_error(UPBody, UPCode),
@@ -292,10 +349,32 @@ add_user(User, ReqData, State) ->
 	Streams = case lib_json:get_field(Json, "streams") of
 				  undefiend ->
 					  error;
+				  "" ->
+					  [];
 				  Value when is_binary(Value) ->
-					  [binary_to_list(Value)];
+					  case binary_to_list(Value) of
+						  "" ->
+							  [];
+						  _ ->
+							  [binary_to_list(Value)]
+					  end;
 				  List ->
 					  lists:map(fun(A) -> binary_to_list(A) end,List)
+			  end,
+	VirtualStreams = case lib_json:get_field(Json, "vstreams") of
+				  undefiend ->
+					  error;
+				  "" ->
+					  [];
+				  VValue when is_binary(VValue) ->
+					  case binary_to_list(VValue) of
+						  "" ->
+							  [];
+						  _ ->
+							  [binary_to_list(VValue)]
+					  end;
+				  VList ->
+					  lists:map(fun(A) -> binary_to_list(A) end,VList)
 			  end,
 	Function = case lib_json:get_field(Json, "function") of
 				   undefined ->
@@ -304,32 +383,48 @@ add_user(User, ReqData, State) ->
 					   binary_to_list(Value2)
 			   end,
 	StreamsQuery = create_stream_query(Streams,[]),
-	Query = "{\"filter\":{\"term\":{ \"function\":\"" ++ Function ++ "\"}},\"query\":{\"match\":{\"streams\":{\"query\":\"" ++ StreamsQuery ++"\",\"operator\":\"and\"}}}}",	
+	VirtualStreamsQuery = create_stream_query(VirtualStreams,[]),
+	Query = case {Streams,VirtualStreams} of
+			   {[],_} ->
+				   "{\"filter\":{\"term\":{ \"function\":\"" ++ Function ++ "\"}},\"query\":{\"match\":{\"vstreams\":{\"query\":\"" ++ VirtualStreamsQuery ++"\",\"operator\":\"and\"}}}}";
+			   {_,[]} ->
+				   "{\"filter\":{\"term\":{ \"function\":\"" ++ Function ++ "\"}},\"query\":{\"match\":{\"streams\":{\"query\":\"" ++ StreamsQuery ++"\",\"operator\":\"and\"}}}}";
+			   _ ->
+				   "{\"filter\":{\"term\":{ \"function\":\"" ++ Function ++ "\"}},\"query\":{\"match\":{\"streams\":{\"query\":\"" ++ StreamsQuery ++"\",\"operator\":\"and\"}}},\"query\":{\"match\":{\"vstreams\":{\"query\":\"" ++ VirtualStreamsQuery ++"\",\"operator\":\"and\"}}}}"
+		   end,
 	EsId = case erlastic_search:search_json(#erls_params{},?INDEX, "trigger", Query) of % See if the trigger is already in the system
 			   {error, {Code, Body}} -> 
 				   {error, {Code, Body}};
 			   {ok,JsonStruct} ->
 				   case lib_json:get_field(JsonStruct, "hits.total") of
 					   0 -> undefined;
-					   1 -> lib_json:get_field(JsonStruct, "hits.hits[0]._id");
-					   X -> get_es_id(lib_json:get_field(JsonStruct, "hits.hits"),Streams)
+					   1 -> get_es_id(lib_json:get_field(JsonStruct, "hits.hits"),Streams++ VirtualStreams);
+					   X -> get_es_id(lib_json:get_field(JsonStruct, "hits.hits"),Streams++ VirtualStreams)
 				   end
 		   end,
-	case {EsId,Streams,Function,Username} of
-		{{error, {Code1, Body1}},_,_,_} ->
+	Type = case Streams of 
+			   [] ->
+				   "vstream";
+			   _ -> 
+				   "stream"
+		   end,
+	case {EsId,Streams,Function,Username,VirtualStreams} of
+		{{error, {Code1, Body1}},_,_,_,_} ->
 			ErrorString1 = api_help:generate_error(Body1, Code1),
 			{{halt, Code1}, wrq:set_resp_body(ErrorString1, ReqData), State};
-		{_,error,_,_} ->
+		{_,error,_,_,_} ->
 			{{halt, 405}, wrq:set_resp_body("Invalid stream list should be a valid stream id or a list of valid stream ids", ReqData), State};
-		{_,_,error,_} ->
+		{_,_,error,_,_} ->
 			{{halt, 405}, wrq:set_resp_body("Invalid function", ReqData), State};
-		{_,_,_,error} ->
+		{_,_,_,error,_} ->
 			{{halt, 405}, wrq:set_resp_body("Error when retriving user_id", ReqData), State};
-		{_,_,_,{error, {UCode, UBody}}} ->
+		{_,_,_,{error, {UCode, UBody}},_} ->
 			UErrorString = api_help:generate_error(UBody, UCode),
 			{{halt, UCode}, wrq:set_resp_body(UErrorString, ReqData), State};
-		{undefined,_,_,_} ->
-			NewTrigger = lib_json:set_attrs([{"function",list_to_binary(Function)},{"streams",Streams},{"outputlist","[{}]"},{"outputlist[0].input",Input},{"outputlist[0].output",["{}"]},{"outputlist[0].output[0].output_id",list_to_binary(Username)},{"outputlist[0].output[0].output_type",list_to_binary("user")}]),
+		{_,_,_,_,error} ->
+			{{halt, 405}, wrq:set_resp_body("Invalid virtual stream list should be a valid virtual stream id or a list of valid virtual stream ids", ReqData), State};
+		{undefined,_,_,_,_} ->
+			NewTrigger = lib_json:set_attrs([{"function",list_to_binary(Function)},{"streams",Streams},{"vstreams",VirtualStreams},{"type",list_to_binary(Type)},{"outputlist","[{}]"},{"outputlist[0].input",Input},{"outputlist[0].output",["{}"]},{"outputlist[0].output[0].output_id",list_to_binary(Username)},{"outputlist[0].output[0].output_type",list_to_binary("user")}]),
 			case erlastic_search:index_doc(?INDEX, "trigger", NewTrigger) of	% Create new triggger if not in the system
 				{error,{Code2,Body2}} ->
 					ErrorString2 = api_help:generate_error(Body2, Code2),
@@ -337,13 +432,14 @@ add_user(User, ReqData, State) ->
 				{ok,List2} -> 
 					TriggerId = lib_json:to_string(lib_json:get_field(List2, "_id")),
 					spawn_link(fun() ->
-									   triggersProcess:create(TriggerId, lists:map(fun(A) -> {stream,A} end,Streams), 
-															  Function, [{Input,[{user,Username}]}])
+									   triggersProcess:create(TriggerId, lists:map(fun(A) -> {stream,A} end,Streams) ++ lists:map(fun(A) -> {vstream,A} end,VirtualStreams), 
+															  Function, [{Input,[{user,Username}]}],Type)
 							   end),
 					UserUpdate = lib_json:set_attrs([{"script",list_to_binary("ctx._source.triggers += newelement")},
 													 {"params","{}"},{"params.newelement","{}"},
 													 {"params.newelement.function",list_to_binary(Function)}, {"params.newelement.input",Input},
-													 {"params.newelement.streams",Streams},{"params.newelement.output_type",list_to_binary("user")},{"params.newelement.output_id",list_to_binary(Username)}]),
+													 {"params.newelement.streams",Streams},{"params.newelement.vstreams",VirtualStreams},{"params.newelement.type",list_to_binary(Type)},
+													 {"params.newelement.output_type",list_to_binary("user")},{"params.newelement.output_id",list_to_binary(Username)}]),
 					case api_help:update_doc(?INDEX, "user", Username, UserUpdate) of
 						{error, {UPCode, UPBody}} -> 
 							UPErrorString = api_help:generate_error(UPBody, UPCode),
@@ -352,7 +448,7 @@ add_user(User, ReqData, State) ->
 							{true, wrq:set_resp_body(lib_json:encode(List2), ReqData), State}
 					end
 			end;
-		{EsId,_,_,_}->
+		{EsId,_,_,_,_}->
 			CommandExchange = list_to_binary("command.trigger."++ EsId),
 			Msg = term_to_binary({add,{Input,{user,Username}}}),
 			%% Connect, now assumes local host
@@ -383,7 +479,8 @@ add_user(User, ReqData, State) ->
 							UserUpdate = lib_json:set_attrs([{"script",list_to_binary("ctx._source.triggers += newelement")},
 															 {"params","{}"},{"params.newelement","{}"},
 															 {"params.newelement.function",list_to_binary(Function)}, {"params.newelement.input",Input},
-															 {"params.newelement.streams",Streams},{"params.newelement.output_type",list_to_binary("user")},{"params.newelement.output_id",list_to_binary(Username)}]),
+															 {"params.newelement.streams",Streams},{"params.newelement.vstreams",VirtualStreams},{"params.newelement.type",list_to_binary(Type)},
+															 {"params.newelement.output_type",list_to_binary("user")},{"params.newelement.output_id",list_to_binary(Username)}]),
 							case api_help:update_doc(?INDEX, "user", Username, UserUpdate) of
 								{error, {UPCode, UPBody}} -> 
 									UPErrorString = api_help:generate_error(UPBody, UPCode),
@@ -412,11 +509,33 @@ remove_uri(User,ReqData, State) ->
 	Streams = case lib_json:get_field(Json, "streams") of
 				  undefiend ->
 					  error;
+				  "" ->
+					  [];
 				  Value when is_binary(Value) ->
-					  [binary_to_list(Value)];
+					  case binary_to_list(Value) of
+						  "" ->
+							  [];
+						  _ ->
+							  [binary_to_list(Value)]
+					  end;
 				  List ->
 					  lists:map(fun(A) -> binary_to_list(A) end,List)
 			  end,
+	VirtualStreams = case lib_json:get_field(Json, "vstreams") of
+						 undefiend ->
+							 error;
+						 "" ->
+							 [];
+						 VValue when is_binary(VValue) ->
+							 case binary_to_list(VValue) of
+								 "" ->
+									 [];
+								 _ ->
+									 [binary_to_list(VValue)]
+							 end;
+						 VList ->
+							 lists:map(fun(A) -> binary_to_list(A) end,VList)
+					 end,
 	Function = case lib_json:get_field(Json, "function") of
 				   undefined ->
 					   error;
@@ -430,7 +549,15 @@ remove_uri(User,ReqData, State) ->
 				error
 	end,
 	StreamsQuery = create_stream_query(Streams,[]),
-	Query = "{\"filter\":{\"term\":{ \"function\":\"" ++ Function ++ "\"}},\"query\":{\"match\":{\"streams\":{\"query\":\"" ++ StreamsQuery ++"\",\"operator\":\"and\"}}}}",% now finds all triggers where the streams being searched for is a subset of the streams for the trigger when they have the same function 
+	VirtualStreamsQuery = create_stream_query(VirtualStreams,[]),
+	Query = case {Streams,VirtualStreams} of
+			   {[],_} ->
+				   "{\"filter\":{\"term\":{ \"function\":\"" ++ Function ++ "\"}},\"query\":{\"match\":{\"vstreams\":{\"query\":\"" ++ VirtualStreamsQuery ++"\",\"operator\":\"and\"}}}}";
+			   {_,[]} ->
+				   "{\"filter\":{\"term\":{ \"function\":\"" ++ Function ++ "\"}},\"query\":{\"match\":{\"streams\":{\"query\":\"" ++ StreamsQuery ++"\",\"operator\":\"and\"}}}}";
+			   _ ->
+				   "{\"filter\":{\"term\":{ \"function\":\"" ++ Function ++ "\"}},\"query\":{\"match\":{\"streams\":{\"query\":\"" ++ StreamsQuery ++"\",\"operator\":\"and\"}}},\"query\":{\"match\":{\"vstreams\":{\"query\":\"" ++ VirtualStreamsQuery ++"\",\"operator\":\"and\"}}}}"
+		   end,
 	EsId = case erlastic_search:search_json(#erls_params{},?INDEX, "trigger", Query) of % Get the es id of the trigger
 			   {error, {Code, Body}} -> 
 				   {error, {Code, Body}};
@@ -438,26 +565,34 @@ remove_uri(User,ReqData, State) ->
 				   erlang:display(binary_to_list(iolist_to_binary(lib_json:encode(JsonStruct)))),
 				   case lib_json:get_field(JsonStruct, "hits.total") of
 					   0 -> error;
-					   1 -> lib_json:get_field(JsonStruct, "hits.hits[0]._id");
-					   X -> get_es_id(lib_json:get_field(JsonStruct, "hits.hits"),Streams)
+					   1 -> get_es_id(lib_json:get_field(JsonStruct, "hits.hits"),Streams++ VirtualStreams);
+					   X -> get_es_id(lib_json:get_field(JsonStruct, "hits.hits"),Streams++ VirtualStreams)
 				   end
 		   end,
-	case {EsId,Streams,Function,URI} of
-		{{error, {Code1, Body1}},_,_,_} ->
+	Type = case Streams of 
+			   [] ->
+				   "vstream";
+			   _ -> 
+				   "stream"
+		   end,
+	case {EsId,Streams,Function,URI,VirtualStreams} of
+		{{error, {Code1, Body1}},_,_,_,_} ->
 			ErrorString1 = api_help:generate_error(Body1, Code1),
 			{{halt, Code1}, wrq:set_resp_body(ErrorString1, ReqData), State};
-		{_,error,_,_} ->
+		{_,error,_,_,_} ->
 			{{halt, 405}, wrq:set_resp_body("Invalid stream list should be a valid stream id or a list of valid stream ids", ReqData), State};
-		{_,_,error,_} ->
+		{_,_,error,_,_} ->
 			{{halt, 405}, wrq:set_resp_body("Invalid function", ReqData), State};
-		{error,_,_,_} ->
+		{error,_,_,_,_} ->
 			{{halt, 404}, ReqData, State};
-		{_,_,_,error} ->
+		{_,_,_,error,_} ->
 			{{halt, 405}, wrq:set_resp_body("Error when retriving user_id", ReqData), State};
-		{_,_,_,{error, {UCode, UBody}}} ->
+		{_,_,_,{error, {UCode, UBody}},_} ->
 			UErrorString = api_help:generate_error(UBody, UCode),
 			{{halt, UCode}, wrq:set_resp_body(UErrorString, ReqData), State};
-		{EsId,_,_ ,_}->		
+		{_,_,_,_,error} ->
+			{{halt, 405}, wrq:set_resp_body("Invalid virtual stream list should be a valid virtual stream id or a list of valid virtual stream ids", ReqData), State};
+		{EsId,_,_ ,_,_}->		
 			Return = case erlastic_search:get_doc(?INDEX, "trigger", EsId) of % Update the es document by removing the user
 						 {error, {Code3, Body3}} -> 
 							 ErrorString3 = api_help:generate_error(Body3, Code3),
@@ -478,7 +613,8 @@ remove_uri(User,ReqData, State) ->
 									 UserUpdate = lib_json:set_attrs([{"script",list_to_binary("for(int i=0;i < ctx._source.triggers.size(); i++){if (ctx._source.triggers[i] == newelement){ctx._source.triggers.remove((Object) ctx._source.triggers[i]); i = ctx._source.triggers.size();}}")},
 																	  {"params","{}"},{"params.newelement","{}"},
 																	  {"params.newelement.function",list_to_binary(Function)}, {"params.newelement.input",Input},
-																	  {"params.newelement.streams",Streams},{"params.newelement.output_type",list_to_binary("uri")},{"params.newelement.output_id",list_to_binary(URI)}]),
+																	  {"params.newelement.streams",Streams},{"params.newelement.vstreams",VirtualStreams},{"params.newelement.type",list_to_binary(Type)},
+																	  {"params.newelement.output_type",list_to_binary("uri")},{"params.newelement.output_id",list_to_binary(URI)}]),
 									 case api_help:update_doc(?INDEX, "user", User, UserUpdate) of
 										 {error, {UPCode, UPBody}} -> 
 											 UPErrorString = api_help:generate_error(UPBody, UPCode),
@@ -520,11 +656,33 @@ remove_user(User, ReqData, State) ->
 	Streams = case lib_json:get_field(Json, "streams") of
 				  undefiend ->
 					  error;
+				  "" ->
+					  [];
 				  Value when is_binary(Value) ->
-					  [binary_to_list(Value)];
+					  case binary_to_list(Value) of
+						  "" ->
+							  [];
+						  _ ->
+							  [binary_to_list(Value)]
+					  end;
 				  List ->
 					  lists:map(fun(A) -> binary_to_list(A) end,List)
 			  end,
+	VirtualStreams = case lib_json:get_field(Json, "vstreams") of
+						 undefiend ->
+							 error;
+						 "" ->
+							 [];
+						 VValue when is_binary(VValue) ->
+							 case binary_to_list(VValue) of
+								 "" ->
+									 [];
+								 _ ->
+									 [binary_to_list(VValue)]
+							 end;
+						 VList ->
+							 lists:map(fun(A) -> binary_to_list(A) end,VList)
+					 end,
 	Function = case lib_json:get_field(Json, "function") of
 				   undefined ->
 					   error;
@@ -532,33 +690,49 @@ remove_user(User, ReqData, State) ->
 					   binary_to_list(Value2)
 			   end,
 	StreamsQuery = create_stream_query(Streams,[]),
-	Query = "{\"filter\":{\"term\":{ \"function\":\"" ++ Function ++ "\"}},\"query\":{\"match\":{\"streams\":{\"query\":\"" ++ StreamsQuery ++"\",\"operator\":\"and\"}}}}",% now finds all triggers where the streams being searched for is a subset of the streams for the trigger when they have the same function 
+	VirtualStreamsQuery = create_stream_query(VirtualStreams,[]),
+	Query = case {Streams,VirtualStreams} of
+				{[],_} ->
+					"{\"filter\":{\"term\":{ \"function\":\"" ++ Function ++ "\"}},\"query\":{\"match\":{\"vstreams\":{\"query\":\"" ++ VirtualStreamsQuery ++"\",\"operator\":\"and\"}}}}";
+				{_,[]} ->
+					"{\"filter\":{\"term\":{ \"function\":\"" ++ Function ++ "\"}},\"query\":{\"match\":{\"streams\":{\"query\":\"" ++ StreamsQuery ++"\",\"operator\":\"and\"}}}}";
+				_ ->
+					"{\"filter\":{\"term\":{ \"function\":\"" ++ Function ++ "\"}},\"query\":{\"match\":{\"streams\":{\"query\":\"" ++ StreamsQuery ++"\",\"operator\":\"and\"}}},\"query\":{\"match\":{\"vstreams\":{\"query\":\"" ++ VirtualStreamsQuery ++"\",\"operator\":\"and\"}}}}"
+			end,
 	EsId = case erlastic_search:search_json(#erls_params{},?INDEX, "trigger", Query) of % Get the es id of the trigger
 			   {error, {Code, Body}} -> 
 				   {error, {Code, Body}};
 			   {ok,JsonStruct} ->
 				   case lib_json:get_field(JsonStruct, "hits.total") of
 					   0 -> error;
-					   1 -> lib_json:get_field(JsonStruct, "hits.hits[0]._id");
-					   X -> get_es_id(lib_json:get_field(JsonStruct, "hits.hits"),Streams)
+					   1 -> get_es_id(lib_json:get_field(JsonStruct, "hits.hits"),Streams++ VirtualStreams);
+					   X -> get_es_id(lib_json:get_field(JsonStruct, "hits.hits"),Streams ++ VirtualStreams)
 				   end
 		   end,
-	case {EsId,Streams,Function,Username} of
-		{{error, {Code1, Body1}},_,_,_} ->
+	Type = case Streams of 
+			   [] ->
+				   "vstream";
+			   _ -> 
+				   "stream"
+		   end,
+	case {EsId,Streams,Function,Username,VirtualStreams} of
+		{{error, {Code1, Body1}},_,_,_,_} ->
 			ErrorString1 = api_help:generate_error(Body1, Code1),
 			{{halt, Code1}, wrq:set_resp_body(ErrorString1, ReqData), State};
-		{_,error,_,_} ->
+		{_,error,_,_,_} ->
 			{{halt, 405}, wrq:set_resp_body("Invalid stream list should be a valid stream id or a list of valid stream ids", ReqData), State};
-		{_,_,error,_} ->
+		{_,_,error,_,_} ->
 			{{halt, 405}, wrq:set_resp_body("Invalid function", ReqData), State};
-		{error,_,_,_} ->
+		{error,_,_,_,_} ->
 			{{halt, 404}, ReqData, State};
-		{_,_,_,error} ->
+		{_,_,_,error,_} ->
 			{{halt, 405}, wrq:set_resp_body("Error when retriving user_id", ReqData), State};
-		{_,_,_,{error, {UCode, UBody}}} ->
+		{_,_,_,{error, {UCode, UBody}},_} ->
 			UErrorString = api_help:generate_error(UBody, UCode),
 			{{halt, UCode}, wrq:set_resp_body(UErrorString, ReqData), State};
-		{EsId,_,_ ,_}->		
+		{_,_,_,_,error} ->
+			{{halt, 405}, wrq:set_resp_body("Invalid virtual stream list should be a valid virtual stream id or a list of valid virtual stream ids", ReqData), State};
+		{EsId,_,_ ,_,_}->		
 			Return = case erlastic_search:get_doc(?INDEX, "trigger", EsId) of % Update the es document by removing the user
 						 {error, {Code3, Body3}} -> 
 							 ErrorString3 = api_help:generate_error(Body3, Code3),
@@ -579,7 +753,8 @@ remove_user(User, ReqData, State) ->
 									 UserUpdate = lib_json:set_attrs([{"script",list_to_binary("for(int i=0;i < ctx._source.triggers.size(); i++){if (ctx._source.triggers[i] == newelement){ctx._source.triggers.remove((Object) ctx._source.triggers[i]); i = ctx._source.triggers.size();}}")},
 																	  {"params","{}"},{"params.newelement","{}"},
 																	  {"params.newelement.function",list_to_binary(Function)}, {"params.newelement.input",Input},
-																	  {"params.newelement.streams",Streams},{"params.newelement.output_type",list_to_binary("user")},{"params.newelement.output_id",list_to_binary(Username)}]),
+																	  {"params.newelement.streams",Streams},{"params.newelement.vstreams",VirtualStreams},{"params.newelement.type",list_to_binary(Type)},
+																	  {"params.newelement.output_type",list_to_binary("user")},{"params.newelement.output_id",list_to_binary(Username)}]),
 									 case api_help:update_doc(?INDEX, "user", Username, UserUpdate) of
 										 {error, {UPCode, UPBody}} -> 
 											 UPErrorString = api_help:generate_error(UPBody, UPCode),
@@ -610,7 +785,8 @@ remove_user(User, ReqData, State) ->
 %% Returns: The created query string
 %% @end
 -spec create_stream_query(StreamIdList::[string()],Acc::string()) -> string().
-
+create_stream_query([],Acc) ->
+	Acc;
 create_stream_query([StreamId],Acc) ->
 	StreamId ++ Acc;
 create_stream_query([StreamId|Rest],Acc) ->
@@ -642,9 +818,9 @@ input_to_string(Input) ->
 -spec get_es_id(DocumentList::list(),StreamsList::string()) -> binary() | error.
 
 get_es_id([],_Streams) ->
-	error;
+	undefined;
 get_es_id([First|Rest],Streams) ->
-	case matches_exactly(lib_json:get_field(First, "_source.streams"),Streams) of
+	case matches_exactly(lib_json:get_field(First, "_source.streams") ++ lib_json:get_field(First, "_source.vstreams"),Streams) of
 		true ->
 			lib_json:get_field(First, "_id");
 		false ->
@@ -665,6 +841,10 @@ get_es_id([First|Rest],Streams) ->
 
 matches_exactly([],[]) ->
 	true;
+matches_exactly(List,[]) ->
+	false;
+matches_exactly([],List) ->
+	false;
 matches_exactly([First|Rest],Streams) when is_binary(First) ->
 	TestId = binary_to_list(First),
 	case lists:member(TestId, Streams) of
@@ -726,8 +906,10 @@ parse_triggers([],Acc) ->
 parse_triggers([{Id,Trigger}|Rest],Acc) ->
 	Function = lib_json:to_string(lib_json:get_field(Trigger, "function")),
 	Streams = lists:map(fun(A) -> lib_json:to_string(A) end, lib_json:get_field(Trigger, "streams")),
+	VStreams = lists:map(fun(A) -> lib_json:to_string(A) end, lib_json:get_field(Trigger, "vstreams")),
 	InputList = parse_outputlist(lib_json:get_field(Trigger, "outputlist"),[]),
-	NewElement = {{id,Id},{function,Function},{inputlist,InputList},{streams,Streams}},
+	Type = lib_json:to_string(lib_json:get_field(Trigger, "type")),
+	NewElement = {{id,Id},{function,Function},{inputlist,InputList},{streams,Streams},{vstreams,VStreams},{type,Type}},
 	parse_triggers(Rest,[NewElement|Acc]).
 
 %% @doc
@@ -768,10 +950,10 @@ get_output(Json,"uri") ->
 
 start_processes([]) ->
 	ok;
-start_processes([{{id,Id},{function,Function},{inputlist,InputList},{streams,Streams}}|Rest]) ->
+start_processes([{{id,Id},{function,Function},{inputlist,InputList},{streams,Streams},{vstreams,VStreams},{type,Type}}|Rest]) ->
 	spawn_link(fun() ->
-					   triggersProcess:create(Id, lists:map(fun(A) -> {stream,A} end,Streams), 
-											  Function, InputList)
+					   triggersProcess:create(Id, lists:map(fun(A) -> {stream,A} end,Streams) ++ lists:map(fun(A) -> {vstream,A} end,VStreams), 
+											  Function, InputList,Type)
 			   end),
 	start_processes(Rest).
 
