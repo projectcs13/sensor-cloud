@@ -24,6 +24,8 @@ Welcome to the "Project CS 2013" project
         make run_rabbit
         make run_es
         make run_nodejs
+        % don't forget to export R_HOME for example
+        export R_HOME="/usr/lib/R"
         make run
    
 4. To shutdown either close each individual shell or run one of the commands below
