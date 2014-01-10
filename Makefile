@@ -68,7 +68,6 @@ install_linux_deps:
 ### Command: make run
 ### Downloads all depenedencies, bulds entire project and runs the project.
 run: compile
-	-export R_HOME="/usr/lib/R"
 	curl -XPUT localhost:9200/sensorcloud
 	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine
 
