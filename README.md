@@ -1,4 +1,4 @@
-# Sensor Cloud Engine
+# IoT-Framework Engine
 
 Welcome to the "Project CS 2013" project
 

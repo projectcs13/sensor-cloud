@@ -24,7 +24,7 @@ if [[ ("$1" = "start") || ("$1" = "test_setup") ]]; then
 	echo $! >> $HOME_PATH/.temp.log
     fi
     sleep 7
-    echo "Starting Sensor-Cloud"
+    echo "Starting IoT-Framework"
     export R_HOME="/usr/lib/R"
     curl -XPUT localhost:$ES_PORT/sensorcloud
     sleep 3
