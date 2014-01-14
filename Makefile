@@ -1,6 +1,8 @@
 ################################################################################
 ###                       Makefile for Project CS 2013                       ###
 ################################################################################
+################################################################################
+################################################################################
 ### Variable assignment
 ################################################################################
 ERL := erl
@@ -8,9 +10,9 @@ REBAR := ./rebar
 ERL_CONFIG := -config config/engine.config -config config/sasl.config
 ERL_BOOT := -boot start_sasl -s reloader -s engine
 ERL_PA_FOLDERS := -pa ebin/ lib/*/ebin/ lib/*/bin/
+TEST_RESULT_FOLDER := test-results
 ################################################################################
-
-
+################################################################################
 ################################################################################
 ### Dependency rules
 ### Do NOT touch this section!
@@ -43,8 +45,7 @@ clean_emacs_vsn_files:
 	rm -rf src/*~
 	rm -rf test/*~
 ################################################################################
-
-
+################################################################################
 ################################################################################
 ### Command rules
 ### This section contains commands that can be used.
@@ -66,16 +67,21 @@ install_linux_deps:
 ### Command: make run
 ### Downloads all depenedencies, bulds entire project and runs the project.
 run: compile
-	-export R_HOME="/usr/lib/R"
 	curl -XPUT localhost:9200/sensorcloud
 	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine
 
+### Command: make run_all
+### Starts all parts of the system in one command.
 run_all: compile
 	sudo scripts/sensec.sh start
 
+### Command: make test_setup
+### Runs all parts of the system except the erlang part. To be used prior to 'make test' for easy test setup
 test_setup: compile
 	sudo scripts/sensec.sh test_setup
 
+### Command: make stop_all
+### Stops all parts of the system in one command.
 stop_all:
 	sudo scripts/sensec.sh stop
 
@@ -84,8 +90,16 @@ stop_all:
 run_es:
 	lib/elasticsearch/bin/elasticsearch -f
 
+### Command: make run_nodejs
+### Runs NodeJS
 run_nodejs:
 	nodejs javascripts/receive.js
+
+### Command: make run_fake_resource
+### Runs the fake resources for polling	
+run_fake_resource:
+	(cd scripts/python/ && python -m CGIHTTPServer 8001 &) 
+	(cd scripts/python/ && python -m CGIHTTPServer 8002)
 
 ### Command: make run_rabbit
 ### Runs rabbitMQ server
@@ -95,74 +109,80 @@ run_rabbit:
 ### Command: make test
 ### Compile project resources (not libraries) and runs all eunit tests.
 test: compile
-	-@mkdir test-results
-	-@curl -XDELETE localhost:9200/sensorcloud
+	-@mkdir $(TEST_RESULT_FOLDER)
+	curl -XDELETE localhost:9200/sensorcloud
 	curl -XPUT localhost:9200/sensorcloud
 	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -s test run
 
 test_travis: compile
-	-@mkdir test-results
+	-@mkdir $(TEST_RESULT_FOLDER)
 	curl -XPUT localhost:9200/sensorcloud
 	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -s test run
 
+test_datapoints: compile
+	-@mkdir $(TEST_RESULT_FOLDER)
+	curl -XDELETE localhost:9200/sensorcloud
+	curl -XPUT localhost:9200/sensorcloud
+	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -eval 'test:run(datapoints)'
+
 test_json: compile
-	-@mkdir test-results
+	-@mkdir $(TEST_RESULT_FOLDER)
 	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -eval 'test:run(lib_json)'
 
 test_resources: compile
-	-@mkdir test-results
+	-@mkdir $(TEST_RESULT_FOLDER)
 	curl -XDELETE localhost:9200/sensorcloud
 	curl -XPUT localhost:9200/sensorcloud
 	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -eval 'test:run(resources)'
 
 test_streams: compile
-	-@mkdir test-results
+	-@mkdir $(TEST_RESULT_FOLDER)
 	curl -XDELETE localhost:9200/sensorcloud
 	curl -XPUT localhost:9200/sensorcloud
 	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -eval 'test:run(streams)'
 
 test_users: compile
-	-@mkdir test-results
+	-@mkdir $(TEST_RESULT_FOLDER)
 	curl -XDELETE localhost:9200/sensorcloud
 	curl -XPUT localhost:9200/sensorcloud
 	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -eval 'test:run(users)'
 
 test_poll: compile
-	-@mkdir test-results
+	-@mkdir $(TEST_RESULT_FOLDER)
 	curl -XDELETE localhost:9200/sensorcloud
 	curl -XPUT localhost:9200/sensorcloud
 	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -eval 'test:run(poll_help)'
 
 test_poll_system: compile
-	-@mkdir test-results
+	-@mkdir $(TEST_RESULT_FOLDER)
 	curl -XDELETE localhost:9200/sensorcloud
 	curl -XPUT localhost:9200/sensorcloud
 	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -eval 'test:run(polling_system)'
 
 test_search: compile
-	-@mkdir test-results
+	-@mkdir $(TEST_RESULT_FOLDER)
 	curl -XDELETE localhost:9200/sensorcloud
 	curl -XPUT localhost:9200/sensorcloud
 	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -eval 'test:run(search)'
 
 test_triggers: compile
-	-@mkdir test-results
+	-@mkdir $(TEST_RESULT_FOLDER)
 	curl -XDELETE localhost:9200/sensorcloud
 	curl -XPUT localhost:9200/sensorcloud
 	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -eval 'test:run(triggers)'
 
 
 test_vstreams: compile
-	-@mkdir test-results
+	-@mkdir $(TEST_RESULT_FOLDER)
 	curl -XDELETE localhost:9200/sensorcloud
 	curl -XPUT localhost:9200/sensorcloud
-	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -eval 'test:run(virtual_stream_process)'
+	$(ERL) $(ERL_PA_FOLDERS) $(ERL_CONFIG) $(ERL_BOOT) -sname engine -eval 'test:run(gen_virtual_stream_process)'
 
 
 ### Command: make docs
 ### Genereats all of the documentation files
 docs: all
-	./rebar skip_deps=true doc
+	./rebar doc skip_deps=true
 
 ### Command: make clean
 ### Cleans the directory of the following things:
@@ -200,10 +220,16 @@ help:
 	@echo "Downloads and compiles all libraries"
 	@echo ""
 	@echo "'make install_linux_deps'"
-	@echo "Installs all Linux dependencies for the project."
+	@echo "Installs all linux dependencies needed. Should only be necessary to do once on a system."
 	@echo ""
 	@echo "'make run'"
-	@echo "Compiles and runs the project. Does NOT compile libraries"
+	@echo "Compiles and runs the otp app. Does NOT compile libraries"
+	@echo ""
+	@echo "'make run_all'"
+	@echo "Compiles the system (not libraries) and runs ALL parts of the system."
+	@echo ""
+	@echo "'make stop_all'"
+	@echo "Stops all parts of the system started with 'make run_all'"
 	@echo ""
 	@echo "'make run_all'"
 	@echo "Compiles and runs all parts of the project. Does NOT compile libraries"
@@ -216,6 +242,9 @@ help:
 	@echo ""
 	@echo "'make run_es'"
 	@echo "Runs the elastic search server"
+	@echo ""
+	@echo "'make run_nodejs'"
+	@echo "Runs the elastic nodejs"
 	@echo ""
 	@echo "make run_rabbit"
 	@echo "Runs the rabbitMQ server"

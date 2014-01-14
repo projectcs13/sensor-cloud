@@ -4,6 +4,8 @@
 					 name,
 					 uri,
 					 frequency,
+					 data_type,
+					 parser,
 					 pid,
 					 timer_ref}).
 

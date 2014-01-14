@@ -9,7 +9,6 @@
 %% @end
 -module(poller).
 -behaviour(gen_server).
--include("parser.hrl").
 -include("state.hrl").
 -include("common.hrl").
 -include_lib("amqp_client.hrl").
@@ -18,7 +17,7 @@
 %% ====================================================================
 %% API functions
 %% ====================================================================
--export([start_link/1, init/1, handle_call/3, handle_info/2, terminate/2]).
+-export([start_link/1, init/1, handle_call/3, handle_info/2, handle_cast/2, terminate/2, code_change/3]).
 
 %% @doc
 %% Function: start_link/1
@@ -48,7 +47,17 @@ init(State)->
 	{ok, ChannelOut} = amqp_connection:open_channel(Connection),
 	amqp_channel:call(ChannelOut, #'exchange.declare'{exchange = StreamExchange, type = <<"fanout">>}),
 	
-	{ok, #state{stream_id=State#state.stream_id, uri=State#state.uri, parser=State#state.parser, exchange=StreamExchange, channel=ChannelOut, connection=Connection}}.
+	{ok, #state{stream_id=State#state.stream_id, uri=State#state.uri, parser=State#state.parser, data_type=State#state.data_type, exchange=StreamExchange, channel=ChannelOut, connection=Connection}}.
+
+%% @doc
+%% Function: handle_cast/2
+%% Purpose: handle asynchronous call of gen_server, could be called via: gen_server:cast(pid(), {rebuild})
+%% Parameter: Request   -- the request provided by gen_server:cast() or gen_server:multi_cast()
+%%            State     -- the current state of the gen_server, which may contain some status information.
+%% Returns: {noreply, ok, State}
+%% @end
+-spec handle_cast(_Request :: term(), State :: record()) -> {noreply, ok, State :: record()}.
+handle_cast(_Request, State) -> {noreply, ok, State}.
 
 %% @doc
 %% Function: handle_call/2
@@ -73,24 +82,20 @@ handle_call({rebuild}, _Form, State)->
 			
 			{reply, {error, Reason}, State};
 		{ok,JsonStruct} ->
-		    FinalJson = lib_json:get_and_add_id(JsonStruct),
+		    FinalJson = api_help:get_and_add_id(JsonStruct),
 			
-			Parser = poll_help:get_parser_by_id(StreamId), %% return a list of parsers [#parser, ...]
-			case Parser of
-				{error, ErrMsg} ->
-					{reply, {error, ErrMsg}, State};
+			NewUri = lib_json:get_field(FinalJson, "uri"),
+			NewFreq = lib_json:get_field(FinalJson, "polling_freq"),
+			NewDataType = binary_to_list(lib_json:get_field(FinalJson, "data_type")),
+			NewParser = binary_to_list(lib_json:get_field(FinalJson, "parser")),
+			case is_binary(NewUri) of
+				false->
+					FinalUri = NewUri;
 				_ ->
-					NewUri = lib_json:get_field(FinalJson, "uri"),
-					NewFreq = lib_json:get_field(FinalJson, "polling_freq"),
-					case is_binary(NewUri) of
-						false->
-							FinalUri = NewUri;
-						_ ->
-							FinalUri = binary_to_list(NewUri)
-					end,			
-					%% notify the supervisor to refresh its records
-					{reply, {update, StreamId, FinalUri, NewFreq}, #state{stream_id=StreamId, uri=FinalUri, parser=Parser, exchange=State#state.exchange, channel=State#state.channel, connection=State#state.connection}}
-			end
+					FinalUri = binary_to_list(NewUri)
+			end,			
+			%% notify the supervisor to refresh its records
+			{reply, {update, StreamId, FinalUri, NewFreq, NewDataType, NewParser}, #state{stream_id=StreamId, uri=FinalUri, parser=NewParser, data_type=NewDataType, exchange=State#state.exchange, channel=State#state.channel, connection=State#state.connection}}
 	end;
 handle_call({check_info}, _Form, State)->
 	%% return the information of poller
@@ -107,6 +112,7 @@ handle_call({check_info}, _Form, State)->
 handle_info({probe}, State)->
 	StreamId = State#state.stream_id,
 	Parser = State#state.parser,
+	DataType = State#state.data_type,
 	Uri = State#state.uri,
 	
 	%%communicate with external resources
@@ -124,11 +130,11 @@ handle_info({probe}, State)->
 										[]
 								end,
 					
-					FinalData = case Parser#parser.input_type of
+					FinalData = case DataType of
 									"application/json" ->
-										parser:parseJson(Parser, Body, make_stamp(TimeList));
+										parser:parseJson(StreamId, Parser, Body, make_stamp(TimeList));
 									"plain/text" ->
-										parser:parseText(Parser, Body, make_stamp(TimeList));
+										parser:parseText(StreamId, Parser, Body, make_stamp(TimeList));
 									_ ->
 										%% the input type of json is wrong
 										{error, "Invalid data type!"}
@@ -142,15 +148,13 @@ handle_info({probe}, State)->
 					end;
 
 				_ ->
-					%%polling fails
-					erlang:display("polling failed")
+					poll_help:add_failed(StreamId,connection_error),
+					erlang:display("polling failed, the response code: "++Code)
 			end,
 			{noreply, State};
-		{error, Reason}->
-			erlang:display("failed to poll external resource, "++Reason),
-			{noreply, State};
 		_ ->
-			erlang:display("failed to poll external resource"),
+			poll_help:add_failed(StreamId,connection_error),
+			erlang:display("failed to connect to the uri: "++Uri),
 			{noreply, State}
 	end.
 
@@ -170,6 +174,19 @@ terminate(_Reason, State)->
 	Uri = State#state.uri,
 	erlang:display("the poller for "++Uri++" stops working!"),
 	application:stop(inets).
+
+%% @doc
+%% Function: code_change/3
+%% Purpose: this funciton will called when the gen_server should update its internal state during a release upgrade/downgrade.
+%% Parameter:	_OldVsn -- In the case of upgrade, the _OldVsn is the Vsn, in the case of downgrade, the _OldVsn is {down, Vsn}.  
+%%                         Vsn is defined by the vsn attribute(s) of the old version of the callback module Module. If no such attribute is defined, the
+%%                         version is the checksum of the BEAM file. 
+%%				State   -- The internal state of the gen_server. 
+%%				_Extra  -- is passed as-is from the {advanced,Extra} part of the update instruction.
+%% Returns: {ok, State}
+%% @end
+-spec code_change(_OldVsn :: term()|{down, term()}, State :: list(), _Extra :: term()) -> {ok, list()}.
+code_change(_OldVsn, State, _Extra) -> {ok, State}.
 
 %% ====================================================================
 %% Internal functions

@@ -4,7 +4,8 @@ import sys
 import urllib
 import urllib2
 
-f = open('realstreams', 'r')
+filename = str(sys.argv[1])
+f = open(filename, 'r')
 url = "http://localhost:8000/streams" 
 
 for line in f:
@@ -14,3 +15,4 @@ for line in f:
 	response = urllib2.urlopen(req)
 	print response.read()
 	time.sleep(0.1)
+

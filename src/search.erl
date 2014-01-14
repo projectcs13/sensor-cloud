@@ -144,41 +144,57 @@ process_search_post(ReqData, State) ->
         FromParam ->
             From = FromParam
     end,
+    case wrq:get_qs_value("location",ReqData) of
+        undefined ->
+            LocationParam = false;
+        "true" ->
+            LocationParam = true;
+        _ ->
+            LocationParam = false
+    end,
     {Json,_,_} = api_help:json_handler(ReqData,State),
-    FilteredJson = filter_json(Json, From, Size, Sort),
+    FilteredJson = filter_json(Json, From, Size, Sort, LocationParam),
     case erlastic_search:search_json(#erls_params{},?INDEX, "stream", FilteredJson) of % Maybe wanna take more
             {error, Reason1} ->
                 StreamSearch = {error, Reason1};
             {ok,List1} ->
 			case lib_json:get_field(FilteredJson, "query.filtered.query.query_string.query") of
 				undefined ->
-					erlang:display("No query string text");
+					erlang:display("No query string text, cannot add a suggestion.");
 				QueryString ->
-					erlastic_search:index_doc(?INDEX,"search_query","{\"search_suggest\":{\"input\":[\""++ lib_json:to_string(QueryString) ++"\"],\"weight\":1}}")
+                    add_query_suggestion(QueryString)
 			end,
 			StreamSearch = lib_json:encode(List1) % May need to convert
     end,
-    case erlastic_search:search_json(#erls_params{},?INDEX, "user", lib_json:rm_field(FilteredJson, "sort")) of % Maybe wanna take more
+    FilteredJson2 = filter_json(Json, From, Size, Sort, false),
+    case erlastic_search:search_json(#erls_params{},?INDEX, "virtual_stream", lib_json:rm_field(FilteredJson2, "sort")) of % Maybe wanna take more
             {error, Reason2} ->
-                    UserSearch = {error, Reason2};
-            {ok,List2} -> 
-			UserSearch = lib_json:encode(List2) % May need to convert
+                VStreamSearch = {error, Reason2};
+            {ok,List2} ->
+                VStreamSearch = lib_json:encode(List2) % May need to convert
+    end,
+    case erlastic_search:search_json(#erls_params{},?INDEX, "user", lib_json:rm_field(FilteredJson2, "sort")) of % Maybe wanna take more
+            {error, Reason3} ->
+                    UserSearch = {error, Reason3};
+            {ok,List3} -> 
+    			UserSearch = lib_json:encode(List3) % May need to convert
      end,
 	% check search-results for error
-	case StreamSearch of
-		{error, {Body, Code}} ->
-		ErrorString = api_help:generate_error(Body, Code),
-		{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-		_ -> 
-		case UserSearch of
-		  {error, {Body, Code}} ->
-			ErrorString = api_help:generate_error(Body, Code),
-			{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-		  _ ->
-				SearchResults = "{\"streams\":"++ StreamSearch ++", \"users\":"++ UserSearch ++"}",
-				{true,wrq:set_resp_body(SearchResults,ReqData),State}
-		end
-	end.
+    case {StreamSearch, VStreamSearch, UserSearch} of
+        {{error, {Body, Code}},_,_} ->
+            ErrorString = api_help:generate_error(Body, Code),
+            {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+        {_,{error, {Body2, Code2}},_} ->
+            ErrorString = api_help:generate_error(Body2, Code2),
+            {{halt, Code2}, wrq:set_resp_body(ErrorString, ReqData), State};
+        {_,_,{error, {Body3, Code3}}} ->
+            ErrorString = api_help:generate_error(Body3, Code3),
+            {{halt, Code3}, wrq:set_resp_body(ErrorString, ReqData), State};
+        _ ->
+            SearchResults = "{\"streams\":"++ StreamSearch ++",\"vstreams\":"++ VStreamSearch ++",\"users\":"++ UserSearch ++"}",
+            {true,wrq:set_resp_body(SearchResults,ReqData),State}
+    end.
+	   
 %% GROUPS ARE NOT IMPLEMENTED
 %%         case erlastic_search:search_json(#erls_params{},?INDEX, "group", FilteredJson) of % Maybe wanna take more
 %%                 {error,Reason} -> {{halt,Reason}, ReqData, State};
@@ -217,7 +233,36 @@ parse_datapoints([Head|Rest], FinalJson) ->
     Datapoint = lib_json:rm_field(lib_json:get_field(Head, "_source"), "stream_id"),
     parse_datapoints(Rest, lib_json:add_value(FinalJson,"data",Datapoint)).
 
-
+%% @doc
+%% Function: add_query_suggestion/1
+%% Purpose: Adds the suggestion to ES if it does not exist, or adds weight to an existing
+%% suggestion.
+%% Returns: an atom, error, created or updated depending on if the search suggestion was
+%% saved, updated or gave an error
+%% @end
+add_query_suggestion(QueryString) ->
+    case erlastic_search:search_json(#erls_params{},?INDEX,"search_query","{\"query\":{\"term\":{\"search_suggest\":\""++ lib_json:to_string(QueryString) ++"\"}}}") of
+        {error,_} ->
+            error;
+        {ok,JsonStruct} ->
+            case lib_json:get_field(JsonStruct, "hits.hits[0]._id") of
+                undefined ->
+                    case erlastic_search:index_doc(?INDEX,"search_query","{\"search_suggest\":{\"input\":[\""++ lib_json:to_string(QueryString) ++"\"],\"weight\":1}}") of
+                        {error,_} ->
+                            error;
+                        {ok,_} ->
+                            created
+                    end;
+                Id ->
+                    case api_help:update_doc(?INDEX,"search_query", binary_to_list(Id), "{\"script\" : \"ctx._source.search_suggest.weight += 1\"}",[]) of
+                        {error,_} ->
+                            error;
+                        {ok,_} ->
+                            updated
+                    end
+            end
+    end.
+    
 
 
 
@@ -232,11 +277,11 @@ filter_json(Json) ->
 
 
 %% @doc
-%% Function: filter_json/3
+%% Function: filter_json/4
 %% Purpose: Used to add private filters to the json query with pagination
 %% Returns: JSON string that is updated with filter and the from size parameters
 %% @end
-filter_json(Json, From, Size, Sort) ->
+filter_json(Json, From, Size, Sort, false) ->
 	case lib_json:get_field(Json, "sort") of 
 		undefined -> 
 			UseSort = "\"" ++ Sort ++ "\"", 
@@ -253,5 +298,23 @@ filter_json(Json, From, Size, Sort) ->
 	",\"size\" : "++Size++
 	",\"sort\" : " ++UseSort++
 	",\"query\" : {\"filtered\" : "++NewJson++
-	",\"filter\" : {\"bool\" : {\"must_not\" : {\"term\" : {\"private\" : \"true\"}}}}}}}".
-
+	",\"filter\" : {\"bool\" : {\"must_not\" : {\"term\" : {\"private\" : \"true\"}}}}}}}";
+filter_json(Json, From, Size, Sort, true) ->
+    case lib_json:get_field(Json, "sort") of 
+        undefined -> 
+            UseSort = "\"" ++ Sort ++ "\"", 
+            SortJson = Json;
+        SortValue when is_binary(SortValue) -> 
+            UseSort = "\"" ++ binary_to_list(SortValue) ++ "\"",
+            SortJson = lib_json:rm_field(Json, "sort");
+        SortValue -> 
+            UseSort = SortValue,
+            SortJson = lib_json:rm_field(Json, "sort")
+    end,
+    NewJson = string:sub_string(SortJson,1,string:len(SortJson)-1),
+    "{\"script_fields\":{\"location\":{\"script\":\"doc['location'].value\"}},\"fields\":\"_source\","++
+    "\"from\" : "++From++
+    ",\"size\" : "++Size++
+    ",\"sort\" : " ++UseSort++
+    ",\"query\" : {\"filtered\" : "++NewJson++
+    ",\"filter\" : {\"bool\" : {\"must_not\" : {\"term\" : {\"private\" : \"true\"}}}}}}}".

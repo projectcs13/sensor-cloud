@@ -97,9 +97,9 @@ process_post(ReqData, State) ->
 		false ->
 			% Create
 			{Resource,_,_} = api_help:json_handler(ReqData,State),
-			case {api_help:do_any_field_exist(Resource,?RESTRCITEDCREATERESOURCES),api_help:do_only_fields_exist(Resource,?ACCEPTEDFIELDSRESOURCES)} of
+			case {api_help:do_any_field_exist(Resource,?RESTRICTED_RESOURCES_CREATE),api_help:do_only_fields_exist(Resource,?ACCEPTED_RESOURCES_FIELDS)} of
 				{true,_} ->
-					ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDCREATERESOURCES),
+					ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRICTED_RESOURCES_CREATE),
 					ResFields2 = string:sub_string(ResFields1, 1, length(ResFields1)-2),
 					{{halt,409}, wrq:set_resp_body("{\"error\":\"Error caused by restricted field in document, these fields are restricted : " ++ ResFields2 ++"\"}", ReqData), State};
 				{false,false} ->
@@ -171,16 +171,16 @@ put_resource(ReqData, State) ->
             {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 		{ok, _} ->
 			{UserJson,_,_} = api_help:json_handler(ReqData, State),
-			case {api_help:do_any_field_exist(UserJson,?RESTRCITEDUPDATERESOURCES),api_help:do_only_fields_exist(UserJson,?ACCEPTEDFIELDSRESOURCES)} of
+			case {api_help:do_any_field_exist(UserJson,?RESTRICTED_RESOURCES_UPDATE),api_help:do_only_fields_exist(UserJson,?ACCEPTED_RESOURCES_FIELDS)} of
 				{true,_} ->
-					ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRCITEDUPDATERESOURCES),
+					ResFields1 = lists:foldl(fun(X, Acc) -> X ++ ", " ++ Acc end, "", ?RESTRICTED_RESOURCES_UPDATE),
 					ResFields2 = string:sub_string(ResFields1, 1, length(ResFields1)-2),
 					{{halt,409}, wrq:set_resp_body("{\"error\":\"Error caused by restricted field in document, these fields are restricted : " ++ ResFields2 ++"\"}", ReqData), State};
 				{false,false} ->
 					{{halt,403}, wrq:set_resp_body("Unsupported field(s)", ReqData), State};
 				{false,true} ->
 					NewJson = suggest:add_resource_suggestion_fields(UserJson),
-					Update = api_help:create_update(NewJson),
+					Update = lib_json:set_attr(doc, NewJson),
 					case api_help:update_doc(?INDEX,"resource", Id, Update) of 
 						{error, {Code, Body}} -> 
 							ErrorString = api_help:generate_error(Body, Code),
@@ -207,7 +207,12 @@ get_resource(ReqData, State) ->
 					% List resources based on URI
 				    case wrq:get_qs_value("size",ReqData) of 
 			            undefined ->
-			                Size = 100;
+							case erlastic_search:count_type(?INDEX, "resource") of
+								{error, {_CountCode, _CountBody}} -> 
+									Size = 100;
+								{ok,CountJsonStruct} ->
+									Size = lib_json:get_field(CountJsonStruct,"count")
+							end;
 			            SizeParam ->
 			                Size = list_to_integer(SizeParam)
 			        end,
@@ -216,7 +221,7 @@ get_resource(ReqData, State) ->
             				ErrorString = api_help:generate_error(Body, Code),
             				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 						{ok,JsonStruct} ->
-							FinalJson = lib_json:get_list_and_add_id(JsonStruct, resources),
+							FinalJson = api_help:get_list_and_add_id(JsonStruct, resources),
 							{FinalJson, ReqData, State} 
 					end;
 				ResourceId ->
@@ -226,7 +231,7 @@ get_resource(ReqData, State) ->
             				ErrorString = api_help:generate_error(Body, Code),
             				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};			
 						{ok,JsonStruct} ->
-							FinalJson = lib_json:get_and_add_id(JsonStruct),
+							FinalJson = api_help:get_and_add_id(JsonStruct),
 							{FinalJson, ReqData, State} 
 					end
 			end;
@@ -277,7 +282,7 @@ add_suggested_stream(Stream) ->
 			{error, ErrorString};
 
 		{ok,JsonStruct} ->
-			FinalJson = lib_json:get_and_add_id(JsonStruct),
+			FinalJson = api_help:get_and_add_id(JsonStruct),
 			case find_stream_type(lib_json:get_field(Stream, "type"),lib_json:get_field(FinalJson,"streams_suggest")) of
 				false ->
 			%%		Sugg = lib_json:get_field(FinalJson, "hits[0]._source"),
@@ -285,7 +290,7 @@ add_suggested_stream(Stream) ->
 														Stream,"location"),"resource"),"private"),"uri"),"user_id"),
 					NewSuggestedStream = lib_json:add_value(FinalJson,"streams_suggest" , FilteredStream ),
 					FinalSuggested = lib_json:rm_field(NewSuggestedStream, "id"),
-					Final = api_help:create_update(FinalSuggested),
+					Final = lib_json:set_attr(doc, FinalSuggested),
 					case api_help:update_doc(?INDEX, "resource", lib_json:to_string(ResourceId), Final) of 
 						{error,{Code,Body}} ->
 							ErrorString = api_help:generate_error(Body, Code),

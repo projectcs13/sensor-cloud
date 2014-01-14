@@ -18,7 +18,7 @@
 -include_lib("json.hrl").
 -include_lib("debug.hrl").
 
--export([create/4, subscribe/2]).
+-export([create/5, subscribe/2]).
 
 
 -define(INDEX, "sensorcloud").
@@ -35,12 +35,12 @@
 %% Returns: ok 
 %% @end
 -spec create(TriggerId :: string(), InputIds :: [StreamInfo],
-                         Function :: atom(), OutputList::list()) -> ok when
+                         Function :: atom(), OutputList::list(),Type::string()) -> ok when
 		  StreamInfo :: {Type, Id},
           Type :: atom(),
           Id :: string().
-create(TriggerId, InputIds, Function, OutputList) ->
-		erlang:display("Starting trigger process for id:" ++ TriggerId),
+create(TriggerId, InputIds, Function, OutputList,Type) ->
+		erlang:display("Starting trigger process for id:" ++ TriggerId ++ " and type " ++ Type),
         %% Exchange name binarys.
         InputExchanges = create_input_exchanges(InputIds),
 		CommandExchange = list_to_binary("command.trigger." ++ TriggerId),
@@ -66,10 +66,10 @@ create(TriggerId, InputIds, Function, OutputList) ->
         timer:sleep(1000),
         
         %% Get the latest value for each datapoint.
-        DataPoints = get_first_value_for_streams(InputIds),
+        DataPoints = get_latest_value_for_streams(InputIds),
         
         loop(TriggerId, DataPoints, TriggerExchange,
-                 {Connection, ChannelIn, ChannelOut}, Function, OutputList).
+                 {Connection, ChannelIn, ChannelOut}, Function, OutputList,Type).
 
 
 
@@ -93,11 +93,12 @@ create(TriggerId, InputIds, Function, OutputList) ->
                  TriggerExchange :: binary(),
                  Net :: {Connection :: pid(), ChannelIn :: pid(), ChannelOut :: pid()},
                  Function :: string(),
-                 OutputList :: list()) -> ok.
-loop(TriggerId, DataPoints, TriggerExchange, Net, Function, OutputList) ->
+                 OutputList :: list(),
+		   Type::string()) -> ok.
+loop(TriggerId, DataPoints, TriggerExchange, Net, Function, OutputList,Type) ->
         receive
                 {#'basic.deliver'{}, #amqp_msg{payload = Body}} ->
-                        Data = binary_to_term(Body),
+                        Data = binary_to_list(Body),
 						erlang:display(Body),
                         case erlson:is_json_string(Data) of
 							%% New value from the source as a Json
@@ -106,25 +107,29 @@ loop(TriggerId, DataPoints, TriggerExchange, Net, Function, OutputList) ->
 								NewDataPoints =
 									lists:keyreplace(Id, 1, DataPoints, {Id, Data}),
 								erlang:display(NewDataPoints),
+								erlang:display("Outputlist"),
+								erlang:display(OutputList),
 								%% Apply function to the new values
 								TriggerList = apply_function(Function, NewDataPoints, OutputList),
 								%% Create timestamp to avoid issues with asynchronus
 								%% datapoints.
 								Timestamp = ?TIME_NOW(erlang:localtime()),
 								
-								Messages = create_messages(TriggerList, Timestamp,[]),
-								
+								Messages = create_messages(TriggerList, Timestamp,[],Type),
+								erlang:display("TriggerList for " ++ TriggerId ++ " and type " ++ Type),
+								erlang:display(TriggerList),
 								ChannelOut = element(3, Net),
                                 %% Send messages to live update
 								send_messages(TriggerExchange,ChannelOut,Messages),
                                 %% Send to standard output
                                 %% TODO: Parallelize, spawn one process for each Message?
                                 send_to_output(TriggerId, Messages),
-								loop(TriggerId, NewDataPoints, TriggerExchange,Net, Function, OutputList);
+								loop(TriggerId, NewDataPoints, TriggerExchange,Net, Function, OutputList,Type);
 							
 							false ->
-								erlang:display(Data),
-								case handle_command(Data,OutputList) of
+								Command = binary_to_term(Body),
+								erlang:display(Command),
+								case handle_command(Command,OutputList) of
 									[] ->
 										case erlastic_search:delete_doc(?INDEX,"trigger", TriggerId) of
 											{error, _} -> 
@@ -140,7 +145,7 @@ loop(TriggerId, DataPoints, TriggerExchange, Net, Function, OutputList) ->
 			
 									NewOutputList ->
 										erlang:display(NewOutputList),
-										loop(TriggerId, DataPoints, TriggerExchange, Net, Function, NewOutputList)
+										loop(TriggerId, DataPoints, TriggerExchange, Net, Function, NewOutputList,Type)
 								end
                         end;
                 quit ->
@@ -150,7 +155,7 @@ loop(TriggerId, DataPoints, TriggerExchange, Net, Function, OutputList) ->
                         amqp_connection:close(Connection),
                         ok;
                 _ -> loop(TriggerId, DataPoints, TriggerExchange,
-                                 Net, Function, OutputList)
+                                 Net, Function, OutputList,Type)
         end.
 
 
@@ -264,24 +269,28 @@ subscribe(ChannelIn, [InputExchange | InputExchanges]) ->
 %% Args: List - The list of streams and virtual streams.
 %% Returns: [] | [{Id, Value}].
 %% @end
--spec get_first_value_for_streams(List :: [{Type :: atom(), Id :: string()}])
+-spec get_latest_value_for_streams(List :: [{Type :: atom(), Id :: string()}])
         -> [] | [{Id :: string(), Value :: json() | undefined}].
-get_first_value_for_streams([]) -> [];
-get_first_value_for_streams([{_Type, Id} | T]) ->
+get_latest_value_for_streams([]) -> [];
+get_latest_value_for_streams([{Type, Id} | T]) ->
         JsonQuery = "{\"query\" : {\"term\" : {\"stream_id\" : \"" ++ Id ++ "\"}},"
                                         ++ "\"sort\" : [{\"timestamp\" : {\"order\" : \"desc\"}}],"
                                         ++ "\"size\" : 1}",
+        DataPointType = case Type of
+                                                stream -> "datapoint";
+                                                vstream -> "vsdatapoint"
+                                        end,
         case erlastic_search:search_json(#erls_params{}, ?ES_INDEX,
-                                                                         "datapoint", JsonQuery) of
+                                                                         DataPointType, JsonQuery) of
                 {ok, Result} ->
                         Datapoint = lib_json:get_field(Result, "hits.hits"),
                         case Datapoint of
-                                [] -> [{Id, undefined} | get_first_value_for_streams(T)];
+                                [] -> [{Id, undefined} | get_latest_value_for_streams(T)];
                                 [Json] ->
                                         Value = lib_json:get_field(Json, "_source"),
-                                        [{Id, Value} | get_first_value_for_streams(T)]
+                                        [{Id, Value} | get_latest_value_for_streams(T)]
                         end;
-                {error, _} -> get_first_value_for_streams(T)
+                {error, _} -> get_latest_value_for_streams(T)
         end.
 
 
@@ -321,13 +330,13 @@ apply_function(Function, DataPoints, InputList) ->
 %%          the output exchange
 %% Returns: the list of messages created
 %% @end
--spec create_messages(MessageList::list(),Timestamp::string(),Acc::list()) -> list().
+-spec create_messages(MessageList::list(),Timestamp::string(),Acc::list(),Type::string()) -> list().
 
-create_messages([], _Timestamp,Acc) ->
+create_messages([], _Timestamp,Acc,Type) ->
 	Acc;
-create_messages([{Value, StreamId, Input, Users}|Rest], Timestamp, Acc) ->
+create_messages([{Value, StreamId, Input, Users}|Rest], Timestamp, Acc,Type) ->
 	create_messages(Rest, Timestamp, 
-				   [term_to_binary({Value,Timestamp,StreamId,Input,Users})|Acc]).
+				   [term_to_binary({Value,Timestamp,StreamId,Input,Users,Type})|Acc],Type).
 
 %% @doc
 %% Function: send_messages/3
@@ -362,15 +371,16 @@ send_to_output(TriggerId, []) ->
     ok;
 send_to_output(TriggerId, [Head|Tail]) when is_binary(Head) ->
     send_to_output(TriggerId, [binary_to_term(Head)|Tail]);
-send_to_output(TriggerId, [{Value, Timestamp, StreamId, Input, []}|Messages]) ->
+send_to_output(TriggerId, [{Value, Timestamp, StreamId, Input, [],Type}|Messages]) ->
     send_to_output(TriggerId, Messages);
-send_to_output(TriggerId, [{Value, Timestamp, StreamId, Input, [{user,UserId}|Rest]}|Messages]) ->
+send_to_output(TriggerId, [{Value, Timestamp, StreamId, Input, [{user,UserId}|Rest],Type}|Messages]) ->
     Message = lib_json:set_attrs([{trigger, "{}"},
         {"trigger.value", Value},
         {"trigger.timestamp", list_to_binary(Timestamp)},
         {"trigger.stream_id", list_to_binary(StreamId)},
         {"trigger.trigger_id", list_to_binary(TriggerId)},
-        {"trigger.input", Input}]),
+        {"trigger.input", Input},
+		{"trigger.type", list_to_binary(Type)}]),
     UpdateJson = "{\"script\":\"ctx._source.notifications += msg\",\"params\":{\"msg\":"++ Message ++"}}",
     case api_help:update_doc(?INDEX, "user", UserId, UpdateJson, []) of
         {error, {Code, Body}} ->
@@ -378,14 +388,15 @@ send_to_output(TriggerId, [{Value, Timestamp, StreamId, Input, [{user,UserId}|Re
         {ok, Response} ->
             ok
     end,
-    send_to_output(TriggerId, [{Value, Timestamp, StreamId, Input, Rest}|Messages]);
-send_to_output(TriggerId, [{Value, Timestamp, StreamId, Input, [{uri,URI}|Rest]}|Messages]) ->
+    send_to_output(TriggerId, [{Value, Timestamp, StreamId, Input, Rest,Type}|Messages]);
+send_to_output(TriggerId, [{Value, Timestamp, StreamId, Input, [{uri,{URI,_}}|Rest],Type}|Messages]) ->
     Message = lib_json:set_attrs([{trigger, "{}"},
         {"trigger.value", Value},
         {"trigger.timestamp", list_to_binary(Timestamp)},
         {"trigger.stream_id", list_to_binary(StreamId)},
         {"trigger.trigger_id", list_to_binary(TriggerId)},
-        {"trigger.input", Input}]),
+        {"trigger.input", Input},
+		{"trigger.type", list_to_binary(Type)}]),
     erlang:display(URI),
     case httpc:request(post, {URI, [],"application/json", Message}, [{timeout, 5000}], []) of
         {ok,{{_, 200, _}, _, _}} ->
@@ -400,10 +411,10 @@ send_to_output(TriggerId, [{Value, Timestamp, StreamId, Input, [{uri,URI}|Rest]}
 		{error, Reason} ->
 			erlang:display(Reason)
     end,
-    send_to_output(TriggerId, [{Value, Timestamp, StreamId, Input, Rest}|Messages]);
-send_to_output(TriggerId, [{Value, Timestamp, StreamId, Input, [_|Rest]}|Messages]) ->
+    send_to_output(TriggerId, [{Value, Timestamp, StreamId, Input, Rest,Type}|Messages]);
+send_to_output(TriggerId, [{Value, Timestamp, StreamId, Input, [_|Rest],Type}|Messages]) ->
     erlang:display("Invalid output!"),
-    send_to_output(TriggerId, [{Value, Timestamp, StreamId, Input, Rest}|Messages]).
+    send_to_output(TriggerId, [{Value, Timestamp, StreamId, Input, Rest,Type}|Messages]).
               
 
 %% @doc

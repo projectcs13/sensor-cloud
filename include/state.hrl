@@ -3,6 +3,7 @@
 -record(state, {stream_id,
 				uri,
 				parser,
+				data_type,
 				channel,
 				exchange,
 				connection}).

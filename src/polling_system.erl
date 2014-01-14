@@ -12,13 +12,12 @@
 -behaviour(gen_server).
 -include("poller.hrl").
 -include("state.hrl").
-
--include("parser.hrl").
+-include("field_restrictions.hrl").
 
 %% ====================================================================
 %% API functions
 %% ====================================================================
--export([start_link/0, init/1, handle_info/2, handle_cast/2, handle_call/3, terminate/2]).
+-export([start_link/0, init/1, handle_info/2, handle_cast/2, handle_call/3, terminate/2, code_change/3]).
 
 %% @doc
 %% Function: start_link/0
@@ -75,16 +74,14 @@ handle_info({print, Message}, _State)->
 %% Side effects: create new poller and send message to specific poller.
 %% @end
 -spec handle_cast(Request :: term(), PollersInfo :: list()) -> {noreply, NewState :: list()}.
-handle_cast({create_poller, #pollerInfo{stream_id = StreamId, name = StreamName, uri = Uri, frequency = Frequency}}, PollersInfo)->
+handle_cast({create_poller, #pollerInfo{stream_id = StreamId, name = StreamName, uri = Uri, frequency = Frequency, data_type = DataType, parser = Parser}}, PollersInfo)->
 	case {is_list(StreamId), is_list(Uri), is_integer(Frequency), Frequency>0} of
 		{true, true, true, true}->
-			Parser = poll_help:get_parser_by_id(StreamId),
-			
-			{ok, Pid}=supervisor:start_child(polling_monitor, [#state{stream_id=StreamId, uri=Uri, parser=Parser}]),
+			{ok, Pid}=supervisor:start_child(polling_monitor, [#state{stream_id=StreamId, uri=Uri, parser=Parser, data_type=DataType}]),
 			%%use timer library to create scheduler for this poller
 			timer:start(),
 			{ok, TRef} = timer:send_interval((Frequency*1000), Pid, {probe}),
-			Record = #pollerInfo{stream_id=StreamId, name=StreamName, uri=Uri, frequency=Frequency, pid=Pid, timer_ref=TRef},
+			Record = #pollerInfo{stream_id=StreamId, name=StreamName, uri=Uri, frequency=Frequency, parser=Parser, data_type=DataType, pid=Pid, timer_ref=TRef},
 			{noreply, [Record|PollersInfo]};
 		{false, _, _, _}->erlang:display("create_poller: please provide a string stream id!"),
 					      {noreply, PollersInfo};
@@ -104,6 +101,7 @@ handle_cast({terminate, StreamId}, PollersInfo)->
 		_ ->
 			supervisor:terminate_child(polling_monitor, Poller#pollerInfo.pid),
 			supervisor:delete_child(polling_monitor, Poller#pollerInfo.pid),
+			erlastic_search:delete_doc(?INDEX,"pollinghistory", StreamId),
 			{noreply, delete_info(PollersInfo, StreamId)}
 	end.
 	
@@ -133,11 +131,10 @@ handle_call({rebuild, StreamId}, _Form, PollersInfo)->
 			erlang:display("the error in finding poller: " ++ ErrMessage),
 			NewPollersInfo = PollersInfo;
 		_ ->
-			{update, StreamId, NewUri, NewFreq} = gen_server:call(Poller#pollerInfo.pid, {rebuild}),
+			{update, StreamId, NewUri, NewFreq, NewDataType, NewParser} = gen_server:call(Poller#pollerInfo.pid, {rebuild}),
 			{ok,  cancel} = timer:cancel(Poller#pollerInfo.timer_ref),
 			{ok, NewTRef} = timer:send_interval((NewFreq*1000), Poller#pollerInfo.pid, {probe}), 
-			%%change the url of the poller information stored
-			NewPollersInfo = update_info(PollersInfo, StreamId, NewUri, NewTRef)
+			NewPollersInfo = update_info(PollersInfo, StreamId, NewUri, NewTRef, NewDataType, NewParser)
 	end,
 	{reply, ok, NewPollersInfo}.
 
@@ -151,6 +148,19 @@ handle_call({rebuild, StreamId}, _Form, PollersInfo)->
 -spec terminate(_Reason :: term(), _State :: list()) -> ok.
 terminate(_Reason, _State)->
 	erlang:display("polling supervisor stops working!").
+
+%% @doc
+%% Function: code_change/3
+%% Purpose: this funciton will called when the gen_server should update its internal state during a release upgrade/downgrade.
+%% Parameter:	_OldVsn -- In the case of upgrade, the _OldVsn is the Vsn, in the case of downgrade, the _OldVsn is {down, Vsn}.  
+%%                         Vsn is defined by the vsn attribute(s) of the old version of the callback module Module. If no such attribute is defined, the
+%%                         version is the checksum of the BEAM file. 
+%%				State   -- The internal state of the gen_server. 
+%%				_Extra  -- is passed as-is from the {advanced,Extra} part of the update instruction.
+%% Returns: {ok, State}
+%% @end
+-spec code_change(_OldVsn :: term()|{down, term()}, State :: list(), _Extra :: term()) -> {ok, list()}.
+code_change(_OldVsn, State, _Extra) -> {ok, State}.
 
 
 %% ====================================================================
@@ -197,16 +207,16 @@ delete_info([Poller|Tail], StreamId)->
 	end.
 
 %% @doc
-%% Function: update_info/4
+%% Function: update_info/6
 %% Purpose: after poller done its rebuild, supervisor uses this function to update its pollers` info store.
 %% Returns: NewPollersRecordList | []
 %% @end
--spec update_info(PollersList :: [record()], StreamId :: string(), NewUri :: string(), NewTRef :: pid()) -> [record()].
-update_info([], _, _, _) -> [];
-update_info([Poller|Tail], StreamId, NewUri, NewTRef) ->
+-spec update_info(PollersList :: [record()], StreamId :: string(), NewUri :: string(), NewTRef :: pid(), NewDataType :: string(), NewParser :: string()) -> [record()].
+update_info([], _, _, _, _, _) -> [];
+update_info([Poller|Tail], StreamId, NewUri, NewTRef, NewDataType, NewParser) ->
 	case Poller#pollerInfo.stream_id == StreamId of
 		true->
-			[Poller#pollerInfo{uri = NewUri, timer_ref = NewTRef} | Tail];
+			[Poller#pollerInfo{uri = NewUri, timer_ref = NewTRef, data_type = NewDataType, parser = NewParser} | Tail];
 		_ ->
-			[Poller | update_info(Tail, StreamId, NewUri, NewTRef)]
+			[Poller | update_info(Tail, StreamId, NewUri, NewTRef, NewDataType, NewParser)]
 	end.
