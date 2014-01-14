@@ -59,7 +59,6 @@ all: compile
 ### Downloads all dependencies and builds the entire project
 install: get_libs conf
 	(cd javascripts; npm install socket.io; npm install rabbit.js)
-	 cp -r lib/elasticsearch-servicewrapper/service lib/elasticsearch/bin/
 
 install_linux_deps:
 	sudo scripts/install.sh
