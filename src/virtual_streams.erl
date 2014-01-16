@@ -90,21 +90,34 @@ content_types_accepted(ReqData, State) ->
 %% @end
 -spec process_post(ReqData::tuple(), State::string()) -> {true, tuple(), string()}.
 process_post(ReqData, State) ->
+	erlang:display("In process post"),
 	case api_help:is_search(ReqData) of
 		false ->
 			{VirtualStreamJson,_,_} = api_help:json_handler(ReqData, State),
+			erlang:display(VirtualStreamJson),
 			{{Year,Month,Day},{Hour,Minute,Second}} = calendar:local_time(),
 			Date = api_help:generate_date([Year,Month,Day]),
+			erlang:display("adding date"),
+			erlang:display(Date),
 			DateAdded = lib_json:add_values(VirtualStreamJson,[{creation_date, list_to_binary(Date)}]),
+			erlang:display(DateAdded),
+			erlang:display("streams involved"),
 			StreamsInvolved = lib_json:get_field(VirtualStreamJson, "streams_involved"),
+			erlang:display("getting time stamp"),
 			TimestampFrom = lib_json:get_field(VirtualStreamJson, "timestampfrom"),
+			erlang:display("Getting the function"),
 			Function = lib_json:get_field(VirtualStreamJson, "function"),
-			AllowedFunctions = ["min", "max", "mean", "total", "diff"],
+			erlang:display(Function),
+			erlang:display("All the way to expression"),
+			Expression = binary_to_list(lib_json:get_field(VirtualStreamJson, "expression")),
+			erlang:display(Expression),
+			AllowedFunctions = ["min", "max", "mean", "total", "diff", "adv"],
 			case api_help:do_only_fields_exist(VirtualStreamJson,?ACCEPTED_FIELDS_VSTREAMS_CREATE) of
 				true-> 
 					case lists:member(binary_to_list(lists:nth(1, Function)), AllowedFunctions) of
 						true ->
 							Func = binary_to_list(lists:nth(1, Function)),
+							erlang:display(Func),
 							if 
 								Func == "diff" andalso length(StreamsInvolved) =/= 1 -> 
 									{{halt, 404}, wrq:set_resp_body("Wrong number of streams involved for diff", ReqData), State};
@@ -121,7 +134,11 @@ process_post(ReqData, State) ->
 											if 
 												Func == "diff" ->
 													ok;
+												Func == "adv" ->
+													erlang:display("YAY"),
+													advanced(VirtualStreamId, StreamsInvolved, TimestampFrom, Expression, ReqData, State);
 												true ->
+													erlang:display("NOT SO YAY"),
 													reduce(VirtualStreamId, StreamsInvolved, TimestampFrom, Function, ReqData, State)
 											end,
 											StreamList = [{stream, binary_to_list(X)} || X <- StreamsInvolved],
@@ -138,6 +155,105 @@ process_post(ReqData, State) ->
 		true ->
 			process_search(ReqData, State, post)
 	end.
+
+
+
+advanced(VirtualStreamId, Streams, TimestampFrom, Expression, ReqData, State) ->
+	Vars = advanced_get_variables(Streams, [], 1),
+	Calced = calc:calculate(Expression, Vars),
+	erlang:display(Calced),
+	done.
+	%DatapointsList = lib_json:get_field(JsonStruct, "facets.statistics.entries"),
+			%NewDatapoints = lists:map(fun(Json) -> 
+			%								FinalDatapoint = lib_json:set_attrs([
+			%																	{"timestamp", list_to_atom(msToDate(lib_json:get_field(Json, "key")))},
+			%																	{"stream_id", VirtualStreamId},
+			%																	{"value",  lib_json:get_field(Json, binary_to_list(lists:nth(1, Function)))}
+			%																	]),
+			%								erlastic_search:index_doc(?INDEX, "vsdatapoint", lib_json:to_string(FinalDatapoint)),
+			%								datapoints:update_fields_in_stream({"virtual_stream", lib_json:to_string(VirtualStreamId)}, list_to_atom(msToDate(lib_json:get_field(Json, "key"))))
+			%							end, DatapointsList),
+			%{true, wrq:set_resp_body("\"status\":\"ok\"", ReqData), State}.
+
+advanced_get_variables([], Acc, _) -> Acc;
+advanced_get_variables([Stream|Rest], Acc, Count) ->
+	
+	advanced_get_variables(
+		Rest, 
+		[{"v"++integer_to_list(Count),get_time_series(advanced_get_data(binary_to_list(Stream)))}|Acc], Count+1).
+			
+
+advanced_get_data(StreamId) -> 
+	erlang:display("stream_id:" ++ StreamId ++ "&sort=timestamp:desc"),
+	case erlastic_search:search_limit(?INDEX, "datapoint","stream_id:" ++ StreamId ++ "&sort=timestamp:desc", 10) of
+		%case erlastic_search:search_json(#erls_params{}, ?INDEX, "datapoint", create_json(StreamId), []) of
+		{error,{Code, Body}} ->
+			erlang:display("ADVANCED VIRTUAL STREAM ERROR!!!"),
+			error;
+		{ok,JsonStruct} ->
+			lib_json:get_field(JsonStruct, "hits.hits")
+	end.
+
+
+%% @doc
+%% Function: get_time_series/1
+%% Purpose: Gets information as strings from a Json object (first time, last time and a list with all values)
+%% Returns: Data from JSON object as strings
+%% @end
+-spec get_time_series(JSON::string()) -> Values::string().
+get_time_series(Json) ->
+	{Values, _} = parse_json_list(Json, [], []),
+	%{Start, End} = get_times(Times, {}),
+	Values.
+	%get_values_string(Values).
+
+
+%% @doc
+%% Function: parse_json_list/3
+%% Purpose: Get a list of times and values from a Json object
+%% Returns: Lists with data from list of Json objects lists
+%% @TODO Avoid reverse by merging this function with get_values_string
+%% @end
+
+-spec parse_json_list(Datapoint::list(), Values::list(), Times::list()) -> {Values::list(), Times::list()}.
+parse_json_list([], Values, Times) -> {lists:reverse(Values), lists:reverse(Times)};
+parse_json_list([Head|Rest], Values, Times) ->
+	Val = lib_json:get_field(Head, "_source.value"),
+	parse_json_list(Rest, [Val|Values], []).
+
+
+
+%% @doc
+%% Function: get_times/1
+%% Purpose: Get the first and last time from a list (no longer interesting)
+%% Returns: A tuple with the first and last times in the list.
+%% @TODO No longer necessary. Remove calls to it.
+%% @end        
+-spec get_times(Values::string(), tuple()) -> {list(), list()}.
+get_times([], {}) -> {"321", "123"};
+get_times([End | List], {}) -> {"321", "123"};
+get_times(List, {End}) -> {binary_to_list(lists:last(List)), binary_to_list(End)}.
+
+
+%% @doc
+%% Function: get_values_string/1
+%% Purpose: Generates a string with a complete command to to forecast on Values in R
+%% Returns: String with complete forecast command for R
+%% @end        
+-spec get_values_string(Values::string()) -> string().
+get_values_string([]) -> no_values;
+get_values_string([Head | Tail]) -> get_values_string(Tail, lists:flatten(io_lib:format("~p)", [Head]))).
+
+
+%% @doc
+%% Function: get_values_string_/2
+%% Purpose: Get a string with values formatted as an R command (to create an equivalent list in R)
+%% Returns: A string with all the values in the argument
+%% @end        
+-spec get_values_string(Values::list(), string()) -> string().
+get_values_string([], S) -> "c("++S;
+get_values_string([Head | Tail], S) -> get_values_string(Tail, lists:flatten(io_lib:format("~p, ", [Head]))++S).
+
 
 
 %% @doc

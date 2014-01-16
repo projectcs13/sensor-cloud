@@ -26,5 +26,5 @@
 -define(ACCEPTED_DATAPOINTS_FIELDS, ["stream_id","timestamp","value"]).
 
 %% Fields for virtual streams
--define(ACCEPTED_FIELDS_VSTREAMS_UPDATE, ["user_id","name","description","tags","private"]).
--define(ACCEPTED_FIELDS_VSTREAMS_CREATE, ["user_id","name","description","tags","private","function","streams_involved","creation_date","timestampfrom"]).
+-define(ACCEPTED_FIELDS_VSTREAMS_UPDATE, ["user_id","name","description","tags","private","expression"]).
+-define(ACCEPTED_FIELDS_VSTREAMS_CREATE, ["user_id","name","description","tags","private","function","streams_involved","creation_date","timestampfrom","expression"]).
