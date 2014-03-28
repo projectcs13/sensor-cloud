@@ -109,11 +109,10 @@ process_post(ReqData, State) ->
 								Func == "diff" andalso length(StreamsInvolved) =/= 1 -> 
 									{{halt, 404}, wrq:set_resp_body("Wrong number of streams involved for diff", ReqData), State};
 								true ->	
-									Initialized1 = lib_json:add_field(DateAdded,"history_size",0),
 									{{Year,Month,Day},{Hour,Minute,Second}} = calendar:local_time(),
 									TimeStamp = binary:list_to_bin(api_help:generate_timestamp([Year,Month,Day,Hour,Minute,Second],0)),
-									Initialized2 = lib_json:add_field(Initialized1,"last_updated",TimeStamp),
-									case erlastic_search:index_doc(?INDEX, "virtual_stream", Initialized2) of	
+									Initialized = lib_json:add_field(DateAdded,"last_updated",TimeStamp),
+									case erlastic_search:index_doc(?INDEX, "virtual_stream", Initialized) of	
 										{error, Reason} ->
 											{{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
 										{ok,List} -> 

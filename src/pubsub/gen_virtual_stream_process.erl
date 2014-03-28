@@ -62,7 +62,7 @@ start_link(VStreamId, InputIds, Function) ->
 
 %% spec of record vsstate:
 %% {string(), [{atom(),string()}], binary(), {pid(), pid(), pid()}, atom()}
--record(vsstate, {vstreamid, datapoints, exchange, network, function, log, history_size, last_updated}).
+-record(vsstate, {vstreamid, datapoints, exchange, network, function, log, last_updated}).
 
 
 
@@ -120,7 +120,7 @@ init([VStreamId, InputIds, Function]) ->
 	%% Get the latest value for each datapoint.
 	DataPoints = get_latest_value_for_streams(InputIds),
 
-	%% Make sure we got all data points and get the history_size and last_updated.
+	%% Make sure we got all data points and the last_updated.
 	case length(InputIds) == length(DataPoints) of
 		false ->
 			{stop, "Can't connect to ES"};
@@ -135,11 +135,6 @@ init([VStreamId, InputIds, Function]) ->
 						undefined ->
 							{stop, "None existing virtual stream"};
 						Json ->
-							HistorySize =
-								case lib_json:get_field(Json, "history_size") of
-									undefined -> 0;
-									Size -> Size
-								end,
 							LastUpdated =
 								case lib_json:get_field(Json, "last_updated") of
 									undefined -> undefined;
@@ -152,7 +147,6 @@ init([VStreamId, InputIds, Function]) ->
 										     network = {Connection, ChannelIn, ChannelOut},
 										     function = Function,
 										     log = [],
-										     history_size = HistorySize,
 										     last_updated = LastUpdated},
 						    {ok, State}
 					end
@@ -258,16 +252,13 @@ handle_info({#'basic.deliver'{}, #amqp_msg{payload = Body}},
 														 "vsdatapoint", Msg) of
 						  	{error, _Reason} ->
 						  		NewLastUpdated = State#vsstate.last_updated,
-						  		NewHistorySize = State#vsstate.history_size,
 						  		%% TODO Persistent storage using file?
 								[Msg | State#vsstate.log];
 							{ok, _} ->
 								NewLastUpdated = Timestamp,
 								%% Try updating the vstream and storing the log
 								{L, S} = store_log_in_es(State#vsstate.log, 0),
-								NewHistorySize = State#vsstate.history_size + S + 1,
 								update_virtual_stream(State#vsstate.vstreamid,
-													  NewHistorySize,
 													  NewLastUpdated),
 								L
 						  end,
@@ -276,7 +267,6 @@ handle_info({#'basic.deliver'{}, #amqp_msg{payload = Body}},
 					send(ChannelOut, VStreamExchange, list_to_binary(Msg)),
 					{noreply, State#vsstate{datapoints = NewDataPoints,
 										    log = Log,
-										    history_size = NewHistorySize,
 										    last_updated = NewLastUpdated}}
 			end;
 		_ ->
@@ -527,24 +517,22 @@ get_latest_value_for_streams([{Type, Id} | T]) ->
 
 
 
-%% update_virtual_stream/3
+%% update_virtual_stream/2
 %% ====================================================================
 %% @doc
-%% Function: update_virtual_stream/3
-%% Purpose: Used to update a virtual streams history size and when it was last updated.
+%% Function: update_virtual_stream/2
+%% Purpose: Used to update a virtual streams last_updated field.
 %% Args: VStreamId - The id of the virtual stream to update,
-%%        HistorySize - The new history size of the virtual stream,
 %%        LastUpdated - The timestamp of when the virtual stream was last updated.
 %% Returns: {ok, Result} | {error, Reason}.
 %% @end
--spec update_virtual_stream(VStreamId, HistorySize, LastUpdated) -> {ok, Result} | {error, Reason} when
+-spec update_virtual_stream(VStreamId,  LastUpdated) -> {ok, Result} | {error, Reason} when
 	VStreamId :: string(),
-	HistorySize :: integer(),
 	LastUpdated :: string(),
 	Result :: term(),
 	Reason :: term().
 %% ====================================================================
-update_virtual_stream(VStreamId, HistorySize, LastUpdated) ->
+update_virtual_stream(VStreamId,  LastUpdated) ->
 	case erlastic_search:get_doc(?ES_INDEX, "virtual_stream", VStreamId) of
 		{error, Reason} ->
 			{error, Reason};
@@ -553,21 +541,14 @@ update_virtual_stream(VStreamId, HistorySize, LastUpdated) ->
 				undefined -> {error, "No such virtual stream"};
 				Json ->
 					Json1 =
-						case lib_json:get_field(Json, "history_size") of
+						case lib_json:get_field(Json, "last_updated") of
 							undefined ->
-								lib_json:add_value(Json, "history_size", HistorySize);
+								lib_json:add_value(Json, "last_updated", list_to_binary(LastUpdated));
 							_ ->
-								lib_json:replace_field(Json, "history_size", HistorySize)
+								lib_json:replace_field(Json, "last_updated", list_to_binary(LastUpdated))
 						end,
-					Json2 =
-						case lib_json:get_field(Json1, "last_updated") of
-							undefined ->
-								lib_json:add_value(Json1, "last_updated", list_to_binary(LastUpdated));
-							_ ->
-								lib_json:replace_field(Json1, "last_updated", list_to_binary(LastUpdated))
-						end,
-					Json3 = lib_json:set_attr(doc,Json2),
-					api_help:update_doc(?ES_INDEX, "virtual_stream", VStreamId, Json3)
+					Json2 = lib_json:set_attr(doc,Json1),
+					api_help:update_doc(?ES_INDEX, "virtual_stream", VStreamId, Json2)
 			end
 	end.
 

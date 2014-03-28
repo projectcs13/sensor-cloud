@@ -222,13 +222,11 @@ restricted_fields_create_test() ->
 	{ok, {{_Version3, 409, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(post, {?WEBMACHINE_URL++"/streams", [], "application/json", "{\n\"subscribers\" : \"\"\n, \"user_id\" : \"asdascvsr213sda\"}"}, [], []),
 	{ok, {{_Version4, 409, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(post, {?WEBMACHINE_URL++"/streams", [], "application/json", "{\n\"last_update\" : \"\"\n, \"user_id\" : \"asdascvsr213sda\"}"}, [], []),
 	{ok, {{_Version5, 409, _ReasonPhrase5}, _Headers5, Body5}} = httpc:request(post, {?WEBMACHINE_URL++"/streams", [], "application/json", "{\n\"creation_date\" : \"\"\n, \"user_id\" : \"asdascvsr213sda\"}"}, [], []),
-	{ok, {{_Version6, 409, _ReasonPhrase6}, _Headers6, Body6}} = httpc:request(post, {?WEBMACHINE_URL++"/streams", [], "application/json", "{\n\"history_size\" : \"\"\n, \"user_id\" : \"asdascvsr213sda\"}"}, [], []),
 	?assertEqual(true,string:str(Body1,"error") =/= 0),
 	?assertEqual(true,string:str(Body2,"error") =/= 0),
 	?assertEqual(true,string:str(Body3,"error") =/= 0),
 	?assertEqual(true,string:str(Body4,"error") =/= 0),
-	?assertEqual(true,string:str(Body5,"error") =/= 0),
-	?assertEqual(true,string:str(Body6,"error") =/= 0).
+	?assertEqual(true,string:str(Body5,"error") =/= 0).
 		
 		
 		
@@ -250,7 +248,6 @@ restricted_fields_update_test() ->
 	{ok, {{_Version3, 409, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(put, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(DocId), [], "application/json", "{\"subscribers\" : \"\"}"}, [], []),
 	{ok, {{_Version4, 409, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(put, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(DocId), [], "application/json", "{\"last_update\" : \"\"}"}, [], []),
 	{ok, {{_Version5, 409, _ReasonPhrase5}, _Headers5, Body5}} = httpc:request(put, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(DocId), [], "application/json", "{\"creation_date\" : \"\"}"}, [], []),
-	{ok, {{_Version6, 409, _ReasonPhrase6}, _Headers6, Body6}} = httpc:request(put, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(DocId), [], "application/json", "{\"history_size\" : \"\"\}"}, [], []),
 	{ok, {{_Version7, 409, _ReasonPhrase7}, _Headers7, Body7}} = httpc:request(put, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(DocId), [], "application/json", "{\"quality\" : \"\"\}"}, [], []),
 	{ok, {{_Version8, 200, _ReasonPhrase8}, _Headers8, _Body8}} = httpc:request(delete, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(DocId), []}, [], []),
 	{ok, {{_Version9, 200, _ReasonPhrase9}, _Headers9, _Body9}} = httpc:request(delete, {?WEBMACHINE_URL++"/users/search5", []}, [], []),
@@ -258,7 +255,6 @@ restricted_fields_update_test() ->
 	?assertEqual(true,string:str(Body3,"error") =/= 0),
 	?assertEqual(true,string:str(Body4,"error") =/= 0),
 	?assertEqual(true,string:str(Body5,"error") =/= 0),
-	?assertEqual(true,string:str(Body6,"error") =/= 0),
 	?assertEqual(true,string:str(Body7,"error") =/= 0).		
 	
 %% @doc
@@ -283,8 +279,7 @@ server_side_creation_test() ->
 	?assertEqual(true,lib_json:get_field(Body2,"user_ranking") =/= undefined),
 	?assertEqual(true,lib_json:get_field(Body2,"subscribers") =/= undefined),
 	?assertEqual(true,lib_json:get_field(Body2,"last_updated") =/= undefined),
-	?assertEqual(true,lib_json:get_field(Body2,"creation_date") =/= undefined),
-	?assertEqual(true,lib_json:get_field(Body2,"history_size") =/= undefined).
+	?assertEqual(true,lib_json:get_field(Body2,"creation_date") =/= undefined).
 
 
 

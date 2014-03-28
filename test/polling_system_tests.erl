@@ -335,7 +335,7 @@ post_stream_with_id(Id, Name, Uri, Freq, Type, Parser)->
 			"" -> "";
 			_ -> ", \"parser\":\"" ++ Parser ++ "\""
 		end,
-	Data = "{"++N++U++F++T++P++", \"polling\":true, \"history_size\":0}",
+	Data = "{"++N++U++F++T++P++", \"polling\":true}",
 	{ok, _} = erlastic_search:index_doc_with_id(?ES_INDEX, "stream", Id, Data).
 
 %% @doc
