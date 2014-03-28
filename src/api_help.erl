@@ -29,6 +29,7 @@
 	 is_polling_history/1,
 	 is_rank/1,
 	 is_search/1,
+	 is_count/1,
 	 is_subs/1,
 	 is_unsubs/1,
 	 json_handler/2,
@@ -329,13 +330,25 @@ is_rank(ReqData) ->
 
 %% @doc
 %% Function: is_search/1
-%% Purpose: Used to deiced if the URI specify a search
+%% Purpose: Used to decide if the URI specify a search
 %% Returns: True if URI specify a search, false otherwise
 %% @end
 -spec is_search(ReqData::term()) -> boolean().
 is_search(ReqData) ->
 	URIList = string:tokens(wrq:path(ReqData), "/"),
 	(string:sub_string(lists:nth(length(URIList),URIList),1,7) == "_search").
+
+
+%% @doc
+%% Function: is_count/1
+%% Purpose: Used to decide if the URI specify a count
+%% Returns: True if URI specify a count, false otherwise
+%% @end
+-spec is_count(ReqData::term()) -> boolean().
+is_count(ReqData) ->
+	URIList = string:tokens(wrq:path(ReqData), "/"),
+	(string:sub_string(lists:nth(length(URIList),URIList),1,7) == "_count").
+
 
 %% @doc
 %% Function: is_subs/1

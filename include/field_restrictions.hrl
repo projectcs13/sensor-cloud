@@ -10,8 +10,8 @@
 -define(INDEX, "sensorcloud").
 
 %% Fields for streams
--define(RESTRICTED_STREAMS_UPDATE, ["active","quality","user_ranking","subscribers","last_update","creation_date","history_size"]).
--define(RESTRICTED_STREAMS_CREATE, ["active","quality","user_ranking","subscribers","nr_subscribers","last_update","creation_date","history_size"]).
+-define(RESTRICTED_STREAMS_UPDATE, ["active","quality","user_ranking","subscribers","last_update","creation_date"]).
+-define(RESTRICTED_STREAMS_CREATE, ["active","quality","user_ranking","subscribers","nr_subscribers","last_update","creation_date"]).
 -define(ACCEPTED_STREAMS_FIELDS, ["user_id","name","description", "type","tags","private","unit","accuracy","min_val","max_val","polling","uri","polling_freq","location","resource","resource.resource_type","resource.uuid","parser","data_type","location.lon","location.lat"]).
 
 %% Fields for users

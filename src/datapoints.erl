@@ -36,12 +36,16 @@ allowed_methods(ReqData, State) ->
 	case api_help:parse_path(wrq:path(ReqData)) of	
 		[{"streams", _Id}, {"data", "_search"}] ->
 			{['POST','GET'], ReqData, State};
+		[{"streams", _Id}, {"data", "_count"}] ->
+			{['GET'], ReqData, State};
 		[{"streams", _Id}, {"data"}] ->
 			{['GET', 'POST'], ReqData, State};
 		[{"vstreams", _Id}, {"data", "_search"}] ->
 			{['POST','GET'], ReqData, State};
 		[{"vstreams", _Id}, {"data"}] ->
 			{['GET', 'POST'], ReqData, State};
+		[{"vstreams", _Id}, {"data", "_count"}] ->
+			{['GET'], ReqData, State};
 		[error] ->
 				{[], ReqData, State}
 	end.
@@ -103,7 +107,7 @@ process_post(ReqData, State) ->
 							true ->
 								case erlastic_search:get_doc(?INDEX, StreamType, Id) of
 							 		{error,{404,_}} ->
-								 		{{halt,409}, wrq:set_resp_body("{\"error\":\"no document with streamid given is present in the system\"}", ReqData), State};
+								 		{{halt,409}, wrq:set_resp_body("{\"error\":\"no document with streamid given is present in the 												system\"}", ReqData), State};
 	                         		{error,{Code,Body}} ->
 	                             		ErrorString = api_help:generate_error(Body, Code),
 	                             		{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
@@ -167,16 +171,31 @@ get_datapoint(ReqData, State) ->
     end,
 	case api_help:is_search(ReqData) of
 		false ->
-			Id = id_from_path(ReqData),			
-			case erlastic_search:search_limit(?INDEX, DataType, "stream_id:" ++ Id, Size) of
-				{ok, Result} ->
-					EncodedResult = lib_json:encode(Result),
-					FinalJson = api_help:get_list_and_add_id(Result, data),
-					{FinalJson, ReqData, State};
-				{error, {Code, Body}} -> 
-        				ErrorString = api_help:generate_error(Body, Code),
-        				{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State}
-			end; 
+			case api_help:is_count(ReqData) of
+				false ->
+					Id = id_from_path(ReqData),			
+					case erlastic_search:search_limit(?INDEX, DataType, "stream_id:" ++ Id, Size) of
+						{ok, Result} ->
+							EncodedResult = lib_json:encode(Result),
+							FinalJson = api_help:get_list_and_add_id(Result, data),
+							{FinalJson, ReqData, State};
+						{error, {Code, Body}} -> 
+							ErrorString = api_help:generate_error(Body, Code),
+							{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State}
+					end; 
+				true ->
+					Id = id_from_path(ReqData),
+					case erlastic_search:count(?INDEX, DataType, "stream_id:" ++ Id) of
+						{ok, Result} ->
+							EncodedResult = lib_json:encode(Result),
+							CountValue = lib_json:get_field(EncodedResult, "count"),
+							ReturnJson = lib_json:set_attr("count", CountValue),
+							{ReturnJson, ReqData, State};
+						{error, {Code, Body}} -> 
+							ErrorString = api_help:generate_error(Body, Code),
+							{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State}
+					end 
+			end;
 		true ->
 			process_search(ReqData,State, get)	
 	end.
@@ -303,8 +322,8 @@ is_virtual(ReqData) ->
 		 
 %% @doc
 %% Function: update_fields_in_stream/4
-%% Purpose: Update the history_size field and last_update
-%%          fields in the stream that is given
+%% Purpose: Update the and last_update
+%%          field in the stream that is given
 %% Returns: ok or {{halt,ErrorCode},ReqData,State}
 %%
 %% Side effects: Updates the document with the given id in ES
@@ -326,8 +345,8 @@ update_fields_in_stream(StreamId,TimeStamp,ReqData,State) ->
 
 %% @doc
 %% Function: update_fields_in_stream/2
-%% Purpose: Update the history_size field and last_update
-%%          fields in the stream that is given
+%% Purpose: Update the last_update
+%%          field in the stream that is given
 %% Returns: ok or {error, Code, ErrorString}
 %%
 %% Side effects: Updates the document with the given id in ES
@@ -340,19 +359,14 @@ update_fields_in_stream({StreamType, StreamId}, TimeStamp) ->
 			ErrorString = api_help:generate_error(Body, Code),
             {error, Code, ErrorString};
 		{ok,StreamJson} ->
-			OldHistorySize = case lib_json:get_field(StreamJson, "_source.history_size") of
-								 undefined ->
-									 0;
-								 OldSize ->
-									 OldSize
-							 end,
 			Time = case is_list(TimeStamp) of
 					   true->
 						   list_to_binary(TimeStamp);
 					   _->
 						   TimeStamp
 				   end,
-			Json = lib_json:set_attrs([{"last_updated", Time}, {"history_size", OldHistorySize+1}]),
+
+			Json = lib_json:set_attrs([{"last_updated", Time}]),
 			Update = lib_json:set_attr(doc, Json),
 			case api_help:update_doc(?INDEX, StreamType, StreamId, Update) of
 				{error, {Code, Body}} -> 

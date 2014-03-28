@@ -800,7 +800,6 @@ add_server_side_fields(Json) ->
 			     {quality, 1.0},
 			     {nr_subscribers, 0},
 			     {subscribers, "[]"},
-			     {history_size, 0}, 
 			     {user_ranking, "{}"},
 			     {"user_ranking.average", 0.0},
 			     {"user_ranking.nr_rankings", 0},
