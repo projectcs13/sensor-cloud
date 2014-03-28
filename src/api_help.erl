@@ -342,7 +342,7 @@ is_search(ReqData) ->
 %% @doc
 %% Function: is_count/1
 %% Purpose: Used to decide if the URI specify a count
-%% Returns: True if URI specify a search, false otherwise
+%% Returns: True if URI specify a count, false otherwise
 %% @end
 -spec is_count(ReqData::term()) -> boolean().
 is_count(ReqData) ->

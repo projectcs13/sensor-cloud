@@ -188,7 +188,9 @@ get_datapoint(ReqData, State) ->
 					case erlastic_search:count(?INDEX, DataType, "stream_id:" ++ Id) of
 						{ok, Result} ->
 							EncodedResult = lib_json:encode(Result),
-							{EncodedResult, ReqData, State};
+							CountValue = lib_json:get_field(EncodedResult, "count"),
+							ReturnJson = lib_json:set_attr("count", CountValue),
+							{ReturnJson, ReqData, State};
 						{error, {Code, Body}} -> 
 							ErrorString = api_help:generate_error(Body, Code),
 							{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State}
