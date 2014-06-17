@@ -6,7 +6,7 @@
 %%
 %% @doc == api_help ==
 %% This module will contain all help functions used by the
-%% api files 
+%% api files
 %%
 %% @end
 -module(api_help).
@@ -46,7 +46,7 @@
 %% @doc
 %% Purpose: Tries really hard to convert to float
 %% Returns: float() or error
-%% 
+%%
 %% @end
 -spec any_to_float(any()) -> float().
 any_to_float(Val) when is_float(Val) -> Val;
@@ -63,7 +63,7 @@ any_to_float(Val) when is_list(Val) ->
 		false -> NewVal = PointVal
 	end,
     case string:to_float(NewVal) of
-        {error,no_float} -> 
+        {error,no_float} ->
         	try
         		case list_to_integer(NewVal) of
         			{error, no_integer} -> error;
@@ -137,7 +137,7 @@ do_any_field_exist(Json,[First|Rest]) ->
 do_only_fields_exist(Json,List) ->
 	NumFields = count_fields(lib_json:to_string(Json)),
 	Values = lib_json:get_fields(Json, List),
-	NumCorrectFields = lists:foldl(fun(X, Sum) -> case X of 
+	NumCorrectFields = lists:foldl(fun(X, Sum) -> case X of
 							  undefined -> Sum;
 							  _ -> Sum + 1
 						      end
@@ -245,58 +245,58 @@ get_webmachine_url() ->
 			"http://localhost:8000"
 	end.
 
-%% @doc 
-%% Gets the '_id' from the root, gets the '_source'. Adds _id as 
+%% @doc
+%% Gets the '_id' from the root, gets the '_source'. Adds _id as
 %% id' in _source and return the new JSON object.
 %%
-%% @end 
+%% @end
 -spec get_and_add_id(JsonStruct::mochijson()) -> json_output_value().
 get_and_add_id(JsonStruct) ->
     Id  = lib_json:get_field(JsonStruct, "_id"),
     SourceJson  = lib_json:get_field(JsonStruct, "_source"),
     lib_json:add_value(SourceJson, "id", Id).
 
-%% @doc 
+%% @doc
 %% Get the search results and performs get_and_add_id/1 on each
 %% elements in the result list.
 %% NOTE: Deprecated, use get_list_and_add_id/2 instead
 %%
-%% @end 
+%% @end
 -spec get_list_and_add_id(JsonStruct::mochijson()) -> json_string().
 get_list_and_add_id(JsonStruct) ->
     HitsList = lib_json:get_field(JsonStruct, "hits.hits"),
     AddedId = lists:map(fun(X) -> get_and_add_id(X) end, HitsList),
     lib_json:set_attr(hits, AddedId).
 
-%% @doc 
+%% @doc
 %% Get the search results and performs get_and_add_id/1 on each
 %% elements in the result list. The resulting list will be returned
 %% as a proper JSON object with the JsonKey as the attribute.
 %%
 %% Return: get_list_and_add_id(List, Attribute) -> "{\"Attribute\": List}"
-%% @end 
+%% @end
 -spec get_list_and_add_id(JsonStruct::mochijson(), atom()) -> json_string().
 get_list_and_add_id(JsonStruct, JsonKey) ->
     HitsList = lib_json:get_field(JsonStruct, "hits.hits"),
     AddedId = lists:map(fun(X) -> get_and_add_id(X) end, HitsList),
     lib_json:set_attr(JsonKey, AddedId).
 
-%% @doc 
-%% Gets the 'password' from the root, gets the '_source'. Adds password as 
+%% @doc
+%% Gets the 'password' from the root, gets the '_source'. Adds password as
 %% password' in _source and return the new JSON object.
 %%
-%% @end 
+%% @end
 -spec get_and_add_password(JsonStruct::mochijson()) -> json_output_value().
 get_and_add_password(JsonStruct) ->
     Id  = lib_json:get_field(JsonStruct, "fields.password"),
     SourceJson  = lib_json:get_field(JsonStruct, "_source"),
     lib_json:add_value(SourceJson, "password", Id).
 
-%% @doc 
+%% @doc
 %% Get the search results and performs get_and_add_password/1 on each
 %% elements in the result list.
-%% 
-%% @end 
+%%
+%% @end
 -spec get_list_and_add_password(JsonStruct::mochijson()) -> json_string().
 get_list_and_add_password(JsonStruct) ->
     HitsList = lib_json:get_field(JsonStruct, "hits.hits"),
@@ -351,6 +351,17 @@ is_count(ReqData) ->
 
 
 %% @doc
+%% Function: is_auth/1
+%% Purpose: Used to decide if the URI specify an authentication request
+%% Returns: True if URI specify an authentication request, false otherwise
+%% @end
+-spec is_auth(ReqData::term()) -> boolean().
+is_auth(ReqData) ->
+	URIList = string:tokens(wrq:path(ReqData), "/"),
+	(string:sub_string(lists:nth(length(URIList),URIList),1,7) == "_auth").
+
+
+%% @doc
 %% Function: is_subs/1
 %% Purpose: Used to decide if the URI specify a subs request
 %% Returns: True if URI specifies a subs request, false otherwise
@@ -386,7 +397,7 @@ is_unsubs(ReqData) ->
 -spec json_handler(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 json_handler(ReqData, State) ->
 	Value = binary_to_list(wrq:req_body(ReqData)),
-	%[{Value,_ }] = mochiweb_util:parse_qs(wrq:req_body(ReqData)), 
+	%[{Value,_ }] = mochiweb_util:parse_qs(wrq:req_body(ReqData)),
 	{Value, ReqData, State}.
 
 
@@ -422,7 +433,7 @@ make_inner_term_query([First|Rest]) ->
 
 %% @doc
 %% Function: pair/1
-%% Purpose: Used to create a new list of tuples where each 
+%% Purpose: Used to create a new list of tuples where each
 %%          2 elements are paired
 %% Returns: The paired list
 %% @end
@@ -438,7 +449,7 @@ pair([A,B|T]) ->
 %% Returns: The parsed URI path as a list
 %% @end
 -spec parse_path(Path::file:name_all()) -> list().
-parse_path(Path) -> 
+parse_path(Path) ->
 	[_|T] = filename:split(Path),
 	pair(T).
 
@@ -481,7 +492,7 @@ transform([{Field,Value}|Rest]) ->
 transform([],true) -> "&";
 transform([],false) -> "";
 transform([{Field,Value}|Rest],AddAnd) ->
-	case Rest of 
+	case Rest of
 		[] -> Field ++ ":" ++ Value ++ transform(Rest,AddAnd);
 		_ -> Field ++ ":" ++ Value ++ "&" ++ transform(Rest,AddAnd)
 	end.

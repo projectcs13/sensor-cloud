@@ -1,7 +1,7 @@
 %% Author: Tomas S�vstr�m <tosa7943@student.uu.se>, Li Hao <hali2222@student.uu.se>
 %% [www.csproj13.student.it.uu.se]
 %% == api include file ==
-%% Includes defenitions of what fields are accteded and what fields are restricted, 
+%% Includes defenitions of what fields are accteded and what fields are restricted,
 %% and also what index to use in elastic search
 %%
 %% @end
@@ -16,7 +16,7 @@
 
 %% Fields for users
 -define(RESTRCITEDUPDATEUSERS, ["username", "subscriptions"]).
--define(ACCEPTEDFIELDSUSERS, ["username", "email", "firstname", "lastname", "description", "password", "private"]).
+-define(ACCEPTEDFIELDSUSERS, ["username", "email", "firstname", "lastname", "description", "password", "private", "access_token", "id_token"]).
 
 %% Fields for resources
 -define(RESTRICTED_RESOURCES_UPDATE, []).
