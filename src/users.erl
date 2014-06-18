@@ -440,26 +440,49 @@ create_user_openidc(ReqData, State) ->
     %       UserNameApproved = false;
     %   UserBinary ->
     % end.
-    AccessToken = lib_json:get_field(UserJson, "access_token"),
-    IDToken = lib_json:get_field(UserJson, "id_token"),
-	erlang:display(UserJson),
-    case {AccessToken, IDToken} of
-        {undefined,_} ->
-            {{halt,403}, wrq:set_resp_body("Access_Token missing", ReqData), State};
-        {_,undefined} ->
-            {{halt,403}, wrq:set_resp_body("ID_Token missing", ReqData), State};
-        {_,_} ->
-            % Fetch user's data from Google
-            % DiscoveryDocument = "https://accounts.google.com/.well-known/openid-configuration",
-            % AuthEndpoint = "https://accounts.google.com/o/oauth2/auth",
-            UserInfoEndpoint = "https://www.googleapis.com/plus/v1/people/me/openIdConnect",
-            OpenIDC_Options = "?scope=openid%20email%20profile",
-            URL = UserInfoEndpoint ++ OpenIDC_Options,
-            Headers = [{access_token, AccessToken}],
-            Res = ibrowse:send_req(URL, Headers, get),
+    % AccessToken = lib_json:get_field(UserJson, "access_token"),
+    % IDToken = lib_json:get_field(UserJson, "id_token"),
+    Code = lib_json:get_field(UserJson, "code"),
+    % case {AccessToken, IDToken} of
+    %     {undefined,_} ->
+    %         {{halt,403}, wrq:set_resp_body("Access_Token missing", ReqData), State};
+    %     {_,undefined} ->
+    %         {{halt,403}, wrq:set_resp_body("ID_Token missing", ReqData), State};
+    %     {_,_} ->
+    %         % Fetch user's data from Google
+    %         % DiscoveryDocument = "https://accounts.google.com/.well-known/openid-configuration",
+    %         % AuthEndpoint = "https://accounts.google.com/o/oauth2/auth",
+    %         UserInfoEndpoint = "https://www.googleapis.com/plus/v1/people/me/openIdConnect",
+    %         OpenIDC_Options = "?scope=openid%20email%20profile",
+    %         URL = UserInfoEndpoint ++ OpenIDC_Options,
+    %         Headers = [{access_token, AccessToken}],
+    %         Res = ibrowse:send_req(URL, Headers, get),
+    %         erlang:display(Res),
+    %         % create_user()
+    %         {true, wrq:set_resp_body("User created!", ReqData), State}
+    % end.
+
+    case Code of
+        undefined ->
+            {{halt,403}, wrq:set_resp_body("OpenID's Code missing", ReqData), State};
+		null ->
+            {{halt,403}, wrq:set_resp_body("OpenID's Code is null", ReqData), State};
+        _ ->
+        	erlang:display("Code"),
+        	erlang:display(Code),
+		    ClientID = "995342763478-fh8bd2u58n1tl98nmec5jrd76dkbeksq.apps.googleusercontent.com",
+		    ClientSecret = "fVpjWngIEny9VTf3ZPZr8Sh6",
+		    % Redirect_URI = "http://localhost:3000/",
+		    % Redirect_URI = "https://oauth2-login-demo.appspot.com/code",
+		    Redirect_URI = "postmessage",
+
+		    Body = [{code, Code}, {client_id, ClientID}, {client_secret, ClientSecret}, {redirect_uri, Redirect_URI}, {grant_type, "authorization_code"}],
+            TokenEndpoint = "https://accounts.google.com/o/oauth2/token",
+
+            Res = ibrowse:send_req(TokenEndpoint, [], get, [], Body),
             erlang:display(Res),
             % create_user()
-            {true, wrq:set_resp_body("User created!", ReqData), State}
+            {true, wrq:set_resp_body("Great!!", ReqData), State}
     end.
 
 
