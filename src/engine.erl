@@ -21,9 +21,10 @@ ensure_started(App) ->
 %% @doc Starts the app for inclusion in a supervisor tree
 start_link() ->
     ensure_started(inets),
+    ensure_started(ibrowse),
     ensure_started(crypto),
     ensure_started(mochiweb),
-    application:set_env(webmachine, webmachine_logger_module, 
+    application:set_env(webmachine, webmachine_logger_module,
                         webmachine_logger),
     ensure_started(webmachine),
     engine_sup:start_link().
@@ -32,9 +33,10 @@ start_link() ->
 %% @doc Start the engine server.
 start() ->
     ensure_started(inets),
+    ensure_started(ibrowse),
     ensure_started(crypto),
     ensure_started(mochiweb),
-    application:set_env(webmachine, webmachine_logger_module, 
+    application:set_env(webmachine, webmachine_logger_module,
                         webmachine_logger),
     ensure_started(webmachine),
     analyse:start(),    % possibly temporary solution for ericsson demo
@@ -47,6 +49,7 @@ stop() ->
     application:stop(webmachine),
     application:stop(mochiweb),
     application:stop(crypto),
+    application:stop(ibrowse),
     application:stop(inets),
     case whereis(polling_monitor) of
         undefined -> ok;
