@@ -2,6 +2,11 @@
 
 Welcome to the "Project CS 2013" project
 
+## Demo
+
+You can check out a demo of the IoT-Framework here: [IoT-Framework
+demo](https://vimeo.com/98966770). 
+
 ## Installing the project
 
 1. Download and compile the linux system dependencies, (only needed once per machine)
