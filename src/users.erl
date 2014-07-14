@@ -14,7 +14,7 @@
          put_user/2,
          get_user/2,
          process_post/2,
-         create_user_openidc/2,
+         process_auth_request/2,
          delete_streams_with_user_id/1]).
 
 -include("webmachine.hrl").
@@ -41,7 +41,7 @@ init([]) ->
 allowed_methods(ReqData, State) ->
     case api_help:parse_path(wrq:path(ReqData)) of
         [{"users","_auth"}] ->
-            {['POST', 'GET'], ReqData, State};
+            {['POST'], ReqData, State};
         [{"users","_search"}] ->
             {['POST','GET'], ReqData, State};
         [{"users",_Id}] ->
@@ -374,7 +374,7 @@ process_post(ReqData, State) ->
         false ->
             case api_help:is_auth(ReqData) of
                 true ->
-                    create_user_openidc(ReqData, State);
+                    process_auth_request(ReqData, State);
                 false ->
                     % create_user()
                     {UserJson,_,_} = api_help:json_handler(ReqData, State),
@@ -385,19 +385,20 @@ process_post(ReqData, State) ->
                         UserBinary ->
                             %% CHECK AND SANITIZE USERNAME
                             UserName = string:to_lower(binary_to_list(UserBinary)),
-                            UserNameApproved = case lists:filter(fun(X) -> not lists:member(X, "abcdefghijklmnopqrstuvwxyz_-0123456789") end,UserName) of
-                                "" ->
-                                    case erlastic_search:get_doc(?INDEX, "user", UserName) of
-                                        {error, {404, _}} ->
-                                            true;
-                                        {error, {Code0, Body0}} ->
-                                            {Code0, Body0};
-                                        {ok,JsonStruct} ->
-                                            false
-                                    end;
-                                _ ->
-                                    invalidcharacters
-                            end
+                            UserNameApproved = check_and_sanitize(UserName),
+                            % UserNameApproved = case lists:filter(fun(X) -> not lists:member(X, "abcdefghijklmnopqrstuvwxyz_-0123456789") end,UserName) of
+                            %     "" ->
+                            %         case erlastic_search:get_doc(?INDEX, "user", UserName) of
+                            %             {error, {404, _}} ->
+                            %                 true;
+                            %             {error, {Code0, Body0}} ->
+                            %                 {Code0, Body0};
+                            %             {ok,JsonStruct} ->
+                            %                 false
+                            %         end;
+                            %     _ ->
+                            %         invalidcharacters
+                            % end
                     end,
                     case {api_help:do_only_fields_exist(UserJson,?ACCEPTEDFIELDSUSERS),UserNameApproved,UserName =/= undefined} of
                         {_,_,false} ->
@@ -427,65 +428,85 @@ process_post(ReqData, State) ->
 
 
 %% @doc
-%% Function: create_user_openidc/2
+%% Function: process_auth_request/2
 %% Purpose: creates a user based on the OpenID data received
 %% Returns: {true, ReqData, State} || {{error, Reason}, ReqData, State}
 %% @end
--spec create_user_openidc(ReqData::tuple(), State::string()) -> {true, tuple(), string()}.
-create_user_openidc(ReqData, State) ->
-    {UserJson,_,_} = api_help:json_handler(ReqData, State),
-    % case lib_json:get_field(UserJson, "access_token") of
-    %   undefined ->
-    %       UserName = undefined,
-    %       UserNameApproved = false;
-    %   UserBinary ->
-    % end.
-    % AccessToken = lib_json:get_field(UserJson, "access_token"),
-    % IDToken = lib_json:get_field(UserJson, "id_token"),
-    Code = lib_json:get_field(UserJson, "code"),
-    % case {AccessToken, IDToken} of
-    %     {undefined,_} ->
-    %         {{halt,403}, wrq:set_resp_body("Access_Token missing", ReqData), State};
-    %     {_,undefined} ->
-    %         {{halt,403}, wrq:set_resp_body("ID_Token missing", ReqData), State};
-    %     {_,_} ->
-    %         % Fetch user's data from Google
-    %         % DiscoveryDocument = "https://accounts.google.com/.well-known/openid-configuration",
-    %         % AuthEndpoint = "https://accounts.google.com/o/oauth2/auth",
-    %         UserInfoEndpoint = "https://www.googleapis.com/plus/v1/people/me/openIdConnect",
-    %         OpenIDC_Options = "?scope=openid%20email%20profile",
-    %         URL = UserInfoEndpoint ++ OpenIDC_Options,
-    %         Headers = [{access_token, AccessToken}],
-    %         Res = ibrowse:send_req(URL, Headers, get),
-    %         erlang:display(Res),
-    %         % create_user()
-    %         {true, wrq:set_resp_body("User created!", ReqData), State}
-    % end.
+-spec process_auth_request(ReqData::tuple(), State::string()) -> {true, tuple(), string()}.
+process_auth_request(ReqData, State) ->
+    % TODO Grab these settings from a config file
+    APIKey = "AIzaSyCyC23vutanlgth_1INqQdZsv6AgZRiknY",
+    ClientID = "995342763478-fh8bd2u58n1tl98nmec5jrd76dkbeksq.apps.googleusercontent.com",
+    ClientSecret = "fVpjWngIEny9VTf3ZPZr8Sh6",
+    RedirectURL = "http://localhost:8000/users/_openid",
 
-    case Code of
-        undefined ->
-            {{halt,403}, wrq:set_resp_body("OpenID's Code missing", ReqData), State};
-		null ->
-            {{halt,403}, wrq:set_resp_body("OpenID's Code is null", ReqData), State};
+    plus_srv:start_link(APIKey, ClientID, ClientSecret, RedirectURL),
+    plus_srv:set_api("https://www.googleapis.com/discovery/v1/apis/plus/v1/rest"),
+    TokenURL = plus_srv:gen_token_url("https://www.googleapis.com/auth/plus.me"),
+
+    JSON = "{\"token_url\": \"" ++ TokenURL ++ "\"}",
+    {true, wrq:set_resp_body(JSON, ReqData), State}.
+
+
+-spec process_auth_redirect(ReqData::tuple(), State::string()) -> {true, tuple(), string()}.
+process_auth_redirect(ReqData, State) ->
+    case {wrq:get_qs_value("code", ReqData), wrq:get_qs_value("state", ReqData)} of
+        {undefined, _} ->
+            {{halt,403}, wrq:set_resp_body("State missing", ReqData), State};
+        {_, undefined} ->
+            {{halt,403}, wrq:set_resp_body("Code missing", ReqData), State};
+        {Code, AuthState} when Code =/= "", AuthState =/= "" ->
+            Token = plus_srv:exchange_token(Code, AuthState),
+            UserJSON = fetch_user_info(),
+            Res = save_if_new(UserJSON),
+            % TODO Return access_token and UserInfo
+
+            N = proplists:get_value(<<"displayName">>, Person),
+            Name = binary_to_list(N),
+            proplists:get_value(<<"url">>, Person),
+            JSON = "{\"token\": \"" ++ Name ++ "\"}",
+            {true, wrq:set_resp_body(JSON, ReqData), State};
         _ ->
-        	erlang:display("Code"),
-        	erlang:display(Code),
-		    ClientID = "995342763478-fh8bd2u58n1tl98nmec5jrd76dkbeksq.apps.googleusercontent.com",
-		    ClientSecret = "fVpjWngIEny9VTf3ZPZr8Sh6",
-		    % Redirect_URI = "http://localhost:3000/",
-		    % Redirect_URI = "https://oauth2-login-demo.appspot.com/code",
-		    Redirect_URI = "postmessage",
-
-		    Body = [{code, Code}, {client_id, ClientID}, {client_secret, ClientSecret}, {redirect_uri, Redirect_URI}, {grant_type, "authorization_code"}],
-            TokenEndpoint = "https://accounts.google.com/o/oauth2/token",
-
-            Res = ibrowse:send_req(TokenEndpoint, [], get, [], Body),
-            erlang:display(Res),
-            % create_user()
-            {true, wrq:set_resp_body("Great!!", ReqData), State}
+            {{halt,403}, wrq:set_resp_body("Unsupported field(s) on the auth request", ReqData), State}
     end.
 
 
+fetch_user_info() ->
+    {ok, Person} = plus_srv:call_method("plus.people.get", [{"userId", "me"}], []).
+    % TODO Transform Person to JSON
+
+
+save_if_new(UserJSON) ->
+    % UserName = UserJSON.username
+    case check_and_sanitize(UserName) of
+        true ->
+            FieldsAdded  = add_server_side_fields(UserJSON),
+            FieldsAdded2 = add_openid_fields(FieldsAdded),
+            case erlastic_search:index_doc_with_id(?INDEX, "user", UserName, FieldsAdded2) of
+                {error, {Code, Body}} ->
+                    ErrorString = api_help:generate_error(Body, Code),
+                    {error, ErrorString};
+                {ok, List} ->
+                    {ok, lib_json:encode(List)}
+            end
+    end.
+
+
+check_and_sanitize(UserName) ->
+    Lambda = fun(X) -> not lists:member(X, "abcdefghijklmnopqrstuvwxyz_-0123456789") end,
+    case lists:filter(Lambda, UserName) of
+        "" ->
+            case erlastic_search:get_doc(?INDEX, "user", UserName) of
+                {error, {404, _}} ->
+                    true;
+                {error, {Code, Body}} ->
+                    {Code, Body};
+                {ok,JsonStruct} ->
+                    false
+            end;
+        _ ->
+            invalidcharacters
+    end.
 
 
 %% @doc
@@ -495,49 +516,54 @@ create_user_openidc(ReqData, State) ->
 %% @end
 -spec get_user(ReqData::tuple(), State::string()) -> {list(), tuple(), string()}.
 get_user(ReqData, State) ->
-    case api_help:is_search(ReqData) of
-        false ->
-            case id_from_path(ReqData) of
-                undefined ->
-                    % Get all users
-                    case wrq:get_qs_value("size",ReqData) of
-                        undefined ->
-                            case erlastic_search:count_type(?INDEX, "user") of
-                                {error, {_CountCode, _CountBody}} ->
-                                    Size = 100;
-                                {ok,CountJsonStruct} ->
-                                    Size = lib_json:get_field(CountJsonStruct,"count")
-                            end;
-                        SizeParam ->
-                            Size = list_to_integer(SizeParam)
-                    end,
-                    case wrq:get_qs_value("admin",ReqData) of
-                        "true" ->
-                            Query = "{\"size\" :" ++ integer_to_list(Size) ++",\"query\" : {\"match_all\" : {}},\"fields\":[\"password\",\"_source\"]}}";
-                        _ ->
-                            Query = "{\"size\" :" ++ integer_to_list(Size) ++",\"query\" : {\"match_all\" : {}},\"filter\" : {\"bool\":{\"must_not\":{\"term\":{\"private\":\"true\"}}}}}"
-                    end,
-                    case erlastic_search:search_json(#erls_params{},?INDEX, "user", Query) of
-                        {error, {Code, Body}} ->
-                            ErrorString = api_help:generate_error(Body, Code),
-                            {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-                        {ok,JsonStruct} ->
-                            FinalJson = api_help:get_list_and_add_password(JsonStruct),
-                            {FinalJson, ReqData, State}
-                    end;
-                Id ->
-                    %% Get specific user
-                    case erlastic_search:get_doc(?INDEX, "user", string:to_lower(Id), [{<<"fields">>, <<"password,_source">>}]) of
-                        {error, {Code1, Body1}} ->
-                            ErrorString1 = api_help:generate_error(Body1, Code1),
-                            {{halt, Code1}, wrq:set_resp_body(ErrorString1, ReqData), State};
-                        {ok,JsonStruct} ->
-                            FinalJson = api_help:get_and_add_password(JsonStruct),
-                            {FinalJson, ReqData, State}
-                    end
-            end;
+    case api_help:is_auth_redirect(ReqData) of
         true ->
-            process_search(ReqData,State, get)
+            process_auth_redirect(ReqData, State);
+        false ->
+            case api_help:is_search(ReqData) of
+                true ->
+                    process_search(ReqData,State, get);
+                false ->
+                    case id_from_path(ReqData) of
+                        undefined ->
+                            % Get all users
+                            case wrq:get_qs_value("size",ReqData) of
+                                undefined ->
+                                    case erlastic_search:count_type(?INDEX, "user") of
+                                        {error, {_CountCode, _CountBody}} ->
+                                            Size = 100;
+                                        {ok,CountJsonStruct} ->
+                                            Size = lib_json:get_field(CountJsonStruct,"count")
+                                    end;
+                                SizeParam ->
+                                    Size = list_to_integer(SizeParam)
+                            end,
+                            case wrq:get_qs_value("admin",ReqData) of
+                                "true" ->
+                                    Query = "{\"size\" :" ++ integer_to_list(Size) ++",\"query\" : {\"match_all\" : {}},\"fields\":[\"password\",\"_source\"]}}";
+                                _ ->
+                                    Query = "{\"size\" :" ++ integer_to_list(Size) ++",\"query\" : {\"match_all\" : {}},\"filter\" : {\"bool\":{\"must_not\":{\"term\":{\"private\":\"true\"}}}}}"
+                            end,
+                            case erlastic_search:search_json(#erls_params{},?INDEX, "user", Query) of
+                                {error, {Code, Body}} ->
+                                    ErrorString = api_help:generate_error(Body, Code),
+                                    {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+                                {ok,JsonStruct} ->
+                                    FinalJson = api_help:get_list_and_add_password(JsonStruct),
+                                    {FinalJson, ReqData, State}
+                            end;
+                        Id ->
+                            %% Get specific user
+                            case erlastic_search:get_doc(?INDEX, "user", string:to_lower(Id), [{<<"fields">>, <<"password,_source">>}]) of
+                                {error, {Code1, Body1}} ->
+                                    ErrorString1 = api_help:generate_error(Body1, Code1),
+                                    {{halt, Code1}, wrq:set_resp_body(ErrorString1, ReqData), State};
+                                {ok,JsonStruct} ->
+                                    FinalJson = api_help:get_and_add_password(JsonStruct),
+                                    {FinalJson, ReqData, State}
+                            end
+                    end
+            end
     end.
 
 
@@ -598,9 +624,18 @@ id_from_path(RD) ->
 %% Returns: The new json with the fields added
 %% @end
 -spec add_server_side_fields(Json::string()) -> string().
-
 add_server_side_fields(Json) ->
     lib_json:add_values(Json,[{rankings, "[]"},{notifications,"[]"},{triggers,"[]"},{subscriptions, "[]"}]).
 
 
+%% @doc
+%% Function: add_openid_fields/2
+%% Purpose: Used to add all the fields that should be added server side
+%% Returns: The new json with the fields added
+%% @end
+-spec add_openid_fields(Json::string()) -> string().
+add_openid_fields(Json) ->
+    AccessToken  = plus_srv:get_access_token(),
+    RefreshToken = plus_srv:get_refresh_token(),
+    lib_json:add_values(Json, [{access_token, AccessToken}, {refreshtoken, RefreshToken}]).
 
