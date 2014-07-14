@@ -28,6 +28,7 @@
 	 get_list_and_add_password/1,
 	 is_polling_history/1,
 	 is_auth/1,
+	 is_auth_redirect/1,
 	 is_rank/1,
 	 is_search/1,
 	 is_count/1,
@@ -350,6 +351,18 @@ is_auth(ReqData) ->
 	% true.
 	URIList = string:tokens(wrq:path(ReqData), "/"),
 	(string:sub_string(lists:nth(length(URIList),URIList),1,7) == "_auth").
+
+
+%% @doc
+%% Function: is_auth_redirect/1
+%% Purpose: Used to decide if the URI specify a search
+%% Returns: True if URI specify a search, false otherwise
+%% @end
+-spec is_auth_redirect(ReqData::term()) -> boolean().
+is_auth_redirect(ReqData) ->
+	% true.
+	URIList = string:tokens(wrq:path(ReqData), "/"),
+	(string:sub_string(lists:nth(length(URIList),URIList),1,7) == "_openid").
 
 
 %% @doc
