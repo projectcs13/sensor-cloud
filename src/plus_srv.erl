@@ -117,7 +117,7 @@ handle_call({gen_token_url, Scopes}, _From, State) ->
 
 handle_call({exchange_token, Code, OAuth2State}, _From, State) when OAuth2State == State#state.oauth2state ->
     {ok, Token} = get_authtoken(Code, State),
-    {reply, ok, State#state{authtoken=Token}};
+    {reply, Token, State#state{authtoken=Token}};
 
 handle_call({exchange_token, _, _}, _From, State) ->
     {reply, {error, "Invalid State"}, State};
@@ -302,6 +302,7 @@ get_authurl(Scopes, #state{clientid = ClientID, redirecturl = RedirectURL}) ->
     ["https://accounts.google.com/o/oauth2/auth?" ++
             "client_id=" ++ ClientID ++
             "&response_type=code" ++
+            "&access_type=offline" ++
             "&redirect_uri=" ++ edoc_lib:escape_uri(RedirectURL) ++
             "&scope=" ++ edoc_lib:escape_uri(Scopes) ++
             "&state=" ++ edoc_lib:escape_uri(OAuth2State), OAuth2State].
