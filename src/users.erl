@@ -42,6 +42,8 @@ allowed_methods(ReqData, State) ->
     case api_help:parse_path(wrq:path(ReqData)) of
         [{"users","_auth"}] ->
             {['POST'], ReqData, State};
+        [{"users","_openid"}] ->
+            {['GET'], ReqData, State};
         [{"users","_search"}] ->
             {['POST','GET'], ReqData, State};
         [{"users",_Id}] ->
@@ -378,6 +380,7 @@ process_post(ReqData, State) ->
                 false ->
                     % create_user()
                     {UserJson,_,_} = api_help:json_handler(ReqData, State),
+
                     case lib_json:get_field(UserJson, "username") of
                         undefined ->
                             UserName = undefined,
@@ -385,21 +388,9 @@ process_post(ReqData, State) ->
                         UserBinary ->
                             %% CHECK AND SANITIZE USERNAME
                             UserName = string:to_lower(binary_to_list(UserBinary)),
-                            UserNameApproved = check_and_sanitize(UserName),
-                            % UserNameApproved = case lists:filter(fun(X) -> not lists:member(X, "abcdefghijklmnopqrstuvwxyz_-0123456789") end,UserName) of
-                            %     "" ->
-                            %         case erlastic_search:get_doc(?INDEX, "user", UserName) of
-                            %             {error, {404, _}} ->
-                            %                 true;
-                            %             {error, {Code0, Body0}} ->
-                            %                 {Code0, Body0};
-                            %             {ok,JsonStruct} ->
-                            %                 false
-                            %         end;
-                            %     _ ->
-                            %         invalidcharacters
-                            % end
+                            UserNameApproved = check_and_sanitize(UserName)
                     end,
+
                     case {api_help:do_only_fields_exist(UserJson,?ACCEPTEDFIELDSUSERS),UserNameApproved,UserName =/= undefined} of
                         {_,_,false} ->
                             {{halt,403}, wrq:set_resp_body("Username missing", ReqData), State};
@@ -453,60 +444,236 @@ process_auth_redirect(ReqData, State) ->
     case {wrq:get_qs_value("code", ReqData), wrq:get_qs_value("state", ReqData)} of
         {undefined, _} ->
             {{halt,403}, wrq:set_resp_body("State missing", ReqData), State};
+
         {_, undefined} ->
             {{halt,403}, wrq:set_resp_body("Code missing", ReqData), State};
-        {Code, AuthState} when Code =/= "", AuthState =/= "" ->
-            Token = plus_srv:exchange_token(Code, AuthState),
-            UserJSON = fetch_user_info(),
-            Res = save_if_new(UserJSON),
-            % TODO Return access_token and UserInfo
 
-            N = proplists:get_value(<<"displayName">>, Person),
-            Name = binary_to_list(N),
-            proplists:get_value(<<"url">>, Person),
-            JSON = "{\"token\": \"" ++ Name ++ "\"}",
-            {true, wrq:set_resp_body(JSON, ReqData), State};
+        {Code, AuthState} when Code =/= "", AuthState =/= "" ->
+            authenticate(Code, AuthState, ReqData, State);
+
         _ ->
             {{halt,403}, wrq:set_resp_body("Unsupported field(s) on the auth request", ReqData), State}
     end.
 
 
-fetch_user_info() ->
-    {ok, Person} = plus_srv:call_method("plus.people.get", [{"userId", "me"}], []).
-    % TODO Transform Person to JSON
+-spec authenticate(Code::string(), AuthState::string(), ReqData::tuple(), State::string()) -> string().
+authenticate(Code, AuthState, ReqData, State) ->
+    {AccToken, RefToken} = exchange_token(Code, AuthState),
 
+    case AccToken of
+        undefined ->
+            ErrorMsg = "Not possible to authenticate. Missing Access Token",
+            {{halt,403}, wrq:set_resp_body(ErrorMsg, ReqData), State};
 
-save_if_new(UserJSON) ->
-    % UserName = UserJSON.username
-    case check_and_sanitize(UserName) of
-        true ->
-            FieldsAdded  = add_server_side_fields(UserJSON),
-            FieldsAdded2 = add_openid_fields(FieldsAdded),
-            case erlastic_search:index_doc_with_id(?INDEX, "user", UserName, FieldsAdded2) of
-                {error, {Code, Body}} ->
-                    ErrorString = api_help:generate_error(Body, Code),
-                    {error, ErrorString};
-                {ok, List} ->
-                    {ok, lib_json:encode(List)}
+        _ ->
+            case fetch_user_info() of
+                {error, _} ->
+                    ErrorMsg = "Not possible to authenticate. Unreachable user info",
+                    {{halt,403}, wrq:set_resp_body(ErrorMsg, ReqData), State};
+
+                {ok, UserData} ->
+                    case user_is_new(UserData) of
+                        false ->
+                            case fetch_refresh_token(UserData) of
+                                {error, ErrorMsg} ->
+                                    {{halt,403}, wrq:set_resp_body(ErrorMsg, ReqData), State};
+
+                                {ok, Ref} ->
+                                    Struct = {struct, [{refresh_token, Ref}]},
+                                    Res = mochijson2:encode(Struct),
+                                    {true, wrq:set_resp_body(Res, ReqData), State}
+                            end;
+
+                        true ->
+                            case RefToken of
+                                undefined ->
+                                    ErrorMsg = "Not possible to authenticate. Missing Refresh Token. Revoke the app access manually",
+                                    {{halt,403}, wrq:set_resp_body(ErrorMsg, ReqData), State};
+                                _ ->
+                                    store_user(UserData, AccToken, RefToken),
+                                    Struct = {struct, [{refresh_token, RefToken}]},
+                                    Res = mochijson2:encode(Struct),
+                                    {true, wrq:set_resp_body(Res, ReqData), State}
+                            end
+                    end
             end
     end.
 
+    % case Token of
+    %     {undefined, _} ->
+    %         ErrorMsg = "Not possible to authenticate. Missing Access Token",
+    %         {{halt,403}, wrq:set_resp_body(ErrorMsg, ReqData), State};
 
-check_and_sanitize(UserName) ->
-    Lambda = fun(X) -> not lists:member(X, "abcdefghijklmnopqrstuvwxyz_-0123456789") end,
-    case lists:filter(Lambda, UserName) of
-        "" ->
-            case erlastic_search:get_doc(?INDEX, "user", UserName) of
-                {error, {404, _}} ->
-                    true;
-                {error, {Code, Body}} ->
-                    {Code, Body};
-                {ok,JsonStruct} ->
-                    false
-            end;
-        _ ->
-            invalidcharacters
+    %     % {_, undefined} ->
+    %     %     ErrorMsg = "Not possible to authenticate. Missing Refresh Token",
+    %     %     {{halt,403}, wrq:set_resp_body(ErrorMsg, ReqData), State};
+
+    %     {AccToken, RefToken} ->
+    %         case fetch_user_info() of
+    %             {error, _} ->
+    %                 ErrorMsg = "Not possible to authenticate. Unreachable user info",
+    %                 {{halt,403}, wrq:set_resp_body(ErrorMsg, ReqData), State};
+
+    %             {ok, UserData} ->
+    %                 case user_is_new(UserData) of
+    %                     false -> store_user(UserData, AccToken, RefToken)
+    %                 end,
+    %                 Res = mochijson2:encode({struct, {refresh_token, RefToken}),
+    %                 {true, wrq:set_resp_body(Res, ReqData), State}
+    %         end;
+
+    %     _ -> {{halt,403}, wrq:set_resp_body("Unknown error", ReqData), State}
+    % end.
+
+
+    % case {AccToken, UserInfo} of
+    %     {undefined, _} ->
+    %         ErrorMsg = "Not possible to authenticate. Unreachable user info",
+    %         {{halt,403}, wrq:set_resp_body(ErrorMsg, ReqData), State};
+
+    %     {_, {error, _}} ->
+    %         ErrorMsg = "Not possible to authenticate. Unreachable user info",
+    %         {{halt,403}, wrq:set_resp_body(ErrorMsg, ReqData), State};
+
+    %     {_, {ok, Data}} ->
+    %         JSON = build_user_json(Data, AccToken),
+    %         Res = save_user_if_new(JSON),
+    %         {true, wrq:set_resp_body(Res, ReqData), State};
+    %     _ ->
+
+    %         {{halt,403}, wrq:set_resp_body(ErrorMsg, ReqData), State}
+    % end.
+
+
+-spec fetch_refresh_token(UserData::string()) -> string().
+fetch_refresh_token(UserData) ->
+    Username = binary_to_list(proplists:get_value(<<"id">>, UserData)),
+    case get_user_by_name(Username) of
+        {ok, JSON} -> {ok, proplists:get_value(<<"refresh_token">>, JSON)};
+        {error, Msg} -> {error, Msg}
     end.
+
+
+
+
+-spec exchange_token(Code::string(), AuthState::string()) -> string().
+exchange_token(Code, AuthState) ->
+    Token = plus_srv:exchange_token(Code, AuthState),
+    AccToken = proplists:get_value(<<"access_token">>, Token),
+    RefToken = proplists:get_value(<<"refresh_token">>, Token),
+    {AccToken, RefToken}.
+
+
+-spec fetch_user_info() -> tuple().
+fetch_user_info() ->
+    plus_srv:call_method("plus.people.get", [{"userId", "me"}], []).
+
+
+-spec build_user_json(Data::tuple(), AccToken::string(), RefToken::string()) -> string().
+build_user_json(Data, AccToken, RefToken) ->
+    Id = proplists:get_value(<<"id">>, Data),
+    % Etag = proplists:get_value(<<"etag">>, Data),
+    Email = list_to_binary(binary_to_list(Id) ++ "@openid.ericsson"),
+    Password = list_to_binary("pa55w0rd"),
+    Description = proplists:get_value(<<"occupation">>, Data),
+
+    {struct, Name} = proplists:get_value(<<"name">>, Data),
+    First = proplists:get_value(<<"givenName">>, Name),
+    Last  = proplists:get_value(<<"familyName">>, Name),
+
+    {struct, Image} = proplists:get_value(<<"image">>, Data),
+    URL = proplists:get_value(<<"url">>, Image),
+
+    mochijson2:encode({
+        struct,[
+            {username, Id},
+            {email, Email},
+            {password, Password},
+            {firstname, First},
+            {lastname, Last},
+            {description, Description},
+            {image_url, URL},
+            {access_token, AccToken},
+            {refresh_token, RefToken}
+        ]
+    }).
+
+
+-spec user_is_new(UserData::string()) -> tuple().
+user_is_new(UserData) ->
+    Username = binary_to_list(proplists:get_value(<<"id">>, UserData)),
+    check_and_sanitize(Username).
+    % Username = binary_to_list(lib_json:get_field(UserJSON, "username")),
+    % case check_and_sanitize(Username) of
+    %     invalidcharacters ->
+    %         "Username characters are not valid";
+    %     false ->
+    %         "User already exists";
+    %     {Code, Body} ->
+    %         Body;
+    %     true ->
+    %         {_, Res} = store_user(Username, UserJSON),
+    %         Res
+    % end.
+
+
+-spec store_user(UserData::string(), AccToken::string(), RefToken::string()) -> tuple().
+store_user(UserData, AccToken, RefToken) ->
+    Username = proplists:get_value(<<"id">>, UserData),
+    JSON = build_user_json(UserData, AccToken, RefToken),
+    FieldsAdded = add_server_side_fields(JSON),
+    case erlastic_search:index_doc_with_id(?INDEX, "user", Username, FieldsAdded) of
+        {error, {Code, Body}} ->
+            ErrorString = api_help:generate_error(Body, Code),
+            {error, ErrorString};
+        {ok, List} ->
+            {ok, lib_json:encode(List)}
+    end.
+
+
+-spec check_and_sanitize(Username::string()) -> tuple().
+check_and_sanitize(Username) ->
+    Lambda = fun(X) -> not lists:member(X, "abcdefghijklmnopqrstuvwxyz_-0123456789") end,
+    case lists:filter(Lambda, Username) of
+        "" ->
+            case erlastic_search:get_doc(?INDEX, "user", Username) of
+                {error, {404, _}}     -> true;
+                {error, {Code, Body}} -> {Code, Body};
+                {ok,JsonStruct}       -> false
+            end;
+
+        _ ->  invalidcharacters
+    end.
+
+
+% -spec check_user(Username::string()) -> tuple().
+% check_user(Username) ->
+%     case erlastic_search:get_doc(?INDEX, "user", Username) of
+%         {error, {404, _}}     -> true;
+%         {error, {Code, Body}} -> {Code, Body};
+%         {ok,JsonStruct}       -> false
+%     end.
+
+-spec get_user_by_name(Username::string()) -> tuple().
+get_user_by_name(Username) ->
+    % {_, JSON} = erlastic_search:get_doc(?INDEX, "user", Username),
+    % JSON.
+    case erlastic_search:get_doc(?INDEX, "user", string:to_lower(Username), [{<<"fields">>, <<"password,_source">>}]) of
+        {error, {Code1, Body1}} ->
+            ErrorString = api_help:generate_error(Body1, Code1),
+            {error, ErrorString};
+            % {{halt, Code1}, wrq:set_resp_body(ErrorString1, ReqData), State};
+
+        {ok, JsonStruct} ->
+            FinalJson = api_help:get_and_add_password(JsonStruct),
+            {ok, FinalJson}
+            % {FinalJson, ReqData, State}
+    end.
+
+
+-spec get_user_by_refreshtoken(RefToken::string()) -> string().
+get_user_by_refreshtoken(RefToken) ->
+    "".
 
 
 %% @doc
@@ -554,13 +721,17 @@ get_user(ReqData, State) ->
                             end;
                         Id ->
                             %% Get specific user
-                            case erlastic_search:get_doc(?INDEX, "user", string:to_lower(Id), [{<<"fields">>, <<"password,_source">>}]) of
-                                {error, {Code1, Body1}} ->
-                                    ErrorString1 = api_help:generate_error(Body1, Code1),
-                                    {{halt, Code1}, wrq:set_resp_body(ErrorString1, ReqData), State};
-                                {ok,JsonStruct} ->
-                                    FinalJson = api_help:get_and_add_password(JsonStruct),
-                                    {FinalJson, ReqData, State}
+                            % case erlastic_search:get_doc(?INDEX, "user", string:to_lower(Id), [{<<"fields">>, <<"password,_source">>}]) of
+                            %     {error, {Code1, Body1}} ->
+                            %         ErrorString1 = api_help:generate_error(Body1, Code1),
+                            %         {{halt, Code1}, wrq:set_resp_body(ErrorString1, ReqData), State};
+                            %     {ok,JsonStruct} ->
+                            %         FinalJson = api_help:get_and_add_password(JsonStruct),
+                            %         {FinalJson, ReqData, State}
+                            % end
+                            case get_user_by_name(Id) of
+                                {error, Msg} -> {{halt, 404}, wrq:set_resp_body(Msg, ReqData), State};
+                                {ok, JSON}   -> {true, wrq:set_resp_body(JSON, ReqData), State}
                             end
                     end
             end
@@ -573,8 +744,7 @@ get_user(ReqData, State) ->
 %% Purpose: Does search for Users for either search done with POST or GET
 %% Returns: {true, ReqData, State} || {{error, Reason}, ReqData, State}
 %% @end
--spec process_search(ReqData::tuple(), State::string(), term()) ->
-                 {list(), tuple(), string()}.
+-spec process_search(ReqData::tuple(), State::string(), term()) -> {list(), tuple(), string()}.
 process_search(ReqData, State, post) ->
         {Json,_,_} = api_help:json_handler(ReqData,State),
         FinalQuery = "{\"query\" : {\"term\" : " ++ Json ++ "},\"filter\" : {\"bool\":{\"must_not\":{\"term\":{\"private\":\"true\"}}}}}",
@@ -626,16 +796,3 @@ id_from_path(RD) ->
 -spec add_server_side_fields(Json::string()) -> string().
 add_server_side_fields(Json) ->
     lib_json:add_values(Json,[{rankings, "[]"},{notifications,"[]"},{triggers,"[]"},{subscriptions, "[]"}]).
-
-
-%% @doc
-%% Function: add_openid_fields/2
-%% Purpose: Used to add all the fields that should be added server side
-%% Returns: The new json with the fields added
-%% @end
--spec add_openid_fields(Json::string()) -> string().
-add_openid_fields(Json) ->
-    AccessToken  = plus_srv:get_access_token(),
-    RefreshToken = plus_srv:get_refresh_token(),
-    lib_json:add_values(Json, [{access_token, AccessToken}, {refreshtoken, RefreshToken}]).
-
