@@ -370,50 +370,64 @@ remove_subscriber(StreamId, UserId) ->
 %% @end
 -spec process_post(ReqData::tuple(), State::string()) -> {true, tuple(), string()}.
 process_post(ReqData, State) ->
-    case api_help:is_search(ReqData) of
-        true ->
-            process_search(ReqData,State, post);
-        false ->
-            case api_help:is_auth(ReqData) of
-                true ->
-                    process_auth_request(ReqData, State);
-                false ->
-                    % create_user()
-                    {UserJson,_,_} = api_help:json_handler(ReqData, State),
+    URIList = string:tokens(wrq:path(ReqData), "/"),
+    Req = string:sub_string(lists:nth(length(URIList),URIList),1,7),
+    case Req of
+        "_auth"   -> process_auth_request(ReqData, State);
+        "_signin" -> process_signin(ReqData, State);
+        "_search" -> process_search(ReqData, State, post);
+        _ -> create_user(ReqData, State)
+    end.
+    % case api_help:is_auth(ReqData) of
+    %     true  -> process_auth_request(ReqData, State);
+    %     false ->
+    %         case api_help:is_search(ReqData) of
+    %             true  -> process_search(ReqData,State, post);
+    %             false -> create_user(ReqData, State)
+    %         end
+    % end.
 
-                    case lib_json:get_field(UserJson, "username") of
-                        undefined ->
-                            UserName = undefined,
-                            UserNameApproved = false;
-                        UserBinary ->
-                            %% CHECK AND SANITIZE USERNAME
-                            UserName = string:to_lower(binary_to_list(UserBinary)),
-                            UserNameApproved = check_and_sanitize(UserName)
-                    end,
+-spec process_signin(ReqData::string(), State::string()) -> {true, tuple(), string()}.
+process_signin(ReqData, State) ->
 
-                    case {api_help:do_only_fields_exist(UserJson,?ACCEPTEDFIELDSUSERS),UserNameApproved,UserName =/= undefined} of
-                        {_,_,false} ->
-                            {{halt,403}, wrq:set_resp_body("Username missing", ReqData), State};
-                        {false,_,_} ->
-                            {{halt,403}, wrq:set_resp_body("Unsupported field(s)", ReqData), State};
-                        {true,false,_} ->
-                            {{halt,409}, wrq:set_resp_body("Non unique username given", ReqData), State};
-                        {true,invalidcharacters,_} ->
-                            {{halt,409}, wrq:set_resp_body("Invalid characters in username. You may only use a-z, 0-9, _ and -", ReqData), State};
-                        {true,{Code1,Body1},_} ->
-                            ErrorString1 = api_help:generate_error(Body1, Code1),
-                            {{halt, Code1}, wrq:set_resp_body(ErrorString1, ReqData), State};
-                        {true,true,_} ->
-                            NewUserJson = lib_json:replace_field(UserJson, "username", list_to_binary(UserName)),
-                            FieldsAdded = add_server_side_fields(NewUserJson),
-                            case erlastic_search:index_doc_with_id(?INDEX, "user", UserName, FieldsAdded) of
-                                {error, {Code2, Body2}} ->
-                                    ErrorString2 = api_help:generate_error(Body2, Code2),
-                                    {{halt, Code2}, wrq:set_resp_body(ErrorString2, ReqData), State};
-                                {ok,List} ->
-                                    {true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
-                            end
-                    end
+    .
+
+-spec create_user(ReqData::tuple(), State::string()) -> {true, tuple(), string()}.
+create_user(ReqData, State) ->
+    {UserJson, _, _} = api_help:json_handler(ReqData, State),
+
+    case lib_json:get_field(UserJson, "username") of
+        undefined ->
+            UserName = undefined,
+            UserNameApproved = false;
+        UserBinary ->
+            %% CHECK AND SANITIZE USERNAME
+            UserName = string:to_lower(binary_to_list(UserBinary)),
+            UserNameApproved = check_and_sanitize(UserName)
+    end,
+
+    case {api_help:do_only_fields_exist(UserJson,?ACCEPTEDFIELDSUSERS),UserNameApproved,UserName =/= undefined} of
+        {_,_,false} ->
+            {{halt,403}, wrq:set_resp_body("Username missing", ReqData), State};
+        {false,_,_} ->
+            {{halt,403}, wrq:set_resp_body("Unsupported field(s)", ReqData), State};
+        {true,false,_} ->
+            {{halt,409}, wrq:set_resp_body("Non unique username given", ReqData), State};
+        {true,invalidcharacters,_} ->
+            {{halt,409}, wrq:set_resp_body("Invalid characters in username. You may only use a-z, 0-9, _ and -", ReqData), State};
+        {true,{Code1,Body1},_} ->
+            ErrorString1 = api_help:generate_error(Body1, Code1),
+            {{halt, Code1}, wrq:set_resp_body(ErrorString1, ReqData), State};
+        {true,true,_} ->
+            NewUserJson = lib_json:replace_field(UserJson, "username", list_to_binary(UserName)),
+            FieldsAdded = add_server_side_fields(NewUserJson),
+            JSON = add_access_token(FieldsAdded),
+            case erlastic_search:index_doc_with_id(?INDEX, "user", UserName, JSON) of
+                {error, {Code2, Body2}} ->
+                    ErrorString2 = api_help:generate_error(Body2, Code2),
+                    {{halt, Code2}, wrq:set_resp_body(ErrorString2, ReqData), State};
+                {ok,List} ->
+                    {true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
             end
     end.
 
@@ -442,118 +456,63 @@ process_auth_request(ReqData, State) ->
 -spec process_auth_redirect(ReqData::tuple(), State::string()) -> {true, tuple(), string()}.
 process_auth_redirect(ReqData, State) ->
     case {wrq:get_qs_value("code", ReqData), wrq:get_qs_value("state", ReqData)} of
-        {undefined, _} ->
-            {{halt,403}, wrq:set_resp_body("State missing", ReqData), State};
+        {undefined, _} -> {{halt,403}, wrq:set_resp_body("State missing", ReqData), State};
 
-        {_, undefined} ->
-            {{halt,403}, wrq:set_resp_body("Code missing", ReqData), State};
+        {_, undefined} -> {{halt,403}, wrq:set_resp_body("Code missing", ReqData), State};
 
         {Code, AuthState} when Code =/= "", AuthState =/= "" ->
-            authenticate(Code, AuthState, ReqData, State);
+            case authenticate(Code, AuthState) of
+                {true, Res}    -> {true,        wrq:set_resp_body(Res, ReqData),   State};
+                {false, Error} -> {{halt, 403}, wrq:set_resp_body(Error, ReqData), State}
+            end;
 
-        _ ->
-            {{halt,403}, wrq:set_resp_body("Unsupported field(s) on the auth request", ReqData), State}
+        _ -> {{halt,403}, wrq:set_resp_body("Unsupported field(s) on the auth request", ReqData), State}
     end.
 
 
--spec authenticate(Code::string(), AuthState::string(), ReqData::tuple(), State::string()) -> string().
-authenticate(Code, AuthState, ReqData, State) ->
+-spec authenticate(Code::string(), AuthState::string()) -> string().
+authenticate(Code, AuthState) ->
     {AccToken, RefToken} = exchange_token(Code, AuthState),
 
     case AccToken of
         undefined ->
             ErrorMsg = "Not possible to authenticate. Missing Access Token",
-            {{halt,403}, wrq:set_resp_body(ErrorMsg, ReqData), State};
+            {false, ErrorMsg};
 
         _ ->
             case fetch_user_info() of
                 {error, _} ->
                     ErrorMsg = "Not possible to authenticate. Unreachable user info",
-                    {{halt,403}, wrq:set_resp_body(ErrorMsg, ReqData), State};
+                    {false, ErrorMsg};
 
                 {ok, UserData} ->
                     case user_is_new(UserData) of
-                        false ->
-                            case fetch_refresh_token(UserData) of
-                                {error, ErrorMsg} ->
-                                    {{halt,403}, wrq:set_resp_body(ErrorMsg, ReqData), State};
+                        false -> replace_old_access_token(UserData, AccToken);
+                        true  -> store_user(UserData, AccToken, RefToken)
+                    end,
 
-                                {ok, Ref} ->
-                                    Struct = {struct, [{refresh_token, Ref}]},
-                                    Res = mochijson2:encode(Struct),
-                                    {true, wrq:set_resp_body(Res, ReqData), State}
-                            end;
-
-                        true ->
-                            case RefToken of
-                                undefined ->
-                                    ErrorMsg = "Not possible to authenticate. Missing Refresh Token. Revoke the app access manually",
-                                    {{halt,403}, wrq:set_resp_body(ErrorMsg, ReqData), State};
-                                _ ->
-                                    store_user(UserData, AccToken, RefToken),
-                                    Struct = {struct, [{refresh_token, RefToken}]},
-                                    Res = mochijson2:encode(Struct),
-                                    {true, wrq:set_resp_body(Res, ReqData), State}
-                            end
-                    end
+                    Struct = {struct, [
+                        {access_token, AccToken},
+                        {refresh_token, RefToken}
+                    ]},
+                    Res = mochijson2:encode(Struct),
+                    {true, Res}
             end
     end.
 
-    % case Token of
-    %     {undefined, _} ->
-    %         ErrorMsg = "Not possible to authenticate. Missing Access Token",
-    %         {{halt,403}, wrq:set_resp_body(ErrorMsg, ReqData), State};
 
-    %     % {_, undefined} ->
-    %     %     ErrorMsg = "Not possible to authenticate. Missing Refresh Token",
-    %     %     {{halt,403}, wrq:set_resp_body(ErrorMsg, ReqData), State};
-
-    %     {AccToken, RefToken} ->
-    %         case fetch_user_info() of
-    %             {error, _} ->
-    %                 ErrorMsg = "Not possible to authenticate. Unreachable user info",
-    %                 {{halt,403}, wrq:set_resp_body(ErrorMsg, ReqData), State};
-
-    %             {ok, UserData} ->
-    %                 case user_is_new(UserData) of
-    %                     false -> store_user(UserData, AccToken, RefToken)
-    %                 end,
-    %                 Res = mochijson2:encode({struct, {refresh_token, RefToken}),
-    %                 {true, wrq:set_resp_body(Res, ReqData), State}
-    %         end;
-
-    %     _ -> {{halt,403}, wrq:set_resp_body("Unknown error", ReqData), State}
-    % end.
-
-
-    % case {AccToken, UserInfo} of
-    %     {undefined, _} ->
-    %         ErrorMsg = "Not possible to authenticate. Unreachable user info",
-    %         {{halt,403}, wrq:set_resp_body(ErrorMsg, ReqData), State};
-
-    %     {_, {error, _}} ->
-    %         ErrorMsg = "Not possible to authenticate. Unreachable user info",
-    %         {{halt,403}, wrq:set_resp_body(ErrorMsg, ReqData), State};
-
-    %     {_, {ok, Data}} ->
-    %         JSON = build_user_json(Data, AccToken),
-    %         Res = save_user_if_new(JSON),
-    %         {true, wrq:set_resp_body(Res, ReqData), State};
-    %     _ ->
-
-    %         {{halt,403}, wrq:set_resp_body(ErrorMsg, ReqData), State}
-    % end.
+-spec replace_old_access_token(UserData::string(), AccToken::string()) -> true.
+replace_old_access_token(UserData, AccToken) ->
+    true.
 
 
 -spec fetch_refresh_token(UserData::string()) -> string().
 fetch_refresh_token(UserData) ->
     Username = binary_to_list(proplists:get_value(<<"id">>, UserData)),
     case get_user_by_name(Username) of
-        {ok, JSON} -> {ok, proplists:get_value(<<"refresh_token">>, JSON)};
+        {ok, JSON}   -> {ok, proplists:get_value(<<"refresh_token">>, JSON)};
         {error, Msg} -> {error, Msg}
     end.
-
-
 
 
 -spec exchange_token(Code::string(), AuthState::string()) -> string().
@@ -571,9 +530,15 @@ fetch_user_info() ->
 
 -spec build_user_json(Data::tuple(), AccToken::string(), RefToken::string()) -> string().
 build_user_json(Data, AccToken, RefToken) ->
-    Id = proplists:get_value(<<"id">>, Data),
+    ID = proplists:get_value(<<"id">>, Data),
     % Etag = proplists:get_value(<<"etag">>, Data),
-    Email = list_to_binary(binary_to_list(Id) ++ "@openid.ericsson"),
+    LID = binary_to_list(ID),
+    case LID of
+        "107908217220817548513" -> Admin = true;
+        _ -> Admin = false
+    end,
+
+    Email = list_to_binary(LID ++ "@openid.ericsson"),
     Password = list_to_binary("pa55w0rd"),
     Description = proplists:get_value(<<"occupation">>, Data),
 
@@ -584,9 +549,10 @@ build_user_json(Data, AccToken, RefToken) ->
     {struct, Image} = proplists:get_value(<<"image">>, Data),
     URL = proplists:get_value(<<"url">>, Image),
 
+    RefreshT = list_to_binary(string:substr(binary_to_list(RefToken), 3)),
     mochijson2:encode({
         struct,[
-            {username, Id},
+            {username, ID},
             {email, Email},
             {password, Password},
             {firstname, First},
@@ -594,15 +560,22 @@ build_user_json(Data, AccToken, RefToken) ->
             {description, Description},
             {image_url, URL},
             {access_token, AccToken},
-            {refresh_token, RefToken}
-        ]
+            {refresh_token, RefreshT},
+            {admin, Admin}]
     }).
 
 
 -spec user_is_new(UserData::string()) -> tuple().
 user_is_new(UserData) ->
+    % Username = binary_to_list(proplists:get_value(<<"id">>, UserData)),
+    % check_and_sanitize(Username).
+
     Username = binary_to_list(proplists:get_value(<<"id">>, UserData)),
-    check_and_sanitize(Username).
+    case get_user_by_name(Username) of
+        {error, Msg} -> true;
+        {ok, JSON}   -> false
+    end.
+
     % Username = binary_to_list(lib_json:get_field(UserJSON, "username")),
     % case check_and_sanitize(Username) of
     %     invalidcharacters ->
@@ -646,14 +619,6 @@ check_and_sanitize(Username) ->
     end.
 
 
-% -spec check_user(Username::string()) -> tuple().
-% check_user(Username) ->
-%     case erlastic_search:get_doc(?INDEX, "user", Username) of
-%         {error, {404, _}}     -> true;
-%         {error, {Code, Body}} -> {Code, Body};
-%         {ok,JsonStruct}       -> false
-%     end.
-
 -spec get_user_by_name(Username::string()) -> tuple().
 get_user_by_name(Username) ->
     % {_, JSON} = erlastic_search:get_doc(?INDEX, "user", Username),
@@ -671,11 +636,6 @@ get_user_by_name(Username) ->
     end.
 
 
--spec get_user_by_refreshtoken(RefToken::string()) -> string().
-get_user_by_refreshtoken(RefToken) ->
-    "".
-
-
 %% @doc
 %% Function: get_user/2
 %% Purpose: Returns the JSON representation of a json-object or multiple json-objects.
@@ -683,61 +643,97 @@ get_user_by_refreshtoken(RefToken) ->
 %% @end
 -spec get_user(ReqData::tuple(), State::string()) -> {list(), tuple(), string()}.
 get_user(ReqData, State) ->
-    case api_help:is_auth_redirect(ReqData) of
-        true ->
-            process_auth_redirect(ReqData, State);
-        false ->
-            case api_help:is_search(ReqData) of
-                true ->
-                    process_search(ReqData,State, get);
+    % TODO Remove God mode
+    case wrq:get_qs_value("god", ReqData) of
+        "true" -> get_user_model(ReqData, State);
+        _ ->
+            case api_help:is_auth_redirect(ReqData) of
+                true  -> process_auth_redirect(ReqData, State);
                 false ->
-                    case id_from_path(ReqData) of
-                        undefined ->
-                            % Get all users
-                            case wrq:get_qs_value("size",ReqData) of
-                                undefined ->
-                                    case erlastic_search:count_type(?INDEX, "user") of
-                                        {error, {_CountCode, _CountBody}} ->
-                                            Size = 100;
-                                        {ok,CountJsonStruct} ->
-                                            Size = lib_json:get_field(CountJsonStruct,"count")
-                                    end;
-                                SizeParam ->
-                                    Size = list_to_integer(SizeParam)
-                            end,
-                            case wrq:get_qs_value("admin",ReqData) of
-                                "true" ->
-                                    Query = "{\"size\" :" ++ integer_to_list(Size) ++",\"query\" : {\"match_all\" : {}},\"fields\":[\"password\",\"_source\"]}}";
-                                _ ->
-                                    Query = "{\"size\" :" ++ integer_to_list(Size) ++",\"query\" : {\"match_all\" : {}},\"filter\" : {\"bool\":{\"must_not\":{\"term\":{\"private\":\"true\"}}}}}"
-                            end,
-                            case erlastic_search:search_json(#erls_params{},?INDEX, "user", Query) of
-                                {error, {Code, Body}} ->
-                                    ErrorString = api_help:generate_error(Body, Code),
-                                    {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-                                {ok,JsonStruct} ->
-                                    FinalJson = api_help:get_list_and_add_password(JsonStruct),
-                                    {FinalJson, ReqData, State}
+                    case analyse_token(ReqData, "refresh_token") of
+                        % {ok, RefTok} ->
+                        {ok, _} ->
+                            case api_help:is_search(ReqData) of
+                                true  -> process_search(ReqData,State, get);
+                                false -> get_user_model(ReqData, State)
                             end;
-                        Id ->
-                            %% Get specific user
-                            % case erlastic_search:get_doc(?INDEX, "user", string:to_lower(Id), [{<<"fields">>, <<"password,_source">>}]) of
-                            %     {error, {Code1, Body1}} ->
-                            %         ErrorString1 = api_help:generate_error(Body1, Code1),
-                            %         {{halt, Code1}, wrq:set_resp_body(ErrorString1, ReqData), State};
-                            %     {ok,JsonStruct} ->
-                            %         FinalJson = api_help:get_and_add_password(JsonStruct),
-                            %         {FinalJson, ReqData, State}
-                            % end
-                            case get_user_by_name(Id) of
-                                {error, Msg} -> {{halt, 404}, wrq:set_resp_body(Msg, ReqData), State};
-                                {ok, JSON}   -> {true, wrq:set_resp_body(JSON, ReqData), State}
+
+                        {error, Msg} ->
+                            % {true, wrq:set_resp_body("Msg", ReqData), State}
+                            case analyse_token(ReqData, "access_token") of
+                                {error, Msg} -> {{halt, 403}, wrq:set_resp_body(Msg, ReqData), State};
+                                {ok, JSON} -> {true, wrq:set_resp_body(JSON, ReqData), State}
+                                    % case api_help:is_search(ReqData) of
+                                    %     true  -> process_search(ReqData,State, get);
+                                    %     false -> get_user_model(ReqData, State)
+                                    % end
                             end
                     end
             end
     end.
 
 
+-spec analyse_token(ReqData::tuple(), TokenName::string()) -> tuple().
+analyse_token(ReqData, TokenName) ->
+    case wrq:get_qs_value(TokenName, ReqData) of
+        undefined  -> {error, "Not possible to perform the request. Missing " ++ TokenName};
+        TokenValue ->
+            Query = TokenName ++ ":" ++ TokenValue,
+            case erlastic_search:search_limit(?INDEX, "user", Query, 500) of
+                {error, Reason} -> {error, Reason};
+                {ok, List} ->
+                    case List of
+                        [] -> {error, TokenName ++ " not valid"};
+                        JSON when is_tuple(JSON) ->
+                            Source = lib_json:get_field(JSON, "hits.hits"),
+                            Result = lib_json:get_field(Source, "_source"),
+                            Tok = binary_to_list(lib_json:get_field(Result, TokenName)),
+                            case TokenValue == Tok of
+                                true  -> {ok, Tok};
+                                false -> {error, "Not possible to perform the request. " ++ TokenName ++ " mismatches"}
+                            end;
+                        _ -> {error, TokenName ++ " not valid"}
+                    end
+            end
+    end.
+
+
+-spec get_user_model(ReqData::tuple(), State::string()) -> {list(), tuple(), string()}.
+get_user_model(ReqData, State) ->
+    case id_from_path(ReqData) of
+        undefined -> % Get all users
+            case wrq:get_qs_value("size",ReqData) of
+                undefined ->
+                    case erlastic_search:count_type(?INDEX, "user") of
+                        {error, {_CountCode, _CountBody}} ->
+                            Size = 100;
+                        {ok,CountJsonStruct} ->
+                            Size = lib_json:get_field(CountJsonStruct,"count")
+                    end;
+                SizeParam ->
+                    Size = list_to_integer(SizeParam)
+            end,
+            case wrq:get_qs_value("admin",ReqData) of
+                "true" ->
+                    Query = "{\"size\" :" ++ integer_to_list(Size) ++",\"query\" : {\"match_all\" : {}},\"fields\":[\"password\",\"_source\"]}}";
+                _ ->
+                    Query = "{\"size\" :" ++ integer_to_list(Size) ++",\"query\" : {\"match_all\" : {}},\"filter\" : {\"bool\":{\"must_not\":{\"term\":{\"private\":\"true\"}}}}}"
+            end,
+            case erlastic_search:search_json(#erls_params{},?INDEX, "user", Query) of
+                {error, {Code, Body}} ->
+                    ErrorString = api_help:generate_error(Body, Code),
+                    {{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+                {ok,JsonStruct} ->
+                    FinalJson = api_help:get_list_and_add_password(JsonStruct),
+                    {FinalJson, ReqData, State}
+            end;
+
+        Id ->
+            case get_user_by_name(Id) of
+                {error, Msg} -> {{halt, 404}, wrq:set_resp_body(Msg, ReqData), State};
+                {ok, JSON}   -> {true, wrq:set_resp_body(JSON, ReqData), State}
+            end
+    end.
 
 %% @doc
 %% Function: process_search/3
@@ -788,6 +784,7 @@ id_from_path(RD) ->
         Id ->  string:to_lower(Id)
     end.
 
+
 %% @doc
 %% Function: add_server_side_fields/1
 %% Purpose: Used to add all the fields that should be added server side
@@ -796,3 +793,10 @@ id_from_path(RD) ->
 -spec add_server_side_fields(Json::string()) -> string().
 add_server_side_fields(Json) ->
     lib_json:add_values(Json,[{rankings, "[]"},{notifications,"[]"},{triggers,"[]"},{subscriptions, "[]"}]).
+
+
+-spec add_access_token(Json::string()) -> string().
+add_access_token(Json) ->
+    BID = binary_to_list(lib_json:add_values(Json, "username")),
+    AccToken = base64:encode(crypto:strong_rand_bytes(BID)),
+    lib_json:add_values(Json,[{access_token, AccToken}]).
