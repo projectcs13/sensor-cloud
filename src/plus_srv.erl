@@ -300,12 +300,13 @@ get_methods(Json, [MethodName|Methods]) ->
 get_authurl(Scopes, #state{clientid = ClientID, redirecturl = RedirectURL}) ->
     OAuth2State = base64:encode_to_string(crypto:rand_bytes(12)),
     ["https://accounts.google.com/o/oauth2/auth?" ++
-            "client_id=" ++ ClientID ++
-            "&response_type=code" ++
-            "&access_type=offline" ++
-            "&redirect_uri=" ++ edoc_lib:escape_uri(RedirectURL) ++
-            "&scope=" ++ edoc_lib:escape_uri(Scopes) ++
-            "&state=" ++ edoc_lib:escape_uri(OAuth2State), OAuth2State].
+        "client_id=" ++ ClientID ++
+        "&response_type=code" ++
+        "&access_type=offline" ++
+        % "&approval_prompt=force" ++
+        "&redirect_uri=" ++ edoc_lib:escape_uri(RedirectURL) ++
+        "&scope=" ++ edoc_lib:escape_uri(Scopes) ++
+        "&state=" ++ edoc_lib:escape_uri(OAuth2State), OAuth2State].
 
 get_authtoken(Code, #state{clientid = ClientID, clientsecret=ClientSecret, redirecturl = RedirectURL}) ->
     %% We check the OAuth2 state variable in the handler for security
