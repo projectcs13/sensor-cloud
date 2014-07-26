@@ -717,24 +717,20 @@ get_user_by_token(TokenName, TokenValue) ->
         {ok, List} ->
             case List of
                 [] -> {error, "No users found by the given token"};
+
                 Li when is_tuple(Li) ->
                     JSONList = lib_json:get_field(Li, "hits.hits"),
+
                     Lambda = fun(JSON) ->
                         Source = lib_json:get_field(JSON, "_source"),
                         Tok = binary_to_list(lib_json:get_field(Source, TokenName)),
-                        case TokenValue == Tok of
-                            true  -> throw({ok, Tok});
-                            false -> false
-                        end
+                        TokenValue == Tok
                     end,
 
-                    try lists:map(Lambda, JSONList)
-                    catch
-                        throw:X -> X;
-                        _:_ -> {error, "Not possible to perform the request. " ++ TokenName ++ " mismatches"}
+                    case lists:filter(Lambda, JSONList) of
+                        []  -> {error, "No users found for this token"};
+                        Res -> {ok, Res}
                     end;
-
-                    % {error, "Not possible to perform the request. " ++ TokenName ++ " mismatches"};
 
                 _ -> {error, TokenName ++ " not valid"}
             end
