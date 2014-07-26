@@ -490,6 +490,7 @@ authenticate(Code, AuthState) ->
 
                     case Status of
                         {error, Msg} -> {error, Msg};
+
                         {ok, _} ->
                             Struct = {struct, [
                                 {access_token, AccToken},
@@ -504,14 +505,14 @@ authenticate(Code, AuthState) ->
 
 -spec replace_old_access_token(UserData::string(), AccToken::string()) -> true.
 replace_old_access_token(UserData, AccToken) ->
-    case get_user_by_token("access_token", AccToken) of
+    Username = binary_to_list(proplists:get_value(<<"id">>, UserData)),
+    case get_user_by_name(Username) of
         {error, Msg} -> {error, Msg};
-        {ok, JSON} ->
-            Username = lib_json:get_field(JSON, "username"),
+        {ok, JSON}   ->
             UserJSON = lib_json:replace_field(JSON, "access_token", AccToken),
             Update   = lib_json:set_attr(doc, UserJSON),
             case api_help:update_doc(?INDEX, "user", Username, Update) of
-                {ok, NewJSON}         -> NewJSON;
+                {ok, NewJSON}         -> {ok, NewJSON};
                 {error, {Code, Body}} -> {error, api_help:generate_error(Body, Code)}
             end
     end.
@@ -702,12 +703,13 @@ get_user_by_token(TokenName, TokenValue) ->
                 [] -> {error, TokenName ++ " not valid"};
                 JSON when is_tuple(JSON) ->
                     Source = lib_json:get_field(JSON, "hits.hits"),
-                    Result = lib_json:get_field(Source, "_source"),
-                    Tok = binary_to_list(lib_json:get_field(Result, TokenName)),
-                    case TokenValue == Tok of
-                        true  -> {ok, Tok};
-                        false -> {error, "Not possible to perform the request. " ++ TokenName ++ " mismatches"}
-                    end;
+                    {ok, Source};
+                    % Result = lib_json:get_field(Source, "_source"),
+                    % Tok = binary_to_list(lib_json:get_field(Result, TokenName)),
+                    % case TokenValue == Tok of
+                    %     true  -> {ok, Tok};
+                    %     false -> {error, "Not possible to perform the request. " ++ TokenName ++ " mismatches"}
+                    % end;
                 _ -> {error, TokenName ++ " not valid"}
             end
     end.
