@@ -374,7 +374,7 @@ process_post(ReqData, State) ->
     Req = string:sub_string(lists:nth(length(URIList),URIList),1,7),
     case Req of
         "_auth"   -> process_auth_request(ReqData, State);
-        "_signin" -> process_signin(ReqData, State);
+        % "_signin" -> process_signin(ReqData, State);
         "_search" -> process_search(ReqData, State, post);
         _ -> create_user(ReqData, State)
     end.
@@ -387,10 +387,9 @@ process_post(ReqData, State) ->
     %         end
     % end.
 
--spec process_signin(ReqData::string(), State::string()) -> {true, tuple(), string()}.
-process_signin(ReqData, State) ->
-
-    .
+% -spec process_signin(ReqData::string(), State::string()) -> {true, tuple(), string()}.
+% process_signin(ReqData, State) ->
+%     .
 
 -spec create_user(ReqData::tuple(), State::string()) -> {true, tuple(), string()}.
 create_user(ReqData, State) ->
@@ -795,8 +794,13 @@ add_server_side_fields(Json) ->
     lib_json:add_values(Json,[{rankings, "[]"},{notifications,"[]"},{triggers,"[]"},{subscriptions, "[]"}]).
 
 
--spec add_access_token(Json::string()) -> string().
-add_access_token(Json) ->
-    BID = binary_to_list(lib_json:add_values(Json, "username")),
-    AccToken = base64:encode(crypto:strong_rand_bytes(BID)),
-    lib_json:add_values(Json,[{access_token, AccToken}]).
+-spec add_access_token(JSON::string()) -> string().
+add_access_token(JSON) ->
+    case lib_json:get_field(JSON, "access_token") of
+        undefined ->
+            % BID = binary_to_list(lib_json:get_field(JSON, "username")),
+            % AccToken = base64:encode(crypto:strong_rand_bytes(BID)),
+            AccToken = base64:encode(crypto:strong_rand_bytes(32)),
+            lib_json:add_values(JSON, [{access_token, AccToken}]);
+        _ -> JSON
+    end.
