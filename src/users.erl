@@ -115,7 +115,6 @@ delete_resource(ReqData, State) ->
 %%           OK = {ok}
 %% @end
 -spec delete_streams_with_user_id(Id::string()) -> term().
-
 delete_streams_with_user_id(Id) ->
     api_help:refresh(),
     Query = "user_id:" ++ Id,
@@ -154,7 +153,6 @@ delete_streams_with_user_id(Id) ->
 %% Returns:  a list with the ids of the JSON objects given
 %% @end
 -spec get_streams(JSON::string()) -> list().
-
 get_streams(JSON) when is_tuple(JSON)->
     Result = lib_json:get_field(JSON, "hits.hits"),
     get_streams(Result);
@@ -486,23 +484,37 @@ authenticate(Code, AuthState) ->
 
                 {ok, UserData} ->
                     case user_is_new(UserData) of
-                        false -> replace_old_access_token(UserData, AccToken);
-                        true  -> store_user(UserData, AccToken, RefToken)
+                        false -> Status = replace_old_access_token(UserData, AccToken);
+                        true  -> Status = store_user(UserData, AccToken, RefToken)
                     end,
 
-                    Struct = {struct, [
-                        {access_token, AccToken},
-                        {refresh_token, RefToken}
-                    ]},
-                    Res = mochijson2:encode(Struct),
-                    {true, Res}
+                    case Status of
+                        {error, Msg} -> {error, Msg};
+                        {ok, _} ->
+                            Struct = {struct, [
+                                {access_token, AccToken},
+                                {refresh_token, RefToken}
+                            ]},
+                            Res = mochijson2:encode(Struct),
+                            {true, Res}
+                    end
             end
     end.
 
 
 -spec replace_old_access_token(UserData::string(), AccToken::string()) -> true.
 replace_old_access_token(UserData, AccToken) ->
-    true.
+    case get_user_by_token("access_token", AccToken) of
+        {error, Msg} -> {error, Msg};
+        {ok, JSON} ->
+            Username = lib_json:get_field(JSON, "username"),
+            UserJSON = lib_json:replace_field(JSON, "access_token", AccToken),
+            Update   = lib_json:set_attr(doc, UserJSON),
+            case api_help:update_doc(?INDEX, "user", Username, Update) of
+                {ok, NewJSON}         -> NewJSON;
+                {error, {Code, Body}} -> {error, api_help:generate_error(Body, Code)}
+            end
+    end.
 
 
 -spec fetch_refresh_token(UserData::string()) -> string().
@@ -676,26 +688,29 @@ get_user(ReqData, State) ->
 analyse_token(ReqData, TokenName) ->
     case wrq:get_qs_value(TokenName, ReqData) of
         undefined  -> {error, "Not possible to perform the request. Missing " ++ TokenName};
-        TokenValue ->
-            Query = TokenName ++ ":" ++ TokenValue,
-            case erlastic_search:search_limit(?INDEX, "user", Query, 500) of
-                {error, Reason} -> {error, Reason};
-                {ok, List} ->
-                    case List of
-                        [] -> {error, TokenName ++ " not valid"};
-                        JSON when is_tuple(JSON) ->
-                            Source = lib_json:get_field(JSON, "hits.hits"),
-                            Result = lib_json:get_field(Source, "_source"),
-                            Tok = binary_to_list(lib_json:get_field(Result, TokenName)),
-                            case TokenValue == Tok of
-                                true  -> {ok, Tok};
-                                false -> {error, "Not possible to perform the request. " ++ TokenName ++ " mismatches"}
-                            end;
-                        _ -> {error, TokenName ++ " not valid"}
-                    end
-            end
+        TokenValue -> get_user_by_token(TokenName, TokenValue)
     end.
 
+
+-spec get_user_by_token(TokenName::string(), TokenValue::string()) -> tuple().
+get_user_by_token(TokenName, TokenValue) ->
+    Query = TokenName ++ ":" ++ TokenValue,
+    case erlastic_search:search_limit(?INDEX, "user", Query, 500) of
+        {error, Reason} -> {error, Reason};
+        {ok, List} ->
+            case List of
+                [] -> {error, TokenName ++ " not valid"};
+                JSON when is_tuple(JSON) ->
+                    Source = lib_json:get_field(JSON, "hits.hits"),
+                    Result = lib_json:get_field(Source, "_source"),
+                    Tok = binary_to_list(lib_json:get_field(Result, TokenName)),
+                    case TokenValue == Tok of
+                        true  -> {ok, Tok};
+                        false -> {error, "Not possible to perform the request. " ++ TokenName ++ " mismatches"}
+                    end;
+                _ -> {error, TokenName ++ " not valid"}
+            end
+    end.
 
 -spec get_user_model(ReqData::tuple(), State::string()) -> {list(), tuple(), string()}.
 get_user_model(ReqData, State) ->
