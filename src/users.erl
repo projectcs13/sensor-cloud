@@ -15,7 +15,11 @@
          get_user/2,
          process_post/2,
          process_auth_request/2,
-         delete_streams_with_user_id/1]).
+         delete_streams_with_user_id/1,
+         replace_old_access_token/2,
+         user_is_new/1,
+         store_user/3,
+         get_user_by_token/2]).
 
 -include("webmachine.hrl").
 -include_lib("erlastic_search.hrl").
@@ -91,7 +95,7 @@ content_types_accepted(ReqData, State) ->
 %% @end
 -spec delete_resource(ReqData::tuple(), State::string()) -> {string(), tuple(), string()}.
 delete_resource(ReqData, State) ->
-    case analyse_token("access_token", ReqData) of
+    case openidc:authenticate_token("access_token", ReqData) of
         {error, Msg} -> {{halt, 403}, wrq:set_resp_body(Msg, ReqData), State};
         {ok, Token} ->
             % {true, wrq:set_resp_body(Token, ReqData), State}
@@ -221,7 +225,7 @@ delete_streams([StreamId|Rest], Type) ->
 %% @end
 -spec put_user(ReqData::tuple(), State::string()) -> {true, tuple(), string()}.
 put_user(ReqData, State) ->
-    case analyse_token("access_token", ReqData) of
+    case openidc:authenticate_token("access_token", ReqData) of
         {error, Msg} -> {{halt, 403}, wrq:set_resp_body(Msg, ReqData), State};
         {ok, Token} ->
             case api_help:is_subs(ReqData) or api_help:is_unsubs(ReqData) of
@@ -338,7 +342,6 @@ find_subscription(StreamId, [Head|Rest]) ->
 %%
 %% @end
 -spec add_subscriber(StreamId::string(), UserId::string()) -> ok | {error, no_model}.
-
 add_subscriber(StreamId, UserId) ->
     UpdateJson = "{\"script\" :\"{ctx._source.nr_subscribers += 1; ctx._source.subscribers += subscriber};\",
                     \"params\":{\"subscriber\":{ \"user_id\":\""++UserId++"\"}}}",
@@ -356,7 +359,6 @@ add_subscriber(StreamId, UserId) ->
 %%
 %% @end
 -spec remove_subscriber(StreamId::string(), UserId::string()) -> ok | {error, no_model}.
-
 remove_subscriber(StreamId, UserId) ->
     UpdateJson = "{\"script\" :\"{ctx._source.nr_subscribers += -1; ctx._source.subscribers.remove(subscriber)};\",
                         \"params\":{\"subscriber\":{ \"user_id\":\""++UserId++"\"}}}",
@@ -444,70 +446,16 @@ create_user(ReqData, State) ->
 %% @end
 -spec process_auth_request(ReqData::tuple(), State::string()) -> {true, tuple(), string()}.
 process_auth_request(ReqData, State) ->
-    % TODO Grab these settings from a config file
-    APIKey = "AIzaSyCyC23vutanlgth_1INqQdZsv6AgZRiknY",
-    ClientID = "995342763478-fh8bd2u58n1tl98nmec5jrd76dkbeksq.apps.googleusercontent.com",
-    ClientSecret = "fVpjWngIEny9VTf3ZPZr8Sh6",
-    RedirectURL = "http://localhost:8000/users/_openid",
-
-    plus_srv:start_link(APIKey, ClientID, ClientSecret, RedirectURL),
-    plus_srv:set_api("https://www.googleapis.com/discovery/v1/apis/plus/v1/rest"),
-    TokenURL = plus_srv:gen_token_url("https://www.googleapis.com/auth/plus.me"),
-
+    TokenURL = openidc:process_auth_request(ReqData, State),
     JSON = "{\"token_url\": \"" ++ TokenURL ++ "\"}",
     {true, wrq:set_resp_body(JSON, ReqData), State}.
 
 
 -spec process_auth_redirect(ReqData::tuple(), State::string()) -> {true, tuple(), string()}.
 process_auth_redirect(ReqData, State) ->
-    case {wrq:get_qs_value("code", ReqData), wrq:get_qs_value("state", ReqData)} of
-        {undefined, _} -> {{halt,403}, wrq:set_resp_body("State missing", ReqData), State};
-
-        {_, undefined} -> {{halt,403}, wrq:set_resp_body("Code missing", ReqData), State};
-
-        {Code, AuthState} when Code =/= "", AuthState =/= "" ->
-            case authenticate(Code, AuthState) of
-                {true, Res}    -> {true,        wrq:set_resp_body(Res, ReqData),   State};
-                {false, Error} -> {{halt, 403}, wrq:set_resp_body(Error, ReqData), State}
-            end;
-
-        _ -> {{halt,403}, wrq:set_resp_body("Unsupported field(s) on the auth request", ReqData), State}
-    end.
-
-
--spec authenticate(Code::string(), AuthState::string()) -> string().
-authenticate(Code, AuthState) ->
-    {AccToken, RefToken} = exchange_token(Code, AuthState),
-
-    case AccToken of
-        undefined ->
-            ErrorMsg = "Not possible to authenticate. Missing Access Token",
-            {false, ErrorMsg};
-
-        _ ->
-            case fetch_user_info() of
-                {error, _} ->
-                    ErrorMsg = "Not possible to authenticate. Unreachable user info",
-                    {false, ErrorMsg};
-
-                {ok, UserData} ->
-                    case user_is_new(UserData) of
-                        false -> Status = replace_old_access_token(UserData, AccToken);
-                        true  -> Status = store_user(UserData, AccToken, RefToken)
-                    end,
-
-                    case Status of
-                        {error, Msg} -> {error, Msg};
-
-                        {ok, _} ->
-                            Struct = {struct, [
-                                {access_token, AccToken},
-                                {refresh_token, RefToken}
-                            ]},
-                            Res = mochijson2:encode(Struct),
-                            {true, Res}
-                    end
-            end
+    case openidc:process_auth_redirect(ReqData, State) of
+        {ok, Res}    -> {true, wrq:set_resp_body(Res, ReqData), State};
+        {error, Msg} -> {{halt,403}, wrq:set_resp_body(Msg, ReqData), State}
     end.
 
 
@@ -535,19 +483,6 @@ fetch_refresh_token(UserData) ->
     end.
 
 
--spec exchange_token(Code::string(), AuthState::string()) -> string().
-exchange_token(Code, AuthState) ->
-    Token = plus_srv:exchange_token(Code, AuthState),
-    AccToken = proplists:get_value(<<"access_token">>, Token),
-    RefToken = proplists:get_value(<<"refresh_token">>, Token),
-    {AccToken, RefToken}.
-
-
--spec fetch_user_info() -> tuple().
-fetch_user_info() ->
-    plus_srv:call_method("plus.people.get", [{"userId", "me"}], []).
-
-
 -spec build_user_json(Data::tuple(), AccToken::string(), RefToken::string()) -> string().
 build_user_json(Data, AccToken, RefToken) ->
     ID = proplists:get_value(<<"id">>, Data),
@@ -569,7 +504,7 @@ build_user_json(Data, AccToken, RefToken) ->
     {struct, Image} = proplists:get_value(<<"image">>, Data),
     URL = proplists:get_value(<<"url">>, Image),
 
-    RefreshT = list_to_binary(string:substr(binary_to_list(RefToken), 3)),
+    % RefreshT = list_to_binary(string:substr(binary_to_list(RefToken), 3)),
     mochijson2:encode({
         struct,[
             {username, ID},
@@ -580,7 +515,7 @@ build_user_json(Data, AccToken, RefToken) ->
             {description, Description},
             {image_url, URL},
             {access_token, AccToken},
-            {refresh_token, RefreshT},
+            {refresh_token, RefToken},
             {admin, Admin}]
     }).
 
@@ -670,7 +605,7 @@ get_user(ReqData, State) ->
             case api_help:is_auth_redirect(ReqData) of
                 true  -> process_auth_redirect(ReqData, State);
                 false ->
-                    case analyse_token("refresh_token", ReqData) of
+                    case openidc:authenticate_token("refresh_token", ReqData) of
                         {ok, _} ->
                             case api_help:is_search(ReqData) of
                                 true  -> process_search(ReqData,State, get);
@@ -678,7 +613,7 @@ get_user(ReqData, State) ->
                             end;
 
                         {error, Msg} ->
-                            case analyse_token("access_token", ReqData) of
+                            case openidc:authenticate_token("access_token", ReqData) of
                                 {ok, _} ->
                                     case api_help:is_search(ReqData) of
                                         true  -> process_search(ReqData,State, get);
@@ -689,18 +624,6 @@ get_user(ReqData, State) ->
                             end
                     end
             end
-    end.
-
-
--spec analyse_token(TokenName::string(), ReqData::tuple()) -> tuple().
-analyse_token(TokenName, ReqData) ->
-    case wrq:get_qs_value(TokenName, ReqData) of
-        undefined ->
-            case wrq:get_req_header(TokenName, ReqData) of
-                undefined -> {error, "Not possible to perform the request. Missing " ++ TokenName};
-                TokenVal  -> get_user_by_token(TokenName, TokenVal)
-            end;
-        TokenValue -> get_user_by_token(TokenName, TokenValue)
     end.
 
 
