@@ -671,7 +671,6 @@ get_user(ReqData, State) ->
                 true  -> process_auth_redirect(ReqData, State);
                 false ->
                     case analyse_token("refresh_token", ReqData) of
-                        % {ok, RefTok} ->
                         {ok, _} ->
                             case api_help:is_search(ReqData) of
                                 true  -> process_search(ReqData,State, get);
@@ -679,18 +678,14 @@ get_user(ReqData, State) ->
                             end;
 
                         {error, Msg} ->
-                            % {true, wrq:set_resp_body("Msg", ReqData), State}
                             case analyse_token("access_token", ReqData) of
-                                {ok, JSON} ->
-                                    % {true, wrq:set_resp_body(JSON, ReqData), State}
-
+                                {ok, _} ->
                                     case api_help:is_search(ReqData) of
                                         true  -> process_search(ReqData,State, get);
                                         false -> get_user_model(ReqData, State)
                                     end;
-                                _ ->
-                                    Msg = "Not possible to perform the request. access_token mismatches",
-                                    {{halt, 403}, wrq:set_resp_body(Msg, ReqData), State}
+
+                                {error, Msg} -> {{halt, 403}, wrq:set_resp_body(Msg, ReqData), State}
                             end
                     end
             end
@@ -729,7 +724,8 @@ get_user_by_token(TokenName, TokenValue) ->
 
                     case lists:filter(Lambda, JSONList) of
                         []  -> {error, "No users found for this token"};
-                        Res -> {ok, Res}
+                        [X] -> {ok, TokenValue};
+                        L   -> {error, "Too many users found for this token"}
                     end;
 
                 _ -> {error, TokenName ++ " not valid"}
