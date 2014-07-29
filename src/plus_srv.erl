@@ -13,7 +13,8 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/4,list_apis/0,set_api/1,call_method/3,list_methods/0,list_scopes/1,gen_token_url/1,exchange_token/2]).
+-export([start_link/4,list_apis/0,set_api/1,call_method/3,
+         list_methods/0,list_scopes/1,gen_token_url/1,exchange_token/2,get_url/1]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3,handle_cast/2, handle_info/2, terminate/2, code_change/3]).
@@ -115,7 +116,8 @@ handle_call({gen_token_url, Scopes}, _From, State) ->
     [URL, OAuth2State] = get_authurl(Scopes, State),
     {reply, URL, State#state{oauth2state=OAuth2State}};
 
-handle_call({exchange_token, Code, OAuth2State}, _From, State) when OAuth2State == State#state.oauth2state ->
+handle_call({exchange_token, Code, _}, _From, State) ->
+% handle_call({exchange_token, Code, OAuth2State}, _From, State) when OAuth2State == State#state.oauth2state ->
     {ok, Token} = get_authtoken(Code, State),
     {reply, Token, State#state{authtoken=Token}};
 
