@@ -16,10 +16,10 @@
          process_post/2,
          process_auth_request/2,
          delete_streams_with_user_id/1,
-         replace_old_access_token/2,
+         replace_access_token/2,
          user_is_new/1,
          store_user/3,
-         get_user_by_token/2]).
+         get_user_by_name/1]).
 
 -include("webmachine.hrl").
 -include_lib("erlastic_search.hrl").
@@ -459,13 +459,12 @@ process_auth_redirect(ReqData, State) ->
     end.
 
 
--spec replace_old_access_token(UserData::string(), AccToken::string()) -> true.
-replace_old_access_token(UserData, AccToken) ->
-    Username = binary_to_list(proplists:get_value(<<"id">>, UserData)),
+-spec replace_access_token(Username::string(), AccToken::string()) -> tuple().
+replace_access_token(Username, AccToken) ->
     case get_user_by_name(Username) of
         {error, Msg} -> {error, Msg};
         {ok, JSON}   ->
-            UserJSON = lib_json:replace_field(JSON, "access_token", AccToken),
+            UserJSON = lib_json:replace_field(JSON, "access_token", list_to_binary(AccToken)),
             Update   = lib_json:set_attr(doc, UserJSON),
             case api_help:update_doc(?INDEX, "user", Username, Update) of
                 {ok, NewJSON}         -> {ok, NewJSON};
@@ -598,6 +597,13 @@ get_user_by_name(Username) ->
 %% @end
 -spec get_user(ReqData::tuple(), State::string()) -> {list(), tuple(), string()}.
 get_user(ReqData, State) ->
+    Do_get_user = fun() ->
+        case api_help:is_search(ReqData) of
+            true  -> process_search(ReqData,State, get);
+            false -> get_user_model(ReqData, State)
+        end
+    end,
+
     % TODO Remove God mode
     case wrq:get_qs_value("god", ReqData) of
         "true" -> get_user_model(ReqData, State);
@@ -606,20 +612,10 @@ get_user(ReqData, State) ->
                 true  -> process_auth_redirect(ReqData, State);
                 false ->
                     case openidc:authenticate_token("refresh_token", ReqData) of
-                        {ok, _} ->
-                            case api_help:is_search(ReqData) of
-                                true  -> process_search(ReqData,State, get);
-                                false -> get_user_model(ReqData, State)
-                            end;
-
+                        {ok, _} -> Do_get_user();
                         {error, Msg} ->
                             case openidc:authenticate_token("access_token", ReqData) of
-                                {ok, _} ->
-                                    case api_help:is_search(ReqData) of
-                                        true  -> process_search(ReqData,State, get);
-                                        false -> get_user_model(ReqData, State)
-                                    end;
-
+                                {ok, _} -> Do_get_user();
                                 {error, Msg} -> {{halt, 403}, wrq:set_resp_body(Msg, ReqData), State}
                             end
                     end
@@ -627,33 +623,38 @@ get_user(ReqData, State) ->
     end.
 
 
--spec get_user_by_token(TokenName::string(), TokenValue::string()) -> tuple().
-get_user_by_token(TokenName, TokenValue) ->
-    Query = TokenName ++ ":" ++ TokenValue,
-    case erlastic_search:search_limit(?INDEX, "user", Query, 500) of
-        {error, Reason} -> {error, Reason};
-        {ok, List} ->
-            case List of
-                [] -> {error, "No users found by the given token"};
+% -spec get_user_by_token(TokenName::string(), TokenValue::string()) -> tuple().
+% get_user_by_token(TokenName, TokenValue) ->
+    % Query = TokenName ++ ":" ++ TokenValue,
+    % case erlastic_search:search_limit(?INDEX, "user", Query, 500) of
+    %     {error, Reason} -> {error, Reason};
+    %     {ok, List} ->
+    %         case List of
+    %             [] -> {error, "No users found by the given token"};
 
-                Li when is_tuple(Li) ->
-                    JSONList = lib_json:get_field(Li, "hits.hits"),
+    %             Li when is_tuple(Li) ->
+    %                 JSONList = lib_json:get_field(Li, "hits.hits"),
 
-                    Lambda = fun(JSON) ->
-                        Source = lib_json:get_field(JSON, "_source"),
-                        Tok = binary_to_list(lib_json:get_field(Source, TokenName)),
-                        TokenValue == Tok
-                    end,
+    %                 Lambda = fun(JSON) ->
+    %                     Source = lib_json:get_field(JSON, "_source"),
+    %                     Field = case TokenName of
+    %                         "Access-Token"  -> "access_token";
+    %                         "Refresh-Token" -> "refresh_token";
+    %                         Other           -> Other
+    %                     end,
+    %                     Tok = binary_to_list(lib_json:get_field(Source, Field)),
+    %                     TokenValue == Tok
+    %                 end,
 
-                    case lists:filter(Lambda, JSONList) of
-                        []  -> {error, "No users found for this token"};
-                        [X] -> {ok, TokenValue};
-                        L   -> {error, "Too many users found for this token"}
-                    end;
+    %                 case lists:filter(Lambda, JSONList) of
+    %                     []  -> {error, "No users found for this token"};
+    %                     [X] -> {ok, TokenValue};
+    %                     L   -> {error, "Too many users found for this token"}
+    %                 end;
 
-                _ -> {error, TokenName ++ " not valid"}
-            end
-    end.
+    %             _ -> {error, TokenName ++ " not valid"}
+    %         end
+    % end.
 
 
 -spec get_user_model(ReqData::tuple(), State::string()) -> {list(), tuple(), string()}.
