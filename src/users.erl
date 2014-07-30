@@ -457,12 +457,6 @@ process_auth_redirect(ReqData, State) ->
     end.
 
 
-% -spec replace_refresh_token(Username::string(), RefToken::string()) -> tuple().
-% replace_refresh_token(Username, RefToken) -> replace_token(Username, "refresh_token", RefToken).
-
-
-% -spec replace_access_token(Username::string(), AccToken::string()) -> tuple().
-% replace_access_token(Username, AccToken) -> replace_token(Username, "access_token", AccToken).
 -spec replace_token(Username::string(), TokenName::string(), TokenValue::string()) -> tuple().
 
 replace_token(Username, "Access-Token", TokenValue)  -> replace_token(Username, "access_token", TokenValue);
@@ -471,7 +465,7 @@ replace_token(Username, TokenName, TokenValue) ->
     case get_user_by_name(Username) of
         {error, Msg} -> {error, Msg};
         {ok, JSON}   ->
-            OldToken = lib_json:replace_field(JSON, TokenName),
+            OldToken = lib_json:get_field(JSON, TokenName),
             case OldToken == TokenValue of   % Optimization, to not update if it is not needed
                 true  -> {ok, JSON};
                 false ->
