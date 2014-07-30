@@ -471,11 +471,16 @@ replace_token(Username, TokenName, TokenValue) ->
     case get_user_by_name(Username) of
         {error, Msg} -> {error, Msg};
         {ok, JSON}   ->
-            UserJSON = lib_json:replace_field(JSON, TokenName, TokenValue),
-            Update   = lib_json:set_attr(doc, UserJSON),
-            case api_help:update_doc(?INDEX, "user", Username, Update) of
-                {ok, NewJSON}         -> {ok, NewJSON};
-                {error, {Code, Body}} -> {error, api_help:generate_error(Body, Code)}
+            OldToken = lib_json:replace_field(JSON, TokenName),
+            case OldToken == TokenValue of   % Optimization, to not update if it is not needed
+                true  -> {ok, JSON};
+                false ->
+                    UserJSON = lib_json:replace_field(JSON, TokenName, TokenValue),
+                    Update   = lib_json:set_attr(doc, UserJSON),
+                    case api_help:update_doc(?INDEX, "user", Username, Update) of
+                        {ok, NewJSON}         -> {ok, NewJSON};
+                        {error, {Code, Body}} -> {error, api_help:generate_error(Body, Code)}
+                    end
             end
     end.
 
