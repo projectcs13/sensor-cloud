@@ -63,9 +63,9 @@ process_auth_redirect(ReqData, State) ->
 
 -spec auth_gen_token(Code::string(), AuthState::string()) -> string().
 auth_gen_token(Code, AuthState) ->
-    {AccToken, RefToken} = exchange_token(Code, AuthState),
+    {AccToken, RefreshT} = exchange_token(Code, AuthState),
 
-    RefreshT = case RefToken of
+    RefToken = case RefreshT of
         undefined -> list_to_binary("undefined");
         String    -> list_to_binary(string:substr(binary_to_list(String), 3))
     end,
@@ -79,8 +79,10 @@ auth_gen_token(Code, AuthState) ->
                 {ok, UserData} ->
                     Username = binary_to_list(proplists:get_value(<<"id">>, UserData)),
                     Status = case users:user_is_new(Username) of
-                        false -> users:replace_access_token(Username, AccToken);
-                        true  -> users:store_user(UserData, AccToken, RefreshT)
+                        true  -> users:store_user(UserData, AccToken, RefToken);
+                        false ->
+                            users:replace_token(Username, "access_token", AccToken),
+                            users:replace_token(Username, "refresh_token", RefToken)
                     end,
 
                     case Status of
@@ -88,7 +90,7 @@ auth_gen_token(Code, AuthState) ->
                         {ok, _} ->
                             Struct = {struct, [
                                 {access_token, AccToken},
-                                {refresh_token, RefreshT}
+                                {refresh_token, RefToken}
                             ]},
                             Res = mochijson2:encode(Struct),
                             {true, Res}
@@ -129,14 +131,14 @@ exchange_token(Code, AuthState) ->
 
 
 -spec authenticate_request(ReqData::tuple()) -> tuple().
-authenticate_request(ReqData) -> authenticate_token("access_token", ReqData).
+authenticate_request(ReqData) -> authenticate_token("Access-Token", ReqData).
 
 
 -spec authenticate_token(TokenName::string(), ReqData::tuple()) -> tuple().
 authenticate_token(TokenName, ReqData) ->
     case wrq:get_req_header(TokenName, ReqData) of
         undefined -> {error, "{\"error\": \"Not possible to perform the request. Missing " ++ TokenName ++ "\"}"};
-        TokenVal  -> check_valid_token(TokenName, list_to_binary(TokenVal))
+        TokenVal  -> check_valid_token(TokenName, TokenVal)
     end.
 
 
@@ -150,7 +152,7 @@ check_valid_token(TokenName, TokenValue) ->
             case verify_token_response(TokenValue, JSON) of
                 {error, Error}        -> {error, Error};
                 {ok, Username, false} -> {error, "{\"error\": \"Token not valid. Expended by other system\"}"};
-                {ok, Username, true}  -> users:replace_access_token(Username, TokenValue)
+                {ok, Username, true}  -> users:replace_token(Username, TokenName, TokenValue)
             end
     end.
 
