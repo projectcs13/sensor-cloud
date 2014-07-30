@@ -382,10 +382,10 @@ process_post(ReqData, State) ->
     Req = string:sub_string(lists:nth(length(URIList),URIList),1,7),
     case Req of
         "_auth"   -> process_auth_request(ReqData, State);
-        % "_signin" -> process_signin(ReqData, State);
         "_search" -> process_search(ReqData, State, post);
         _ -> create_user(ReqData, State)
     end.
+
     % case api_help:is_auth(ReqData) of
     %     true  -> process_auth_request(ReqData, State);
     %     false ->
@@ -395,9 +395,6 @@ process_post(ReqData, State) ->
     %         end
     % end.
 
-% -spec process_signin(ReqData::string(), State::string()) -> {true, tuple(), string()}.
-% process_signin(ReqData, State) ->
-%     .
 
 -spec create_user(ReqData::tuple(), State::string()) -> {true, tuple(), string()}.
 create_user(ReqData, State) ->
@@ -455,7 +452,9 @@ process_auth_request(ReqData, State) ->
 process_auth_redirect(ReqData, State) ->
     case openidc:process_auth_redirect(ReqData, State) of
         {ok, Res}    -> {true, wrq:set_resp_body(Res, ReqData), State};
-        {error, Msg} -> {{halt,403}, wrq:set_resp_body(Msg, ReqData), State}
+        {error, Msg} ->
+            Error = "{\"error\": \"" ++ Msg ++ "\"}",
+            {{halt,403}, wrq:set_resp_body(Error, ReqData), State}
     end.
 
 
@@ -464,21 +463,12 @@ replace_access_token(Username, AccToken) ->
     case get_user_by_name(Username) of
         {error, Msg} -> {error, Msg};
         {ok, JSON}   ->
-            UserJSON = lib_json:replace_field(JSON, "access_token", list_to_binary(AccToken)),
+            UserJSON = lib_json:replace_field(JSON, "access_token", AccToken),
             Update   = lib_json:set_attr(doc, UserJSON),
             case api_help:update_doc(?INDEX, "user", Username, Update) of
                 {ok, NewJSON}         -> {ok, NewJSON};
                 {error, {Code, Body}} -> {error, api_help:generate_error(Body, Code)}
             end
-    end.
-
-
--spec fetch_refresh_token(UserData::string()) -> string().
-fetch_refresh_token(UserData) ->
-    Username = binary_to_list(proplists:get_value(<<"id">>, UserData)),
-    case get_user_by_name(Username) of
-        {ok, JSON}   -> {ok, proplists:get_value(<<"refresh_token">>, JSON)};
-        {error, Msg} -> {error, Msg}
     end.
 
 
@@ -503,7 +493,6 @@ build_user_json(Data, AccToken, RefToken) ->
     {struct, Image} = proplists:get_value(<<"image">>, Data),
     URL = proplists:get_value(<<"url">>, Image),
 
-    % RefreshT = list_to_binary(string:substr(binary_to_list(RefToken), 3)),
     mochijson2:encode({
         struct,[
             {username, ID},
@@ -519,29 +508,12 @@ build_user_json(Data, AccToken, RefToken) ->
     }).
 
 
--spec user_is_new(UserData::string()) -> tuple().
-user_is_new(UserData) ->
-    % Username = binary_to_list(proplists:get_value(<<"id">>, UserData)),
-    % check_and_sanitize(Username).
-
-    Username = binary_to_list(proplists:get_value(<<"id">>, UserData)),
+-spec user_is_new(Username::string()) -> tuple().
+user_is_new(Username) ->
     case get_user_by_name(Username) of
         {error, Msg} -> true;
         {ok, JSON}   -> false
     end.
-
-    % Username = binary_to_list(lib_json:get_field(UserJSON, "username")),
-    % case check_and_sanitize(Username) of
-    %     invalidcharacters ->
-    %         "Username characters are not valid";
-    %     false ->
-    %         "User already exists";
-    %     {Code, Body} ->
-    %         Body;
-    %     true ->
-    %         {_, Res} = store_user(Username, UserJSON),
-    %         Res
-    % end.
 
 
 -spec store_user(UserData::string(), AccToken::string(), RefToken::string()) -> tuple().
@@ -568,25 +540,20 @@ check_and_sanitize(Username) ->
                 {error, {Code, Body}} -> {Code, Body};
                 {ok,JsonStruct}       -> false
             end;
-
         _ ->  invalidcharacters
     end.
 
 
 -spec get_user_by_name(Username::string()) -> tuple().
 get_user_by_name(Username) ->
-    % {_, JSON} = erlastic_search:get_doc(?INDEX, "user", Username),
-    % JSON.
     case erlastic_search:get_doc(?INDEX, "user", string:to_lower(Username), [{<<"fields">>, <<"password,_source">>}]) of
         {error, {Code1, Body1}} ->
             ErrorString = api_help:generate_error(Body1, Code1),
             {error, ErrorString};
-            % {{halt, Code1}, wrq:set_resp_body(ErrorString1, ReqData), State};
 
         {ok, JsonStruct} ->
             FinalJson = api_help:get_and_add_password(JsonStruct),
             {ok, FinalJson}
-            % {FinalJson, ReqData, State}
     end.
 
 
@@ -613,48 +580,16 @@ get_user(ReqData, State) ->
                 false ->
                     case openidc:authenticate_token("refresh_token", ReqData) of
                         {ok, _} -> Do_get_user();
-                        {error, Msg} ->
+                        {error, _} ->
                             case openidc:authenticate_token("access_token", ReqData) of
                                 {ok, _} -> Do_get_user();
-                                {error, Msg} -> {{halt, 403}, wrq:set_resp_body(Msg, ReqData), State}
+                                {error, Msg} ->
+                                    Error = "{\"error\": \"" ++ Msg ++ "\"}",
+                                    {{halt, 403}, wrq:set_resp_body(Error, ReqData), State}
                             end
                     end
             end
     end.
-
-
-% -spec get_user_by_token(TokenName::string(), TokenValue::string()) -> tuple().
-% get_user_by_token(TokenName, TokenValue) ->
-    % Query = TokenName ++ ":" ++ TokenValue,
-    % case erlastic_search:search_limit(?INDEX, "user", Query, 500) of
-    %     {error, Reason} -> {error, Reason};
-    %     {ok, List} ->
-    %         case List of
-    %             [] -> {error, "No users found by the given token"};
-
-    %             Li when is_tuple(Li) ->
-    %                 JSONList = lib_json:get_field(Li, "hits.hits"),
-
-    %                 Lambda = fun(JSON) ->
-    %                     Source = lib_json:get_field(JSON, "_source"),
-    %                     Field = case TokenName of
-    %                         "Access-Token"  -> "access_token";
-    %                         "Refresh-Token" -> "refresh_token";
-    %                         Other           -> Other
-    %                     end,
-    %                     Tok = binary_to_list(lib_json:get_field(Source, Field)),
-    %                     TokenValue == Tok
-    %                 end,
-
-    %                 case lists:filter(Lambda, JSONList) of
-    %                     []  -> {error, "No users found for this token"};
-    %                     [X] -> {ok, TokenValue};
-    %                     L   -> {error, "Too many users found for this token"}
-    %                 end;
-
-    %             _ -> {error, TokenName ++ " not valid"}
-    %         end
-    % end.
 
 
 -spec get_user_model(ReqData::tuple(), State::string()) -> {list(), tuple(), string()}.
