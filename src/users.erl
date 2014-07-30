@@ -16,7 +16,7 @@
          process_post/2,
          process_auth_request/2,
          delete_streams_with_user_id/1,
-         replace_access_token/2,
+         replace_token/3,
          user_is_new/1,
          store_user/3,
          get_user_by_name/1]).
@@ -95,10 +95,9 @@ content_types_accepted(ReqData, State) ->
 %% @end
 -spec delete_resource(ReqData::tuple(), State::string()) -> {string(), tuple(), string()}.
 delete_resource(ReqData, State) ->
-    case openidc:authenticate_token("access_token", ReqData) of
+    case openidc:authenticate_request(ReqData) of
         {error, Msg} -> {{halt, 403}, wrq:set_resp_body(Msg, ReqData), State};
         {ok, Token} ->
-            % {true, wrq:set_resp_body(Token, ReqData), State}
             Id = id_from_path(ReqData),
             case delete_streams_with_user_id(Id) of
                 {error, {Code, Body}} ->
@@ -225,7 +224,7 @@ delete_streams([StreamId|Rest], Type) ->
 %% @end
 -spec put_user(ReqData::tuple(), State::string()) -> {true, tuple(), string()}.
 put_user(ReqData, State) ->
-    case openidc:authenticate_token("access_token", ReqData) of
+    case openidc:authenticate_request(ReqData) of
         {error, Msg} -> {{halt, 403}, wrq:set_resp_body(Msg, ReqData), State};
         {ok, Token} ->
             case api_help:is_subs(ReqData) or api_help:is_unsubs(ReqData) of
@@ -458,12 +457,21 @@ process_auth_redirect(ReqData, State) ->
     end.
 
 
--spec replace_access_token(Username::string(), AccToken::string()) -> tuple().
-replace_access_token(Username, AccToken) ->
+% -spec replace_refresh_token(Username::string(), RefToken::string()) -> tuple().
+% replace_refresh_token(Username, RefToken) -> replace_token(Username, "refresh_token", RefToken).
+
+
+% -spec replace_access_token(Username::string(), AccToken::string()) -> tuple().
+% replace_access_token(Username, AccToken) -> replace_token(Username, "access_token", AccToken).
+-spec replace_token(Username::string(), TokenName::string(), TokenValue::string()) -> tuple().
+
+replace_token(Username, "Access-Token", TokenValue)  -> replace_token(Username, "access_token", TokenValue);
+replace_token(Username, "Refresh-Token", TokenValue) -> replace_token(Username, "refresh_token", TokenValue);
+replace_token(Username, TokenName, TokenValue) ->
     case get_user_by_name(Username) of
         {error, Msg} -> {error, Msg};
         {ok, JSON}   ->
-            UserJSON = lib_json:replace_field(JSON, "access_token", AccToken),
+            UserJSON = lib_json:replace_field(JSON, TokenName, TokenValue),
             Update   = lib_json:set_attr(doc, UserJSON),
             case api_help:update_doc(?INDEX, "user", Username, Update) of
                 {ok, NewJSON}         -> {ok, NewJSON};
@@ -578,16 +586,14 @@ get_user(ReqData, State) ->
             case api_help:is_auth_redirect(ReqData) of
                 true  -> process_auth_redirect(ReqData, State);
                 false ->
-                    case openidc:authenticate_token("refresh_token", ReqData) of
-                        {ok, _} -> Do_get_user();
-                        {error, _} ->
-                            case openidc:authenticate_token("access_token", ReqData) of
+                    % case openidc:authenticate_token("refresh_token", ReqData) of
+                    %     {ok, _} -> Do_get_user();
+                    %     {error, _} ->
+                            case openidc:authenticate_request(ReqData) of
                                 {ok, _} -> Do_get_user();
-                                {error, Msg} ->
-                                    Error = "{\"error\": \"" ++ Msg ++ "\"}",
-                                    {{halt, 403}, wrq:set_resp_body(Error, ReqData), State}
+                                {error, Msg} -> {{halt, 403}, wrq:set_resp_body(Msg, ReqData), State}
                             end
-                    end
+                    % end
             end
     end.
 
