@@ -9,12 +9,12 @@ sudo apt-get install -yq xsltproc software-properties-common
 echo "#################################################################"
 echo "Installing Erlang"
 echo "#################################################################"
-grep -q -e 'deb http://packages.erlang-solutions.com/debian '$(lsb_release -sc)' contrib' /etc/apt/sources.list || echo 'deb http://packages.erlang-solutions.com/debian '$(lsb_release -sc)' contrib' >> /etc/apt/sources.list
-sudo wget http://packages.erlang-solutions.com/debian/erlang_solutions.asc
-sudo apt-key add erlang_solutions.asc
-rm -f erlang_solutions.asc
-sudo apt-get update -q
-sudo apt-get install -yq erlang
+#grep -q -e 'deb http://packages.erlang-solutions.com/debian '$(lsb_release -sc)' contrib' /etc/apt/sources.list || echo 'deb http://packages.erlang-solutions.com/debian '$(lsb_release -sc)' contrib' >> /etc/apt/sources.list
+#sudo wget http://packages.erlang-solutions.com/debian/erlang_solutions.asc
+#sudo apt-key add erlang_solutions.asc
+#rm -f erlang_solutions.asc
+#sudo apt-get update -q
+#sudo apt-get install -yq erlang
 
 echo "#################################################################"
 echo "Installing Nodejs together with npm"
@@ -29,4 +29,4 @@ echo "Installing R"
 echo "#################################################################"
 sudo add-apt-repository "deb http://ftp.sunet.se/pub/lang/CRAN/bin/linux/ubuntu precise/"
 sudo apt-get update -q
-sudo apt-get install -yq r-base
+sudo apt-get install -yq r-base --force-yes
