@@ -12,6 +12,7 @@
 -module(api_help).
 -include_lib("erlastic_search.hrl").
 -include("json.hrl").
+-include("field_restrictions.hrl").
 
 -export([any_to_float/1,
 	 do_any_field_exist/2,
@@ -26,6 +27,7 @@
 	 get_list_and_add_id/2,
 	 get_and_add_password/1,
 	 get_list_and_add_password/1,
+	 id_from_path/1,
 	 is_polling_history/1,
 	 is_auth/1,
 	 is_auth_redirect/1,
@@ -36,6 +38,7 @@
 	 is_unsubs/1,
 	 json_handler/2,
 	 make_term_query/1,
+	 now_to_seconds/0,
 	 pair/1,
 	 parse_path/1,
 	 refresh/0,
@@ -306,6 +309,34 @@ get_list_and_add_password(JsonStruct) ->
     lib_json:set_attr(users, AddedPassword).
 
 %% @doc
+%% Function: id_from_path/1
+%% Purpose: Retrieves the id from the path.
+%% Returns: Id
+%% @end
+-spec id_from_path(RD::tuple()) -> string().
+id_from_path(RD) ->
+    Fetch_user_id = fun(TableName, Id) ->
+        case erlastic_search:get_doc(?INDEX, "stream", Id) of
+            {error, _} -> undefined;
+            {ok, JSON} ->
+                UID = lib_json:get_field(JSON, "_source.user_id"),
+                string:to_lower(binary_to_list(UID))
+        end
+    end,
+
+    case api_help:parse_path(wrq:path(RD)) of
+        [error]               -> undefined;
+        [{"users"}]           -> undefined;
+        [{"users", Id}]       -> string:to_lower(Id);
+        [{"users", Id}, _]    -> string:to_lower(Id);
+        [{"streams", Id}]     -> Fetch_user_id("streams", Id);
+        [{"streams", Id}, _]  -> Fetch_user_id("streams", Id);
+        [{"vstreams", Id}]    -> Fetch_user_id("vstreams", Id);
+        [{"vstreams", Id}, _] -> Fetch_user_id("vstreams", Id);
+        _                     -> undefined
+    end.
+
+%% @doc
 %% Function: is_polling_history/1
 %% Purpose: Used to deiced if the URI specify a polling_history
 %% Returns: True if URI specify a pollinghistory, false otherwise
@@ -445,6 +476,17 @@ make_inner_term_query([First|Rest]) ->
 		_ ->
 			[First|make_inner_term_query(Rest)]
 	end.
+
+%% @doc
+%% Function: now_to_seconds/0
+%% Purpose: Converts the built-in function now() into seconds
+%% Returns: The current number of seconds from 1970
+%% @end
+-spec now_to_seconds() -> integer().
+now_to_seconds() ->
+	{Mega, Sec, _} = erlang:now(),
+    (Mega * 1000000) + Sec.
+
 
 %% @doc
 %% Function: pair/1
