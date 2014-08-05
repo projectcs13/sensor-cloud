@@ -1,21 +1,26 @@
-%% @author Georgios Koutsoumpakis, Li Hao
+%% @author Alberto Blazquez <albl1900@student.uu.se>
 %% [www.csproj13.student.it.uu.se]
 %% @version 1.0
 %% @copyright [Copyright information]
 
-%% @doc Webmachine_resource for /users
+%% @doc == openidc ==
+%% Authentication/Authorization module based upon the OpenID Connect protocol
+%% It relies heavily on the Google Sign in API (the Identity Provider)
+%%
+%% @end
 
 -module(openidc).
 -export([init/1,
-         auth_gen_token/2,
-         authenticate_request/1,
-         authenticate_token/2,
-         authorize_priviledge_request/1,
+         auth_request/1,
+         authenticate/2,
+         authorize/2,
+         generate_idp_token/2,
+         generate_own_token/1,
          is_priviledge/1,
-         exchange_token/2,
-         fetch_user_info/0,
          process_auth_request/2,
          process_auth_redirect/2]).
+
+-include("field_restrictions.hrl").
 
 % TODO Grab these settings from a config file
 -define(APIKEY, "AIzaSyCyC23vutanlgth_1INqQdZsv6AgZRiknY").
@@ -52,7 +57,7 @@ process_auth_redirect(ReqData, State) ->
         {_, undefined} -> {error, "Code missing"};
 
         {Code, AuthState} when Code =/= "", AuthState =/= "" ->
-            case auth_gen_token(Code, AuthState) of
+            case generate_idp_token(Code, AuthState) of
                 {true, Res}    -> {ok, Res};
                 {false, Error} -> {error, Error}
             end;
@@ -61,21 +66,21 @@ process_auth_redirect(ReqData, State) ->
     end.
 
 
--spec auth_gen_token(Code::string(), AuthState::string()) -> string().
-auth_gen_token(Code, AuthState) ->
-    {AccToken, RefreshT} = exchange_token(Code, AuthState),
+-spec generate_idp_token(Code::string(), AuthState::string()) -> string().
+generate_idp_token(Code, AuthState) ->
+    {AccToken, RefToken} = exchange_token(Code, AuthState),
 
-    RefToken = case RefreshT of
-        undefined -> list_to_binary("undefined");
-        String    -> list_to_binary(string:substr(binary_to_list(String), 3))
-    end,
+    % RefToken = case RefreshT of
+    %     undefined -> list_to_binary("undefined");
+    %     % String    -> list_to_binary(string:substr(binary_to_list(String), 3))
+    %     String -> list_to_binary(String)
+    % end,
 
     case AccToken of
         undefined -> {false, "Not possible to authenticate. Missing Access Token"};
         _ ->
             case fetch_user_info() of
                 {error, _} -> {false, "Not possible to authenticate. Unreachable user info"};
-
                 {ok, UserData} ->
                     Username = binary_to_list(proplists:get_value(<<"id">>, UserData)),
                     Status = case users:user_is_new(Username) of
@@ -98,23 +103,161 @@ auth_gen_token(Code, AuthState) ->
             end
     end.
 
-% TODO Test this function
--spec authorize_priviledge_request(ReqData::tuple()) -> tuple().
-authorize_priviledge_request(ReqData) ->
-    {JSON, _, _} = api_help:json_handler(ReqData, ""),
-    Username = binary_to_list(proplists:get_value(<<"user_id">>, JSON)),
+-spec auth_request(ReqData::tuple()) -> tuple().
+auth_request(ReqData) ->
+    case authenticate("Access-Token", ReqData) of
+        {error, Error} -> {error, "{\"error\": \"" ++ Error ++ "\"}"};
+        {ok, UserID}   -> authorize(ReqData, UserID)
+    end.
 
-    case {is_priviledge(Username), authenticate_request(ReqData)} of
-        {false, _}         -> {error, "{\"error\": \"User not authorized\"}"};
-        {_, {error, Msg}}  -> {error, Msg};
-        {true, {ok, Data}} -> {ok, Data}
+
+%%% Private Functions
+
+-spec authenticate(TokenName::string(), ReqData::tuple()) -> tuple().
+authenticate(TokenName, ReqData) ->
+    case wrq:get_req_header(TokenName, ReqData) of
+        undefined -> {error, "Not possible to perform the request. Missing " ++ TokenName};
+        TokenVal  ->
+            Username = api_help:id_from_path(ReqData),
+            erlang:display(Username),
+            check_valid_token(Username, TokenName, TokenVal)
+    end.
+
+
+-spec authorize(ReqData::tuple(), UserID::string()) -> tuple().
+authorize(ReqData, UserID) ->
+    Username  = api_help:id_from_path(ReqData),
+    {ok, UserJSON} = users:get_user_by_name(UserID),
+    ReqMethod = wrq:method(ReqData),
+    Private   = lib_json:get_field(UserJSON, "private"),
+
+    UserMatches = (Username == UserID),
+    HoldsAccessPolicy = case {ReqMethod, Private} of
+        {get, false} -> true;
+        {_, _}       -> false
+    end,
+
+    IsAccessible = is_priviledge(UserID) or UserMatches or HoldsAccessPolicy,
+    case IsAccessible of
+        true  -> {ok, UserID};
+        false -> {error, "{\"error\": \"User not authorized. Permission denied\"}"}
+    end.
+
+
+-spec check_valid_token(Username::string(), TokenName::string(), TokenValue::string()) -> tuple().
+check_valid_token(Username, TokenName, TokenValue) ->
+    case verify_idp_token(TokenValue) of
+        {error, Msg} ->
+            case verify_own_token(TokenValue) of
+                {error, Error}      -> {error, Error};
+                {ok, true, UserID}  -> {ok, UserID};
+                {ok, false, UserID} -> renew_token_and_replace(UserID, TokenName, TokenValue)
+            end;
+
+        {ok, GoogleJSON} ->
+            case analyse_token_response(Username, TokenValue, GoogleJSON) of
+                {error, Error}     -> {error, Error};
+                {ok, false}        -> {error, "Token not valid. Expended by other system"};
+                {ok, true, UserID} ->
+                    case users:replace_token(UserID, TokenName, TokenValue) of
+                        {error, Error} -> {error, Error};
+                        {ok, UserJSON} -> {ok, UserID}
+                    end
+            end
+    end.
+
+
+-spec verify_idp_token(Token::string()) -> tuple().
+verify_idp_token(Token) ->
+    AuthURL = "https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=" ++ Token,
+    case plus_srv:get_url(httpc:request(get,{AuthURL,[]},[],[])) of
+        {ok, Json} -> {ok, Json};
+        {error, _} -> {error, "Token not valid or already expired"}
+    end.
+
+
+-spec analyse_token_response(Username::string(), NewToken::string(), JSON::tuple()) -> tuple().
+analyse_token_response(Username, NewToken, JSON) ->
+    case proplists:get_value(<<"error">>, JSON) of
+        undefined ->
+            GoogleUsername = binary_to_list(proplists:get_value(<<"user_id">>, JSON)),
+            case binary_to_list(proplists:get_value(<<"audience">>, JSON)) of
+                undefined -> {error, "Token not valid. Audience field not found"};
+                Audience  ->
+                    Valid = (Audience == ?CLIENT_ID),
+                    {ok, Valid, GoogleUsername}
+            end;
+        Error -> {error, "Error verifying the token with Identity Provider"}
     end.
 
 
 -spec is_priviledge(Username::string()) -> boolean().
 is_priviledge(Username) ->
-    % case Username of ?FRONTEND_ID or ?PUB_SUB_ID or ?POLLING_ID -> true; _ -> false end.
     (Username == ?FRONTEND_ID) or (Username == ?PUB_SUB_ID) or (Username == ?POLLING_ID).
+
+
+-spec verify_own_token(AccToken::string()) -> boolean().
+verify_own_token(AccToken) ->
+    case look_up_token(AccToken) of
+        {error, Error} -> {error, Error};
+        {ok, JSON} ->
+            UserID = binary_to_list(lib_json:get_field(JSON, "_source.user_id")),
+
+            CurrentTS = api_help:now_to_seconds(),
+            IssuedAt  = lib_json:get_field(JSON, "_source.issued_at"),
+            ExpiresIn = lib_json:get_field(JSON, "_source.expires_in"),  % 3600 seconds usually
+
+            Valid = (CurrentTS < (IssuedAt + ExpiresIn)),
+            erlang:display(IssuedAt),
+            erlang:display(CurrentTS),
+            erlang:display(Valid),
+
+            {ok, Valid, UserID}
+    end.
+
+
+-spec look_up_token(AccToken::string()) -> tuple().
+look_up_token(AccToken) ->
+    erlang:display("Looking up..."),
+    erlang:display(AccToken),
+    case erlastic_search:get_doc(?INDEX, "token", AccToken) of
+        {error, _} -> {error, "Token not found on the database"};
+        {ok, List} -> {ok, List}
+    end.
+
+
+% Replace the old token and generate a new valid token because
+% it is the only way to authorize a valid non-OpenID user
+-spec renew_token_and_replace(UserID::string(), TokenName::string(), OldAccToken::string()) -> tuple().
+renew_token_and_replace(UserID, TokenName, OldAccToken) ->
+    case generate_own_token(UserID) of
+        {error, Msg} -> {error, Msg};
+        {ok, NewAccToken, _} ->
+            erlastic_search:delete_doc(?INDEX, "token", OldAccToken),
+            NewToken = binary_to_list(NewAccToken),
+            case users:replace_token(UserID, TokenName, NewToken) of
+                {error, Error} -> {error, Error};
+                {ok, _}        -> {ok, UserID}
+            end
+    end.
+
+
+-spec generate_own_token(Username::string()) -> tuple().
+generate_own_token(Username) ->
+    AccToken = base64:encode(crypto:strong_rand_bytes(32)),
+
+    TokenJSON = mochijson2:encode({struct, [
+        {access_token, AccToken},
+        {expires_in, 3600},
+        {issued_at, api_help:now_to_seconds()},
+        {refresh_token, <<"undefined">>},
+        {user_id, Username}
+    ]}),
+
+    case erlastic_search:index_doc_with_id(?INDEX, "token", AccToken, TokenJSON) of
+        {error, _} -> {error, "Not possible to store the generated token"};
+        {ok, List} -> {ok, AccToken, TokenJSON}
+    end.
 
 
 -spec fetch_user_info() -> tuple().
@@ -128,53 +271,3 @@ exchange_token(Code, AuthState) ->
     AccToken = proplists:get_value(<<"access_token">>, Token),
     RefToken = proplists:get_value(<<"refresh_token">>, Token),
     {AccToken, RefToken}.
-
-
--spec authenticate_request(ReqData::tuple()) -> tuple().
-authenticate_request(ReqData) -> authenticate_token("Access-Token", ReqData).
-
-
--spec authenticate_token(TokenName::string(), ReqData::tuple()) -> tuple().
-authenticate_token(TokenName, ReqData) ->
-    case wrq:get_req_header(TokenName, ReqData) of
-        undefined -> {error, "{\"error\": \"Not possible to perform the request. Missing " ++ TokenName ++ "\"}"};
-        TokenVal  -> check_valid_token(TokenName, TokenVal)
-    end.
-
-
-%%% Private Functions
-
--spec check_valid_token(TokenName::string(), TokenValue::string()) -> tuple().
-check_valid_token(TokenName, TokenValue) ->
-    case verify_token(TokenValue) of
-        {error, Msg} -> {error, "{\"error\": \"" ++ Msg ++ "\"}"};
-        {ok, JSON}   ->
-            case verify_token_response(TokenValue, JSON) of
-                {error, Error}        -> {error, Error};
-                {ok, Username, false} -> {error, "{\"error\": \"Token not valid. Expended by other system\"}"};
-                {ok, Username, true}  -> users:replace_token(Username, TokenName, TokenValue)
-            end
-    end.
-
-
--spec verify_token(Token::string()) -> tuple().
-verify_token(Token) ->
-    AuthURL = "https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=" ++ Token,
-    case plus_srv:get_url(httpc:request(get,{AuthURL,[]},[],[])) of
-        {ok, Json} -> {ok, Json};
-        {error, _} -> {error, "Token not valid or already expired"}
-    end.
-
-
--spec verify_token_response(NewToken::string(), JSON::tuple()) -> tuple().
-verify_token_response(NewToken, JSON) ->
-    case proplists:get_value(<<"error">>, JSON) of
-        undefined ->
-            Username = binary_to_list(proplists:get_value(<<"user_id">>, JSON)),
-            case binary_to_list(proplists:get_value(<<"audience">>, JSON)) of
-                undefined -> {error, "Delivered token not valid. Audience field not found"};
-                Audience  -> {ok, Username, Audience == ?CLIENT_ID}
-            end;
-        Error -> {error, binary_to_list(Error)}
-    end.
-
