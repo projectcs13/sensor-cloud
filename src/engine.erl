@@ -31,13 +31,19 @@ start_link() ->
 %% @spec start() -> ok
 %% @doc Start the engine server.
 start() ->
-    ensure_started(inets),
     ensure_started(crypto),
-    ensure_started(mochiweb),
-    application:set_env(webmachine, webmachine_logger_module, 
-                        webmachine_logger),
-    ensure_started(webmachine),
-    analyse:start(),    % possibly temporary solution for ericsson demo
+   ensure_started(asn1),
+   ensure_started(inets),
+   ensure_started(ibrowse),
+   ensure_started(public_key),
+   ensure_started(ssl),
+   ensure_started(xmerl),
+   ensure_started(compiler),
+   ensure_started(syntax_tools),
+   ensure_started(mochiweb),
+   application:set_env(webmachine, webmachine_logger_module,
+                       webmachine_logger),
+   ensure_started(webmachine),
     application:start(engine).
 
 %% @spec stop() -> ok

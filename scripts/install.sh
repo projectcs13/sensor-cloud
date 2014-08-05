@@ -9,12 +9,15 @@ sudo apt-get install -yq xsltproc software-properties-common
 echo "#################################################################"
 echo "Installing Erlang"
 echo "#################################################################"
-grep -q -e 'deb http://packages.erlang-solutions.com/debian '$(lsb_release -sc)' contrib' /etc/apt/sources.list || echo 'deb http://packages.erlang-solutions.com/debian '$(lsb_release -sc)' contrib' >> /etc/apt/sources.list
-sudo wget http://packages.erlang-solutions.com/debian/erlang_solutions.asc
-sudo apt-key add erlang_solutions.asc
-rm -f erlang_solutions.asc
-sudo apt-get update -q
-sudo apt-get install -yq erlang
+wget http://packages.erlang-solutions.com/site/esl/esl-erlang/FLAVOUR_1_general/esl-erlang_16.b.1~ubuntu~precise_amd64.deb
+sudo dpkg -i esl-erlang_16.b.1~ubuntu~precise_amd64.deb
+
+echo "#################################################################"
+echo "Installing Elastic Search"
+echo "#################################################################"
+wget https://download.elasticsearch.org/elasticsearch/elasticsearch/elasticsearch-1.3.1.deb
+sudo dpkg -i elasticsearch-1.3.1.deb
+###elasticsearch -Des.config=/path/to/config/file
 
 echo "#################################################################"
 echo "Installing Nodejs together with npm"
