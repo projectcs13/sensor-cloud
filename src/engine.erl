@@ -20,9 +20,15 @@ ensure_started(App) ->
 %% @spec start_link() -> {ok,Pid::pid()}
 %% @doc Starts the app for inclusion in a supervisor tree
 start_link() ->
+    ensure_started(crypto),
+    ensure_started(as1),
     ensure_started(inets),
     ensure_started(ibrowse),
-    ensure_started(crypto),
+    ensure_started(public_key),
+    ensure_started(ssl),
+    ensure_started(xmerl),
+    ensure_started(compiler),
+    ensure_started(syntax_tools),
     ensure_started(mochiweb),
     application:set_env(webmachine, webmachine_logger_module,
                         webmachine_logger),
@@ -32,14 +38,20 @@ start_link() ->
 %% @spec start() -> ok
 %% @doc Start the engine server.
 start() ->
+    ensure_started(crypto),
+    ensure_started(asn1),
     ensure_started(inets),
     ensure_started(ibrowse),
-    ensure_started(crypto),
+    ensure_started(public_key),
+    ensure_started(ssl),
+    ensure_started(xmerl),
+    ensure_started(compiler),
+    ensure_started(syntax_tools),
     ensure_started(mochiweb),
     application:set_env(webmachine, webmachine_logger_module,
                         webmachine_logger),
     ensure_started(webmachine),
-    analyse:start(),    % possibly temporary solution for ericsson demo
+    % analyse:start(),    % possibly temporary solution for ericsson demo
     application:start(engine).
 
 %% @spec stop() -> ok
@@ -48,7 +60,13 @@ stop() ->
     Res = application:stop(engine),
     application:stop(webmachine),
     application:stop(mochiweb),
+    application:stop(syntax_tools),
+    application:stop(compiler),
+    application:stop(xmerl),
+    application:stop(ssl),
+    application:stop(asn1),
     application:stop(crypto),
+    application:stop(public_key),
     application:stop(ibrowse),
     application:stop(inets),
     case whereis(polling_monitor) of
