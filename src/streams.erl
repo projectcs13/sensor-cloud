@@ -90,9 +90,9 @@ content_types_accepted(ReqData, State) ->
 %% @end
 -spec delete_resource(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 delete_resource(ReqData, State) ->
-	case openidc:authenticate_request(ReqData) of
+	case openidc:auth_request(ReqData) of
         {error, Msg} -> {{halt, 403}, wrq:set_resp_body(Msg, ReqData), State};
-        {ok, Token} ->
+        {ok, _} ->
 			case {proplists:get_value('user', wrq:path_info(ReqData)),proplists:get_value('stream', wrq:path_info(ReqData))} of
 				{UserId,undefined} ->
 					case users:delete_streams_with_user_id(string:to_lower(UserId)) of
@@ -193,9 +193,9 @@ delete_data_points_with_stream_id(Id, Type) ->
 %% @end
 -spec process_post(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 process_post(ReqData, State) ->
-	case openidc:authenticate_request(ReqData) of
+	case openidc:auth_request(ReqData) of
         {error, Msg} -> {{halt, 403}, wrq:set_resp_body(Msg, ReqData), State};
-        {ok, Token} ->
+        {ok, _} ->
 		    case api_help:is_search(ReqData) of
 		    	true  -> process_search_post(ReqData,State);
 				false ->
@@ -474,9 +474,9 @@ process_search_get(ReqData, State) ->
 %% @end
 -spec put_stream(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 put_stream(ReqData, State) ->
-	case openidc:authenticate_request(ReqData) of
+	case openidc:auth_request(ReqData) of
         {error, Msg} -> {{halt, 403}, wrq:set_resp_body(Msg, ReqData), State};
-        {ok, Token} ->
+        {ok, _} ->
 			case api_help:is_rank(ReqData) of
 				false ->
 					StreamId = proplists:get_value('stream', wrq:path_info(ReqData)),
@@ -583,9 +583,9 @@ put_stream(ReqData, State) ->
 %% @end
 -spec get_stream(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 get_stream(ReqData, State) ->
-	case openidc:authenticate_request(ReqData) of
+	case openidc:auth_request(ReqData) of
         {error, Msg} -> {{halt, 403}, wrq:set_resp_body(Msg, ReqData), State};
-        {ok, Token} ->
+		{ok, _} ->
 			case {api_help:is_search(ReqData),api_help:is_polling_history(ReqData)} of
 				{true,_} -> process_search_get(ReqData,State);
 				{_,true} -> get_polling_history(ReqData, State);
