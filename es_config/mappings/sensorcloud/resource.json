@@ -1,0 +1,63 @@
+{
+	"resource" : {
+		"_timestamp" : { "enabled" : true, "store" : true},
+		"dynamic": false,
+		"properties" : {
+			"name" : { 
+				"type" : "string",
+				"index" : "not_analyzed"
+			},
+			"description" : { 
+				"type" : "string",
+				"index" : "not_analyzed"
+			},
+			"manufacturer" : { 
+				"type" : "string",
+				"index" : "not_analyzed"
+			},
+			"model" : { 
+				"type" : "string",
+				"index" : "not_analyzed"
+			},
+			"streams_suggest" : { 
+				"properties" : {
+					"name" : {
+						"type" : "string",
+						"index" : "not_analyzed"
+					},
+					"accuracy" : {
+						"type" : "float"
+					},
+					"description" : {
+						"type" : "string",
+						"index" : "no"
+					},
+					"min_val" : {
+						"type" : "float"
+					},
+					"max_val" : {
+						"type" : "float"
+					},
+					"polling" : {
+						"type" : "boolean"
+					},
+					"polling_freq" : {
+						"type" : "long"
+					},
+					"type" : {
+						"type" : "string",
+						"index" : "not_analyzed"
+					},
+					"tags" : {
+						"type" : "string",
+						"index" : "analyzed"
+					},
+					"unit" : {
+						"type" : "string",
+						"index" : "not_analyzed"
+					}
+				}
+			}
+		}
+	}
+}

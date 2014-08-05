@@ -1,0 +1,29 @@
+{
+	"trigger" : {
+		"_timestamp" : { "enabled" : true, "store" : true},
+		"properties" : {
+			"function" : { 
+				"type" : "string",
+				"index" : "not_analyzed"
+			},
+			"outputlist" : {
+                		"properties" : {
+                    			"input" : {"type" : "float"},
+                    			"output" : {"properties" : {
+							"output_id" : {"type" : "string"},
+							"output_type" : {"type" : "string"}
+							}
+                    			}
+                		}
+            		},
+			"streams" : {
+				"type" : "string",
+				"index" : "analyzed"
+                		},
+                	"vstreams" : {
+				"type" : "string",
+				"index" : "analyzed"
+                		}
+		}
+	}
+}

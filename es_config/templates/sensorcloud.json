@@ -1,0 +1,23 @@
+{
+	"sensorcloud":{
+		"template":"sensorcloud",
+		"settings":{
+			"index":{
+				"analysis":{
+					"filter":{
+					},
+					"analyzer":{
+						"model_analyzer":{
+							"filter":[ "standard",
+							"lowercase",
+							"asciifolding"
+								],
+							"type":"custom",
+							"tokenizer":"keyword"
+						}
+					}
+				}
+			}
+		}
+	}
+}

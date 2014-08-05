@@ -1,0 +1,11 @@
+{
+        "pollinghistory" : {
+         "_source" : { "enabled" : true },
+                "dynamic": false,
+                "properties" : {
+                        "history":{
+                                "type" : "object"
+                        }
+                }
+        }
+}

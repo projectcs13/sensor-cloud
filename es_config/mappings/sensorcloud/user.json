@@ -1,0 +1,58 @@
+{
+	"user" : {
+		"_timestamp" : { "enabled" : true, "store" : true},
+		"_source" : {"excludes" : ["password"]},
+		"properties" : {
+			"username" : { 
+				"type" : "string",
+				"index" : "not_analyzed"
+			},
+			"rankings" : {
+                		"properties" : {
+                    			"stream_id" : {"type" : "string"},
+                    			"rank" : {"type" : "float"}
+                		}
+            		},
+			"triggers" : {
+				"properties" : {
+                    			"function" : {"type" : "string"},
+                    			"input" : {"type" : "float"},
+					"streams" : {"type" : "string"}
+				}
+                	},
+                	"notifications" : {
+				"type" : "object"
+                	},
+			"email" : {
+				"type" : "string",
+				"index" : "no"
+			},
+		       	"password" : {
+				"type" : "string",
+				"index" : "no",
+				"store" : "yes"
+			},
+		       	"firstname" : {
+				"type" : "string"
+			},
+		       	"lastname" : {
+				"type" : "string"
+			},
+			"description" : {
+				"type" : "string"
+			},
+			"subscriptions" : {
+				"properties" : {
+					"stream_id" : {
+						"type" : "string",
+						"index" : "not_analyzed",
+						"store" : "no"
+					}
+				}
+			},
+			"private" : {
+				"type":"boolean"
+			}
+		}
+	}
+}

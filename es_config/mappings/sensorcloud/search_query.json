@@ -1,0 +1,14 @@
+{
+   "search_query": {
+      "properties": {
+         "search_suggest": {
+            "type": "completion",
+            "analyzer": "keyword",
+            "payloads": false,
+            "preserve_separators": true,
+            "preserve_position_increments": true,
+            "max_input_len": 50
+         }
+      }
+   }
+}
