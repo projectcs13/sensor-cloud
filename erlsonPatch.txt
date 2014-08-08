@@ -1,0 +1,146 @@
+diff --git a/include/erlson.hrl b/include/erlson.hrl
+index f7ce189..565788b 100644
+--- a/include/erlson.hrl
++++ b/include/erlson.hrl
+@@ -7,8 +7,8 @@
+ -define(erlson_default(X, Default),
+     try
+         X
+-    catch error:'erlson_not_found' ->
+-        Default
++    catch error:_ ->
++	    Default
+     end
+ ).
+ 
+diff --git a/src/erlson.erl b/src/erlson.erl
+index 1205634..f86e716 100644
+--- a/src/erlson.erl
++++ b/src/erlson.erl
+@@ -28,14 +28,14 @@
+ 
+ % public API
+ -export([from_proplist/1, from_nested_proplist/1, from_nested_proplist/2]).
+--export([to_json/1, from_json/1]).
++-export([to_json/1, from_json/1, is_json_string/1]).
+ -export([list_to_json_array/1, list_from_json_array/1]).
+ % these two functions are useful, if there's a need to call mochijson2:decode
+ % and mochijson2:encode separately
+ -export([to_json_term/1, from_json_term/1]).
+ 
+ % these functions are used by Erlson compiled code
+--export([fetch/2, store/3]).
++-export([fetch/2, store/3, remove/2]).
+ 
+ -export([get_value/2]).
+ -export([get_value/3]).
+@@ -105,6 +105,9 @@ get_value(Path, Dict, Default) ->
+     end.
+ 
+ 
++fetch_path([H|T], Dict) when is_integer(H) ->
++    Val = lists:nth(H, Dict),
++    fetch_path(T, Val);
+ fetch_path([H|T], Dict) ->
+     Val = fetch_val(H, Dict),
+     fetch_path(T, Val);
+@@ -138,8 +141,17 @@ store(Path, Value, Dict) ->
+     end.
+ 
+ 
++store_path([N], Value, Dict) when is_integer(N) ->
++    {Part1, [_OldValue | Part2]} = lists:split(N-1, Dict),
++    Part1 ++ [Value | Part2];
+ store_path([N], Value, Dict) ->
+     store_val(N, Value, Dict);
++store_path([H|T], Value, Dict) when is_integer(H)->
++    %% Split on H-1 in order to get the desired element in the head of the second list for quick access.
++    {Part1, [InnerDict | Part2]} = lists:split(H-1, Dict),
++    % replace the existing value with the new inner dictionary
++    NewInnerDict = store_path(T, Value, InnerDict),
++    Part1 ++ [NewInnerDict | Part2];
+ store_path([H|T], Value, Dict) ->
+     InnerDict = fetch_val(H, Dict),
+     % replace the existing value with the new inner dictionary
+@@ -151,6 +163,46 @@ store_val(Name, Value, Dict) ->
+     orddict:store(Name, Value, Dict).
+ 
+ 
++-spec remove/2 :: (
++    Path :: name_path(),
++    Dict :: orddict() ) -> orddict().
++remove(Name,  Dict) when is_atom(Name) ->
++    remove_val(Name, Dict);
++remove(Path, Dict) ->
++    try
++        remove_path(Path, Dict)
++    catch
++        'erlson_not_found' ->
++            erlang:error('erlson_not_found', [Path, Dict])
++    end.
++
++remove_path([N], Dict) when is_integer(N) ->
++    {Part1, [_H | Part2]} = lists:split(N-1, Dict),
++    Part1 ++ Part2;
++remove_path([N], Dict) ->
++    remove_val(N, Dict);
++remove_path([H|T], Dict) when is_integer(H) ->
++    %% Split on H-1 in order to get the desired element in the head of the second list for quick access.
++    {Part1, [InnerDict | Part2]} = lists:split(H-1, Dict),
++    % replace the existing value with the new inner dictionary
++    case remove_path(T, InnerDict) of
++	[] ->
++	    Part1 ++ Part2;
++	NewInnerDict ->
++	    Part1 ++ [NewInnerDict | Part2]
++    end;
++remove_path([H|T], Dict) ->
++    InnerDict = fetch_val(H, Dict),
++    % replace the existing value with the new inner dictionary
++    NewInnerDict = remove_path(T, InnerDict),
++    store_val(H, NewInnerDict, Dict).
++
++
++remove_val(Name, Dict) ->
++    orddict:erase(Name, Dict).
++
++
++
+ % @doc Create Erlson dictionary from a proplist
+ %
+ % During conversion, each atom() property is converted to {atom(), true}
+@@ -237,6 +289,16 @@ store_proplist_elem(_X, _Dict, _MaxDepth) ->
+     throw('erlson_bad_proplist').
+ 
+ 
++is_json_string(Json) ->
++    try from_json(Json) of
++	_ -> true
++    catch
++	_:_ -> false
++    end.
++	    
++	     
++
++
+ % @doc Convert Erlson dictionary to a JSON Object
+ -spec to_json/1 :: (Dict :: orddict()) -> iolist().
+ to_json(Dict) ->
+@@ -349,7 +411,7 @@ decode_json_term(L) when is_list(L) -> % JSON array
+     [ decode_json_term(X) || X <- L ];
+ decode_json_term('null') ->
+     % decoding JSON null as a more conventional 'undefined'
+-    'undefined'.
++    'null'.
+ 
+ 
+ from_json_fields(L) ->
+@@ -368,7 +430,7 @@ store_json_field({N, V}, Dict) ->
+ % as either atom() or binary(), and because Erlson dict is ordered, all binary()
+ % fields will be stored closer to the tail of the list
+ decode_json_field_name(N) ->
+-    try binary_to_existing_atom(N, utf8)
++    try binary_to_atom(N, utf8)
+     catch
+         error:badarg -> N
+     end.
