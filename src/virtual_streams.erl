@@ -89,9 +89,9 @@ content_types_accepted(ReqData, State) ->
 %% @end
 -spec process_post(ReqData::tuple(), State::string()) -> {true, tuple(), string()}.
 process_post(ReqData, State) ->
-	case openidc:authenticate_request(ReqData) of
+	case openidc:auth_request(ReqData) of
         {error, Msg} -> {{halt, 403}, wrq:set_resp_body(Msg, ReqData), State};
-        {ok, Token} ->
+        {ok, _} ->
 			case api_help:is_search(ReqData) of
 				false ->
 					{VirtualStreamJson,_,_} = api_help:json_handler(ReqData, State),
@@ -179,9 +179,9 @@ reduce(VirtualStreamId, Streams, TimestampFrom, Function, ReqData, State) ->
 %% @end
 -spec get_vstream(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 get_vstream(ReqData, State) ->
-	case openidc:authenticate_request(ReqData) of
+	case openidc:auth_request(ReqData) of
         {error, Msg} -> {{halt, 403}, wrq:set_resp_body(Msg, ReqData), State};
-        {ok, Token} ->
+        {ok, _} ->
 			case wrq:get_qs_value("size",ReqData) of
 				undefined ->
 					Size = 100;
@@ -233,9 +233,9 @@ get_vstream(ReqData, State) ->
 %% @end
 -spec put_stream(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 put_stream(ReqData, State) ->
-	case openidc:authenticate_request(ReqData) of
+	case openidc:auth_request(ReqData) of
         {error, Msg} -> {{halt, 403}, wrq:set_resp_body(Msg, ReqData), State};
-        {ok, Token} ->
+        {ok, _} ->
 			VStreamId = proplists:get_value('id', wrq:path_info(ReqData)),
 			{VStream,_,_} = api_help:json_handler(ReqData,State),
 			Update = lib_json:set_attr(doc,VStream),
@@ -263,9 +263,9 @@ put_stream(ReqData, State) ->
 %% @end
 -spec delete_resource(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 delete_resource(ReqData, State) ->
-	case openidc:authenticate_request(ReqData) of
+	case openidc:auth_request(ReqData) of
         {error, Msg} -> {{halt, 403}, wrq:set_resp_body(Msg, ReqData), State};
-        {ok, Token} ->
+        {ok, _} ->
 			case {proplists:get_value('id', wrq:path_info(ReqData))} of
 				{Id} ->
 					case streams:delete_data_points_with_stream_id(Id, "virtual_stream") of
@@ -283,7 +283,7 @@ delete_resource(ReqData, State) ->
 							end
 					end
 			end
-	end
+	end.
 
 
 %% @doc
