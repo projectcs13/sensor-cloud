@@ -1,0 +1,1064 @@
+
+
+
+
+<!DOCTYPE html>
+<html lang="en" class="   ">
+  <head prefix="og: http://ogp.me/ns# fb: http://ogp.me/ns/fb# object: http://ogp.me/ns/object# article: http://ogp.me/ns/article# profile: http://ogp.me/ns/profile#">
+    <meta charset='utf-8'>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta http-equiv="Content-Language" content="en">
+    
+    
+    <title>sensor-cloud/.travis.yml at precompiled_elasticsearch · projectcs13/sensor-cloud</title>
+    <link rel="search" type="application/opensearchdescription+xml" href="/opensearch.xml" title="GitHub">
+    <link rel="fluid-icon" href="https://github.com/fluidicon.png" title="GitHub">
+    <link rel="apple-touch-icon" sizes="57x57" href="/apple-touch-icon-114.png">
+    <link rel="apple-touch-icon" sizes="114x114" href="/apple-touch-icon-114.png">
+    <link rel="apple-touch-icon" sizes="72x72" href="/apple-touch-icon-144.png">
+    <link rel="apple-touch-icon" sizes="144x144" href="/apple-touch-icon-144.png">
+    <meta property="fb:app_id" content="1401488693436528">
+
+      <meta content="@github" name="twitter:site" /><meta content="summary" name="twitter:card" /><meta content="projectcs13/sensor-cloud" name="twitter:title" /><meta content="Contribute to sensor-cloud development by creating an account on GitHub." name="twitter:description" /><meta content="https://avatars0.githubusercontent.com/u/5426897?v=2&amp;s=400" name="twitter:image:src" />
+<meta content="GitHub" property="og:site_name" /><meta content="object" property="og:type" /><meta content="https://avatars0.githubusercontent.com/u/5426897?v=2&amp;s=400" property="og:image" /><meta content="projectcs13/sensor-cloud" property="og:title" /><meta content="https://github.com/projectcs13/sensor-cloud" property="og:url" /><meta content="Contribute to sensor-cloud development by creating an account on GitHub." property="og:description" />
+
+    <link rel="assets" href="https://assets-cdn.github.com/">
+    <link rel="conduit-xhr" href="https://ghconduit.com:25035">
+    <link rel="xhr-socket" href="/_sockets">
+
+    <meta name="msapplication-TileImage" content="/windows-tile.png">
+    <meta name="msapplication-TileColor" content="#ffffff">
+    <meta name="selected-link" value="repo_source" data-pjax-transient>
+      <meta name="google-analytics" content="UA-3769691-2">
+
+    <meta content="collector.githubapp.com" name="octolytics-host" /><meta content="collector-cdn.github.com" name="octolytics-script-host" /><meta content="github" name="octolytics-app-id" /><meta content="C0249DCA:0871:624CB:53E4A459" name="octolytics-dimension-request_id" /><meta content="5426903" name="octolytics-actor-id" /><meta content="iakovosk" name="octolytics-actor-login" /><meta content="0b215f795777d9188c7ace5cf699900cef965f8b6047a9eb42ad3db9d917e960" name="octolytics-actor-hash" />
+    
+
+    
+    
+    <link rel="icon" type="image/x-icon" href="https://assets-cdn.github.com/favicon.ico">
+
+
+    <meta content="authenticity_token" name="csrf-param" />
+<meta content="AJ9SN/7AnqSsfvsLeCkNWCZ+5755XhudicAzg8taITaUTbZTkyUlXSRKoBWqFhurrloGAxwcKDJamzX8mYKg7Q==" name="csrf-token" />
+
+    <link href="https://assets-cdn.github.com/assets/github-7d0cf5969c6b0c04ea48a7dc937648fd0eb9c4a2.css" media="all" rel="stylesheet" type="text/css" />
+    <link href="https://assets-cdn.github.com/assets/github2-c47807f6c282e07774df77d23061aecf5fe36c2a.css" media="all" rel="stylesheet" type="text/css" />
+    
+
+
+    <meta http-equiv="x-pjax-version" content="b601b4324050953c93a3386f420a009a">
+
+      
+  <meta name="description" content="Contribute to sensor-cloud development by creating an account on GitHub.">
+
+
+  <meta content="5426897" name="octolytics-dimension-user_id" /><meta content="projectcs13" name="octolytics-dimension-user_login" /><meta content="13037155" name="octolytics-dimension-repository_id" /><meta content="projectcs13/sensor-cloud" name="octolytics-dimension-repository_nwo" /><meta content="true" name="octolytics-dimension-repository_public" /><meta content="false" name="octolytics-dimension-repository_is_fork" /><meta content="13037155" name="octolytics-dimension-repository_network_root_id" /><meta content="projectcs13/sensor-cloud" name="octolytics-dimension-repository_network_root_nwo" />
+  <link href="https://github.com/projectcs13/sensor-cloud/commits/precompiled_elasticsearch.atom" rel="alternate" title="Recent Commits to sensor-cloud:precompiled_elasticsearch" type="application/atom+xml">
+
+  </head>
+
+
+  <body class="logged_in  env-production linux vis-public page-blob">
+    <a href="#start-of-content" tabindex="1" class="accessibility-aid js-skip-to-content">Skip to content</a>
+    <div class="wrapper">
+      
+      
+      
+      
+
+
+      <div class="header header-logged-in true">
+  <div class="container clearfix">
+
+    <a class="header-logo-invertocat" href="https://github.com/orgs/projectcs13/dashboard" aria-label="Homepage">
+  <span class="mega-octicon octicon-mark-github"></span>
+</a>
+
+
+        <a href="/projectcs13/sensor-cloud/notifications" aria-label="You have unread notifications in this repository" class="notification-indicator tooltipped tooltipped-s contextually-unread" data-hotkey="g n">
+        <span class="mail-status unread"></span>
+</a>
+
+      <div class="command-bar js-command-bar  in-repository">
+          <form accept-charset="UTF-8" action="/search" class="command-bar-form" id="top_search_form" method="get"><div style="margin:0;padding:0;display:inline"><input name="utf8" type="hidden" value="&#x2713;" /></div>
+
+<div class="commandbar">
+  <span class="message"></span>
+  <input type="text" data-hotkey="s, /" name="q" id="js-command-bar-field" placeholder="Search or type a command" tabindex="1" autocapitalize="off"
+    
+    data-username="iakovosk"
+    data-repo="projectcs13/sensor-cloud"
+  >
+  <div class="display hidden"></div>
+</div>
+
+    <input type="hidden" name="nwo" value="projectcs13/sensor-cloud">
+
+    <div class="select-menu js-menu-container js-select-menu search-context-select-menu">
+      <span class="minibutton select-menu-button js-menu-target" role="button" aria-haspopup="true">
+        <span class="js-select-button">This repository</span>
+      </span>
+
+      <div class="select-menu-modal-holder js-menu-content js-navigation-container" aria-hidden="true">
+        <div class="select-menu-modal">
+
+          <div class="select-menu-item js-navigation-item js-this-repository-navigation-item selected">
+            <span class="select-menu-item-icon octicon octicon-check"></span>
+            <input type="radio" class="js-search-this-repository" name="search_target" value="repository" checked="checked">
+            <div class="select-menu-item-text js-select-button-text">This repository</div>
+          </div> <!-- /.select-menu-item -->
+
+          <div class="select-menu-item js-navigation-item js-all-repositories-navigation-item">
+            <span class="select-menu-item-icon octicon octicon-check"></span>
+            <input type="radio" name="search_target" value="global">
+            <div class="select-menu-item-text js-select-button-text">All repositories</div>
+          </div> <!-- /.select-menu-item -->
+
+        </div>
+      </div>
+    </div>
+
+  <span class="help tooltipped tooltipped-s" aria-label="Show command bar help">
+    <span class="octicon octicon-question"></span>
+  </span>
+
+
+  <input type="hidden" name="ref" value="cmdform">
+
+</form>
+        <ul class="top-nav">
+          <li class="explore"><a href="/explore">Explore</a></li>
+            <li><a href="https://gist.github.com">Gist</a></li>
+            <li><a href="/blog">Blog</a></li>
+          <li><a href="https://help.github.com">Help</a></li>
+        </ul>
+      </div>
+
+    
+<ul id="user-links">
+  <li>
+    <a href="/iakovosk" class="name">
+      <img alt="iakovosk" data-user="5426903" height="20" src="https://avatars1.githubusercontent.com/u/5426903?v=2&amp;s=40" width="20" /> iakovosk
+    </a>
+  </li>
+
+  <li class="new-menu dropdown-toggle js-menu-container">
+    <a href="#" class="js-menu-target tooltipped tooltipped-s" aria-label="Create new...">
+      <span class="octicon octicon-plus"></span>
+      <span class="dropdown-arrow"></span>
+    </a>
+
+    <div class="new-menu-content js-menu-content">
+    </div>
+  </li>
+
+  <li>
+    <a href="/settings/profile" id="account_settings"
+      class="tooltipped tooltipped-s"
+      aria-label="Account settings ">
+      <span class="octicon octicon-tools"></span>
+    </a>
+  </li>
+  <li>
+    <form accept-charset="UTF-8" action="/logout" class="logout-form" method="post"><div style="margin:0;padding:0;display:inline"><input name="utf8" type="hidden" value="&#x2713;" /><input name="authenticity_token" type="hidden" value="h5D+q4BNguJnHvUozcST8JierM6FQe5/PQPUCI7RrVvWurCHFpAY3JDSCv3sMQcBbQ1oq4AN1ETQyIVPLO0kFw==" /></div>
+      <button class="sign-out-button tooltipped tooltipped-s" aria-label="Sign out">
+        <span class="octicon octicon-sign-out"></span>
+      </button>
+</form>  </li>
+
+</ul>
+
+<div class="js-new-dropdown-contents hidden">
+  
+<ul class="dropdown-menu">
+  <li>
+    <a href="/new"><span class="octicon octicon-repo"></span> New repository</a>
+  </li>
+  <li>
+    <a href="https://porter.github.com/new"><span class="octicon octicon-move-right"></span> Import repository</a>
+  </li>
+  <li>
+    <a href="/organizations/new"><span class="octicon octicon-organization"></span> New organization</a>
+  </li>
+    <li class="section-title">
+      <span title="projectcs13">This organization</span>
+    </li>
+
+    <li>
+      <a href="/orgs/projectcs13/people/new"><span class="octicon octicon-person"></span> New member</a>
+    </li>
+
+    <li>
+      <a href="/orgs/projectcs13/new-team"><span class="octicon octicon-jersey"></span> New team</a>
+    </li>
+
+    <li>
+      <a href="/organizations/projectcs13/repositories/new"><span class="octicon octicon-repo"></span> New repository</a>
+    </li>
+
+
+    <li class="section-title">
+      <span title="projectcs13/sensor-cloud">This repository</span>
+    </li>
+      <li>
+        <a href="/projectcs13/sensor-cloud/issues/new"><span class="octicon octicon-issue-opened"></span> New issue</a>
+      </li>
+      <li>
+        <a href="/projectcs13/sensor-cloud/settings/collaboration"><span class="octicon octicon-person"></span> New collaborator</a>
+      </li>
+</ul>
+
+</div>
+
+
+    
+  </div>
+</div>
+
+      
+
+        
+
+
+      <div id="start-of-content" class="accessibility-aid"></div>
+          <div class="site" itemscope itemtype="http://schema.org/WebPage">
+    <div id="js-flash-container">
+      
+    </div>
+    <div class="pagehead repohead instapaper_ignore readability-menu">
+      <div class="container">
+        
+<ul class="pagehead-actions">
+
+    <li class="subscription">
+      <form accept-charset="UTF-8" action="/notifications/subscribe" class="js-social-container" data-autosubmit="true" data-remote="true" method="post"><div style="margin:0;padding:0;display:inline"><input name="utf8" type="hidden" value="&#x2713;" /><input name="authenticity_token" type="hidden" value="39WjDnX9i/Cocrr+oaEfh6xxeRuK+eoR+0dpodI9t68jK50Ci4LjspCWQto2b9UkEyLTIfHJbRVrRsA8mQsByQ==" /></div>  <input id="repository_id" name="repository_id" type="hidden" value="13037155" />
+
+    <div class="select-menu js-menu-container js-select-menu">
+      <a class="social-count js-social-count" href="/projectcs13/sensor-cloud/watchers">
+        17
+      </a>
+      <a href="/projectcs13/sensor-cloud/subscription"
+        class="minibutton select-menu-button with-count js-menu-target" role="button" tabindex="0" aria-haspopup="true">
+        <span class="js-select-button">
+          <span class="octicon octicon-eye"></span>
+          Unwatch
+        </span>
+      </a>
+
+      <div class="select-menu-modal-holder">
+        <div class="select-menu-modal subscription-menu-modal js-menu-content" aria-hidden="true">
+          <div class="select-menu-header">
+            <span class="select-menu-title">Notifications</span>
+            <span class="octicon octicon-x js-menu-close" role="button" aria-label="Close"></span>
+          </div> <!-- /.select-menu-header -->
+
+          <div class="select-menu-list js-navigation-container" role="menu">
+
+            <div class="select-menu-item js-navigation-item " role="menuitem" tabindex="0">
+              <span class="select-menu-item-icon octicon octicon-check"></span>
+              <div class="select-menu-item-text">
+                <input id="do_included" name="do" type="radio" value="included" />
+                <h4>Not watching</h4>
+                <span class="description">Be notified when participating or @mentioned.</span>
+                <span class="js-select-button-text hidden-select-button-text">
+                  <span class="octicon octicon-eye"></span>
+                  Watch
+                </span>
+              </div>
+            </div> <!-- /.select-menu-item -->
+
+            <div class="select-menu-item js-navigation-item selected" role="menuitem" tabindex="0">
+              <span class="select-menu-item-icon octicon octicon octicon-check"></span>
+              <div class="select-menu-item-text">
+                <input checked="checked" id="do_subscribed" name="do" type="radio" value="subscribed" />
+                <h4>Watching</h4>
+                <span class="description">Be notified of all conversations.</span>
+                <span class="js-select-button-text hidden-select-button-text">
+                  <span class="octicon octicon-eye"></span>
+                  Unwatch
+                </span>
+              </div>
+            </div> <!-- /.select-menu-item -->
+
+            <div class="select-menu-item js-navigation-item " role="menuitem" tabindex="0">
+              <span class="select-menu-item-icon octicon octicon-check"></span>
+              <div class="select-menu-item-text">
+                <input id="do_ignore" name="do" type="radio" value="ignore" />
+                <h4>Ignoring</h4>
+                <span class="description">Never be notified.</span>
+                <span class="js-select-button-text hidden-select-button-text">
+                  <span class="octicon octicon-mute"></span>
+                  Stop ignoring
+                </span>
+              </div>
+            </div> <!-- /.select-menu-item -->
+
+          </div> <!-- /.select-menu-list -->
+
+        </div> <!-- /.select-menu-modal -->
+      </div> <!-- /.select-menu-modal-holder -->
+    </div> <!-- /.select-menu -->
+
+</form>
+    </li>
+
+  <li>
+    
+  <div class="js-toggler-container js-social-container starring-container ">
+
+    <form accept-charset="UTF-8" action="/projectcs13/sensor-cloud/unstar" class="js-toggler-form starred js-unstar-button" data-remote="true" method="post"><div style="margin:0;padding:0;display:inline"><input name="utf8" type="hidden" value="&#x2713;" /><input name="authenticity_token" type="hidden" value="TWF475kr8xOMQ/145Z+rm4v2r5Z7m/oAnIhHM3PZJp2nTEzz3yQ8NuyIOchuhB2GKCOhYnl0eGnf6VwuDLU38A==" /></div>
+      <button
+        class="minibutton with-count js-toggler-target star-button"
+        aria-label="Unstar this repository" title="Unstar projectcs13/sensor-cloud">
+        <span class="octicon octicon-star"></span>
+        Unstar
+      </button>
+        <a class="social-count js-social-count" href="/projectcs13/sensor-cloud/stargazers">
+          11
+        </a>
+</form>
+    <form accept-charset="UTF-8" action="/projectcs13/sensor-cloud/star" class="js-toggler-form unstarred js-star-button" data-remote="true" method="post"><div style="margin:0;padding:0;display:inline"><input name="utf8" type="hidden" value="&#x2713;" /><input name="authenticity_token" type="hidden" value="W6IDqaX5pkfVAJTkv/gjB5+E0tlI6o6+SJiEZdf+mROIZKhrlKR2xkX2mnsH8/KvVeXSCHTUiQjEFkFlp9qycA==" /></div>
+      <button
+        class="minibutton with-count js-toggler-target star-button"
+        aria-label="Star this repository" title="Star projectcs13/sensor-cloud">
+        <span class="octicon octicon-star"></span>
+        Star
+      </button>
+        <a class="social-count js-social-count" href="/projectcs13/sensor-cloud/stargazers">
+          11
+        </a>
+</form>  </div>
+
+  </li>
+
+
+        <li>
+          <a href="/projectcs13/sensor-cloud/fork" class="minibutton with-count js-toggler-target fork-button lighter tooltipped-n" title="Fork your own copy of projectcs13/sensor-cloud to your account" aria-label="Fork your own copy of projectcs13/sensor-cloud to your account" rel="facebox nofollow">
+            <span class="octicon octicon-repo-forked"></span>
+            Fork
+          </a>
+          <a href="/projectcs13/sensor-cloud/network" class="social-count">3</a>
+        </li>
+
+</ul>
+
+        <h1 itemscope itemtype="http://data-vocabulary.org/Breadcrumb" class="entry-title public">
+          <span class="mega-octicon octicon-repo"></span>
+          <span class="author"><a href="/projectcs13" class="url fn" itemprop="url" rel="author"><span itemprop="title">projectcs13</span></a></span><!--
+       --><span class="path-divider">/</span><!--
+       --><strong><a href="/projectcs13/sensor-cloud" class="js-current-repository js-repo-home-link">sensor-cloud</a></strong>
+
+          <span class="page-context-loader">
+            <img alt="" height="16" src="https://assets-cdn.github.com/images/spinners/octocat-spinner-32.gif" width="16" />
+          </span>
+
+        </h1>
+      </div><!-- /.container -->
+    </div><!-- /.repohead -->
+
+    <div class="container">
+      <div class="repository-with-sidebar repo-container new-discussion-timeline  ">
+        <div class="repository-sidebar clearfix">
+            
+<div class="sunken-menu vertical-right repo-nav js-repo-nav js-repository-container-pjax js-octicon-loaders" data-issue-count-url="/projectcs13/sensor-cloud/issues/counts">
+  <div class="sunken-menu-contents">
+    <ul class="sunken-menu-group">
+      <li class="tooltipped tooltipped-w" aria-label="Code">
+        <a href="/projectcs13/sensor-cloud/tree/precompiled_elasticsearch" aria-label="Code" class="selected js-selected-navigation-item sunken-menu-item" data-hotkey="g c" data-pjax="true" data-selected-links="repo_source repo_downloads repo_commits repo_releases repo_tags repo_branches /projectcs13/sensor-cloud/tree/precompiled_elasticsearch">
+          <span class="octicon octicon-code"></span> <span class="full-word">Code</span>
+          <img alt="" class="mini-loader" height="16" src="https://assets-cdn.github.com/images/spinners/octocat-spinner-32.gif" width="16" />
+</a>      </li>
+
+        <li class="tooltipped tooltipped-w" aria-label="Issues">
+          <a href="/projectcs13/sensor-cloud/issues" aria-label="Issues" class="js-selected-navigation-item sunken-menu-item js-disable-pjax" data-hotkey="g i" data-selected-links="repo_issues repo_labels repo_milestones /projectcs13/sensor-cloud/issues">
+            <span class="octicon octicon-issue-opened"></span> <span class="full-word">Issues</span>
+            <span class="js-issue-replace-counter"></span>
+            <img alt="" class="mini-loader" height="16" src="https://assets-cdn.github.com/images/spinners/octocat-spinner-32.gif" width="16" />
+</a>        </li>
+
+      <li class="tooltipped tooltipped-w" aria-label="Pull Requests">
+        <a href="/projectcs13/sensor-cloud/pulls" aria-label="Pull Requests" class="js-selected-navigation-item sunken-menu-item js-disable-pjax" data-hotkey="g p" data-selected-links="repo_pulls /projectcs13/sensor-cloud/pulls">
+            <span class="octicon octicon-git-pull-request"></span> <span class="full-word">Pull Requests</span>
+            <span class="js-pull-replace-counter"></span>
+            <img alt="" class="mini-loader" height="16" src="https://assets-cdn.github.com/images/spinners/octocat-spinner-32.gif" width="16" />
+</a>      </li>
+
+
+        <li class="tooltipped tooltipped-w" aria-label="Wiki">
+          <a href="/projectcs13/sensor-cloud/wiki" aria-label="Wiki" class="js-selected-navigation-item sunken-menu-item js-disable-pjax" data-hotkey="g w" data-selected-links="repo_wiki /projectcs13/sensor-cloud/wiki">
+            <span class="octicon octicon-book"></span> <span class="full-word">Wiki</span>
+            <img alt="" class="mini-loader" height="16" src="https://assets-cdn.github.com/images/spinners/octocat-spinner-32.gif" width="16" />
+</a>        </li>
+    </ul>
+    <div class="sunken-menu-separator"></div>
+    <ul class="sunken-menu-group">
+
+      <li class="tooltipped tooltipped-w" aria-label="Pulse">
+        <a href="/projectcs13/sensor-cloud/pulse/weekly" aria-label="Pulse" class="js-selected-navigation-item sunken-menu-item" data-pjax="true" data-selected-links="pulse /projectcs13/sensor-cloud/pulse/weekly">
+          <span class="octicon octicon-pulse"></span> <span class="full-word">Pulse</span>
+          <img alt="" class="mini-loader" height="16" src="https://assets-cdn.github.com/images/spinners/octocat-spinner-32.gif" width="16" />
+</a>      </li>
+
+      <li class="tooltipped tooltipped-w" aria-label="Graphs">
+        <a href="/projectcs13/sensor-cloud/graphs" aria-label="Graphs" class="js-selected-navigation-item sunken-menu-item" data-pjax="true" data-selected-links="repo_graphs repo_contributors /projectcs13/sensor-cloud/graphs">
+          <span class="octicon octicon-graph"></span> <span class="full-word">Graphs</span>
+          <img alt="" class="mini-loader" height="16" src="https://assets-cdn.github.com/images/spinners/octocat-spinner-32.gif" width="16" />
+</a>      </li>
+    </ul>
+
+
+      <div class="sunken-menu-separator"></div>
+      <ul class="sunken-menu-group">
+        <li class="tooltipped tooltipped-w" aria-label="Settings">
+          <a href="/projectcs13/sensor-cloud/settings" aria-label="Settings" class="js-selected-navigation-item sunken-menu-item" data-pjax="true" data-selected-links="repo_settings /projectcs13/sensor-cloud/settings">
+            <span class="octicon octicon-tools"></span> <span class="full-word">Settings</span>
+            <img alt="" class="mini-loader" height="16" src="https://assets-cdn.github.com/images/spinners/octocat-spinner-32.gif" width="16" />
+</a>        </li>
+      </ul>
+  </div>
+</div>
+
+              <div class="only-with-full-nav">
+                
+  
+<div class="clone-url open"
+  data-protocol-type="http"
+  data-url="/users/set_protocol?protocol_selector=http&amp;protocol_type=push">
+  <h3><strong>HTTPS</strong> clone URL</h3>
+  <div class="input-group">
+    <input type="text" class="input-mini input-monospace js-url-field"
+           value="https://github.com/projectcs13/sensor-cloud.git" readonly="readonly">
+    <span class="input-group-button">
+      <button aria-label="Copy to clipboard" class="js-zeroclipboard minibutton zeroclipboard-button" data-clipboard-text="https://github.com/projectcs13/sensor-cloud.git" data-copied-hint="Copied!" type="button"><span class="octicon octicon-clippy"></span></button>
+    </span>
+  </div>
+</div>
+
+  
+<div class="clone-url "
+  data-protocol-type="ssh"
+  data-url="/users/set_protocol?protocol_selector=ssh&amp;protocol_type=push">
+  <h3><strong>SSH</strong> clone URL</h3>
+  <div class="input-group">
+    <input type="text" class="input-mini input-monospace js-url-field"
+           value="git@github.com:projectcs13/sensor-cloud.git" readonly="readonly">
+    <span class="input-group-button">
+      <button aria-label="Copy to clipboard" class="js-zeroclipboard minibutton zeroclipboard-button" data-clipboard-text="git@github.com:projectcs13/sensor-cloud.git" data-copied-hint="Copied!" type="button"><span class="octicon octicon-clippy"></span></button>
+    </span>
+  </div>
+</div>
+
+  
+<div class="clone-url "
+  data-protocol-type="subversion"
+  data-url="/users/set_protocol?protocol_selector=subversion&amp;protocol_type=push">
+  <h3><strong>Subversion</strong> checkout URL</h3>
+  <div class="input-group">
+    <input type="text" class="input-mini input-monospace js-url-field"
+           value="https://github.com/projectcs13/sensor-cloud" readonly="readonly">
+    <span class="input-group-button">
+      <button aria-label="Copy to clipboard" class="js-zeroclipboard minibutton zeroclipboard-button" data-clipboard-text="https://github.com/projectcs13/sensor-cloud" data-copied-hint="Copied!" type="button"><span class="octicon octicon-clippy"></span></button>
+    </span>
+  </div>
+</div>
+
+
+<p class="clone-options">You can clone with
+      <a href="#" class="js-clone-selector" data-protocol="http">HTTPS</a>,
+      <a href="#" class="js-clone-selector" data-protocol="ssh">SSH</a>,
+      or <a href="#" class="js-clone-selector" data-protocol="subversion">Subversion</a>.
+  <a href="https://help.github.com/articles/which-remote-url-should-i-use" class="help tooltipped tooltipped-n" aria-label="Get help on which URL is right for you.">
+    <span class="octicon octicon-question"></span>
+  </a>
+</p>
+
+
+
+                <a href="/projectcs13/sensor-cloud/archive/precompiled_elasticsearch.zip"
+                   class="minibutton sidebar-button"
+                   aria-label="Download projectcs13/sensor-cloud as a zip file"
+                   title="Download projectcs13/sensor-cloud as a zip file"
+                   rel="nofollow">
+                  <span class="octicon octicon-cloud-download"></span>
+                  Download ZIP
+                </a>
+              </div>
+        </div><!-- /.repository-sidebar -->
+
+        <div id="js-repo-pjax-container" class="repository-content context-loader-container" data-pjax-container>
+          
+
+<a href="/projectcs13/sensor-cloud/blob/32fe55bbef279c8792a5e01546f29b15cb445736/.travis.yml" class="hidden js-permalink-shortcut" data-hotkey="y">Permalink</a>
+
+<!-- blob contrib key: blob_contributors:v21:46edea06383ad005976ad8b1b0660e50 -->
+
+<div class="file-navigation">
+  
+<div class="select-menu js-menu-container js-select-menu" >
+  <span class="minibutton select-menu-button js-menu-target css-truncate" data-hotkey="w"
+    data-master-branch="develop"
+    data-ref="precompiled_elasticsearch"
+    title="precompiled_elasticsearch"
+    role="button" aria-label="Switch branches or tags" tabindex="0" aria-haspopup="true">
+    <span class="octicon octicon-git-branch"></span>
+    <i>branch:</i>
+    <span class="js-select-button css-truncate-target">precompiled_el…</span>
+  </span>
+
+  <div class="select-menu-modal-holder js-menu-content js-navigation-container" data-pjax aria-hidden="true">
+
+    <div class="select-menu-modal">
+      <div class="select-menu-header">
+        <span class="select-menu-title">Switch branches/tags</span>
+        <span class="octicon octicon-x js-menu-close" role="button" aria-label="Close"></span>
+      </div> <!-- /.select-menu-header -->
+
+      <div class="select-menu-filters">
+        <div class="select-menu-text-filter">
+          <input type="text" aria-label="Find or create a branch…" id="context-commitish-filter-field" class="js-filterable-field js-navigation-enable" placeholder="Find or create a branch…">
+        </div>
+        <div class="select-menu-tabs">
+          <ul>
+            <li class="select-menu-tab">
+              <a href="#" data-tab-filter="branches" class="js-select-menu-tab">Branches</a>
+            </li>
+            <li class="select-menu-tab">
+              <a href="#" data-tab-filter="tags" class="js-select-menu-tab">Tags</a>
+            </li>
+          </ul>
+        </div><!-- /.select-menu-tabs -->
+      </div><!-- /.select-menu-filters -->
+
+      <div class="select-menu-list select-menu-tab-bucket js-select-menu-tab-bucket" data-tab-filter="branches">
+
+        <div data-filterable-for="context-commitish-filter-field" data-filterable-type="substring">
+
+
+            <div class="select-menu-item js-navigation-item ">
+              <span class="select-menu-item-icon octicon octicon-check"></span>
+              <a href="/projectcs13/sensor-cloud/blob/AdvanceVStreams/.travis.yml"
+                 data-name="AdvanceVStreams"
+                 data-skip-pjax="true"
+                 rel="nofollow"
+                 class="js-navigation-open select-menu-item-text css-truncate-target"
+                 title="AdvanceVStreams">AdvanceVStreams</a>
+            </div> <!-- /.select-menu-item -->
+            <div class="select-menu-item js-navigation-item ">
+              <span class="select-menu-item-icon octicon octicon-check"></span>
+              <a href="/projectcs13/sensor-cloud/blob/CountRequestForHistorySize/.travis.yml"
+                 data-name="CountRequestForHistorySize"
+                 data-skip-pjax="true"
+                 rel="nofollow"
+                 class="js-navigation-open select-menu-item-text css-truncate-target"
+                 title="CountRequestForHistorySize">CountRequestForHistorySize</a>
+            </div> <!-- /.select-menu-item -->
+            <div class="select-menu-item js-navigation-item ">
+              <span class="select-menu-item-icon octicon octicon-check"></span>
+              <a href="/projectcs13/sensor-cloud/blob/OpenIDConnect/.travis.yml"
+                 data-name="OpenIDConnect"
+                 data-skip-pjax="true"
+                 rel="nofollow"
+                 class="js-navigation-open select-menu-item-text css-truncate-target"
+                 title="OpenIDConnect">OpenIDConnect</a>
+            </div> <!-- /.select-menu-item -->
+            <div class="select-menu-item js-navigation-item ">
+              <span class="select-menu-item-icon octicon octicon-check"></span>
+              <a href="/projectcs13/sensor-cloud/blob/Small_makefile_change/.travis.yml"
+                 data-name="Small_makefile_change"
+                 data-skip-pjax="true"
+                 rel="nofollow"
+                 class="js-navigation-open select-menu-item-text css-truncate-target"
+                 title="Small_makefile_change">Small_makefile_change</a>
+            </div> <!-- /.select-menu-item -->
+            <div class="select-menu-item js-navigation-item ">
+              <span class="select-menu-item-icon octicon octicon-check"></span>
+              <a href="/projectcs13/sensor-cloud/blob/Sp8.Sc1.search_vstreams/.travis.yml"
+                 data-name="Sp8.Sc1.search_vstreams"
+                 data-skip-pjax="true"
+                 rel="nofollow"
+                 class="js-navigation-open select-menu-item-text css-truncate-target"
+                 title="Sp8.Sc1.search_vstreams">Sp8.Sc1.search_vstreams</a>
+            </div> <!-- /.select-menu-item -->
+            <div class="select-menu-item js-navigation-item ">
+              <span class="select-menu-item-icon octicon octicon-check"></span>
+              <a href="/projectcs13/sensor-cloud/blob/Sp8.Sc2.DiffVstream/.travis.yml"
+                 data-name="Sp8.Sc2.DiffVstream"
+                 data-skip-pjax="true"
+                 rel="nofollow"
+                 class="js-navigation-open select-menu-item-text css-truncate-target"
+                 title="Sp8.Sc2.DiffVstream">Sp8.Sc2.DiffVstream</a>
+            </div> <!-- /.select-menu-item -->
+            <div class="select-menu-item js-navigation-item ">
+              <span class="select-menu-item-icon octicon octicon-check"></span>
+              <a href="/projectcs13/sensor-cloud/blob/Sp8.Sc2.VStreamsPUTRestrictions/.travis.yml"
+                 data-name="Sp8.Sc2.VStreamsPUTRestrictions"
+                 data-skip-pjax="true"
+                 rel="nofollow"
+                 class="js-navigation-open select-menu-item-text css-truncate-target"
+                 title="Sp8.Sc2.VStreamsPUTRestrictions">Sp8.Sc2.VStreamsPUTRestrictions</a>
+            </div> <!-- /.select-menu-item -->
+            <div class="select-menu-item js-navigation-item ">
+              <span class="select-menu-item-icon octicon octicon-check"></span>
+              <a href="/projectcs13/sensor-cloud/blob/Sp8.Sc2.VirtualStreamsAdditions/.travis.yml"
+                 data-name="Sp8.Sc2.VirtualStreamsAdditions"
+                 data-skip-pjax="true"
+                 rel="nofollow"
+                 class="js-navigation-open select-menu-item-text css-truncate-target"
+                 title="Sp8.Sc2.VirtualStreamsAdditions">Sp8.Sc2.VirtualStreamsAdditions</a>
+            </div> <!-- /.select-menu-item -->
+            <div class="select-menu-item js-navigation-item ">
+              <span class="select-menu-item-icon octicon octicon-check"></span>
+              <a href="/projectcs13/sensor-cloud/blob/Sp8.Sc2.VirtualStreamsUpdateFields/.travis.yml"
+                 data-name="Sp8.Sc2.VirtualStreamsUpdateFields"
+                 data-skip-pjax="true"
+                 rel="nofollow"
+                 class="js-navigation-open select-menu-item-text css-truncate-target"
+                 title="Sp8.Sc2.VirtualStreamsUpdateFields">Sp8.Sc2.VirtualStreamsUpdateFields</a>
+            </div> <!-- /.select-menu-item -->
+            <div class="select-menu-item js-navigation-item ">
+              <span class="select-menu-item-icon octicon octicon-check"></span>
+              <a href="/projectcs13/sensor-cloud/blob/Sp8.Sc2.make_username_lowercase/.travis.yml"
+                 data-name="Sp8.Sc2.make_username_lowercase"
+                 data-skip-pjax="true"
+                 rel="nofollow"
+                 class="js-navigation-open select-menu-item-text css-truncate-target"
+                 title="Sp8.Sc2.make_username_lowercase">Sp8.Sc2.make_username_lowercase</a>
+            </div> <!-- /.select-menu-item -->
+            <div class="select-menu-item js-navigation-item ">
+              <span class="select-menu-item-icon octicon octicon-check"></span>
+              <a href="/projectcs13/sensor-cloud/blob/Sp8.Sc2.polling_history/.travis.yml"
+                 data-name="Sp8.Sc2.polling_history"
+                 data-skip-pjax="true"
+                 rel="nofollow"
+                 class="js-navigation-open select-menu-item-text css-truncate-target"
+                 title="Sp8.Sc2.polling_history">Sp8.Sc2.polling_history</a>
+            </div> <!-- /.select-menu-item -->
+            <div class="select-menu-item js-navigation-item ">
+              <span class="select-menu-item-icon octicon octicon-check"></span>
+              <a href="/projectcs13/sensor-cloud/blob/demo/.travis.yml"
+                 data-name="demo"
+                 data-skip-pjax="true"
+                 rel="nofollow"
+                 class="js-navigation-open select-menu-item-text css-truncate-target"
+                 title="demo">demo</a>
+            </div> <!-- /.select-menu-item -->
+            <div class="select-menu-item js-navigation-item ">
+              <span class="select-menu-item-icon octicon octicon-check"></span>
+              <a href="/projectcs13/sensor-cloud/blob/develop/.travis.yml"
+                 data-name="develop"
+                 data-skip-pjax="true"
+                 rel="nofollow"
+                 class="js-navigation-open select-menu-item-text css-truncate-target"
+                 title="develop">develop</a>
+            </div> <!-- /.select-menu-item -->
+            <div class="select-menu-item js-navigation-item ">
+              <span class="select-menu-item-icon octicon octicon-check"></span>
+              <a href="/projectcs13/sensor-cloud/blob/master/.travis.yml"
+                 data-name="master"
+                 data-skip-pjax="true"
+                 rel="nofollow"
+                 class="js-navigation-open select-menu-item-text css-truncate-target"
+                 title="master">master</a>
+            </div> <!-- /.select-menu-item -->
+            <div class="select-menu-item js-navigation-item ">
+              <span class="select-menu-item-icon octicon octicon-check"></span>
+              <a href="/projectcs13/sensor-cloud/blob/openidc/.travis.yml"
+                 data-name="openidc"
+                 data-skip-pjax="true"
+                 rel="nofollow"
+                 class="js-navigation-open select-menu-item-text css-truncate-target"
+                 title="openidc">openidc</a>
+            </div> <!-- /.select-menu-item -->
+            <div class="select-menu-item js-navigation-item selected">
+              <span class="select-menu-item-icon octicon octicon-check"></span>
+              <a href="/projectcs13/sensor-cloud/blob/precompiled_elasticsearch/.travis.yml"
+                 data-name="precompiled_elasticsearch"
+                 data-skip-pjax="true"
+                 rel="nofollow"
+                 class="js-navigation-open select-menu-item-text css-truncate-target"
+                 title="precompiled_elasticsearch">precompiled_elasticsearch</a>
+            </div> <!-- /.select-menu-item -->
+            <div class="select-menu-item js-navigation-item ">
+              <span class="select-menu-item-icon octicon octicon-check"></span>
+              <a href="/projectcs13/sensor-cloud/blob/sc6.sc3.vstreams_subscribing_to_several_streams/.travis.yml"
+                 data-name="sc6.sc3.vstreams_subscribing_to_several_streams"
+                 data-skip-pjax="true"
+                 rel="nofollow"
+                 class="js-navigation-open select-menu-item-text css-truncate-target"
+                 title="sc6.sc3.vstreams_subscribing_to_several_streams">sc6.sc3.vstreams_subscribing_to_several_streams</a>
+            </div> <!-- /.select-menu-item -->
+            <div class="select-menu-item js-navigation-item ">
+              <span class="select-menu-item-icon octicon octicon-check"></span>
+              <a href="/projectcs13/sensor-cloud/blob/sp4.sc1.streamProcess/.travis.yml"
+                 data-name="sp4.sc1.streamProcess"
+                 data-skip-pjax="true"
+                 rel="nofollow"
+                 class="js-navigation-open select-menu-item-text css-truncate-target"
+                 title="sp4.sc1.streamProcess">sp4.sc1.streamProcess</a>
+            </div> <!-- /.select-menu-item -->
+            <div class="select-menu-item js-navigation-item ">
+              <span class="select-menu-item-icon octicon octicon-check"></span>
+              <a href="/projectcs13/sensor-cloud/blob/sp6.sc3.pollingSystem/.travis.yml"
+                 data-name="sp6.sc3.pollingSystem"
+                 data-skip-pjax="true"
+                 rel="nofollow"
+                 class="js-navigation-open select-menu-item-text css-truncate-target"
+                 title="sp6.sc3.pollingSystem">sp6.sc3.pollingSystem</a>
+            </div> <!-- /.select-menu-item -->
+            <div class="select-menu-item js-navigation-item ">
+              <span class="select-menu-item-icon octicon octicon-check"></span>
+              <a href="/projectcs13/sensor-cloud/blob/sp7.sc3.polling_system/.travis.yml"
+                 data-name="sp7.sc3.polling_system"
+                 data-skip-pjax="true"
+                 rel="nofollow"
+                 class="js-navigation-open select-menu-item-text css-truncate-target"
+                 title="sp7.sc3.polling_system">sp7.sc3.polling_system</a>
+            </div> <!-- /.select-menu-item -->
+            <div class="select-menu-item js-navigation-item ">
+              <span class="select-menu-item-icon octicon octicon-check"></span>
+              <a href="/projectcs13/sensor-cloud/blob/sp8.sc1.fix_bug_in_stream_test_cases/.travis.yml"
+                 data-name="sp8.sc1.fix_bug_in_stream_test_cases"
+                 data-skip-pjax="true"
+                 rel="nofollow"
+                 class="js-navigation-open select-menu-item-text css-truncate-target"
+                 title="sp8.sc1.fix_bug_in_stream_test_cases">sp8.sc1.fix_bug_in_stream_test_cases</a>
+            </div> <!-- /.select-menu-item -->
+            <div class="select-menu-item js-navigation-item ">
+              <span class="select-menu-item-icon octicon octicon-check"></span>
+              <a href="/projectcs13/sensor-cloud/blob/sp8.sc2.bug-fixes/.travis.yml"
+                 data-name="sp8.sc2.bug-fixes"
+                 data-skip-pjax="true"
+                 rel="nofollow"
+                 class="js-navigation-open select-menu-item-text css-truncate-target"
+                 title="sp8.sc2.bug-fixes">sp8.sc2.bug-fixes</a>
+            </div> <!-- /.select-menu-item -->
+            <div class="select-menu-item js-navigation-item ">
+              <span class="select-menu-item-icon octicon octicon-check"></span>
+              <a href="/projectcs13/sensor-cloud/blob/sp8.sc2.config/.travis.yml"
+                 data-name="sp8.sc2.config"
+                 data-skip-pjax="true"
+                 rel="nofollow"
+                 class="js-navigation-open select-menu-item-text css-truncate-target"
+                 title="sp8.sc2.config">sp8.sc2.config</a>
+            </div> <!-- /.select-menu-item -->
+            <div class="select-menu-item js-navigation-item ">
+              <span class="select-menu-item-icon octicon octicon-check"></span>
+              <a href="/projectcs13/sensor-cloud/blob/sp8.sc3.fix_bug_in_polling_system/.travis.yml"
+                 data-name="sp8.sc3.fix_bug_in_polling_system"
+                 data-skip-pjax="true"
+                 rel="nofollow"
+                 class="js-navigation-open select-menu-item-text css-truncate-target"
+                 title="sp8.sc3.fix_bug_in_polling_system">sp8.sc3.fix_bug_in_polling_system</a>
+            </div> <!-- /.select-menu-item -->
+            <div class="select-menu-item js-navigation-item ">
+              <span class="select-menu-item-icon octicon octicon-check"></span>
+              <a href="/projectcs13/sensor-cloud/blob/sp8.sc3.integrate_parser_into_stream/.travis.yml"
+                 data-name="sp8.sc3.integrate_parser_into_stream"
+                 data-skip-pjax="true"
+                 rel="nofollow"
+                 class="js-navigation-open select-menu-item-text css-truncate-target"
+                 title="sp8.sc3.integrate_parser_into_stream">sp8.sc3.integrate_parser_into_stream</a>
+            </div> <!-- /.select-menu-item -->
+            <div class="select-menu-item js-navigation-item ">
+              <span class="select-menu-item-icon octicon octicon-check"></span>
+              <a href="/projectcs13/sensor-cloud/blob/sp8.sc3.nodejs_fix/.travis.yml"
+                 data-name="sp8.sc3.nodejs_fix"
+                 data-skip-pjax="true"
+                 rel="nofollow"
+                 class="js-navigation-open select-menu-item-text css-truncate-target"
+                 title="sp8.sc3.nodejs_fix">sp8.sc3.nodejs_fix</a>
+            </div> <!-- /.select-menu-item -->
+            <div class="select-menu-item js-navigation-item ">
+              <span class="select-menu-item-icon octicon octicon-check"></span>
+              <a href="/projectcs13/sensor-cloud/blob/sp8.sc3.virtual-stream-process-termination/.travis.yml"
+                 data-name="sp8.sc3.virtual-stream-process-termination"
+                 data-skip-pjax="true"
+                 rel="nofollow"
+                 class="js-navigation-open select-menu-item-text css-truncate-target"
+                 title="sp8.sc3.virtual-stream-process-termination">sp8.sc3.virtual-stream-process-termination</a>
+            </div> <!-- /.select-menu-item -->
+        </div>
+
+          <form accept-charset="UTF-8" action="/projectcs13/sensor-cloud/branches" class="js-create-branch select-menu-item select-menu-new-item-form js-navigation-item js-new-item-form" method="post"><div style="margin:0;padding:0;display:inline"><input name="utf8" type="hidden" value="&#x2713;" /><input name="authenticity_token" type="hidden" value="lL2YO7/MGVHaPWmj8SY654QFg+ix7t6B4LXL3qKzVM5W9D7jNf2sFpupuD+bHsDEhOU/kkWh0eYHbILc9Yl8mw==" /></div>
+            <span class="octicon octicon-git-branch select-menu-item-icon"></span>
+            <div class="select-menu-item-text">
+              <h4>Create branch: <span class="js-new-item-name"></span></h4>
+              <span class="description">from ‘precompiled_elasticsearch’</span>
+            </div>
+            <input type="hidden" name="name" id="name" class="js-new-item-value">
+            <input type="hidden" name="branch" id="branch" value="precompiled_elasticsearch">
+            <input type="hidden" name="path" id="path" value=".travis.yml">
+          </form> <!-- /.select-menu-item -->
+
+      </div> <!-- /.select-menu-list -->
+
+      <div class="select-menu-list select-menu-tab-bucket js-select-menu-tab-bucket" data-tab-filter="tags">
+        <div data-filterable-for="context-commitish-filter-field" data-filterable-type="substring">
+
+
+        </div>
+
+        <div class="select-menu-no-results">Nothing to show</div>
+      </div> <!-- /.select-menu-list -->
+
+    </div> <!-- /.select-menu-modal -->
+  </div> <!-- /.select-menu-modal-holder -->
+</div> <!-- /.select-menu -->
+
+  <div class="button-group right">
+    <a href="/projectcs13/sensor-cloud/find/precompiled_elasticsearch"
+          class="js-show-file-finder minibutton empty-icon tooltipped tooltipped-s"
+          data-pjax
+          data-hotkey="t"
+          aria-label="Quickly jump between files">
+      <span class="octicon octicon-list-unordered"></span>
+    </a>
+    <button class="js-zeroclipboard minibutton zeroclipboard-button"
+          data-clipboard-text=".travis.yml"
+          aria-label="Copy to clipboard"
+          data-copied-hint="Copied!">
+      <span class="octicon octicon-clippy"></span>
+    </button>
+  </div>
+
+  <div class="breadcrumb">
+    <span class='repo-root js-repo-root'><span itemscope="" itemtype="http://data-vocabulary.org/Breadcrumb"><a href="/projectcs13/sensor-cloud/tree/precompiled_elasticsearch" class="" data-branch="precompiled_elasticsearch" data-direction="back" data-pjax="true" itemscope="url"><span itemprop="title">sensor-cloud</span></a></span></span><span class="separator"> / </span><strong class="final-path">.travis.yml</strong>
+  </div>
+</div>
+
+
+  <div class="commit file-history-tease">
+      <img alt="Taddic" class="main-avatar" data-user="5426880" height="24" src="https://avatars2.githubusercontent.com/u/5426880?v=2&amp;s=48" width="24" />
+      <span class="author"><a href="/Taddic" rel="contributor">Taddic</a></span>
+      <time datetime="2013-12-06T16:38:14+01:00" is="relative-time">December 06, 2013</time>
+      <div class="commit-title">
+          <a href="/projectcs13/sensor-cloud/commit/17495db0d4782bcc2f86d3aa3b817383e1763819" class="message" data-pjax="true" title="Updated travis test make target">Updated travis test make target</a>
+      </div>
+
+    <div class="participation">
+      <p class="quickstat"><a href="#blob_contributors_box" rel="facebox"><strong>4</strong>  contributors</a></p>
+      
+    <a class="avatar tooltipped tooltipped-s" aria-label="gkoutsou" href="/projectcs13/sensor-cloud/commits/develop/.travis.yml?author=gkoutsou"><img alt="gkoutsou" data-user="5426896" height="20" src="https://avatars3.githubusercontent.com/u/5426896?v=2&amp;s=40" width="20" /></a>
+    <a class="avatar tooltipped tooltipped-s" aria-label="Taddic" href="/projectcs13/sensor-cloud/commits/develop/.travis.yml?author=Taddic"><img alt="Taddic" data-user="5426880" height="20" src="https://avatars0.githubusercontent.com/u/5426880?v=2&amp;s=40" width="20" /></a>
+    <a class="avatar tooltipped tooltipped-s" aria-label="gxlzlihao" href="/projectcs13/sensor-cloud/commits/develop/.travis.yml?author=gxlzlihao"><img alt="Li Hao" data-user="4500479" height="20" src="https://avatars0.githubusercontent.com/u/4500479?v=2&amp;s=40" width="20" /></a>
+    <a class="avatar tooltipped tooltipped-s" aria-label="steine" href="/projectcs13/sensor-cloud/commits/develop/.travis.yml?author=steine"><img alt="Anders Steinrud" data-user="336007" height="20" src="https://avatars3.githubusercontent.com/u/336007?v=2&amp;s=40" width="20" /></a>
+
+
+    </div>
+    <div id="blob_contributors_box" style="display:none">
+      <h2 class="facebox-header">Users who have contributed to this file</h2>
+      <ul class="facebox-user-list">
+          <li class="facebox-user-list-item">
+            <img alt="gkoutsou" data-user="5426896" height="24" src="https://avatars1.githubusercontent.com/u/5426896?v=2&amp;s=48" width="24" />
+            <a href="/gkoutsou">gkoutsou</a>
+          </li>
+          <li class="facebox-user-list-item">
+            <img alt="Taddic" data-user="5426880" height="24" src="https://avatars2.githubusercontent.com/u/5426880?v=2&amp;s=48" width="24" />
+            <a href="/Taddic">Taddic</a>
+          </li>
+          <li class="facebox-user-list-item">
+            <img alt="Li Hao" data-user="4500479" height="24" src="https://avatars2.githubusercontent.com/u/4500479?v=2&amp;s=48" width="24" />
+            <a href="/gxlzlihao">gxlzlihao</a>
+          </li>
+          <li class="facebox-user-list-item">
+            <img alt="Anders Steinrud" data-user="336007" height="24" src="https://avatars1.githubusercontent.com/u/336007?v=2&amp;s=48" width="24" />
+            <a href="/steine">steine</a>
+          </li>
+      </ul>
+    </div>
+  </div>
+
+<div class="file-box">
+  <div class="file">
+    <div class="meta clearfix">
+      <div class="info file-name">
+          <span>20 lines (19 sloc)</span>
+          <span class="meta-divider"></span>
+        <span>0.562 kb</span>
+      </div>
+      <div class="actions">
+        <div class="button-group">
+          <a href="/projectcs13/sensor-cloud/raw/precompiled_elasticsearch/.travis.yml" class="minibutton " id="raw-url">Raw</a>
+            <a href="/projectcs13/sensor-cloud/blame/precompiled_elasticsearch/.travis.yml" class="minibutton js-update-url-with-hash">Blame</a>
+          <a href="/projectcs13/sensor-cloud/commits/precompiled_elasticsearch/.travis.yml" class="minibutton " rel="nofollow">History</a>
+        </div><!-- /.button-group -->
+
+
+              <a class="octicon-button js-update-url-with-hash"
+                 href="/projectcs13/sensor-cloud/edit/precompiled_elasticsearch/.travis.yml"
+                 data-method="post" rel="nofollow" data-hotkey="e"><span class="octicon octicon-pencil"></span></a>
+
+            <a class="octicon-button danger"
+               href="/projectcs13/sensor-cloud/delete/precompiled_elasticsearch/.travis.yml"
+               data-method="post" data-test-id="delete-blob-file" rel="nofollow">
+          <span class="octicon octicon-trashcan"></span>
+        </a>
+      </div><!-- /.actions -->
+    </div>
+      
+  <div class="blob-wrapper data type-yaml">
+      
+<table class="highlight tab-size-8 js-file-line-container">
+      <tr>
+        <td id="L1" class="blob-line-num js-line-number" data-line-number="1"></td>
+        <td id="LC1" class="blob-line-code js-file-line"><span class="l-Scalar-Plain">language</span><span class="p-Indicator">:</span> <span class="l-Scalar-Plain">erlang</span></td>
+      </tr>
+      <tr>
+        <td id="L2" class="blob-line-num js-line-number" data-line-number="2"></td>
+        <td id="LC2" class="blob-line-code js-file-line"><span class="l-Scalar-Plain">env</span><span class="p-Indicator">:</span> <span class="l-Scalar-Plain">R_HOME=/usr/lib/R</span></td>
+      </tr>
+      <tr>
+        <td id="L3" class="blob-line-num js-line-number" data-line-number="3"></td>
+        <td id="LC3" class="blob-line-code js-file-line"><span class="l-Scalar-Plain">before_install</span><span class="p-Indicator">:</span></td>
+      </tr>
+      <tr>
+        <td id="L4" class="blob-line-num js-line-number" data-line-number="4"></td>
+        <td id="LC4" class="blob-line-code js-file-line">  <span class="p-Indicator">-</span> <span class="l-Scalar-Plain">sudo apt-get install -qq xsltproc</span> </td>
+      </tr>
+      <tr>
+        <td id="L5" class="blob-line-num js-line-number" data-line-number="5"></td>
+        <td id="LC5" class="blob-line-code js-file-line">  <span class="p-Indicator">-</span> <span class="l-Scalar-Plain">sudo add-apt-repository &quot;deb http://ftp.sunet.se/pub/lang/CRAN/bin/linux/ubuntu precise/&quot;</span> </td>
+      </tr>
+      <tr>
+        <td id="L6" class="blob-line-num js-line-number" data-line-number="6"></td>
+        <td id="LC6" class="blob-line-code js-file-line">  <span class="p-Indicator">-</span> <span class="l-Scalar-Plain">sudo apt-get install r-base</span></td>
+      </tr>
+      <tr>
+        <td id="L7" class="blob-line-num js-line-number" data-line-number="7"></td>
+        <td id="LC7" class="blob-line-code js-file-line"><span class="l-Scalar-Plain">services</span><span class="p-Indicator">:</span></td>
+      </tr>
+      <tr>
+        <td id="L8" class="blob-line-num js-line-number" data-line-number="8"></td>
+        <td id="LC8" class="blob-line-code js-file-line">  <span class="p-Indicator">-</span> <span class="l-Scalar-Plain">rabbitmq</span></td>
+      </tr>
+      <tr>
+        <td id="L9" class="blob-line-num js-line-number" data-line-number="9"></td>
+        <td id="LC9" class="blob-line-code js-file-line"><span class="l-Scalar-Plain">script</span><span class="p-Indicator">:</span> <span class="s">&quot;make</span><span class="nv"> </span><span class="s">install</span><span class="nv"> </span><span class="s">&amp;&amp;</span><span class="nv"> </span><span class="s">make</span><span class="nv"> </span><span class="s">test_travis&quot;</span></td>
+      </tr>
+      <tr>
+        <td id="L10" class="blob-line-num js-line-number" data-line-number="10"></td>
+        <td id="LC10" class="blob-line-code js-file-line"><span class="l-Scalar-Plain">before_script</span><span class="p-Indicator">:</span> </td>
+      </tr>
+      <tr>
+        <td id="L11" class="blob-line-num js-line-number" data-line-number="11"></td>
+        <td id="LC11" class="blob-line-code js-file-line"><span class="p-Indicator">-</span> <span class="s">&quot;curl</span><span class="nv"> </span><span class="s">https://raw.github.com/projectcs13/sensor-cloud/develop/scripts/travis-elasticsearch.sh</span><span class="nv">  </span><span class="s">|</span><span class="nv"> </span><span class="s">bash&quot;</span></td>
+      </tr>
+      <tr>
+        <td id="L12" class="blob-line-num js-line-number" data-line-number="12"></td>
+        <td id="LC12" class="blob-line-code js-file-line"><span class="p-Indicator">-</span> <span class="s">&quot;cd</span><span class="nv"> </span><span class="s">scripts/python/&quot;</span></td>
+      </tr>
+      <tr>
+        <td id="L13" class="blob-line-num js-line-number" data-line-number="13"></td>
+        <td id="LC13" class="blob-line-code js-file-line"><span class="p-Indicator">-</span> <span class="s">&quot;python</span><span class="nv"> </span><span class="s">-m</span><span class="nv"> </span><span class="s">CGIHTTPServer</span><span class="nv"> </span><span class="s">8001</span><span class="nv"> </span><span class="s">&amp;&quot;</span></td>
+      </tr>
+      <tr>
+        <td id="L14" class="blob-line-num js-line-number" data-line-number="14"></td>
+        <td id="LC14" class="blob-line-code js-file-line"><span class="p-Indicator">-</span> <span class="s">&quot;python</span><span class="nv"> </span><span class="s">-m</span><span class="nv"> </span><span class="s">CGIHTTPServer</span><span class="nv"> </span><span class="s">8002</span><span class="nv"> </span><span class="s">&amp;&quot;</span></td>
+      </tr>
+      <tr>
+        <td id="L15" class="blob-line-num js-line-number" data-line-number="15"></td>
+        <td id="LC15" class="blob-line-code js-file-line"><span class="p-Indicator">-</span> <span class="s">&quot;cd</span><span class="nv"> </span><span class="s">../../&quot;</span></td>
+      </tr>
+      <tr>
+        <td id="L16" class="blob-line-num js-line-number" data-line-number="16"></td>
+        <td id="LC16" class="blob-line-code js-file-line"><span class="l-Scalar-Plain">otp_release</span><span class="p-Indicator">:</span></td>
+      </tr>
+      <tr>
+        <td id="L17" class="blob-line-num js-line-number" data-line-number="17"></td>
+        <td id="LC17" class="blob-line-code js-file-line"><span class="c1">#  - R16B02</span></td>
+      </tr>
+      <tr>
+        <td id="L18" class="blob-line-num js-line-number" data-line-number="18"></td>
+        <td id="LC18" class="blob-line-code js-file-line"><span class="c1">#  - R16B01</span></td>
+      </tr>
+      <tr>
+        <td id="L19" class="blob-line-num js-line-number" data-line-number="19"></td>
+        <td id="LC19" class="blob-line-code js-file-line">  <span class="p-Indicator">-</span> <span class="l-Scalar-Plain">R16B</span></td>
+      </tr>
+</table>
+
+  </div>
+
+  </div>
+</div>
+
+<a href="#jump-to-line" rel="facebox[.linejump]" data-hotkey="l" style="display:none">Jump to Line</a>
+<div id="jump-to-line" style="display:none">
+  <form accept-charset="UTF-8" class="js-jump-to-line-form">
+    <input class="linejump-input js-jump-to-line-field" type="text" placeholder="Jump to line&hellip;" autofocus>
+    <button type="submit" class="button">Go</button>
+  </form>
+</div>
+
+        </div>
+
+      </div><!-- /.repo-container -->
+      <div class="modal-backdrop"></div>
+    </div><!-- /.container -->
+  </div><!-- /.site -->
+
+
+    </div><!-- /.wrapper -->
+
+      <div class="container">
+  <div class="site-footer">
+    <ul class="site-footer-links right">
+      <li><a href="https://status.github.com/">Status</a></li>
+      <li><a href="http://developer.github.com">API</a></li>
+      <li><a href="http://training.github.com">Training</a></li>
+      <li><a href="http://shop.github.com">Shop</a></li>
+      <li><a href="/blog">Blog</a></li>
+      <li><a href="/about">About</a></li>
+
+    </ul>
+
+    <a href="/" aria-label="Homepage">
+      <span class="mega-octicon octicon-mark-github" title="GitHub"></span>
+    </a>
+
+    <ul class="site-footer-links">
+      <li>&copy; 2014 <span title="0.04755s from github-fe128-cp1-prd.iad.github.net">GitHub</span>, Inc.</li>
+        <li><a href="/site/terms">Terms</a></li>
+        <li><a href="/site/privacy">Privacy</a></li>
+        <li><a href="/security">Security</a></li>
+        <li><a href="/contact">Contact</a></li>
+    </ul>
+  </div><!-- /.site-footer -->
+</div><!-- /.container -->
+
+
+    <div class="fullscreen-overlay js-fullscreen-overlay" id="fullscreen_overlay">
+  <div class="fullscreen-container js-suggester-container">
+    <div class="textarea-wrap">
+      <textarea name="fullscreen-contents" id="fullscreen-contents" class="fullscreen-contents js-fullscreen-contents js-suggester-field" placeholder=""></textarea>
+    </div>
+  </div>
+  <div class="fullscreen-sidebar">
+    <a href="#" class="exit-fullscreen js-exit-fullscreen tooltipped tooltipped-w" aria-label="Exit Zen Mode">
+      <span class="mega-octicon octicon-screen-normal"></span>
+    </a>
+    <a href="#" class="theme-switcher js-theme-switcher tooltipped tooltipped-w"
+      aria-label="Switch themes">
+      <span class="octicon octicon-color-mode"></span>
+    </a>
+  </div>
+</div>
+
+
+
+    <div id="ajax-error-message" class="flash flash-error">
+      <span class="octicon octicon-alert"></span>
+      <a href="#" class="octicon octicon-x close js-ajax-error-dismiss" aria-label="Dismiss error"></a>
+      Something went wrong with that request. Please try again.
+    </div>
+
+
+      <script crossorigin="anonymous" src="https://assets-cdn.github.com/assets/frameworks-12d5fda141e78e513749dddbc56445fe172cbd9a.js" type="text/javascript"></script>
+      <script async="async" crossorigin="anonymous" src="https://assets-cdn.github.com/assets/github-766b0d418ce5caf7cf8540ce1c80165442c2ab6b.js" type="text/javascript"></script>
+      
+      
+        <script async src="https://www.google-analytics.com/analytics.js"></script>
+  </body>
+</html>
+
