@@ -15,5 +15,5 @@ before_script:
 - "cd ../../"
 otp_release:
 #  - R16B02
-#  - R16B01
-  - R16B
+  - R16B01
+# - R16B
