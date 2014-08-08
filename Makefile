@@ -29,6 +29,11 @@ conf: compile_libs
 
 get_libs:
 	@@$(REBAR) get-deps
+	wget "https://download.elasticsearch.org/elasticsearch/elasticsearch/elasticsearch-1.1.2.zip"
+	unzip elasticsearch-1.1.2.zip -d lib
+	rm elasticsearch-1.1.2.zip
+	cp -r es_config/* lib/elasticsearch-1.1.2/config/
+	-git apply --directory=lib/erlson --whitespace=fix erlsonPatch.txt
 
 compile_libs:
 	@$(REBAR) compile
@@ -88,7 +93,7 @@ stop_all:
 ### Command: make run_es
 ### Runs elastic search
 run_es:
-	lib/elasticsearch/bin/elasticsearch -f
+	lib/elasticsearch-1.1.2/bin/elasticsearch -f
 
 ### Command: make run_nodejs
 ### Runs NodeJS

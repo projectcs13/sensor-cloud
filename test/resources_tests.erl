@@ -34,7 +34,7 @@ init_test() ->
 process_search_post_test() ->
 	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {?WEBMACHINE_URL++"/resources", [],"application/json", "{\"name\" : \"post\"}"}, [], []),
     DocId1 = lib_json:get_field(Body1,"_id"),
-    ?assertEqual(true,lib_json:get_field(Body1,"ok")),        
+    ?assertEqual(true,lib_json:get_field(Body1,"created")),        
     api_help:refresh(),
     {ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(post, {?WEBMACHINE_URL++"/resources/_search", [],"application/json", "{\"query\":{\"match_all\":{}}}"}, [], []),
     {ok, {{_Version3, 200, _ReasonPhrase4}, _Headers4, Body4}} = httpc:request(post, {?WEBMACHINE_URL++"/resources/_search", [],"application/json", "{\"query\":{\"match_all\":{}}}"}, [], []),
@@ -51,8 +51,8 @@ process_search_post_test() ->
 %% @end
 process_post_test() ->
         {ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {?WEBMACHINE_URL++"/resources", [],"application/json", "{\"name\" : \"post\"}"}, [], []),
-        api_help:refresh(),
-        ?assertEqual(true,lib_json:get_field(Body1,"ok")),        
+        api_help:refresh(),  
+        ?assertEqual(true,lib_json:get_field(Body1,"created")),        
         %Clean up after the test
         httpc:request(delete, {?WEBMACHINE_URL++"/resources/" ++ lib_json:to_string(lib_json:get_field(Body1,"_id")), []}, [], []).
 
@@ -71,8 +71,8 @@ delete_resource_test() ->
         api_help:refresh(),
         % Delete a resource that doesn't exist
         {ok, {{_Version5, 404, _ReasonPhrase5}, _Headers5, _Body5}} = httpc:request(delete, {?WEBMACHINE_URL++"/resources/1", []}, [], []),
-        ?assertEqual(true, lib_json:get_field(Body2,"ok")),
-        ?assertEqual(true, lib_json:get_field(Body3,"ok")).
+        ?assertEqual(true, lib_json:get_field(Body2,"created")),
+        ?assertEqual(true, lib_json:get_field(Body3,"found")).
         
 %% @doc
 %% Function: put_resource_test/0
@@ -89,8 +89,10 @@ put_resource_test() ->
         {ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, Body3}} = httpc:request(get, {?WEBMACHINE_URL++"/resources/" ++ lib_json:to_string(DocId), []}, [], []),
         %Try to put to a resource that doesn't exist
         {ok, {{_Version4, 404, _ReasonPhrase4}, _Headers4, _Body4}} = httpc:request(put, {?WEBMACHINE_URL++"/resources/" ++ "non-existing-index", [],"application/json", "{\"name\" : \"put2\"}"}, [], []),
-        ?assertEqual(true,lib_json:get_field(Body1,"ok")),
-        ?assertEqual(true,lib_json:get_field(Body2,"ok")),
+        ?assertEqual(true,lib_json:get_field(Body1,"created")),
+
+erlang:display("BODY1!!!!:: " ++ Body2), 
+        ?assertNotEqual(null,lib_json:get_field(Body2,"_id")),
         ?assertEqual(<<"put2">>,lib_json:get_field(Body3,"name")),
         %Clean up
         httpc:request(delete, {?WEBMACHINE_URL++"/resources/" ++ lib_json:to_string(DocId), []}, [], []).

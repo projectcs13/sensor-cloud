@@ -11,13 +11,7 @@ echo "Installing Erlang"
 echo "#################################################################"
 wget http://packages.erlang-solutions.com/site/esl/esl-erlang/FLAVOUR_1_general/esl-erlang_16.b.1~ubuntu~precise_amd64.deb
 sudo dpkg -i esl-erlang_16.b.1~ubuntu~precise_amd64.deb
-
-echo "#################################################################"
-echo "Installing Elastic Search"
-echo "#################################################################"
-wget https://download.elasticsearch.org/elasticsearch/elasticsearch/elasticsearch-1.3.1.deb
-sudo dpkg -i elasticsearch-1.3.1.deb
-###elasticsearch -Des.config=/path/to/config/file
+rm esl-erlang_16.b.1~ubuntu~precise_amd64.deb
 
 echo "#################################################################"
 echo "Installing Nodejs together with npm"

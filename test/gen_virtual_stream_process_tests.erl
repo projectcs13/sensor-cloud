@@ -365,7 +365,7 @@ create_a_stream_on_index(Index) ->
 	case erlastic_search:index_doc(Index, "stream", "{}") of
 		{error, Reason} -> {error, Reason};
 		{ok, Data} ->
-			binary_to_list(element(2, lists:nth(4, element(2, Data))))
+			binary_to_list(lib_json:get_field(Data, "_id"))
 	end.
 
 
@@ -392,7 +392,7 @@ create_a_virtual_stream_on_index(Index, List) ->
 	case erlastic_search:index_doc(Index, "virtual_stream", "{\"name\":\"test\", \"streams_involved\":" ++ Involved ++ ", \"function\":[\"total\", \"2s\"]}") of
 		{error, Reason} -> {error, Reason};
 		{ok, Data} ->
-			binary_to_list(element(2, lists:nth(4, element(2, Data))))
+			binary_to_list(lib_json:get_field(Data, "_id"))
 	end.
 
 

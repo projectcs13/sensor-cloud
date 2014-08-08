@@ -171,6 +171,8 @@ polling_history_test()->
 	{ok, {{_Version3, 200, _ReasonPhrase3}, _Headers3, _Body3}} = httpc:request(delete, {?WEBMACHINE_URL++"/streams/" ++ lib_json:to_string(StrId1), []}, [], []),
 	{ok, {{_Version4, 200, _ReasonPhrase4}, _Headers4, _Body4}} = httpc:request(delete, {?WEBMACHINE_URL++"/users/tomas", []}, [], []),
 	api_help:refresh(),
+
+	erlang:display("/n############################### /n" ++ Body2),
 	?assertNotEqual([],lib_json:get_field(Body2, "history")).
 
 %% @doc

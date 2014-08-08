@@ -453,8 +453,8 @@ post_stream_with_parser_test()->
 add_multiple_streams_test() ->
 	{ok, {{_Version1, 200, _ReasonPhrase1}, _Headers1, Body1}} = httpc:request(post, {?WEBMACHINE_URL++"/streams", [], "application/json", "{\"multi_json\" : [{\"name\" : \"testM1\",\"user_id\" : \"RandomUser\"},{\"name\" : \"testM2\",\"user_id\" : \"RandomUser\"}]}"}, [], []),
 	api_help:refresh(),
-	?assertEqual(true,lib_json:get_field(Body1,"results[0].ok")),
-	?assertEqual(true,lib_json:get_field(Body1,"results[1].ok")),
+	?assertEqual(true,lib_json:get_field(Body1,"results[0].created")),
+	?assertEqual(true,lib_json:get_field(Body1,"results[1].created")),
 	api_help:refresh(),
 	DocId1 = lib_json:get_field(Body1,"results[0]._id"),
 	DocId2 = lib_json:get_field(Body1,"results[1]._id"),
@@ -466,7 +466,7 @@ add_multiple_streams_test() ->
 
 	{ok, {{_Version5, 200, _ReasonPhrase5}, _Headers5, Body5}} = httpc:request(post, {?WEBMACHINE_URL++"/streams", [], "application/json", "{\"multi_json\" : [{\"name\" : \"testM1\",\"user_id\" : \"RandomUser\"},{\"nme\" : \"testM2\",\"user_id\" : \"RandomUser\"}]}"}, [], []),
 	api_help:refresh(),
-	?assertEqual(true,lib_json:get_field(Body5,"results[0].ok")),
+	?assertEqual(true,lib_json:get_field(Body5,"results[0].created")),
 	?assertEqual(false,lib_json:get_field(Body5,"results[1].ok")),
 	api_help:refresh(),
 	DocId3 = lib_json:get_field(Body5,"results[0]._id"),
@@ -475,6 +475,7 @@ add_multiple_streams_test() ->
 
 	{ok, {{_Version7, 200, _ReasonPhrase7}, _Headers7, Body7}} = httpc:request(post, {?WEBMACHINE_URL++"/streams", [], "application/json", "{\"multi_json\" : [{\"nme\" : \"testM1\",\"user_id\" : \"RandomUser\"},{\"nme\" : \"testM2\",\"user_id\" : \"RandomUser\"}]}"}, [], []),
 	api_help:refresh(),
+	erlang:display("/n############################### /n" ++ Body7),
 	?assertEqual(false,lib_json:get_field(Body7,"results[0].ok")),
 	?assertEqual(false,lib_json:get_field(Body7,"results[1].ok")),
 	api_help:refresh().

@@ -124,7 +124,7 @@ engine_config_check() ->
 -spec elastic_search_config_check() -> ok | error.
 elastic_search_config_check() ->
     {ok, CWD} = file:get_cwd(),
-    File = CWD ++ "/lib/elasticsearch/config/elasticsearch.yml",
+    File = CWD ++ "/lib/elasticsearch-1.1.2/config/elasticsearch.yml",
     case file:read_file_info(File) of
 	{ok, _FileInfo}->
 	    ok;
@@ -225,7 +225,7 @@ engine_and_nodejs_config() ->
 -spec elastic_search_config() -> ok.
 elastic_search_config() ->
     {ok, CWD} = file:get_cwd(),
-    File = CWD ++ "/lib/elasticsearch/config/elasticsearch.yml",
+    File = CWD ++ "/lib/elasticsearch-1.1.2/config/elasticsearch.yml",
     Lines = lib_file:read_file_lines(File),
     FunStrip = fun(X) -> NoComment = string:strip(X, left, $#),
 			 string:strip(NoComment, left) 
