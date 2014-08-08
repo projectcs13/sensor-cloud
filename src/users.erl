@@ -98,7 +98,7 @@ delete_resource(ReqData, State) ->
     case openidc:auth_request(ReqData) of
         {error, Msg} -> {{halt, 403}, wrq:set_resp_body(Msg, ReqData), State};
         {ok, _} ->
-            Id = api_help:id_from_path(ReqData),
+            Id = id_from_path(ReqData),
             case delete_streams_with_user_id(Id) of
                 {error, {Code, Body}} ->
                     ErrorString = api_help:generate_error(Body, Code),
@@ -229,7 +229,7 @@ put_user(ReqData, State) ->
         {ok, _} ->
             case api_help:is_subs(ReqData) or api_help:is_unsubs(ReqData) of
                 false ->
-                    Id = api_help:id_from_path(ReqData),
+                    Id = id_from_path(ReqData),
                     {UserJson,_,_} = api_help:json_handler(ReqData, State),
                     %check if doc already exists
                     case {api_help:do_any_field_exist(UserJson,?RESTRCITEDUPDATEUSERS),api_help:do_only_fields_exist(UserJson,?ACCEPTEDFIELDSUSERS)} of
@@ -251,7 +251,7 @@ put_user(ReqData, State) ->
                     end;
                 true ->
                     erlang:display("SUBSCRIPTION!"),
-                    Id = api_help:id_from_path(ReqData),
+                    Id = id_from_path(ReqData),
                     {Json,_,_} = api_help:json_handler(ReqData,State),
                     StreamId = case lib_json:get_field(Json,"stream_id") of
                         undefined ->
@@ -603,7 +603,7 @@ get_user(ReqData, State) ->
 
 -spec get_user_model(ReqData::tuple(), State::string()) -> {list(), tuple(), string()}.
 get_user_model(ReqData, State) ->
-    case api_help:id_from_path(ReqData) of
+    case id_from_path(ReqData) of
         undefined -> % Get all users
             case wrq:get_qs_value("size",ReqData) of
                 undefined ->
@@ -690,4 +690,14 @@ create_access_token(Username, JSON) ->
             end;
 
         AccToken -> {ok, AccToken, JSON}
+    end.
+
+
+-spec id_from_path(ReqData::tuple()) -> string().
+id_from_path(ReqData) ->
+    case api_help:parse_path(wrq:path(ReqData)) of
+        % [error]               -> undefined;
+        [{"users", Id}]       -> string:to_lower(Id);
+        [{"users", Id}, _]    -> string:to_lower(Id);
+        _                     -> undefined
     end.
