@@ -105,9 +105,10 @@ generate_idp_token(Code, AuthState) ->
 
 -spec auth_request(ReqData::tuple()) -> tuple().
 auth_request(ReqData) ->
+    erlang:display("Authenticate"),
     case authenticate("Access-Token", ReqData) of
-        {error, Error} -> {error, "{\"error\": \"" ++ Error ++ "\"}"};
-        {ok, UserID}   -> authorize(ReqData, UserID)
+        {error, Error} -> erlang:display("error"), {error, "{\"error\": \"" ++ Error ++ "\"}"};
+        {ok, UserID}   -> erlang:display("pre"), authorize(ReqData, UserID)
     end.
 
 
@@ -117,35 +118,72 @@ auth_request(ReqData) ->
 authenticate(TokenName, ReqData) ->
     case wrq:get_req_header(TokenName, ReqData) of
         undefined -> {error, "Not possible to perform the request. Missing " ++ TokenName};
-        TokenVal  ->
-            Username = api_help:id_from_path(ReqData),
-            erlang:display(Username),
-            check_valid_token(Username, TokenName, TokenVal)
+        TokenVal  -> check_valid_token(TokenName, TokenVal)
     end.
 
 
 -spec authorize(ReqData::tuple(), UserID::string()) -> tuple().
 authorize(ReqData, UserID) ->
-    Username  = api_help:id_from_path(ReqData),
-    {ok, UserJSON} = users:get_user_by_name(UserID),
-    ReqMethod = wrq:method(ReqData),
-    Private   = lib_json:get_field(UserJSON, "private"),
+    {Method, Resource, UserRequested} = api_help:get_info_request(ReqData),
 
-    UserMatches = (Username == UserID),
-    HoldsAccessPolicy = case {ReqMethod, Private} of
-        {get, false} -> true;
-        {_, _}       -> false
+    erlang:display("Authorising..."),
+    erlang:display({Method, Resource, UserRequested}),
+    erlang:display({"UserID", UserID}),
+
+    ValidAccess = case UserRequested of
+        undefined -> check_auth_rules_collections(Method, Resource);
+        _         -> check_auth_rules_individuals(Method, Resource, UserRequested, UserID)
     end,
 
-    IsAccessible = is_priviledge(UserID) or UserMatches or HoldsAccessPolicy,
-    case IsAccessible of
+    erlang:display({is_priviledge(UserID), ValidAccess}),
+    case is_priviledge(UserID) or ValidAccess of
         true  -> {ok, UserID};
         false -> {error, "{\"error\": \"User not authorized. Permission denied\"}"}
     end.
 
 
--spec check_valid_token(Username::string(), TokenName::string(), TokenValue::string()) -> tuple().
-check_valid_token(Username, TokenName, TokenValue) ->
+check_auth_rules_individuals(Method, Resource, UserRequested, UserID) ->
+    erlang:display("INDIVIDUAL"),
+    {ok, UserJSON} = users:get_user_by_name(UserRequested),
+    Private = lib_json:get_field(UserJSON, "private"),
+
+    erlang:display({"Private", Private}),
+
+    case {UserRequested == UserID, Private} of
+        {true, _} ->
+            case {Method, Resource} of                      % Rule 1: Can MAKE anything with our own data
+                {'GET', "datapoints"} -> true;              %         except for manipulating datapoints
+                {    _, "datapoints"} -> false;
+                {'PUT',       "rank"} -> true;              % Rule 4: Can ONLY PUT the ranking of other user's stream
+                _                     -> true
+            end;
+
+        {false, true}  -> false;                            % Rule 2: Can NOT MAKE anything to private users
+
+        {false, false} ->
+            case {Method, Resource} of
+                {'GET',    "users"} -> true;                % Rule 3: Can ONLY GET User/S/VS from other public users
+                {'GET',  "streams"} -> true;
+                {'GET', "vstreams"} -> true;
+
+                {'PUT', "rank"} -> true;                    % Rule 4: Can ONLY PUT the ranking of other user's stream
+
+                _ -> false                                  % Rule 5: Anything else is forbidden
+            end
+    end.
+
+
+check_auth_rules_collections(Method, Resource) ->
+    erlang:display("Collection!!"),
+    % Rule 6: Only fetch a collection or create a new User, Stream or Virtual Stream is allowed
+    % This rule is checked in cases when a GET or POST to /users, without a specific user id, is requested
+    ValidMethods   = (Method == 'GET') or (Method == 'POST'),
+    ValidResources = (Resource == "users") or (Resource == "streams") or (Resource == "vstreams"),
+    ValidMethods and ValidResources.
+
+
+-spec check_valid_token(TokenName::string(), TokenValue::string()) -> tuple().
+check_valid_token(TokenName, TokenValue) ->
     case verify_idp_token(TokenValue) of
         {error, Msg} ->
             case verify_own_token(TokenValue) of
@@ -155,7 +193,7 @@ check_valid_token(Username, TokenName, TokenValue) ->
             end;
 
         {ok, GoogleJSON} ->
-            case analyse_token_response(Username, TokenValue, GoogleJSON) of
+            case analyse_token_response(TokenValue, GoogleJSON) of
                 {error, Error}     -> {error, Error};
                 {ok, false}        -> {error, "Token not valid. Expended by other system"};
                 {ok, true, UserID} ->
@@ -176,8 +214,8 @@ verify_idp_token(Token) ->
     end.
 
 
--spec analyse_token_response(Username::string(), NewToken::string(), JSON::tuple()) -> tuple().
-analyse_token_response(Username, NewToken, JSON) ->
+-spec analyse_token_response(NewToken::string(), JSON::tuple()) -> tuple().
+analyse_token_response(NewToken, JSON) ->
     case proplists:get_value(<<"error">>, JSON) of
         undefined ->
             GoogleUsername = binary_to_list(proplists:get_value(<<"user_id">>, JSON)),

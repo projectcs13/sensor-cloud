@@ -23,11 +23,11 @@
 	 get_elastic_search_url/0,
 	 get_webmachine_url/0,
 	 get_and_add_id/1,
+	 get_info_request/1,
 	 get_list_and_add_id/1,
 	 get_list_and_add_id/2,
 	 get_and_add_password/1,
 	 get_list_and_add_password/1,
-	 id_from_path/1,
 	 is_polling_history/1,
 	 is_auth/1,
 	 is_auth_redirect/1,
@@ -309,14 +309,14 @@ get_list_and_add_password(JsonStruct) ->
     lib_json:set_attr(users, AddedPassword).
 
 %% @doc
-%% Function: id_from_path/1
+%% Function: get_info_request/1
 %% Purpose: Retrieves the id from the path.
 %% Returns: Id
 %% @end
--spec id_from_path(RD::tuple()) -> string().
-id_from_path(RD) ->
-    Fetch_user_id = fun(TableName, Id) ->
-        case erlastic_search:get_doc(?INDEX, "stream", Id) of
+-spec get_info_request(ReqData::tuple()) -> string().
+get_info_request(ReqData) ->
+    Fetch_username = fun(TableName, Id) ->
+        case erlastic_search:get_doc(?INDEX, TableName, Id) of
             {error, _} -> undefined;
             {ok, JSON} ->
                 UID = lib_json:get_field(JSON, "_source.user_id"),
@@ -324,17 +324,35 @@ id_from_path(RD) ->
         end
     end,
 
-    case api_help:parse_path(wrq:path(RD)) of
-        [error]               -> undefined;
-        [{"users"}]           -> undefined;
-        [{"users", Id}]       -> string:to_lower(Id);
-        [{"users", Id}, _]    -> string:to_lower(Id);
-        [{"streams", Id}]     -> Fetch_user_id("streams", Id);
-        [{"streams", Id}, _]  -> Fetch_user_id("streams", Id);
-        [{"vstreams", Id}]    -> Fetch_user_id("vstreams", Id);
-        [{"vstreams", Id}, _] -> Fetch_user_id("vstreams", Id);
-        _                     -> undefined
-    end.
+	Method = wrq:method(ReqData),
+
+    {Resource, UserRequested} = case api_help:parse_path(wrq:path(ReqData)) of
+        [{"users"}]                             -> {     "users", undefined};
+        [{"users", Id}]                         -> {     "users", string:to_lower(Id)};
+        [{"users", Id}, {Reso, Sid}]            -> {        Reso, string:to_lower(Id)};
+        [{"users", Id}, {Reso}]                 -> {        Reso, string:to_lower(Id)};
+        [{"users", Id}, {_, Sid}, {"triggers"}] -> {  "triggers", string:to_lower(Id)};
+        [{"users", Id}, _]                      -> {     "users", string:to_lower(Id)};
+        [{"streams"}]                           -> {   "streams", undefined};
+        [{"streams", Id}]                       -> {   "streams", Fetch_username("stream",  Id)};
+        [{"streams", Id}, {"_rank"}]            -> {      "rank", Fetch_username("stream",  Id)};
+        [{"streams", Id}, {"data"}]             -> {"datapoints", Fetch_username("stream",  Id)};
+        [{"streams", Id}, {"data", _}]          -> {"datapoints", Fetch_username("stream",  Id)};
+        [{"streams", Id}, _]                    -> {   "streams", Fetch_username("stream",  Id)};
+        [{"vstreams"}]                          -> {  "vstreams", undefined};
+        [{"vstreams", Id}]                      -> {  "vstreams", Fetch_username("vstream", Id)};
+        [{"vstreams", Id}, {"data"}]            -> {"datapoints", Fetch_username("vstream", Id)};
+        [{"vstreams", Id}, {"data", _}]         -> {"datapoints", Fetch_username("vstream", Id)};
+        [{"vstreams", Id}, _]                   -> {  "vstreams", Fetch_username("vstream", Id)};
+        [{"resources"}]                         -> { "resources", undefined};
+        [{"resources", Id}]                     -> { "resources", Fetch_username("resource", Id)};
+        % [error]                               -> {   undefined, undefined};
+        _                                       -> {   undefined, undefined}
+    end,
+
+    {Method, Resource, UserRequested}.
+
+
 
 %% @doc
 %% Function: is_polling_history/1
