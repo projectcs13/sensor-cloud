@@ -74,7 +74,7 @@ content_types_provided(ReqData, State) ->
 -spec process_post(ReqData::tuple(), State::string()) -> {true, tuple(), string()}.
 process_post(ReqData, State) ->
 	case openidc:auth_request(ReqData) of
-        {error, Msg} -> {{halt, 403}, wrq:set_resp_body(Msg, ReqData), State};
+        {error, Msg} -> {{halt, 498}, wrq:set_resp_body(Msg, ReqData), State};
         {ok, _} ->
 			case api_help:is_search(ReqData) of
 				false ->
@@ -158,7 +158,7 @@ process_post(ReqData, State) ->
 -spec get_datapoint(ReqData::tuple(), State::string()) -> {list(), tuple(), string()}.
 get_datapoint(ReqData, State) ->
 	case openidc:auth_request(ReqData) of
-        {error, Msg} -> {{halt, 403}, wrq:set_resp_body(Msg, ReqData), State};
+        {error, Msg} -> {{halt, 498}, wrq:set_resp_body(Msg, ReqData), State};
         {ok, _} ->
 			DataType = case is_virtual(ReqData) of
 						   true -> "vsdatapoint";

@@ -91,7 +91,7 @@ content_types_accepted(ReqData, State) ->
 -spec delete_resource(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 delete_resource(ReqData, State) ->
 	case openidc:auth_request(ReqData) of
-        {error, Msg} -> {{halt, 403}, wrq:set_resp_body(Msg, ReqData), State};
+        {error, Msg} -> {{halt, 498}, wrq:set_resp_body(Msg, ReqData), State};
         {ok, _} ->
 			case {proplists:get_value('user', wrq:path_info(ReqData)),proplists:get_value('stream', wrq:path_info(ReqData))} of
 				{UserId,undefined} ->
@@ -194,7 +194,7 @@ delete_data_points_with_stream_id(Id, Type) ->
 -spec process_post(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 process_post(ReqData, State) ->
 	case openidc:auth_request(ReqData) of
-        {error, Msg} -> {{halt, 403}, wrq:set_resp_body(Msg, ReqData), State};
+        {error, Msg} -> {{halt, 498}, wrq:set_resp_body(Msg, ReqData), State};
         {ok, _} ->
 		    case api_help:is_search(ReqData) of
 		    	true  -> process_search_post(ReqData,State);
@@ -475,7 +475,7 @@ process_search_get(ReqData, State) ->
 -spec put_stream(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 put_stream(ReqData, State) ->
 	case openidc:auth_request(ReqData) of
-        {error, Msg} -> {{halt, 403}, wrq:set_resp_body(Msg, ReqData), State};
+        {error, Msg} -> {{halt, 498}, wrq:set_resp_body(Msg, ReqData), State};
         {ok, _} ->
 			case api_help:is_rank(ReqData) of
 				false ->
@@ -584,7 +584,7 @@ put_stream(ReqData, State) ->
 -spec get_stream(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 get_stream(ReqData, State) ->
 	case openidc:auth_request(ReqData) of
-        {error, Msg} -> {{halt, 403}, wrq:set_resp_body(Msg, ReqData), State};
+        {error, Msg} -> {{halt, 498}, wrq:set_resp_body(Msg, ReqData), State};
 		{ok, _} ->
 			case {api_help:is_search(ReqData),api_help:is_polling_history(ReqData)} of
 				{true,_} -> process_search_get(ReqData,State);

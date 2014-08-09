@@ -75,7 +75,7 @@ content_types_accepted(ReqData, State) ->
 -spec delete_resource(ReqData::tuple(), State::string()) -> {string(), tuple(), string()}.
 delete_resource(ReqData, State) ->
 	case openidc:auth_request(ReqData) of
-        {error, Msg} -> {{halt, 403}, wrq:set_resp_body(Msg, ReqData), State};
+        {error, Msg} -> {{halt, 498}, wrq:set_resp_body(Msg, ReqData), State};
         {ok, _} ->
 			Id = proplists:get_value('resourceid', wrq:path_info(ReqData)),
 			case erlastic_search:delete_doc(?INDEX,"resource", Id) of
@@ -95,7 +95,7 @@ delete_resource(ReqData, State) ->
 -spec process_post(ReqData::tuple(), State::string()) -> {atom(), tuple(), string()}.
 process_post(ReqData, State) ->
 	case openidc:auth_request(ReqData) of
-        {error, Msg} -> {{halt, 403}, wrq:set_resp_body(Msg, ReqData), State};
+        {error, Msg} -> {{halt, 498}, wrq:set_resp_body(Msg, ReqData), State};
         {ok, _} ->
 			URIList = string:tokens(wrq:path(ReqData), "/"),
 			IsSearch = (string:sub_string(lists:nth(length(URIList),URIList),1,7) == "_search"),
@@ -170,7 +170,7 @@ process_search_post(ReqData, State) ->
 -spec put_resource(ReqData::tuple(), State::string()) -> {list(), tuple(), string()}.
 put_resource(ReqData, State) ->
 	case openidc:auth_request(ReqData) of
-        {error, Msg} -> {{halt, 403}, wrq:set_resp_body(Msg, ReqData), State};
+        {error, Msg} -> {{halt, 498}, wrq:set_resp_body(Msg, ReqData), State};
         {ok, _} ->
 			%check if doc already exists
 			Id = id_from_path(ReqData),
@@ -210,7 +210,7 @@ put_resource(ReqData, State) ->
 -spec get_resource(ReqData::tuple(), State::string()) -> {list(), tuple(), string()}.
 get_resource(ReqData, State) ->
 	case openidc:auth_request(ReqData) of
-        {error, Msg} -> {{halt, 403}, wrq:set_resp_body(Msg, ReqData), State};
+        {error, Msg} -> {{halt, 498}, wrq:set_resp_body(Msg, ReqData), State};
         {ok, _} ->
 			case api_help:is_search(ReqData) of
 				false ->

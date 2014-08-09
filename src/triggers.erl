@@ -76,7 +76,7 @@ content_types_accepted(ReqData, State) ->
 
 get_triggers(ReqData, State) ->
 	case openidc:auth_request(ReqData) of
-        {error, Msg} -> {{halt, 403}, wrq:set_resp_body(Msg, ReqData), State};
+        {error, Msg} -> {{halt, 498}, wrq:set_resp_body(Msg, ReqData), State};
         {ok, _} ->
 		    case proplists:get_value('userid', wrq:path_info(ReqData)) of
 				undefined ->
@@ -123,7 +123,7 @@ get_triggers(ReqData, State) ->
 -spec process_post(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 process_post(ReqData, State) ->
 	case openidc:auth_request(ReqData) of
-        {error, Msg} -> {{halt, 403}, wrq:set_resp_body(Msg, ReqData), State};
+        {error, Msg} -> {{halt, 498}, wrq:set_resp_body(Msg, ReqData), State};
         {ok, _} ->
 			case proplists:get_value('action', wrq:path_info(ReqData)) of
 				"remove" -> delete_resource(ReqData, State);
@@ -152,7 +152,7 @@ process_post(ReqData, State) ->
 -spec delete_resource(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 delete_resource(ReqData, State) ->
 	case openidc:auth_request(ReqData) of
-        {error, Msg} -> {{halt, 403}, wrq:set_resp_body(Msg, ReqData), State};
+        {error, Msg} -> {{halt, 498}, wrq:set_resp_body(Msg, ReqData), State};
         {ok, _} ->
 			{Json,_,_} = api_help:json_handler(ReqData, State),
 			User = proplists:get_value('userid', wrq:path_info(ReqData)),

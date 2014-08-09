@@ -90,7 +90,7 @@ content_types_accepted(ReqData, State) ->
 -spec process_post(ReqData::tuple(), State::string()) -> {true, tuple(), string()}.
 process_post(ReqData, State) ->
 	case openidc:auth_request(ReqData) of
-        {error, Msg} -> {{halt, 403}, wrq:set_resp_body(Msg, ReqData), State};
+        {error, Msg} -> {{halt, 498}, wrq:set_resp_body(Msg, ReqData), State};
         {ok, _} ->
 			case api_help:is_search(ReqData) of
 				false ->
@@ -180,7 +180,7 @@ reduce(VirtualStreamId, Streams, TimestampFrom, Function, ReqData, State) ->
 -spec get_vstream(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 get_vstream(ReqData, State) ->
 	case openidc:auth_request(ReqData) of
-        {error, Msg} -> {{halt, 403}, wrq:set_resp_body(Msg, ReqData), State};
+        {error, Msg} -> {{halt, 498}, wrq:set_resp_body(Msg, ReqData), State};
         {ok, _} ->
 			case wrq:get_qs_value("size",ReqData) of
 				undefined ->
@@ -234,7 +234,7 @@ get_vstream(ReqData, State) ->
 -spec put_stream(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 put_stream(ReqData, State) ->
 	case openidc:auth_request(ReqData) of
-        {error, Msg} -> {{halt, 403}, wrq:set_resp_body(Msg, ReqData), State};
+        {error, Msg} -> {{halt, 498}, wrq:set_resp_body(Msg, ReqData), State};
         {ok, _} ->
 			VStreamId = proplists:get_value('id', wrq:path_info(ReqData)),
 			{VStream,_,_} = api_help:json_handler(ReqData,State),
@@ -264,7 +264,7 @@ put_stream(ReqData, State) ->
 -spec delete_resource(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 delete_resource(ReqData, State) ->
 	case openidc:auth_request(ReqData) of
-        {error, Msg} -> {{halt, 403}, wrq:set_resp_body(Msg, ReqData), State};
+        {error, Msg} -> {{halt, 498}, wrq:set_resp_body(Msg, ReqData), State};
         {ok, _} ->
 			case {proplists:get_value('id', wrq:path_info(ReqData))} of
 				{Id} ->
