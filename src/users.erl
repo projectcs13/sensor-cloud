@@ -16,7 +16,6 @@
          process_post/2,
          process_auth_request/2,
          delete_streams_with_user_id/1,
-         replace_token/3,
          user_is_new/1,
          store_user/3,
          get_user_by_name/1]).
@@ -48,6 +47,8 @@ allowed_methods(ReqData, State) ->
             {['POST'], ReqData, State};
         [{"users","_openid"}] ->
             {['GET'], ReqData, State};
+        [{"users","_renewtoken"}] ->
+            {['POST'], ReqData, State};
         [{"users","_search"}] ->
             {['POST','GET'], ReqData, State};
         [{"users",_Id}] ->
@@ -96,7 +97,7 @@ content_types_accepted(ReqData, State) ->
 -spec delete_resource(ReqData::tuple(), State::string()) -> {string(), tuple(), string()}.
 delete_resource(ReqData, State) ->
     case openidc:auth_request(ReqData) of
-        {error, Msg} -> {{halt, 403}, wrq:set_resp_body(Msg, ReqData), State};
+        {error, Msg} -> {{halt, 498}, wrq:set_resp_body(Msg, ReqData), State};
         {ok, _} ->
             Id = id_from_path(ReqData),
             case delete_streams_with_user_id(Id) of
@@ -225,7 +226,7 @@ delete_streams([StreamId|Rest], Type) ->
 -spec put_user(ReqData::tuple(), State::string()) -> {true, tuple(), string()}.
 put_user(ReqData, State) ->
     case openidc:auth_request(ReqData) of
-        {error, Msg} -> {{halt, 403}, wrq:set_resp_body(Msg, ReqData), State};
+        {error, Msg} -> {{halt, 498}, wrq:set_resp_body(Msg, ReqData), State};
         {ok, _} ->
             case api_help:is_subs(ReqData) or api_help:is_unsubs(ReqData) of
                 false ->
@@ -378,11 +379,14 @@ remove_subscriber(StreamId, UserId) ->
 -spec process_post(ReqData::tuple(), State::string()) -> {true, tuple(), string()}.
 process_post(ReqData, State) ->
     URIList = string:tokens(wrq:path(ReqData), "/"),
-    Req = string:sub_string(lists:nth(length(URIList),URIList),1,7),
+    Req = string:sub_string(lists:nth(length(URIList),URIList), 1, 12),
+    % Path = string:sub_string(wrq:path(ReqData), 1, 5),  % Removing the "users" substring from the path
+    erlang:display({"Req", Req}),
     case Req of
-        "_auth"   -> process_auth_request(ReqData, State);
-        "_search" -> process_search(ReqData, State, post);
-        _ -> create_user(ReqData, State)
+        "_auth"       -> process_auth_request(ReqData, State);
+        "_search"     -> process_search(ReqData, State, post);
+        "_renewtoken" -> process_renew_token(ReqData, State);
+        ""            -> create_user(ReqData, State)
     end.
 
     % case api_help:is_auth(ReqData) of
@@ -397,9 +401,9 @@ process_post(ReqData, State) ->
 
 -spec create_user(ReqData::tuple(), State::string()) -> {true, tuple(), string()}.
 create_user(ReqData, State) ->
-    {UserJson, _, _} = api_help:json_handler(ReqData, State),
+    {UserJSON, _, _} = api_help:json_handler(ReqData, State),
 
-    case lib_json:get_field(UserJson, "username") of
+    case lib_json:get_field(UserJSON, "username") of
         undefined ->
             UserName = undefined,
             UserNameApproved = false;
@@ -409,7 +413,7 @@ create_user(ReqData, State) ->
             UserNameApproved = check_and_sanitize(UserName)
     end,
 
-    case {api_help:do_only_fields_exist(UserJson,?ACCEPTEDFIELDSUSERS),UserNameApproved,UserName =/= undefined} of
+    case {api_help:do_only_fields_exist(UserJSON,?ACCEPTEDFIELDSUSERS),UserNameApproved,UserName =/= undefined} of
         {_,_,false} ->
             {{halt,403}, wrq:set_resp_body("Username missing", ReqData), State};
         {false,_,_} ->
@@ -422,33 +426,29 @@ create_user(ReqData, State) ->
             ErrorString1 = api_help:generate_error(Body1, Code1),
             {{halt, Code1}, wrq:set_resp_body(ErrorString1, ReqData), State};
         {true,true,_} ->
-            UserID = list_to_binary(UserName),
-            NewUserJson = lib_json:replace_field(UserJson, "username", UserID),
-            FieldsAdded = add_server_side_fields(NewUserJson),
+            UserID    = list_to_binary(UserName),
+            UserJSON1 = lib_json:replace_field(UserJSON, "username", UserID),
+            UserJSON2 = add_server_side_fields(UserJSON1),
 
-            case create_access_token(UserID, FieldsAdded) of
-                {error, Msg} -> {{halt, 403}, wrq:set_resp_body(Msg, ReqData), State};
+            TokenJSON = create_access_token(UserID, UserJSON2),
+            AccToken  = lib_json:get_field(TokenJSON, "access_token"),
+            RefToken  = lib_json:get_field(TokenJSON, "refresh_token"),
 
-                {ok, AccToken, JSON} ->  % Create user on DB
-                    case erlastic_search:index_doc_with_id(?INDEX, "user", UserName, JSON) of
-                        {error, {Code2, Body2}} ->
-                            ErrorString2 = api_help:generate_error(Body2, Code2),
-                            {{halt, Code2}, wrq:set_resp_body(ErrorString2, ReqData), State};
-                        {ok, DBResponse} ->
-                            List = lib_json:encode(DBResponse),
-                            Res  = lib_json:add_values(List, [{access_token, AccToken}]),
-                            {true, wrq:set_resp_body(Res, ReqData), State}
-                    end
+            UserJSON3 = lib_json:add_values(UserJSON2, [{access_token, AccToken}, {refresh_token, RefToken}]),
+
+            case erlastic_search:index_doc_with_id(?INDEX, "user", UserName, UserJSON3) of
+                {error, {Code2, Body2}} ->
+                    ErrorString2 = api_help:generate_error(Body2, Code2),
+                    {{halt, Code2}, wrq:set_resp_body(ErrorString2, ReqData), State};
+
+                {ok, DBResultSet} ->
+                    List = lib_json:encode(DBResultSet),
+                    Res  = lib_json:add_values(List, [{access_token, AccToken}, {refresh_token, RefToken}]),
+                    {true, wrq:set_resp_body(Res, ReqData), State}
             end
-
     end.
 
 
-%% @doc
-%% Function: process_auth_request/2
-%% Purpose: creates a user based on the OpenID data received
-%% Returns: {true, ReqData, State} || {{error, Reason}, ReqData, State}
-%% @end
 -spec process_auth_request(ReqData::tuple(), State::string()) -> {true, tuple(), string()}.
 process_auth_request(ReqData, State) ->
     TokenURL = openidc:process_auth_request(ReqData, State),
@@ -459,32 +459,23 @@ process_auth_request(ReqData, State) ->
 -spec process_auth_redirect(ReqData::tuple(), State::string()) -> {true, tuple(), string()}.
 process_auth_redirect(ReqData, State) ->
     case openidc:process_auth_redirect(ReqData, State) of
-        {ok, Res}    -> {true, wrq:set_resp_body(Res, ReqData), State};
+        {ok,    Res} -> {true, wrq:set_resp_body(Res, ReqData), State};
         {error, Msg} ->
             Error = "{\"error\": \"" ++ Msg ++ "\"}",
             {{halt,403}, wrq:set_resp_body(Error, ReqData), State}
     end.
 
 
--spec replace_token(Username::string(), TokenName::string(), TokenValue::string()) -> tuple().
+-spec process_renew_token(ReqData::tuple(), State::string()) -> tuple().
+process_renew_token(ReqData, State) ->
+    case openidc:process_renew_token(ReqData, State) of
+        {ok, AccToken} ->
+            Res = "{\"access_token\": \"" ++ AccToken ++ "\"}",
+            {true, wrq:set_resp_body(Res, ReqData), State};
 
-replace_token(Username, "Access-Token", TokenValue)  -> replace_token(Username, "access_token", TokenValue);
-replace_token(Username, "Refresh-Token", TokenValue) -> replace_token(Username, "refresh_token", TokenValue);
-replace_token(Username, TokenName, TokenValue) ->
-    case get_user_by_name(Username) of
-        {error, Msg} -> {error, "User not found on database"};
-        {ok, JSON}   ->
-            OldToken = lib_json:get_field(JSON, TokenName),
-            case OldToken == TokenValue of   % Optimization, to not update if it is not needed
-                true  -> {ok, JSON};
-                false ->
-                    UserJSON = lib_json:replace_field(JSON, TokenName, list_to_binary(TokenValue)),
-                    Update   = lib_json:set_attr(doc, UserJSON),
-                    case api_help:update_doc(?INDEX, "user", Username, Update) of
-                        {ok, _} -> {ok, UserJSON};
-                        {error, _} -> {error, "Not possible to update the user"}
-                    end
-            end
+        {error, Msg} ->
+            Error = "{\"error\": \"" ++ Msg ++ "\"}",
+            {{halt,403}, wrq:set_resp_body(Error, ReqData), State}
     end.
 
 
@@ -579,23 +570,15 @@ get_user_by_name(Username) ->
 %% @end
 -spec get_user(ReqData::tuple(), State::string()) -> {list(), tuple(), string()}.
 get_user(ReqData, State) ->
-    Do_get_user = fun() ->
-        case api_help:is_search(ReqData) of
-            true  -> process_search(ReqData,State, get);
-            false -> get_user_model(ReqData, State)
-        end
-    end,
-
-    % TODO Remove God mode
-    case wrq:get_qs_value("god", ReqData) of
-        "true" -> get_user_model(ReqData, State);
-        _ ->
-            case api_help:is_auth_redirect(ReqData) of
-                true  -> process_auth_redirect(ReqData, State);
-                false ->
-                    case openidc:auth_request(ReqData) of
-                        {ok, _} -> Do_get_user();
-                        {error, Msg} -> {{halt, 403}, wrq:set_resp_body(Msg, ReqData), State}
+    case api_help:is_auth_redirect(ReqData) of
+        true  -> process_auth_redirect(ReqData, State);
+        false ->
+            case openidc:auth_request(ReqData) of
+                {error, Msg} -> {{halt, 498}, wrq:set_resp_body(Msg, ReqData), State};
+                {ok, _} ->
+                    case api_help:is_search(ReqData) of
+                        true  -> process_search(ReqData,State, get);
+                        false -> get_user_model(ReqData, State)
                     end
             end
     end.
@@ -678,18 +661,21 @@ add_server_side_fields(Json) ->
     lib_json:add_values(Json,[{rankings, "[]"},{notifications,"[]"},{triggers,"[]"},{subscriptions, "[]"}]).
 
 
--spec create_access_token(Username::string(), JSON::string()) -> string().
-create_access_token(Username, JSON) ->
-    case lib_json:get_field(JSON, "access_token") of
-        undefined ->
-            case openidc:generate_own_token(Username) of
-                {error, Msg}      -> {error, "\"error\": \"" ++ Msg ++ "\""};
-                {ok, AccToken, _} ->
-                    UserJSON = lib_json:add_values(JSON, [{access_token, AccToken}]),
-                    {ok, AccToken, UserJSON}
+-spec create_access_token(Username::string(), UserJSON::tuple()) -> string().
+create_access_token(Username, UserJSON) ->
+    AccToken = lib_json:get_field(UserJSON, "access_token"),
+    RefToken = lib_json:get_field(UserJSON, "refresh_token"),
+    case {AccToken, RefToken} of
+        {AT, RT} when (AT == undefined) or (RT == undefined) ->
+            TokenJSON = openidc:generate_own_token(Username),
+            case openidc:store_own_token(TokenJSON) of
+                {error, Msg} -> {error, "\"error\": \"" ++ Msg ++ "\""};
+                ok -> TokenJSON
             end;
 
-        AccToken -> {ok, AccToken, JSON}
+        _ ->
+            "{\"access_token\":\""  ++ binary_to_list(AccToken) ++ "\"" ++
+            ",\"refresh_token\":\"" ++ binary_to_list(RefToken) ++ "\"}"
     end.
 
 
