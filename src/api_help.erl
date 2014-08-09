@@ -372,10 +372,8 @@ is_polling_history(ReqData) ->
 -spec is_rank(ReqData::term()) -> boolean().
 is_rank(ReqData) ->
 	case string:str(wrq:path(ReqData),"_rank") of
-		0 ->
-			false;
-		_ ->
-			true
+		0 -> false;
+		_ -> true
 	end.
 
 
@@ -433,10 +431,8 @@ is_count(ReqData) ->
 -spec is_subs(ReqData::term()) -> boolean().
 is_subs(ReqData) ->
 	case string:str(wrq:path(ReqData),"_subscribe") of
-		0 ->
-			false;
-		_ ->
-			true
+		0 -> false;
+		_ -> true
 	end.
 
 %% @doc
@@ -447,10 +443,8 @@ is_subs(ReqData) ->
 -spec is_unsubs(ReqData::term()) -> boolean().
 is_unsubs(ReqData) ->
 	case string:str(wrq:path(ReqData),"_unsubscribe") of
-		0 ->
-			false;
-		_ ->
-			true
+		0 -> false;
+		_ -> true
 	end.
 
 %% @doc
