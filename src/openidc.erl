@@ -78,8 +78,7 @@ process_renew_token(ReqData, State) ->
     case {RToken, UserID} of
         {undefined, _} -> {error, "Failed operation: Missing refresh_token"};
         {_, undefined} -> {error, "Failed operation: Missing username"};
-        {_, _} ->
-            % RefToken = binary_to_list(RToken),
+        _ ->
             case is_own_token(RToken) of
                 false                -> renew_idp_token(UserID, RToken);
                 {true, OldTokenJSON} -> renew_own_token(UserID, RToken, OldTokenJSON)
@@ -98,7 +97,8 @@ renew_idp_token(UserID, RefToken) ->
     Header = "application/x-www-form-urlencoded",
     Body   = Client ++ Secret ++ RToken ++ G_Type,
 
-    case plus_srv:get_url(httpc:request(post, {URL, [], Header, Body}, [], [])) of
+    Request = httpc:request(post, {URL, [], Header, Body}, [], []),
+    case plus_srv:get_url(Request) of
         {error, _} -> {error, "Refresh Token not valid"};
         {ok, JSON} ->
             case proplists:get_value(<<"access_token">>, JSON) of
@@ -114,13 +114,28 @@ renew_idp_token(UserID, RefToken) ->
 
 -spec renew_own_token(UserID::string(), RefToken::string(), OldTokenJSON::tuple()) -> tuple().
 renew_own_token(UserID, RefToken, OldTokenJSON) ->
-    % Delete old token
-    OldAccToken = lib_json:get_field(OldTokenJSON, "access_token"),
-    erlastic_search:delete_doc(?INDEX, "token", OldAccToken),
+    case lib_json:get_field(OldTokenJSON, "access_token") of
+        undefined   -> {error, "Access token not found on database"};
+        OldAccToken ->
+            % Create new token based on the given RefToken
+            TokenJSON = generate_own_token(list_to_binary(UserID), list_to_binary(RefToken)),
 
-    % Create new token
-    TokenJSON = generate_own_token(UserID),
-    store_own_token(TokenJSON).
+            case users:get_user_by_name(UserID) of
+                {error, Err}   -> {error, Err};
+                {ok, UserJSON} ->
+                    % Update = lib_json:set_attr(doc, TokenJSON),
+                    % api_help:update_doc(?INDEX, "token", OldAccToken, Update),
+
+                    AccToken = lib_json:get_field(TokenJSON, "access_token"),
+
+                    UserJSON2  = lib_json:replace_field(UserJSON, "access_token", AccToken),
+                    UserUpdate = lib_json:set_attr(doc, UserJSON2),
+                    api_help:update_doc(?INDEX, "user", UserID, UserUpdate),
+
+                    Res = erlastic_search:delete_doc(?INDEX, "token", OldAccToken),
+                    store_own_token(TokenJSON)
+            end
+    end.
 
 
 -spec is_own_token(Token::string()) -> boolean().
@@ -129,10 +144,9 @@ is_own_token(Token) ->
     case erlastic_search:search_limit(?INDEX, "token", Query, 1) of
         {error, _} -> false;
         {ok, JSON} ->
-            case lib_json:get_field(JSON, "_source.refresh_token") of
-                undefined -> false;
-                _         -> {true, lib_json:get_field(JSON, "_source")}
-            end
+            Source    = lib_json:get_field(JSON, "hits.hits"),
+            TokenJSON = lib_json:get_field(Source, "_source"),
+            {true, TokenJSON}
     end.
 
 
@@ -170,8 +184,15 @@ generate_idp_token(Code, AuthState) ->
 
 -spec generate_own_token(Username::string()) -> tuple().
 generate_own_token(Username) ->
-    AccToken = base64:encode(crypto:strong_rand_bytes(64)),
-    RefToken = base64:encode(crypto:strong_rand_bytes(48)),
+    RT = base64:encode(crypto:strong_rand_bytes(48)),
+    RefToken = list_to_binary(re:replace(RT, "/|\\+", "0", [global, {return, list}])),
+    generate_own_token(Username, RefToken).
+
+
+-spec generate_own_token(Username::string(), RefToken::string()) -> tuple().
+generate_own_token(Username, RefToken) ->
+    AT = base64:encode(crypto:strong_rand_bytes(64)),
+    AccToken = list_to_binary(re:replace(AT, "/|\\+", "0", [global, {return, list}])),
 
     TokenJSON = mochijson2:encode({struct, [
         {access_token, AccToken},
@@ -179,9 +200,7 @@ generate_own_token(Username) ->
         {issued_at, api_help:now_to_seconds()},
         {refresh_token, RefToken},
         {user_id, Username}
-    ]}),
-
-    {AccToken, TokenJSON}.
+    ]}).
 
 
 -spec store_own_token(TokenJSON::tuple()) -> tuple().
@@ -189,22 +208,24 @@ store_own_token(TokenJSON) ->
     AccToken = lib_json:get_field(TokenJSON, "access_token"),
     case erlastic_search:index_doc_with_id(?INDEX, "token", AccToken, TokenJSON) of
         {error, _} -> {error, "Not possible to store the generated token"};
-        {ok, _}    -> ok
+        {ok, _}    -> {ok, binary_to_list(AccToken)}
     end.
 
 
 -spec auth_request(ReqData::tuple()) -> tuple().
 auth_request(ReqData) ->
     case authenticate("Access-Token", ReqData) of
-        {error, Error} -> erlang:display("error"), {error, "{\"error\": \"" ++ Error ++ "\"}"};
+        {error, Error} -> {error, "{\"error\": \"" ++ Error ++ "\"}"};
         {ok, UserID}   -> authorize(ReqData, UserID)
     end.
 
 
 -spec authenticate(TokenName::string(), ReqData::tuple()) -> tuple().
 authenticate(TokenName, ReqData) ->
+    ErrorMsg = "Not possible to perform the request. Missing " ++ TokenName,
     case wrq:get_req_header(TokenName, ReqData) of
-        undefined -> {error, "Not possible to perform the request. Missing " ++ TokenName};
+        undefined -> {error, ErrorMsg};
+        ""        -> {error, ErrorMsg};
         TokenVal  -> check_valid_token(TokenName, list_to_binary(TokenVal))
     end.
 
@@ -213,16 +234,11 @@ authenticate(TokenName, ReqData) ->
 authorize(ReqData, UserID) ->
     {Method, Resource, UserRequested} = api_help:get_info_request(ReqData),
 
-    erlang:display("Authorising..."),
-    erlang:display({Method, Resource, UserRequested}),
-    erlang:display({"UserID", UserID}),
-
     ValidAccess = case UserRequested of
         undefined -> authorization_rules_collection(Method, Resource);
         _         -> authorization_rules_individual(Method, Resource, UserRequested, UserID)
     end,
 
-    erlang:display({is_priviledge(UserID), ValidAccess}),
     case is_priviledge(UserID) or ValidAccess of
         true  -> {ok, UserID};
         false -> {error, "{\"error\": \"User not authorized. Permission denied\"}"}
@@ -231,11 +247,8 @@ authorize(ReqData, UserID) ->
 
 -spec authorization_rules_individual(Method::atom(), Resource::string(), UserRequested::string(), UserID::string()) -> boolean().
 authorization_rules_individual(Method, Resource, UserRequested, UserID) ->
-    erlang:display("INDIVIDUAL"),
     {ok, UserJSON} = users:get_user_by_name(UserRequested),
     Private = lib_json:get_field(UserJSON, "private"),
-
-    erlang:display({"Private", Private}),
 
     case {UserRequested == UserID, Private} of
         {true, _} ->
@@ -262,7 +275,6 @@ authorization_rules_individual(Method, Resource, UserRequested, UserID) ->
 
 -spec authorization_rules_collection(Method::atom(), Resource::string()) -> boolean().
 authorization_rules_collection(Method, Resource) ->
-    erlang:display("Collection!!"),
     % Rule 6: Only fetch a collection or create a new User, Stream or Virtual Stream is allowed
     % This rule is checked in cases when a GET or POST to /users, without a specific user id, is requested
     ValidMethods   = (Method == 'GET') or (Method == 'POST'),
@@ -307,14 +319,9 @@ verify_own_token(AccToken) ->
 
             CurrentTS = api_help:now_to_seconds(),
             IssuedAt  = lib_json:get_field(JSON, "_source.issued_at"),
-            % ExpiresIn = lib_json:get_field(JSON, "_source.expires_in"),  % 3600 seconds usually
-            ExpiresIn = 1,
+            ExpiresIn = lib_json:get_field(JSON, "_source.expires_in"),  % 3600 seconds usually
 
             Valid = (CurrentTS < (IssuedAt + ExpiresIn)),
-            erlang:display(IssuedAt),
-            erlang:display(CurrentTS),
-            erlang:display(Valid),
-
             {ok, Valid, UserID}
     end.
 

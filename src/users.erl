@@ -380,23 +380,12 @@ remove_subscriber(StreamId, UserId) ->
 process_post(ReqData, State) ->
     URIList = string:tokens(wrq:path(ReqData), "/"),
     Req = string:sub_string(lists:nth(length(URIList),URIList), 1, 12),
-    % Path = string:sub_string(wrq:path(ReqData), 1, 5),  % Removing the "users" substring from the path
-    erlang:display({"Req", Req}),
     case Req of
         "_auth"       -> process_auth_request(ReqData, State);
         "_search"     -> process_search(ReqData, State, post);
         "_renewtoken" -> process_renew_token(ReqData, State);
-        ""            -> create_user(ReqData, State)
+        "users"       -> create_user(ReqData, State)
     end.
-
-    % case api_help:is_auth(ReqData) of
-    %     true  -> process_auth_request(ReqData, State);
-    %     false ->
-    %         case api_help:is_search(ReqData) of
-    %             true  -> process_search(ReqData,State, post);
-    %             false -> create_user(ReqData, State)
-    %         end
-    % end.
 
 
 -spec create_user(ReqData::tuple(), State::string()) -> {true, tuple(), string()}.
@@ -430,21 +419,23 @@ create_user(ReqData, State) ->
             UserJSON1 = lib_json:replace_field(UserJSON, "username", UserID),
             UserJSON2 = add_server_side_fields(UserJSON1),
 
-            TokenJSON = create_access_token(UserID, UserJSON2),
-            AccToken  = lib_json:get_field(TokenJSON, "access_token"),
-            RefToken  = lib_json:get_field(TokenJSON, "refresh_token"),
+            case create_access_token(UserID, UserJSON2) of
+                {error, Err} -> {{halt, 403}, wrq:set_resp_body(Err, ReqData), State};
+                TokenJSON ->
+                    AccToken  = lib_json:get_field(TokenJSON, "access_token"),
+                    RefToken  = lib_json:get_field(TokenJSON, "refresh_token"),
+                    UserJSON3 = lib_json:add_values(UserJSON2, [{access_token, AccToken}, {refresh_token, RefToken}]),
 
-            UserJSON3 = lib_json:add_values(UserJSON2, [{access_token, AccToken}, {refresh_token, RefToken}]),
+                    case erlastic_search:index_doc_with_id(?INDEX, "user", UserName, UserJSON3) of
+                        {error, {Code2, Body2}} ->
+                            ErrorString2 = api_help:generate_error(Body2, Code2),
+                            {{halt, Code2}, wrq:set_resp_body(ErrorString2, ReqData), State};
 
-            case erlastic_search:index_doc_with_id(?INDEX, "user", UserName, UserJSON3) of
-                {error, {Code2, Body2}} ->
-                    ErrorString2 = api_help:generate_error(Body2, Code2),
-                    {{halt, Code2}, wrq:set_resp_body(ErrorString2, ReqData), State};
-
-                {ok, DBResultSet} ->
-                    List = lib_json:encode(DBResultSet),
-                    Res  = lib_json:add_values(List, [{access_token, AccToken}, {refresh_token, RefToken}]),
-                    {true, wrq:set_resp_body(Res, ReqData), State}
+                        {ok, DBResultSet} ->
+                            List = lib_json:encode(DBResultSet),
+                            Res  = lib_json:add_values(List, [{access_token, AccToken}, {refresh_token, RefToken}]),
+                            {true, wrq:set_resp_body(Res, ReqData), State}
+                    end
             end
     end.
 
@@ -670,7 +661,7 @@ create_access_token(Username, UserJSON) ->
             TokenJSON = openidc:generate_own_token(Username),
             case openidc:store_own_token(TokenJSON) of
                 {error, Msg} -> {error, "\"error\": \"" ++ Msg ++ "\""};
-                ok -> TokenJSON
+                {ok, _} -> TokenJSON
             end;
 
         _ ->
