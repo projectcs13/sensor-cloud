@@ -276,10 +276,12 @@ authorization_rules_individual(Method, Resource, UserRequested, UserID) ->
 -spec authorization_rules_collection(Method::atom(), Resource::string()) -> boolean().
 authorization_rules_collection(Method, Resource) ->
     % Rule 6: Only fetch a collection or create a new User, Stream or Virtual Stream is allowed
-    % This rule is checked in cases when a GET or POST to /users, without a specific user id, is requested
-    ValidMethods   = (Method == 'GET') or (Method == 'POST'),
-    ValidResources = (Resource == "users") or (Resource == "streams") or (Resource == "vstreams"),
-    ValidMethods and ValidResources.
+    % This rule is checked in cases when a GET /users or POST to /streams, without a specific user id, is requested
+    ValidGET = ((Method == 'GET') and (Resource == "users")),
+    
+    POSTResources = ((Resource == "users") or (Resource == "streams") or (Resource == "vstreams")),
+    ValidPOST = ((Method == 'POST') and POSTResources),
+    ValidGET or ValidPOST.
 
 
 -spec check_valid_token(TokenName::string(), TokenValue::string()) -> tuple().
