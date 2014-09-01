@@ -6,12 +6,13 @@
 %%
 %% @doc == api_help ==
 %% This module will contain all help functions used by the
-%% api files 
+%% api files
 %%
 %% @end
 -module(api_help).
 -include_lib("erlastic_search.hrl").
 -include("json.hrl").
+-include("field_restrictions.hrl").
 
 -export([any_to_float/1,
 	 do_any_field_exist/2,
@@ -22,11 +23,14 @@
 	 get_elastic_search_url/0,
 	 get_webmachine_url/0,
 	 get_and_add_id/1,
+	 get_info_request/1,
 	 get_list_and_add_id/1,
 	 get_list_and_add_id/2,
 	 get_and_add_password/1,
 	 get_list_and_add_password/1,
 	 is_polling_history/1,
+	 is_auth/1,
+	 is_auth_redirect/1,
 	 is_rank/1,
 	 is_search/1,
 	 is_count/1,
@@ -34,6 +38,7 @@
 	 is_unsubs/1,
 	 json_handler/2,
 	 make_term_query/1,
+	 now_to_seconds/0,
 	 pair/1,
 	 parse_path/1,
 	 refresh/0,
@@ -46,7 +51,7 @@
 %% @doc
 %% Purpose: Tries really hard to convert to float
 %% Returns: float() or error
-%% 
+%%
 %% @end
 -spec any_to_float(any()) -> float().
 any_to_float(Val) when is_float(Val) -> Val;
@@ -63,7 +68,7 @@ any_to_float(Val) when is_list(Val) ->
 		false -> NewVal = PointVal
 	end,
     case string:to_float(NewVal) of
-        {error,no_float} -> 
+        {error,no_float} ->
         	try
         		case list_to_integer(NewVal) of
         			{error, no_integer} -> error;
@@ -137,7 +142,7 @@ do_any_field_exist(Json,[First|Rest]) ->
 do_only_fields_exist(Json,List) ->
 	NumFields = count_fields(lib_json:to_string(Json)),
 	Values = lib_json:get_fields(Json, List),
-	NumCorrectFields = lists:foldl(fun(X, Sum) -> case X of 
+	NumCorrectFields = lists:foldl(fun(X, Sum) -> case X of
 							  undefined -> Sum;
 							  _ -> Sum + 1
 						      end
@@ -245,63 +250,109 @@ get_webmachine_url() ->
 			"http://localhost:8000"
 	end.
 
-%% @doc 
-%% Gets the '_id' from the root, gets the '_source'. Adds _id as 
+%% @doc
+%% Gets the '_id' from the root, gets the '_source'. Adds _id as
 %% id' in _source and return the new JSON object.
 %%
-%% @end 
+%% @end
 -spec get_and_add_id(JsonStruct::mochijson()) -> json_output_value().
 get_and_add_id(JsonStruct) ->
     Id  = lib_json:get_field(JsonStruct, "_id"),
     SourceJson  = lib_json:get_field(JsonStruct, "_source"),
     lib_json:add_value(SourceJson, "id", Id).
 
-%% @doc 
+%% @doc
 %% Get the search results and performs get_and_add_id/1 on each
 %% elements in the result list.
 %% NOTE: Deprecated, use get_list_and_add_id/2 instead
 %%
-%% @end 
+%% @end
 -spec get_list_and_add_id(JsonStruct::mochijson()) -> json_string().
 get_list_and_add_id(JsonStruct) ->
     HitsList = lib_json:get_field(JsonStruct, "hits.hits"),
     AddedId = lists:map(fun(X) -> get_and_add_id(X) end, HitsList),
     lib_json:set_attr(hits, AddedId).
 
-%% @doc 
+%% @doc
 %% Get the search results and performs get_and_add_id/1 on each
 %% elements in the result list. The resulting list will be returned
 %% as a proper JSON object with the JsonKey as the attribute.
 %%
 %% Return: get_list_and_add_id(List, Attribute) -> "{\"Attribute\": List}"
-%% @end 
+%% @end
 -spec get_list_and_add_id(JsonStruct::mochijson(), atom()) -> json_string().
 get_list_and_add_id(JsonStruct, JsonKey) ->
     HitsList = lib_json:get_field(JsonStruct, "hits.hits"),
     AddedId = lists:map(fun(X) -> get_and_add_id(X) end, HitsList),
     lib_json:set_attr(JsonKey, AddedId).
 
-%% @doc 
-%% Gets the 'password' from the root, gets the '_source'. Adds password as 
+%% @doc
+%% Gets the 'password' from the root, gets the '_source'. Adds password as
 %% password' in _source and return the new JSON object.
 %%
-%% @end 
+%% @end
 -spec get_and_add_password(JsonStruct::mochijson()) -> json_output_value().
 get_and_add_password(JsonStruct) ->
     Id  = lib_json:get_field(JsonStruct, "fields.password"),
     SourceJson  = lib_json:get_field(JsonStruct, "_source"),
     lib_json:add_value(SourceJson, "password", Id).
 
-%% @doc 
+%% @doc
 %% Get the search results and performs get_and_add_password/1 on each
 %% elements in the result list.
-%% 
-%% @end 
+%%
+%% @end
 -spec get_list_and_add_password(JsonStruct::mochijson()) -> json_string().
 get_list_and_add_password(JsonStruct) ->
     HitsList = lib_json:get_field(JsonStruct, "hits.hits"),
     AddedPassword = lists:map(fun(X) -> get_and_add_password(X) end, HitsList),
     lib_json:set_attr(users, AddedPassword).
+
+%% @doc
+%% Function: get_info_request/1
+%% Purpose: Retrieves the id from the path.
+%% Returns: Id
+%% @end
+-spec get_info_request(ReqData::tuple()) -> string().
+get_info_request(ReqData) ->
+    Fetch_username = fun(TableName, Id) ->
+        case erlastic_search:get_doc(?INDEX, TableName, Id) of
+            {error, _} -> undefined;
+            {ok, JSON} ->
+                UID = lib_json:get_field(JSON, "_source.user_id"),
+                string:to_lower(binary_to_list(UID))
+        end
+    end,
+
+	Method = wrq:method(ReqData),
+
+    {Resource, UserRequested} = case api_help:parse_path(wrq:path(ReqData)) of
+        [{"users"}]                             -> {     "users", undefined};
+        [{"users", Id}]                         -> {     "users", string:to_lower(Id)};
+        [{"users", Id}, {Reso, Sid}]            -> {        Reso, string:to_lower(Id)};
+        [{"users", Id}, {Reso}]                 -> {        Reso, string:to_lower(Id)};
+        [{"users", Id}, {_, Sid}, {"triggers"}] -> {  "triggers", string:to_lower(Id)};
+        [{"users", Id}, _]                      -> {     "users", string:to_lower(Id)};
+        [{"streams"}]                           -> {   "streams", undefined};
+        [{"streams", Id}]                       -> {   "streams", Fetch_username("stream",  Id)};
+        [{"streams", Id}, {"_rank"}]            -> {      "rank", Fetch_username("stream",  Id)};
+        [{"streams", Id}, {"data"}]             -> {"datapoints", Fetch_username("stream",  Id)};
+        [{"streams", Id}, {"data", _}]          -> {"datapoints", Fetch_username("stream",  Id)};
+        [{"streams", Id}, _]                    -> {   "streams", Fetch_username("stream",  Id)};
+        [{"vstreams"}]                          -> {  "vstreams", undefined};
+        [{"vstreams", Id}]                      -> {  "vstreams", Fetch_username("vstream", Id)};
+        [{"vstreams", Id}, {"data"}]            -> {"datapoints", Fetch_username("vstream", Id)};
+        [{"vstreams", Id}, {"data", _}]         -> {"datapoints", Fetch_username("vstream", Id)};
+        [{"vstreams", Id}, _]                   -> {  "vstreams", Fetch_username("vstream", Id)};
+        [{"resources"}]                         -> { "resources", undefined};
+        [{"resources", Id}]                     -> { "resources", Fetch_username("resource", Id)};
+        % [error]                               -> {   undefined, undefined};
+        _                                       -> {   undefined, undefined}
+    end,
+
+    {Method, Resource, UserRequested}.
+
+
 
 %% @doc
 %% Function: is_polling_history/1
@@ -321,10 +372,8 @@ is_polling_history(ReqData) ->
 -spec is_rank(ReqData::term()) -> boolean().
 is_rank(ReqData) ->
 	case string:str(wrq:path(ReqData),"_rank") of
-		0 ->
-			false;
-		_ ->
-			true
+		0 -> false;
+		_ -> true
 	end.
 
 
@@ -337,6 +386,30 @@ is_rank(ReqData) ->
 is_search(ReqData) ->
 	URIList = string:tokens(wrq:path(ReqData), "/"),
 	(string:sub_string(lists:nth(length(URIList),URIList),1,7) == "_search").
+
+
+%% @doc
+%% Function: is_auth/1
+%% Purpose: Used to decide if the URI specify a search
+%% Returns: True if URI specify a search, false otherwise
+%% @end
+-spec is_auth(ReqData::term()) -> boolean().
+is_auth(ReqData) ->
+	% true.
+	URIList = string:tokens(wrq:path(ReqData), "/"),
+	(string:sub_string(lists:nth(length(URIList),URIList),1,7) == "_auth").
+
+
+%% @doc
+%% Function: is_auth_redirect/1
+%% Purpose: Used to decide if the URI specify a search
+%% Returns: True if URI specify a search, false otherwise
+%% @end
+-spec is_auth_redirect(ReqData::term()) -> boolean().
+is_auth_redirect(ReqData) ->
+	% true.
+	URIList = string:tokens(wrq:path(ReqData), "/"),
+	(string:sub_string(lists:nth(length(URIList),URIList),1,7) == "_openid").
 
 
 %% @doc
@@ -358,10 +431,8 @@ is_count(ReqData) ->
 -spec is_subs(ReqData::term()) -> boolean().
 is_subs(ReqData) ->
 	case string:str(wrq:path(ReqData),"_subscribe") of
-		0 ->
-			false;
-		_ ->
-			true
+		0 -> false;
+		_ -> true
 	end.
 
 %% @doc
@@ -372,10 +443,8 @@ is_subs(ReqData) ->
 -spec is_unsubs(ReqData::term()) -> boolean().
 is_unsubs(ReqData) ->
 	case string:str(wrq:path(ReqData),"_unsubscribe") of
-		0 ->
-			false;
-		_ ->
-			true
+		0 -> false;
+		_ -> true
 	end.
 
 %% @doc
@@ -386,7 +455,7 @@ is_unsubs(ReqData) ->
 -spec json_handler(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 json_handler(ReqData, State) ->
 	Value = binary_to_list(wrq:req_body(ReqData)),
-	%[{Value,_ }] = mochiweb_util:parse_qs(wrq:req_body(ReqData)), 
+	%[{Value,_ }] = mochiweb_util:parse_qs(wrq:req_body(ReqData)),
 	{Value, ReqData, State}.
 
 
@@ -421,8 +490,19 @@ make_inner_term_query([First|Rest]) ->
 	end.
 
 %% @doc
+%% Function: now_to_seconds/0
+%% Purpose: Converts the built-in function now() into seconds
+%% Returns: The current number of seconds from 1970
+%% @end
+-spec now_to_seconds() -> integer().
+now_to_seconds() ->
+	{Mega, Sec, _} = erlang:now(),
+    (Mega * 1000000) + Sec.
+
+
+%% @doc
 %% Function: pair/1
-%% Purpose: Used to create a new list of tuples where each 
+%% Purpose: Used to create a new list of tuples where each
 %%          2 elements are paired
 %% Returns: The paired list
 %% @end
@@ -438,7 +518,7 @@ pair([A,B|T]) ->
 %% Returns: The parsed URI path as a list
 %% @end
 -spec parse_path(Path::file:name_all()) -> list().
-parse_path(Path) -> 
+parse_path(Path) ->
 	[_|T] = filename:split(Path),
 	pair(T).
 
@@ -481,7 +561,7 @@ transform([{Field,Value}|Rest]) ->
 transform([],true) -> "&";
 transform([],false) -> "";
 transform([{Field,Value}|Rest],AddAnd) ->
-	case Rest of 
+	case Rest of
 		[] -> Field ++ ":" ++ Value ++ transform(Rest,AddAnd);
 		_ -> Field ++ ":" ++ Value ++ "&" ++ transform(Rest,AddAnd)
 	end.

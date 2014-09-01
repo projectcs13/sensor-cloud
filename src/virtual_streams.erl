@@ -2,20 +2,20 @@
 %%   [www.csproj13.student.it.uu.se]
 %% @version 1.0
 %% @copyright [Copyright information]
-%% This module will contain all functions needed to handle 
-%% http requests done to the webmachine regarding virtual streams 
+%% This module will contain all functions needed to handle
+%% http requests done to the webmachine regarding virtual streams
 %%
 %% @end
 
 -module(virtual_streams).
--export([init/1, 
-		 allowed_methods/2, 
+-export([init/1,
+		 allowed_methods/2,
 		 content_types_provided/2,
-		 content_types_accepted/2, 
-		 process_post/2, 
-		 process_search/3, 
-		 put_stream/2, 
-		 delete_resource/2, 
+		 content_types_accepted/2,
+		 process_post/2,
+		 process_search/3,
+		 put_stream/2,
+		 delete_resource/2,
 		 get_vstream/2]).
 
 -include_lib("erlastic_search.hrl").
@@ -32,7 +32,7 @@
 %% Returns: {ok, undefined}
 %% @end
 -spec init([]) -> {ok, undefined}.
-init([]) -> 
+init([]) ->
     {ok, undefined}.
 
 %% @doc
@@ -42,9 +42,9 @@ init([]) ->
 %% @end
 -spec allowed_methods(ReqData::tuple(), State::string()) -> {list(), tuple(), string()}.
 allowed_methods(ReqData, State) ->
-	case api_help:parse_path(wrq:path(ReqData)) of	
+	case api_help:parse_path(wrq:path(ReqData)) of
 		[{"vstreams"}] ->
-			{['POST', 'GET'], ReqData, State}; 
+			{['POST', 'GET'], ReqData, State};
 		[{"vstreams", _Id}] ->
 			{['POST', 'PUT', 'DELETE', 'GET'], ReqData, State};
 		[{"vstreams", "_search"}] ->
@@ -74,14 +74,13 @@ content_types_provided(ReqData, State) ->
 %% Returns: {[{Mediatype, Handler}], ReqData, State}
 %% @end
 -spec content_types_accepted(ReqData::term(),State::term()) -> {list(), term(), term()}.
-
 content_types_accepted(ReqData, State) ->
 	{[{"application/json", put_stream}], ReqData, State}.
 
 
 %% @doc
 %% Function: process_post/2
-%% Purpose: decodes a JSON object and creates a virtual stream that aggregates 
+%% Purpose: decodes a JSON object and creates a virtual stream that aggregates
 %% streams using a function
 %% It is run automatically for POST requests
 %% Returns: {true, ReqData, State} || {{error, Reason}, ReqData, State}
@@ -90,52 +89,56 @@ content_types_accepted(ReqData, State) ->
 %% @end
 -spec process_post(ReqData::tuple(), State::string()) -> {true, tuple(), string()}.
 process_post(ReqData, State) ->
-	case api_help:is_search(ReqData) of
-		false ->
-			{VirtualStreamJson,_,_} = api_help:json_handler(ReqData, State),
-			{{Year,Month,Day},{Hour,Minute,Second}} = calendar:local_time(),
-			Date = api_help:generate_date([Year,Month,Day]),
-			DateAdded = lib_json:add_values(VirtualStreamJson,[{creation_date, list_to_binary(Date)}]),
-			StreamsInvolved = lib_json:get_field(VirtualStreamJson, "streams_involved"),
-			TimestampFrom = lib_json:get_field(VirtualStreamJson, "timestampfrom"),
-			Function = lib_json:get_field(VirtualStreamJson, "function"),
-			AllowedFunctions = ["min", "max", "mean", "total", "diff"],
-			case api_help:do_only_fields_exist(VirtualStreamJson,?ACCEPTED_FIELDS_VSTREAMS_CREATE) of
-				true-> 
-					case lists:member(binary_to_list(lists:nth(1, Function)), AllowedFunctions) of
-						true ->
-							Func = binary_to_list(lists:nth(1, Function)),
-							if 
-								Func == "diff" andalso length(StreamsInvolved) =/= 1 -> 
-									{{halt, 404}, wrq:set_resp_body("Wrong number of streams involved for diff", ReqData), State};
-								true ->	
-									{{Year,Month,Day},{Hour,Minute,Second}} = calendar:local_time(),
-									TimeStamp = binary:list_to_bin(api_help:generate_timestamp([Year,Month,Day,Hour,Minute,Second],0)),
-									Initialized = lib_json:add_field(DateAdded,"last_updated",TimeStamp),
-									case erlastic_search:index_doc(?INDEX, "virtual_stream", Initialized) of	
-										{error, Reason} ->
-											{{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
-										{ok,List} -> 
-											VirtualStreamId = lib_json:get_field(List, "_id"),
-											if 
-												Func == "diff" ->
-													ok;
-												true ->
-													reduce(VirtualStreamId, StreamsInvolved, TimestampFrom, Function, ReqData, State)
-											end,
-											StreamList = [{stream, binary_to_list(X)} || X <- StreamsInvolved],
-											virtual_stream_process_supervisor:add_child(binary_to_list(VirtualStreamId), StreamList, Function),
-											{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
-									end
+	case openidc:auth_request(ReqData) of
+        {error, Msg} -> {{halt, 498}, wrq:set_resp_body(Msg, ReqData), State};
+        {ok, _} ->
+			case api_help:is_search(ReqData) of
+				false ->
+					{VirtualStreamJson,_,_} = api_help:json_handler(ReqData, State),
+					{{Year,Month,Day},{Hour,Minute,Second}} = calendar:local_time(),
+					Date = api_help:generate_date([Year,Month,Day]),
+					DateAdded = lib_json:add_values(VirtualStreamJson,[{creation_date, list_to_binary(Date)}]),
+					StreamsInvolved = lib_json:get_field(VirtualStreamJson, "streams_involved"),
+					TimestampFrom = lib_json:get_field(VirtualStreamJson, "timestampfrom"),
+					Function = lib_json:get_field(VirtualStreamJson, "function"),
+					AllowedFunctions = ["min", "max", "mean", "total", "diff"],
+					case api_help:do_only_fields_exist(VirtualStreamJson,?ACCEPTED_FIELDS_VSTREAMS_CREATE) of
+						true->
+							case lists:member(binary_to_list(lists:nth(1, Function)), AllowedFunctions) of
+								true ->
+									Func = binary_to_list(lists:nth(1, Function)),
+									if
+										Func == "diff" andalso length(StreamsInvolved) =/= 1 ->
+											{{halt, 404}, wrq:set_resp_body("Wrong number of streams involved for diff", ReqData), State};
+										true ->
+											{{Year,Month,Day},{Hour,Minute,Second}} = calendar:local_time(),
+											TimeStamp = binary:list_to_bin(api_help:generate_timestamp([Year,Month,Day,Hour,Minute,Second],0)),
+											Initialized = lib_json:add_field(DateAdded,"last_updated",TimeStamp),
+											case erlastic_search:index_doc(?INDEX, "virtual_stream", Initialized) of
+												{error, Reason} ->
+													{{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
+												{ok,List} ->
+													VirtualStreamId = lib_json:get_field(List, "_id"),
+													if
+														Func == "diff" ->
+															ok;
+														true ->
+															reduce(VirtualStreamId, StreamsInvolved, TimestampFrom, Function, ReqData, State)
+													end,
+													StreamList = [{stream, binary_to_list(X)} || X <- StreamsInvolved],
+													virtual_stream_process_supervisor:add_child(binary_to_list(VirtualStreamId), StreamList, Function),
+													{true, wrq:set_resp_body(lib_json:encode(List), ReqData), State}
+											end
+									end;
+								false ->
+									{{halt, 404}, wrq:set_resp_body("404 Function missing or not supported", ReqData), State}
 							end;
-						false ->
-							{{halt, 404}, wrq:set_resp_body("404 Function missing or not supported", ReqData), State}
+						false->
+							{{halt,403}, wrq:set_resp_body("Unsupported field(s), virtual stream not created", ReqData), State}
 					end;
-				false->
-					{{halt,403}, wrq:set_resp_body("Unsupported field(s), virtual stream not created", ReqData), State}
-			end;
-		true ->
-			process_search(ReqData, State, post)
+				true ->
+					process_search(ReqData, State, post)
+			end
 	end.
 
 
@@ -145,7 +148,7 @@ process_post(ReqData, State) ->
 %% and the statistical function, it executes a query and posts the vsdatapoints returned
 %% to the current virtual stream
 %% Returns: {true, ReqData, State} || {{error, Reason}, ReqData, State}
--spec reduce(VirtualStreamId::string(), Streams::string(), TimestampFrom::string(), Function::string(), ReqData::tuple(), State::string()) -> 
+-spec reduce(VirtualStreamId::string(), Streams::string(), TimestampFrom::string(), Function::string(), ReqData::tuple(), State::string()) ->
 		  {true, tuple(), string()}.
 reduce(VirtualStreamId, Streams, TimestampFrom, Function, ReqData, State) ->
 	Query = create_query(Function, Streams, TimestampFrom),
@@ -153,7 +156,7 @@ reduce(VirtualStreamId, Streams, TimestampFrom, Function, ReqData, State) ->
 		{error, Reason} -> {{error,Reason}, wrq:set_resp_body("{\"error\":\""++ atom_to_list(Reason) ++ "\"}", ReqData), State};
 		{ok,JsonStruct} ->
 			DatapointsList = lib_json:get_field(JsonStruct, "facets.statistics.entries"),
-			NewDatapoints = lists:map(fun(Json) -> 
+			NewDatapoints = lists:map(fun(Json) ->
 											FinalDatapoint = lib_json:set_attrs([
 																				{"timestamp", list_to_atom(msToDate(lib_json:get_field(Json, "key")))},
 																				{"stream_id", VirtualStreamId},
@@ -165,7 +168,7 @@ reduce(VirtualStreamId, Streams, TimestampFrom, Function, ReqData, State) ->
 			{true, wrq:set_resp_body("\"status\":\"ok\"", ReqData), State}
 	end.
 
- 
+
 %% @doc
 %% Function: get_vstream/2
 %% Purpose: Used to handle GET requests by giving the document with the given Id
@@ -176,49 +179,52 @@ reduce(VirtualStreamId, Streams, TimestampFrom, Function, ReqData, State) ->
 %% @end
 -spec get_vstream(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 get_vstream(ReqData, State) ->
-	case wrq:get_qs_value("size",ReqData) of 
-		undefined ->
-			Size = 100;
-		SizeParam ->
-			Size = list_to_integer(SizeParam)
-	end,
-	case proplists:get_value('user', wrq:path_info(ReqData)) of
-		undefined ->
-			case id_from_path(ReqData) of
+	case openidc:auth_request(ReqData) of
+        {error, Msg} -> {{halt, 498}, wrq:set_resp_body(Msg, ReqData), State};
+        {ok, _} ->
+			case wrq:get_qs_value("size",ReqData) of
 				undefined ->
-					Query = "{\"size\" :" ++ integer_to_list(Size) ++",\"query\" : {\"match_all\" : {}},
-							\"filter\" : {\"bool\":{\"must_not\":{\"term\":{\"private\":\"true\"}}}}}",
-					case erlastic_search:search_json(#erls_params{},?INDEX, "virtual_stream", Query) of
- 					{error, {Code, Body}} -> 
-							ErrorString = api_help:generate_error(Body, Code),
-							{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-					{ok,JsonStruct} ->
-							FinalJson = api_help:get_list_and_add_id(JsonStruct, vstreams),
-							{FinalJson, ReqData, State}  
+					Size = 100;
+				SizeParam ->
+					Size = list_to_integer(SizeParam)
+			end,
+			case proplists:get_value('user', wrq:path_info(ReqData)) of
+				undefined ->
+					case id_from_path(ReqData) of
+						undefined ->
+							Query = "{\"size\" :" ++ integer_to_list(Size) ++",\"query\" : {\"match_all\" : {}},
+									\"filter\" : {\"bool\":{\"must_not\":{\"term\":{\"private\":\"true\"}}}}}",
+							case erlastic_search:search_json(#erls_params{},?INDEX, "virtual_stream", Query) of
+		 					{error, {Code, Body}} ->
+									ErrorString = api_help:generate_error(Body, Code),
+									{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+							{ok,JsonStruct} ->
+									FinalJson = api_help:get_list_and_add_id(JsonStruct, vstreams),
+									{FinalJson, ReqData, State}
+							end;
+						Id ->
+							case erlastic_search:get_doc(?INDEX, "virtual_stream", Id) of
+								{error, {Code, Body}} ->
+									ErrorString = api_help:generate_error(Body, Code),
+									{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+								{ok,JsonStruct} ->
+									FinalJson = api_help:get_and_add_id(JsonStruct),
+									{FinalJson, ReqData, State}
+							end
 					end;
-				Id ->
-					case erlastic_search:get_doc(?INDEX, "virtual_stream", Id) of
-						{error, {Code, Body}} -> 
+				UserId ->
+					Query = "{\"size\" :" ++ integer_to_list(Size) ++",\"query\" : {\"term\" : { \"user_id\":\"" ++ UserId ++ "\"}}}",
+					case erlastic_search:search_json(#erls_params{},?INDEX, "virtual_stream", Query) of
+						{error, {Code, Body}} ->
 							ErrorString = api_help:generate_error(Body, Code),
 							{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
 						{ok,JsonStruct} ->
-							FinalJson = api_help:get_and_add_id(JsonStruct),
-							{FinalJson, ReqData, State} 
-					end
-			end;
-		UserId -> 
-			Query = "{\"size\" :" ++ integer_to_list(Size) ++",\"query\" : {\"term\" : { \"user_id\":\"" ++ UserId ++ "\"}}}",
-			case erlastic_search:search_json(#erls_params{},?INDEX, "virtual_stream", Query) of
-				{error, {Code, Body}} -> 
-					ErrorString = api_help:generate_error(Body, Code),
-					{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-				{ok,JsonStruct} ->
-					FinalJson = api_help:get_list_and_add_id(JsonStruct, vstreams),
-					{FinalJson, ReqData, State}  
-		end
+							FinalJson = api_help:get_list_and_add_id(JsonStruct, vstreams),
+							{FinalJson, ReqData, State}
+				end
+			end
 	end.
 
-	
 %% @doc
 %% Function: put_stream/2
 %% Purpose: Used to handle PUT requests by updating the given documents in elastic search
@@ -227,26 +233,29 @@ get_vstream(ReqData, State) ->
 %% @end
 -spec put_stream(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 put_stream(ReqData, State) ->
-	VStreamId = proplists:get_value('id', wrq:path_info(ReqData)),
-	{VStream,_,_} = api_help:json_handler(ReqData,State),
-	Update = lib_json:set_attr(doc,VStream),
-	case api_help:do_only_fields_exist(VStream,?ACCEPTED_FIELDS_VSTREAMS_UPDATE) of
-		true-> 
-			case api_help:update_doc(?INDEX, "virtual_stream", VStreamId, Update) of 
-				{error, {Code, Body}} -> 
-					ErrorString = api_help:generate_error(Body, Code),
-					{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-				{ok,List} -> 
-					{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
-			end;
-		false ->
-			{{halt,403}, wrq:set_resp_body("Unsupported field(s)", ReqData), State}
+	case openidc:auth_request(ReqData) of
+        {error, Msg} -> {{halt, 498}, wrq:set_resp_body(Msg, ReqData), State};
+        {ok, _} ->
+			VStreamId = proplists:get_value('id', wrq:path_info(ReqData)),
+			{VStream,_,_} = api_help:json_handler(ReqData,State),
+			Update = lib_json:set_attr(doc,VStream),
+			case api_help:do_only_fields_exist(VStream,?ACCEPTED_FIELDS_VSTREAMS_UPDATE) of
+				true->
+					case api_help:update_doc(?INDEX, "virtual_stream", VStreamId, Update) of
+						{error, {Code, Body}} ->
+							ErrorString = api_help:generate_error(Body, Code),
+							{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+						{ok,List} ->
+							{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
+					end;
+				false ->
+					{{halt,403}, wrq:set_resp_body("Unsupported field(s)", ReqData), State}
+			end
 	end.
-
 
 %% @doc
 %% Function: delete_resource/2
-%% Purpose: Used to handle DELETE requests for deleting the virtual stream and its 
+%% Purpose: Used to handle DELETE requests for deleting the virtual stream and its
 %% vsdatapoints in elastic search
 %% Returns: {Success, ReqData, State}, where Success is true if delete is successful
 %% and false otherwise.
@@ -254,20 +263,24 @@ put_stream(ReqData, State) ->
 %% @end
 -spec delete_resource(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 delete_resource(ReqData, State) ->
-	case {proplists:get_value('id', wrq:path_info(ReqData))} of
-		{Id} ->
-			case streams:delete_data_points_with_stream_id(Id, "virtual_stream") of 
-				{error, {Code, Body}} -> 
-					ErrorString = api_help:generate_error(Body, Code),
-					{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-				{ok} ->
-					case erlastic_search:delete_doc(?INDEX,"virtual_stream", Id) of
-						{error, {Code, Body}} -> 
+	case openidc:auth_request(ReqData) of
+        {error, Msg} -> {{halt, 498}, wrq:set_resp_body(Msg, ReqData), State};
+        {ok, _} ->
+			case {proplists:get_value('id', wrq:path_info(ReqData))} of
+				{Id} ->
+					case streams:delete_data_points_with_stream_id(Id, "virtual_stream") of
+						{error, {Code, Body}} ->
 							ErrorString = api_help:generate_error(Body, Code),
 							{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
-						{ok,List} -> 
-							virtual_stream_process_supervisor:terminate_child(Id),
-							{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
+						{ok} ->
+							case erlastic_search:delete_doc(?INDEX,"virtual_stream", Id) of
+								{error, {Code, Body}} ->
+									ErrorString = api_help:generate_error(Body, Code),
+									{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+								{ok,List} ->
+									virtual_stream_process_supervisor:terminate_child(Id),
+									{true,wrq:set_resp_body(lib_json:encode(List),ReqData),State}
+							end
 					end
 			end
 	end.
@@ -293,7 +306,7 @@ create_query(Function, Streams, TimestampFrom) ->
 		   {"query.filtered.filter.range.timestamp", "{}"},
 		   {"query.filtered.filter.range.timestamp.gte", TimestampFrom}
 	]),
-	
+
 	Interval = binary_to_list(lists:nth(2, Function)),
 	Facet = [{"facets", "{}"},
 			{"facets.statistics", "{}"},

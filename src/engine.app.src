@@ -9,6 +9,7 @@
                   kernel,
                   stdlib,
                   inets,
+                  ibrowse,
                   crypto,
                   mochiweb,
                   webmachine

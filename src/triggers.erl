@@ -4,7 +4,7 @@
 %% @copyright [Copyright information]
 %%
 %% @doc == triggers ==
-%% This module will contain all functions needed to handle 
+%% This module will contain all functions needed to handle
 %% http requests done to the webmachine regarding triggers
 %%
 %% @end
@@ -27,28 +27,28 @@
 %% Returns: {ok, undefined}
 %% @end
 -spec init([]) -> {ok, undefined}.
-init([]) -> 
+init([]) ->
     {ok, undefined}.
 
 %% @doc
 %% Function: allowed_methods/2
 %% Purpose: Used to define what methods are allowed one the given URI's.
-%% Returns: {List, ReqData, State}, where list is the allowed methods for the given URI. 
+%% Returns: {List, ReqData, State}, where list is the allowed methods for the given URI.
 %% @end
 -spec allowed_methods(ReqData::term(),State::term()) -> {list(), term(), term()}.
 
 allowed_methods(ReqData, State) ->
 	case api_help:parse_path(wrq:path(ReqData)) of
 	    [{"users", _UserID},{"streams",_StreamId},{"triggers"}] ->
-		{['GET'], ReqData, State};
+			{['GET'], ReqData, State};
 		[{"users", _UserID},{"vstreams",_VStreamId},{"triggers"}] ->
-		{['GET'], ReqData, State};
+			{['GET'], ReqData, State};
 	    [{"users", _UserID},{"triggers",_Action}] ->
-		{['POST'], ReqData, State};
+			{['POST'], ReqData, State};
 	    [{"users", _UserId},{"triggers"}] ->
-		{['GET'], ReqData, State};
+			{['GET'], ReqData, State};
 	    [error] ->
-		{[], ReqData, State} 
+		{[], ReqData, State}
 	end.
 
 
@@ -60,7 +60,6 @@ allowed_methods(ReqData, State) ->
 %% Returns: {[{Mediatype, Handler}], ReqData, State}
 %% @end
 -spec content_types_provided(ReqData::term(),State::term()) -> {list(), term(), term()}.
-
 content_types_provided(ReqData, State) ->
 	{[{"application/json", get_triggers}], ReqData, State}.
 
@@ -71,48 +70,48 @@ content_types_provided(ReqData, State) ->
 %% Returns: {[{Mediatype, Handler}], ReqData, State}
 %% @end
 -spec content_types_accepted(ReqData::term(),State::term()) -> {list(), term(), term()}.
-
 content_types_accepted(ReqData, State) ->
 	{[{"application/json", process_post}], ReqData, State}.
 
 
-
-
-
 get_triggers(ReqData, State) ->
-    case proplists:get_value('userid', wrq:path_info(ReqData)) of
-	undefined ->
-	    {ok, JsonStruct} = erlastic_search:search_json(#erls_params{}, ?INDEX, "trigger", "{}"),		       
-	    {lib_json:set_attr(error, "need to supply a username"), ReqData, State};
-	UserName ->
-	    case erlastic_search:get_doc(?INDEX, "user", UserName) of
-		{error, {Code, Body}} ->
-		    ErrorString = api_help:generate_error(Body, Code),
-		    {{halt, Code} = wrq:set_resp_body(ErrorString, ReqData), State};
-		{ok, JsonStruct} ->
-		    TriggerList = lib_json:get_field(JsonStruct, "_source.triggers"),	
-		    case {proplists:get_value('streamid', wrq:path_info(ReqData)),proplists:get_value('vstreamid', wrq:path_info(ReqData))} of
-				{undefined,undefined} ->			    
-					{lib_json:set_attr(triggers, TriggerList),ReqData, State};
-				{StreamId,undefined} ->
-					Fun = fun(X) ->
-								  StreamList = lib_json:get_field(X, streams),
-								  lists:member(binary:list_to_bin(StreamId), StreamList)
-						  end,
-					StreamTriggers = lists:filter(Fun, TriggerList),
-					{lib_json:set_attr(triggers, StreamTriggers),ReqData,State};
-				{undefined,VStreamId} ->
-					Fun = fun(X) ->
-								  VStreamList = lib_json:get_field(X, vstreams),
-								  lists:member(binary:list_to_bin(VStreamId), VStreamList)
-						  end,
-					VStreamTriggers = lists:filter(Fun, TriggerList),
-					{lib_json:set_attr(triggers, VStreamTriggers),ReqData,State};
-				_ ->
-					{lib_json:set_attr(triggers, TriggerList),ReqData, State}
-		    end
-	    end
-    end.
+	case openidc:auth_request(ReqData) of
+        {error, Msg} -> {{halt, 498}, wrq:set_resp_body(Msg, ReqData), State};
+        {ok, _} ->
+		    case proplists:get_value('userid', wrq:path_info(ReqData)) of
+				undefined ->
+				    {ok, JsonStruct} = erlastic_search:search_json(#erls_params{}, ?INDEX, "trigger", "{}"),
+			    	{lib_json:set_attr(error, "need to supply a username"), ReqData, State};
+				UserName ->
+				    case erlastic_search:get_doc(?INDEX, "user", UserName) of
+					{error, {Code, Body}} ->
+					    ErrorString = api_help:generate_error(Body, Code),
+					    {{halt, Code} = wrq:set_resp_body(ErrorString, ReqData), State};
+					{ok, JsonStruct} ->
+					    TriggerList = lib_json:get_field(JsonStruct, "_source.triggers"),
+					    case {proplists:get_value('streamid', wrq:path_info(ReqData)),proplists:get_value('vstreamid', wrq:path_info(ReqData))} of
+							{undefined,undefined} ->
+								{lib_json:set_attr(triggers, TriggerList),ReqData, State};
+							{StreamId,undefined} ->
+								Fun = fun(X) ->
+											  StreamList = lib_json:get_field(X, streams),
+											  lists:member(binary:list_to_bin(StreamId), StreamList)
+									  end,
+								StreamTriggers = lists:filter(Fun, TriggerList),
+								{lib_json:set_attr(triggers, StreamTriggers),ReqData,State};
+							{undefined,VStreamId} ->
+								Fun = fun(X) ->
+											  VStreamList = lib_json:get_field(X, vstreams),
+											  lists:member(binary:list_to_bin(VStreamId), VStreamList)
+									  end,
+								VStreamTriggers = lists:filter(Fun, TriggerList),
+								{lib_json:set_attr(triggers, VStreamTriggers),ReqData,State};
+							_ ->
+								{lib_json:set_attr(triggers, TriggerList),ReqData, State}
+					    end
+				    end
+			end
+	end.
 
 
 %% @doc
@@ -122,42 +121,48 @@ get_triggers(ReqData, State) ->
 %% successful and false otherwise.
 %% @end
 -spec process_post(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
-
 process_post(ReqData, State) ->
-	case proplists:get_value('action', wrq:path_info(ReqData)) of
-		"remove" -> delete_resource(ReqData, State);
-		"add" ->
-			{Json,_,_} = api_help:json_handler(ReqData, State),
-			User = proplists:get_value('userid', wrq:path_info(ReqData)),
-			case lib_json:get_field(Json, "uri") of
-				undefined ->
-					add_user(string:to_lower(User),ReqData,State);
-				URI ->
-					add_uri(string:to_lower(User),ReqData, State)
-			end;
-		_ ->
-			{true,ReqData,State}
+	case openidc:auth_request(ReqData) of
+        {error, Msg} -> {{halt, 498}, wrq:set_resp_body(Msg, ReqData), State};
+        {ok, _} ->
+			case proplists:get_value('action', wrq:path_info(ReqData)) of
+				"remove" -> delete_resource(ReqData, State);
+				"add" ->
+					{Json,_,_} = api_help:json_handler(ReqData, State),
+					User = proplists:get_value('userid', wrq:path_info(ReqData)),
+					case lib_json:get_field(Json, "uri") of
+						undefined ->
+							add_user(string:to_lower(User),ReqData,State);
+						URI ->
+							add_uri(string:to_lower(User),ReqData, State)
+					end;
+				_ ->
+					{true,ReqData,State}
+			end
 	end.
 
 %% @doc
 %% Function: delete_resource/2
-%% Purpose: Used to handle requests for deleting users from the lists of 
+%% Purpose: Used to handle requests for deleting users from the lists of
 %%          current triggers
 
 %% Returns: {Success, ReqData, State}, where Success is true if delete is successful
 %% and false otherwise.
 %% @end
 -spec delete_resource(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
-
 delete_resource(ReqData, State) ->
-	{Json,_,_} = api_help:json_handler(ReqData, State),
-	User = proplists:get_value('userid', wrq:path_info(ReqData)),
-	case lib_json:get_field(Json, "uri") of
-				undefined ->
-					remove_user(string:to_lower(User),ReqData,State);
-				URI ->
-					remove_uri(string:to_lower(User),ReqData, State)
-					
+	case openidc:auth_request(ReqData) of
+        {error, Msg} -> {{halt, 498}, wrq:set_resp_body(Msg, ReqData), State};
+        {ok, _} ->
+			{Json,_,_} = api_help:json_handler(ReqData, State),
+			User = proplists:get_value('userid', wrq:path_info(ReqData)),
+			case lib_json:get_field(Json, "uri") of
+						undefined ->
+							remove_user(string:to_lower(User),ReqData,State);
+						URI ->
+							remove_uri(string:to_lower(User),ReqData, State)
+
+			end
 	end.
 
 
@@ -226,7 +231,7 @@ add_uri(User,ReqData, State) ->
 				   "{\"filter\":{\"term\":{ \"function\":\"" ++ Function ++ "\"}},\"query\":{\"match\":{\"streams\":{\"query\":\"" ++ StreamsQuery ++"\",\"operator\":\"and\"}}},\"query\":{\"match\":{\"vstreams\":{\"query\":\"" ++ VirtualStreamsQuery ++"\",\"operator\":\"and\"}}}}"
 		   end,
 	EsId = case erlastic_search:search_json(#erls_params{},?INDEX, "trigger", Query) of % See if the trigger is already in the system
-			   {error, {Code, Body}} -> 
+			   {error, {Code, Body}} ->
 				   {error, {Code, Body}};
 			   {ok,JsonStruct} ->
 				   case lib_json:get_field(JsonStruct, "hits.total") of
@@ -235,10 +240,10 @@ add_uri(User,ReqData, State) ->
 					   X -> get_es_id(lib_json:get_field(JsonStruct, "hits.hits"),Streams++ VirtualStreams)
 				   end
 		   end,
-	Type = case Streams of 
+	Type = case Streams of
 			   [] ->
 				   "vstream";
-			   _ -> 
+			   _ ->
 				   "stream"
 		   end,
 	case {EsId,Streams,Function,URI,VirtualStreams} of
@@ -262,16 +267,16 @@ add_uri(User,ReqData, State) ->
 				{error,{Code2,Body2}} ->
 					ErrorString2 = api_help:generate_error(Body2, Code2),
 					{{halt, Code2}, wrq:set_resp_body(ErrorString2, ReqData), State};
-				{ok,List2} -> 
+				{ok,List2} ->
 					TriggerId = lib_json:to_string(lib_json:get_field(List2, "_id")),
-					Type = case Streams of 
+					Type = case Streams of
 							   [] ->
 								   "vstream";
-							   _ -> 
+							   _ ->
 								   "stream"
 						   end,
 					spawn_link(fun() ->
-									   triggersProcess:create(TriggerId, lists:map(fun(A) -> {stream,A} end,Streams) ++ lists:map(fun(A) -> {vstream,A} end,VirtualStreams), 
+									   triggersProcess:create(TriggerId, lists:map(fun(A) -> {stream,A} end,Streams) ++ lists:map(fun(A) -> {vstream,A} end,VirtualStreams),
 															  Function, [{Input,[{uri,{URI,User}}]}],Type)
 							   end),
 					UserUpdate = lib_json:set_attrs([{"script",list_to_binary("ctx._source.triggers += newelement")},
@@ -280,7 +285,7 @@ add_uri(User,ReqData, State) ->
 													 {"params.newelement.streams",Streams},{"params.newelement.vstreams",VirtualStreams},{"params.newelement.type",list_to_binary(Type)},
 													 {"params.newelement.output_type",list_to_binary("uri")},{"params.newelement.output_id",list_to_binary(URI)}]),
 					case api_help:update_doc(?INDEX, "user", User, UserUpdate) of
-						{error, {UPCode, UPBody}} -> 
+						{error, {UPCode, UPBody}} ->
 							UPErrorString = api_help:generate_error(UPBody, UPCode),
 							{{halt, UPCode}, wrq:set_resp_body(UPErrorString, ReqData), State};
 						{ok, _} ->
@@ -296,14 +301,14 @@ add_uri(User,ReqData, State) ->
 			%% Open channel
 			{ok, Channel} = amqp_connection:open_channel(Connection),
 			%% Declare exchange
-			amqp_channel:call(Channel, #'exchange.declare'{exchange = CommandExchange, type = <<"fanout">>}),      % Update triggersProcess running of new user  
+			amqp_channel:call(Channel, #'exchange.declare'{exchange = CommandExchange, type = <<"fanout">>}),      % Update triggersProcess running of new user
 			%% Send
 			amqp_channel:cast(Channel, #'basic.publish'{exchange = CommandExchange}, #amqp_msg{payload = Msg}),
-			case erlastic_search:get_doc(?INDEX, "trigger", EsId) of 
-				{error, {Code3, Body3}} -> 
+			case erlastic_search:get_doc(?INDEX, "trigger", EsId) of
+				{error, {Code3, Body3}} ->
 					ErrorString3 = api_help:generate_error(Body3, Code3),
 					{{halt, Code3}, wrq:set_resp_body(ErrorString3, ReqData), State};
-				{ok,JsonStruct2} -> 
+				{ok,JsonStruct2} ->
 					Update = case lib_json:field_value_exists(JsonStruct2, "_source.outputlist[*].input", Input) of
 								 true ->
 									 "{\"script\" : \"for(int i=0;i < ctx._source.outputlist.size(); i++){if (ctx._source.outputlist[i].input == newinput && !ctx._source.outputlist[i].output.contains(newoutput)){ctx._source.outputlist[i].output += newoutput; i = ctx._source.outputlist.size();}}\", \"params\":{\"newinput\":" ++  input_to_string(Input)++ ", \"newoutput\":{\"output_id\":[\""++URI++"\",\""++ User++"\"],\"output_type\":\"uri\"}}}";
@@ -311,17 +316,17 @@ add_uri(User,ReqData, State) ->
 									 "{\"script\" : \"ctx._source.outputlist += newelement\", \"params\":{\"newelement\":{\"input\" : "++ input_to_string(Input) ++ ", \"output\":[{\"output_id\":[\""++URI++"\",\""++ User++"\"],\"output_type\":\"uri\"}]}}}"
 							 end,
 					case api_help:update_doc(?INDEX, "trigger", EsId, Update) of % Update document in es with the new user
-						{error, {Code4, Body4}} -> 
+						{error, {Code4, Body4}} ->
 							ErrorString4 = api_help:generate_error(Body4, Code4),
 							{{halt, Code4}, wrq:set_resp_body(ErrorString4, ReqData), State};
-						{ok,List4} -> 
+						{ok,List4} ->
 							UserUpdate = lib_json:set_attrs([{"script",list_to_binary("ctx._source.triggers += newelement")},
 															 {"params","{}"},{"params.newelement","{}"},
 															 {"params.newelement.function",list_to_binary(Function)}, {"params.newelement.input",Input},
 															 {"params.newelement.streams",Streams},{"params.newelement.vstreams",VirtualStreams},{"params.newelement.type",list_to_binary(Type)},
 															 {"params.newelement.output_type",list_to_binary("uri")},{"params.newelement.output_id",list_to_binary(URI)}]),
 							case api_help:update_doc(?INDEX, "user", User, UserUpdate) of
-								{error, {UPCode, UPBody}} -> 
+								{error, {UPCode, UPBody}} ->
 									UPErrorString = api_help:generate_error(UPBody, UPCode),
 									{{halt, UPCode}, wrq:set_resp_body(UPErrorString, ReqData), State};
 								{ok, _} ->
@@ -329,7 +334,7 @@ add_uri(User,ReqData, State) ->
 							end
 					end
 			end
-	
+
 	end.
 
 
@@ -393,7 +398,7 @@ add_user(User, ReqData, State) ->
 				   "{\"filter\":{\"term\":{ \"function\":\"" ++ Function ++ "\"}},\"query\":{\"match\":{\"streams\":{\"query\":\"" ++ StreamsQuery ++"\",\"operator\":\"and\"}}},\"query\":{\"match\":{\"vstreams\":{\"query\":\"" ++ VirtualStreamsQuery ++"\",\"operator\":\"and\"}}}}"
 		   end,
 	EsId = case erlastic_search:search_json(#erls_params{},?INDEX, "trigger", Query) of % See if the trigger is already in the system
-			   {error, {Code, Body}} -> 
+			   {error, {Code, Body}} ->
 				   {error, {Code, Body}};
 			   {ok,JsonStruct} ->
 				   case lib_json:get_field(JsonStruct, "hits.total") of
@@ -402,10 +407,10 @@ add_user(User, ReqData, State) ->
 					   X -> get_es_id(lib_json:get_field(JsonStruct, "hits.hits"),Streams++ VirtualStreams)
 				   end
 		   end,
-	Type = case Streams of 
+	Type = case Streams of
 			   [] ->
 				   "vstream";
-			   _ -> 
+			   _ ->
 				   "stream"
 		   end,
 	case {EsId,Streams,Function,Username,VirtualStreams} of
@@ -429,10 +434,10 @@ add_user(User, ReqData, State) ->
 				{error,{Code2,Body2}} ->
 					ErrorString2 = api_help:generate_error(Body2, Code2),
 					{{halt, Code2}, wrq:set_resp_body(ErrorString2, ReqData), State};
-				{ok,List2} -> 
+				{ok,List2} ->
 					TriggerId = lib_json:to_string(lib_json:get_field(List2, "_id")),
 					spawn_link(fun() ->
-									   triggersProcess:create(TriggerId, lists:map(fun(A) -> {stream,A} end,Streams) ++ lists:map(fun(A) -> {vstream,A} end,VirtualStreams), 
+									   triggersProcess:create(TriggerId, lists:map(fun(A) -> {stream,A} end,Streams) ++ lists:map(fun(A) -> {vstream,A} end,VirtualStreams),
 															  Function, [{Input,[{user,Username}]}],Type)
 							   end),
 					UserUpdate = lib_json:set_attrs([{"script",list_to_binary("ctx._source.triggers += newelement")},
@@ -441,7 +446,7 @@ add_user(User, ReqData, State) ->
 													 {"params.newelement.streams",Streams},{"params.newelement.vstreams",VirtualStreams},{"params.newelement.type",list_to_binary(Type)},
 													 {"params.newelement.output_type",list_to_binary("user")},{"params.newelement.output_id",list_to_binary(Username)}]),
 					case api_help:update_doc(?INDEX, "user", Username, UserUpdate) of
-						{error, {UPCode, UPBody}} -> 
+						{error, {UPCode, UPBody}} ->
 							UPErrorString = api_help:generate_error(UPBody, UPCode),
 							{{halt, UPCode}, wrq:set_resp_body(UPErrorString, ReqData), State};
 						{ok, _} ->
@@ -457,14 +462,14 @@ add_user(User, ReqData, State) ->
 			%% Open channel
 			{ok, Channel} = amqp_connection:open_channel(Connection),
 			%% Declare exchange
-			amqp_channel:call(Channel, #'exchange.declare'{exchange = CommandExchange, type = <<"fanout">>}),      % Update triggersProcess running of new user  
+			amqp_channel:call(Channel, #'exchange.declare'{exchange = CommandExchange, type = <<"fanout">>}),      % Update triggersProcess running of new user
 			%% Send
 			amqp_channel:cast(Channel, #'basic.publish'{exchange = CommandExchange}, #amqp_msg{payload = Msg}),
-			case erlastic_search:get_doc(?INDEX, "trigger", EsId) of 
-				{error, {Code3, Body3}} -> 
+			case erlastic_search:get_doc(?INDEX, "trigger", EsId) of
+				{error, {Code3, Body3}} ->
 					ErrorString3 = api_help:generate_error(Body3, Code3),
 					{{halt, Code3}, wrq:set_resp_body(ErrorString3, ReqData), State};
-				{ok,JsonStruct2} -> 
+				{ok,JsonStruct2} ->
 					Update = case lib_json:field_value_exists(JsonStruct2, "_source.outputlist[*].input", Input) of
 								 true ->
 									 "{\"script\" : \"for(int i=0;i < ctx._source.outputlist.size(); i++){if (ctx._source.outputlist[i].input == newinput && !ctx._source.outputlist[i].output.contains(newoutput)){ctx._source.outputlist[i].output += newoutput; i = ctx._source.outputlist.size();}}\", \"params\":{\"newinput\":" ++  input_to_string(Input)++ ", \"newoutput\":{\"output_id\":\""++Username++"\",\"output_type\":\"user\"}}}";
@@ -472,28 +477,28 @@ add_user(User, ReqData, State) ->
 									 "{\"script\" : \"ctx._source.outputlist += newelement\", \"params\":{\"newelement\":{\"input\" : "++ input_to_string(Input) ++ ", \"output\":[{\"output_id\":\""++Username++"\",\"output_type\":\"user\"}]}}}"
 							 end,
 					case api_help:update_doc(?INDEX, "trigger", EsId, Update) of % Update document in es with the new user
-						{error, {Code4, Body4}} -> 
+						{error, {Code4, Body4}} ->
 							ErrorString4 = api_help:generate_error(Body4, Code4),
 							{{halt, Code4}, wrq:set_resp_body(ErrorString4, ReqData), State};
-						{ok,List4} -> 
+						{ok,List4} ->
 							UserUpdate = lib_json:set_attrs([{"script",list_to_binary("ctx._source.triggers += newelement")},
 															 {"params","{}"},{"params.newelement","{}"},
 															 {"params.newelement.function",list_to_binary(Function)}, {"params.newelement.input",Input},
 															 {"params.newelement.streams",Streams},{"params.newelement.vstreams",VirtualStreams},{"params.newelement.type",list_to_binary(Type)},
 															 {"params.newelement.output_type",list_to_binary("user")},{"params.newelement.output_id",list_to_binary(Username)}]),
 							case api_help:update_doc(?INDEX, "user", Username, UserUpdate) of
-								{error, {UPCode, UPBody}} -> 
+								{error, {UPCode, UPBody}} ->
 									UPErrorString = api_help:generate_error(UPBody, UPCode),
 									{{halt, UPCode}, wrq:set_resp_body(UPErrorString, ReqData), State};
 								{ok, _} ->
 									{true,wrq:set_resp_body(lib_json:encode(List4),ReqData),State}
-							end	
+							end
 					end
 			end
 
 	end.
 
-	
+
 
 %% @doc
 %% Function: remove_uri/3
@@ -559,7 +564,7 @@ remove_uri(User,ReqData, State) ->
 				   "{\"filter\":{\"term\":{ \"function\":\"" ++ Function ++ "\"}},\"query\":{\"match\":{\"streams\":{\"query\":\"" ++ StreamsQuery ++"\",\"operator\":\"and\"}}},\"query\":{\"match\":{\"vstreams\":{\"query\":\"" ++ VirtualStreamsQuery ++"\",\"operator\":\"and\"}}}}"
 		   end,
 	EsId = case erlastic_search:search_json(#erls_params{},?INDEX, "trigger", Query) of % Get the es id of the trigger
-			   {error, {Code, Body}} -> 
+			   {error, {Code, Body}} ->
 				   {error, {Code, Body}};
 			   {ok,JsonStruct} ->
 				   erlang:display(binary_to_list(iolist_to_binary(lib_json:encode(JsonStruct)))),
@@ -569,10 +574,10 @@ remove_uri(User,ReqData, State) ->
 					   X -> get_es_id(lib_json:get_field(JsonStruct, "hits.hits"),Streams++ VirtualStreams)
 				   end
 		   end,
-	Type = case Streams of 
+	Type = case Streams of
 			   [] ->
 				   "vstream";
-			   _ -> 
+			   _ ->
 				   "stream"
 		   end,
 	case {EsId,Streams,Function,URI,VirtualStreams} of
@@ -592,12 +597,12 @@ remove_uri(User,ReqData, State) ->
 			{{halt, UCode}, wrq:set_resp_body(UErrorString, ReqData), State};
 		{_,_,_,_,error} ->
 			{{halt, 405}, wrq:set_resp_body("Invalid virtual stream list should be a valid virtual stream id or a list of valid virtual stream ids", ReqData), State};
-		{EsId,_,_ ,_,_}->		
+		{EsId,_,_ ,_,_}->
 			Return = case erlastic_search:get_doc(?INDEX, "trigger", EsId) of % Update the es document by removing the user
-						 {error, {Code3, Body3}} -> 
+						 {error, {Code3, Body3}} ->
 							 ErrorString3 = api_help:generate_error(Body3, Code3),
 							 {{halt, Code3}, wrq:set_resp_body(ErrorString3, ReqData), State};
-						 {ok,JsonStruct2} -> 	 
+						 {ok,JsonStruct2} ->
 							 Update = case lib_json:field_value_exists(JsonStruct2, "_source.outputlist[*].input", Input) of
 										  true ->
 											  "{\"script\" : \"for(int i=0;i < ctx._source.outputlist.size(); i++){if (ctx._source.outputlist[i].input == newinput){if (ctx._source.outputlist[i].output == newoutputlist) {ctx._source.outputlist.remove((Object) ctx._source.outputlist[i]); i = ctx._source.outputlist.size();} else {for(int k=0;k < ctx._source.outputlist[i].output.size(); k++) {if (ctx._source.outputlist[i].output[k] == newoutput) {ctx._source.outputlist[i].output.remove((Object) ctx._source.outputlist[i].output[k]); k = ctx._source.outputlist[i].output.size();}}}}}\", \"params\":{\"newinput\":\"" ++ input_to_string(Input) ++ "\",  \"newoutputlist\":[{\"output_id\":[\""++URI++"\",\""++ User++"\"],\"output_type\":\"uri\"}],  \"newoutput\":{\"output_id\":[\""++URI++"\",\""++ User++"\"],\"output_type\":\"uri\"}}}";
@@ -605,18 +610,18 @@ remove_uri(User,ReqData, State) ->
 											  erlang:display("Error: input not in file"),
 											  "{}"
 									  end,
-							 case api_help:update_doc(?INDEX, "trigger", EsId, Update) of 
-								 {error, {Code4, Body4}} -> 
+							 case api_help:update_doc(?INDEX, "trigger", EsId, Update) of
+								 {error, {Code4, Body4}} ->
 									 ErrorString4 = api_help:generate_error(Body4, Code4),
 									 {{halt, Code4}, wrq:set_resp_body(ErrorString4, ReqData), State};
-								 {ok,List4} -> 
+								 {ok,List4} ->
 									 UserUpdate = lib_json:set_attrs([{"script",list_to_binary("for(int i=0;i < ctx._source.triggers.size(); i++){if (ctx._source.triggers[i] == newelement){ctx._source.triggers.remove((Object) ctx._source.triggers[i]); i = ctx._source.triggers.size();}}")},
 																	  {"params","{}"},{"params.newelement","{}"},
 																	  {"params.newelement.function",list_to_binary(Function)}, {"params.newelement.input",Input},
 																	  {"params.newelement.streams",Streams},{"params.newelement.vstreams",VirtualStreams},{"params.newelement.type",list_to_binary(Type)},
 																	  {"params.newelement.output_type",list_to_binary("uri")},{"params.newelement.output_id",list_to_binary(URI)}]),
 									 case api_help:update_doc(?INDEX, "user", User, UserUpdate) of
-										 {error, {UPCode, UPBody}} -> 
+										 {error, {UPCode, UPBody}} ->
 											 UPErrorString = api_help:generate_error(UPBody, UPCode),
 											 {{halt, UPCode}, wrq:set_resp_body(UPErrorString, ReqData), State};
 										 {ok, _} ->
@@ -632,7 +637,7 @@ remove_uri(User,ReqData, State) ->
 			%% Open channel
 			{ok, Channel} = amqp_connection:open_channel(Connection),
 			%% Declare exchange
-			amqp_channel:call(Channel, #'exchange.declare'{exchange = CommandExchange, type = <<"fanout">>}),    % Update the triggersProcess by sending a message    
+			amqp_channel:call(Channel, #'exchange.declare'{exchange = CommandExchange, type = <<"fanout">>}),    % Update the triggersProcess by sending a message
 			%% Send
 			amqp_channel:cast(Channel, #'basic.publish'{exchange = CommandExchange}, #amqp_msg{payload = Msg}),
 			Return
@@ -700,7 +705,7 @@ remove_user(User, ReqData, State) ->
 					"{\"filter\":{\"term\":{ \"function\":\"" ++ Function ++ "\"}},\"query\":{\"match\":{\"streams\":{\"query\":\"" ++ StreamsQuery ++"\",\"operator\":\"and\"}}},\"query\":{\"match\":{\"vstreams\":{\"query\":\"" ++ VirtualStreamsQuery ++"\",\"operator\":\"and\"}}}}"
 			end,
 	EsId = case erlastic_search:search_json(#erls_params{},?INDEX, "trigger", Query) of % Get the es id of the trigger
-			   {error, {Code, Body}} -> 
+			   {error, {Code, Body}} ->
 				   {error, {Code, Body}};
 			   {ok,JsonStruct} ->
 				   case lib_json:get_field(JsonStruct, "hits.total") of
@@ -709,10 +714,10 @@ remove_user(User, ReqData, State) ->
 					   X -> get_es_id(lib_json:get_field(JsonStruct, "hits.hits"),Streams ++ VirtualStreams)
 				   end
 		   end,
-	Type = case Streams of 
+	Type = case Streams of
 			   [] ->
 				   "vstream";
-			   _ -> 
+			   _ ->
 				   "stream"
 		   end,
 	case {EsId,Streams,Function,Username,VirtualStreams} of
@@ -732,12 +737,12 @@ remove_user(User, ReqData, State) ->
 			{{halt, UCode}, wrq:set_resp_body(UErrorString, ReqData), State};
 		{_,_,_,_,error} ->
 			{{halt, 405}, wrq:set_resp_body("Invalid virtual stream list should be a valid virtual stream id or a list of valid virtual stream ids", ReqData), State};
-		{EsId,_,_ ,_,_}->		
+		{EsId,_,_ ,_,_}->
 			Return = case erlastic_search:get_doc(?INDEX, "trigger", EsId) of % Update the es document by removing the user
-						 {error, {Code3, Body3}} -> 
+						 {error, {Code3, Body3}} ->
 							 ErrorString3 = api_help:generate_error(Body3, Code3),
 							 {{halt, Code3}, wrq:set_resp_body(ErrorString3, ReqData), State};
-						 {ok,JsonStruct2} -> 	 
+						 {ok,JsonStruct2} ->
 							 Update = case lib_json:field_value_exists(JsonStruct2, "_source.outputlist[*].input", Input) of
 										  true ->
 											  "{\"script\" : \"for(int i=0;i < ctx._source.outputlist.size(); i++){if (ctx._source.outputlist[i].input == newinput){if (ctx._source.outputlist[i].output == newoutputlist) {ctx._source.outputlist.remove((Object) ctx._source.outputlist[i]); i = ctx._source.outputlist.size();} else {for(int k=0;k < ctx._source.outputlist[i].output.size(); k++) {if (ctx._source.outputlist[i].output[k] == newoutput) {ctx._source.outputlist[i].output.remove((Object) ctx._source.outputlist[i].output[k]); k = ctx._source.outputlist[i].output.size();}}}}}\", \"params\":{\"newinput\":\"" ++ input_to_string(Input) ++ "\",  \"newoutputlist\":[{\"output_id\":\""++Username++"\",\"output_type\":\"user\"}],  \"newoutput\":{\"output_id\":\""++Username++"\",\"output_type\":\"user\"}}}";
@@ -745,23 +750,23 @@ remove_user(User, ReqData, State) ->
 											  erlang:display("Error: input not in file"),
 											  "{}"
 									  end,
-							 case api_help:update_doc(?INDEX, "trigger", EsId, Update) of 
-								 {error, {Code4, Body4}} -> 
+							 case api_help:update_doc(?INDEX, "trigger", EsId, Update) of
+								 {error, {Code4, Body4}} ->
 									 ErrorString4 = api_help:generate_error(Body4, Code4),
 									 {{halt, Code4}, wrq:set_resp_body(ErrorString4, ReqData), State};
-								 {ok,List4} -> 
+								 {ok,List4} ->
 									 UserUpdate = lib_json:set_attrs([{"script",list_to_binary("for(int i=0;i < ctx._source.triggers.size(); i++){if (ctx._source.triggers[i] == newelement){ctx._source.triggers.remove((Object) ctx._source.triggers[i]); i = ctx._source.triggers.size();}}")},
 																	  {"params","{}"},{"params.newelement","{}"},
 																	  {"params.newelement.function",list_to_binary(Function)}, {"params.newelement.input",Input},
 																	  {"params.newelement.streams",Streams},{"params.newelement.vstreams",VirtualStreams},{"params.newelement.type",list_to_binary(Type)},
 																	  {"params.newelement.output_type",list_to_binary("user")},{"params.newelement.output_id",list_to_binary(Username)}]),
 									 case api_help:update_doc(?INDEX, "user", Username, UserUpdate) of
-										 {error, {UPCode, UPBody}} -> 
+										 {error, {UPCode, UPBody}} ->
 											 UPErrorString = api_help:generate_error(UPBody, UPCode),
 											 {{halt, UPCode}, wrq:set_resp_body(UPErrorString, ReqData), State};
 										 {ok, _} ->
 											 {true,wrq:set_resp_body(lib_json:encode(List4),ReqData),State}
-									 end	
+									 end
 							 end
 					 end,
 			CommandExchange = list_to_binary("command.trigger."++ EsId),
@@ -772,7 +777,7 @@ remove_user(User, ReqData, State) ->
 			%% Open channel
 			{ok, Channel} = amqp_connection:open_channel(Connection),
 			%% Declare exchange
-			amqp_channel:call(Channel, #'exchange.declare'{exchange = CommandExchange, type = <<"fanout">>}),    % Update the triggersProcess by sending a message    
+			amqp_channel:call(Channel, #'exchange.declare'{exchange = CommandExchange, type = <<"fanout">>}),    % Update the triggersProcess by sending a message
 			%% Send
 			amqp_channel:cast(Channel, #'basic.publish'{exchange = CommandExchange}, #amqp_msg{payload = Msg}),
 			Return
@@ -830,7 +835,7 @@ get_es_id([First|Rest],Streams) ->
 
 %% @doc
 %% Function: matches_exactly/2
-%% Purpose: Used check if the streams in the list are 
+%% Purpose: Used check if the streams in the list are
 %%          the streams in the document, and that
 %%          there are no more streams then them
 %% Returns: returns true if the given list from the
@@ -874,14 +879,14 @@ matches_exactly([First|Rest],Streams) ->
 start_all_triggers_in_es() ->
 	AmountQuery = "{\"query\" : {\"match_all\" : {}}}",
 	case erlastic_search:search_json(#erls_params{},?INDEX, "trigger", AmountQuery) of % Maybe wanna take more
-		{error, {_Code, _Body}} -> 
+		{error, {_Code, _Body}} ->
 			erlang:display("Error when starting up triggers"),
 			error;
 		{ok,JsonStruct} ->
 			NumberOfTriggers = lib_json:get_field(JsonStruct, "hits.total"),
 			TriggerQuery = "{\"size\": " ++ integer_to_list(NumberOfTriggers) ++ ",\"query\" : {\"match_all\" : {}}}",
 			case erlastic_search:search_json(#erls_params{},?INDEX, "trigger", TriggerQuery) of % Maybe wanna take more
-				{error, {_Code2, _Body2}} -> 
+				{error, {_Code2, _Body2}} ->
 					erlang:display("Error when starting up triggers"),
 					error;
 				{ok,JsonStruct2} ->
@@ -952,7 +957,7 @@ start_processes([]) ->
 	ok;
 start_processes([{{id,Id},{function,Function},{inputlist,InputList},{streams,Streams},{vstreams,VStreams},{type,Type}}|Rest]) ->
 	spawn_link(fun() ->
-					   triggersProcess:create(Id, lists:map(fun(A) -> {stream,A} end,Streams) ++ lists:map(fun(A) -> {vstream,A} end,VStreams), 
+					   triggersProcess:create(Id, lists:map(fun(A) -> {stream,A} end,Streams) ++ lists:map(fun(A) -> {vstream,A} end,VStreams),
 											  Function, InputList,Type)
 			   end),
 	start_processes(Rest).
