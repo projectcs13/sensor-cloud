@@ -1,8 +1,18 @@
 language: erlang
+env: R_HOME=/usr/lib/R
 before_install:
   - sudo apt-get install -qq xsltproc 
-script: "make install && make test"
-before_script: "curl https://raw.github.com/projectcs13/sensor-cloud/develop/scripts/travis-elasticsearch.sh  | bash"
+  - sudo add-apt-repository "deb http://ftp.sunet.se/pub/lang/CRAN/bin/linux/ubuntu precise/" 
+  - sudo apt-get install r-base
+services:
+  - rabbitmq
+script: "make install && make test_travis"
+before_script: 
+- "curl https://raw.github.com/projectcs13/sensor-cloud/develop/scripts/travis-elasticsearch.sh  | bash"
+- "cd scripts/python/"
+- "python -m CGIHTTPServer 8001 &"
+- "python -m CGIHTTPServer 8002 &"
+- "cd ../../"
 otp_release:
 #  - R16B02
 #  - R16B01

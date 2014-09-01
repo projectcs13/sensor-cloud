@@ -8,6 +8,11 @@ TEST*.xml
 .project
 .settings
 *.swp
+priv/data
+priv/logs
+javascripts/node_modules
 
 # Do not Ignore these
 !doc/overview.edoc
+/ebin
+.temp.log

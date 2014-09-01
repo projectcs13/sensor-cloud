@@ -11,7 +11,12 @@
 	content_types_provided/2, 
 	get_suggestion/2, 
 	add_suggestion/2,
-	update_suggestion/1]).
+	update_suggestion/1,
+	update_stream/2,
+	update_resource/2,
+	add_resource_suggestion_fields/1,
+	add_stream_suggestion_fields/1
+	]).
 
 
 -include_lib("erlastic_search.hrl").
@@ -23,23 +28,22 @@
 
 
 %% @doc
-%% Function: init/1
-%% Purpose: init function used to fetch path information from webmachine dispatcher.
-%% Returns: {ok, undefined}
+%% Init function used to fetch path information from webmachine dispatcher.
 %% @end
 -spec init([]) -> {ok, undefined}.
 init([]) -> 
 	{ok, undefined}.
 
 %% @doc
-%% Function: allowed_methods/2
-%% Purpose: Used to define what methods are allowed one the given URI's.
-%% Returns: {List, ReqData, State}, where list is the allowed methods for the given URI. 
+%% Define what methods are allowed one the given URI's. It is called automatically by webmachine
 %% @end
 -spec allowed_methods(ReqData::term(),State::term()) -> {list(), term(), term()}.
-
 allowed_methods(ReqData, State) ->
 	case api_help:parse_path(wrq:path(ReqData)) of
+		[{"suggest", "_search"}] ->
+			{['GET'], ReqData, State};
+		[{"suggest", _Field} , {_Term}] ->
+			{['GET'], ReqData, State}; 
 		[{"suggest", _Term}] ->
 			{['GET'], ReqData, State}; 
 		[error] ->
@@ -49,10 +53,8 @@ allowed_methods(ReqData, State) ->
 
 
 %% @doc
-%% Function: content_types_provided/2
-%% Purpose: based on the Accept header on a 'GET' request, we provide different media types to the client.
+%% Based on the Accept header on a 'GET' request, we provide different media types to the client.
 %% A code 406 is returned to the client if we cannot return the media-type that the user has requested.
-%% Returns: {[{Mediatype, Handler}], ReqData, State}
 %% @end
 -spec content_types_provided(ReqData::term(),State::term()) -> {list(), term(), term()}.
 content_types_provided(ReqData, State) ->
@@ -61,36 +63,84 @@ content_types_provided(ReqData, State) ->
 
 
 %% @doc
+%% Handles suggestion request.
+%%
+%% Case 1:
 %% Handles GET requests for suggestions by giving the term.(model). It returns only one suggestion,
 %% the one with the highest score.
 %%
 %% Example URL: localhost:8000/suggest/my_model 
+%%
+%% Case 2:
+%% Handles GET request for text autocompletion.
+%%
+%% Example URL: localhost:8000/suggest/my_field/my_text?size=5 
+%%
+%% Case 3:
+%% Handles GET requests for phrase_suggestion/auto_completion
+%%
+%% Example URL: localhost:8000/suggest/_search?query=test
+%% This will try to find completion suggestions for the query "test"
 %% @end
 -spec get_suggestion(ReqData::term(),State::term()) -> {boolean(), term(), term()}.
 get_suggestion(ReqData, State) ->
-	case proplists:get_value('term', wrq:path_info(ReqData)) of
-		undefined ->
-			{{halt, 400}, ReqData, State};
-		Term ->
-			%forms the query
-			Query = "{                   
-					\"testsuggest\" : {     
-						\"text\" : \""++Term++"\",
-						\"completion\" : {                    
-						\"field\" : \"suggest\",
-								\"size\" : 1            
-						}                                                   
-					}                                      
-				}",
-			case erlastic_search:suggest(?INDEX, Query) of	
-				{error, Reason} -> {lib_json:encode(Reason),ReqData, State};
-				{ok,List} -> 
-					EncodedList = lib_json:encode(List),
-					case re:run(EncodedList, "\"options\":\\[\\]", [{capture, first, list}]) of
-						{match, _} -> 
-							{{halt,404},ReqData, State};
-						_->
-							{lib_json:encode(List),ReqData, State}
+	case api_help:is_search(ReqData) of
+		false ->
+			case wrq:get_qs_value("size",ReqData) of 
+				undefined ->
+					Size = "1";
+				SizeParam ->
+					Size = SizeParam
+			end,
+			case proplists:get_value('field', wrq:path_info(ReqData)) of
+				undefined ->
+					Field = "suggest";
+				FieldParam ->
+					Field = FieldParam ++ "_suggest"
+			end,
+			case proplists:get_value('term', wrq:path_info(ReqData)) of
+				undefined ->
+					{{halt, 400}, ReqData, State};
+				Term ->
+					Query = "{                   
+							\"testsuggest\" : {     
+								\"text\" : \""++http_uri:decode(Term)++"\",
+								\"completion\" : {                    
+								\"field\" : \""++Field++"\",
+										\"size\" : "++ Size ++"            
+								}                                                   
+							}                                      
+						}",
+					case erlastic_search:suggest(?INDEX, Query) of	
+						{error, {Code, Body}} -> 
+							ErrorString = api_help:generate_error(Body, Code),
+							{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+						{ok,List} -> 
+							EncodedList = lib_json:encode(List),
+							case re:run(EncodedList, "\"options\":\\[\\]", [{capture, first, list}]) of
+								{match, _} -> 
+									Output = lib_json:set_attr("suggestions",[]);
+								_-> 
+									Output = lib_json:set_attr("suggestions",lib_json:get_field(List, "testsuggest[0].options")),
+																	erlang:display(Output)
+
+							end,
+							{lib_json:encode(Output),ReqData, State}
+					end
+			end;
+		true ->
+			case wrq:get_qs_value("query",ReqData) of
+				undefined ->
+					erlang:display("No query specified!");
+				QueryString ->
+					SuggestJson = "{\"suggestion\":{\"text\":\""++ QueryString ++"\",\"completion\":{\"field\":\"search_suggest\",\"fuzzy\":true}}}",
+					case erlastic_search:suggest(?INDEX, SuggestJson) of
+						{error, {Code, Body}} -> 
+							ErrorString = api_help:generate_error(Body, Code),
+							{{halt, Code}, wrq:set_resp_body(ErrorString, ReqData), State};
+						{ok,List} ->
+							OutputJson = lib_json:set_attr("suggestions",lib_json:get_field(List, "suggestion[0].options")),
+							{OutputJson ,ReqData ,State}
 					end
 			end
 	end.
@@ -114,24 +164,73 @@ add_suggestion(Resource, ResourceId) ->
 		undefined ->
 			{error, no_model};
 		_ ->
-			Suggestion = "{
-				\"resource_id\" : \"" ++ undefined_to_string(ResourceId) ++ "\",
-				\"suggest\" : {
-					\"input\" : [ \"" ++ undefined_to_string(Model) ++ "\" ], 
-					\"output\" : \"" ++ get_timestamp() ++ "\",
-					\"payload\" : { 
-						\"manufacturer\" : \"" ++ undefined_to_string(Manufacturer) ++ "\",
-						\"tags\" : \"" ++ undefined_to_string(Tags) ++ "\",
-						\"polling_freq\" : \"" ++ undefined_to_string(Polling_freq) ++ "\"
-					},
-					\"weight\" : " ++ integer_to_list(Weight) ++ "
-				}				
-				}",
+			Suggestion = lib_json:set_attrs(
+						  [
+						   {resource_id, ResourceId},
+						   {suggest, "{}"},
+						   {"suggest.input", [Model, Manufacturer, binary:list_to_bin(binary_to_list(Manufacturer) ++ " " ++ binary_to_list(Model))]},
+						   {"suggest.output", Model},
+						   {"suggest.payload", "{}"},
+						   {"suggest.payload.resource", ResourceId},
+						   {"suggest.payload.model", Model},
+						   {"suggest.payload.manufacturer", Manufacturer},
+						   {"suggest.weight", Weight}
+						  ]
+						 ),
 			case erlastic_search:index_doc(?INDEX, "suggestion", Suggestion) of 
 				{error, _Reason} -> erlang:display("Suggestion not saved ");
 				{ok, _} -> 	ok
 			end
 	end.
+
+
+%% @doc
+%% When inserting or updating a resource, it generates the suggest fields
+%% @end
+add_resource_suggestion_fields(Resource) ->
+	case lib_json:get_field(Resource,"manufacturer") of
+		undefined ->
+			Temp1 = Resource;
+		Manufacturer ->
+			Temp1 = lib_json:add_value(Resource, "manufacturer_suggest", Manufacturer)
+	end,
+	case lib_json:get_field(Resource,"model") of
+		undefined ->
+			Temp2 = Temp1;
+		Model ->
+			Temp2 = lib_json:add_value(Temp1, "model_suggest", Model)
+	end,
+	case lib_json:get_field(Resource,"tags") of
+		undefined ->
+			Temp3 = Temp2;
+		Tags ->
+			Temp3 = lib_json:add_value(Temp2, "tags_suggest", Tags)
+	end,
+	Temp3.
+
+%% @doc
+%% When inserting or updating a stream, it generates the suggest fields
+%% @end
+add_stream_suggestion_fields(Stream) ->
+	case lib_json:get_field(Stream,"name") of
+		undefined ->
+			Temp1 = Stream;
+		Name ->
+			Temp1 = lib_json:add_value(Stream, "name_suggest", Name)
+	end,
+	case lib_json:get_field(Stream,"type") of
+		undefined ->
+			Temp2 = Temp1;
+		Type ->
+			Temp2 = lib_json:add_value(Temp1, "type_suggest", Type)
+	end,
+	case lib_json:get_field(Stream,"tags") of
+		undefined ->
+			Temp3 = Temp2;
+		Tags ->
+			Temp3 = lib_json:add_value(Temp2, "tags_suggest", Tags)
+	end,
+	Temp3.
 
 
 %% @doc
@@ -141,6 +240,10 @@ add_suggestion(Resource, ResourceId) ->
 %% @end
 -spec update_suggestion(Stream::json()) -> ok.
 update_suggestion(Stream) ->
+	
+	%% only for testing
+	erlang:display("run function: update_suggestion/1"),
+	
 	ResourceId = lib_json:get_field(Stream, "resource_id"),
 	case erlastic_search:search(?INDEX, "suggestion", "resource_id:"++ lib_json:to_string(ResourceId)) of
 		{error, _} -> erlang:display("ERROR");
@@ -164,15 +267,118 @@ update_suggestion(Stream) ->
 							NewStreamList = lib_json:add_value(Sugg,"suggest.payload.streams" , StreamInfo),
 							NewSugg = lib_json:replace_field(NewStreamList, "suggest.weight", NewWeight)
 					end,
-					Final = api_help:create_update(NewSugg),
+					Final = lib_json:set_attr(doc,NewSugg),
 					case api_help:update_doc(?INDEX, "suggestion", Id, Final) of 
 						{error, _Reason} -> erlang:display("not updated");
-						{ok, _Json} -> ok 
+						{ok, _Json} -> 
+							erlang:display("succeed updating the suggestion!!"),
+							ok 
 					end;
 				_ -> 
 					erlang:display("No suggestion exists for that resource")
 			end
 	end.
+
+%% @doc
+%% Updates the suggestion to reflect the changes that has been done in a resource.
+%% @end
+-spec update_resource(Resource::json(), ResourceId::string()) -> ok.
+update_resource(Resource, ResourceId) ->
+	Manufacturer = lib_json:get_field(Resource, "manufacturer"),
+	Model = lib_json:get_field(Resource, "model"),
+	Tags = lib_json:get_field(Resource, "tags"),
+	Polling_freq = lib_json:get_field(Resource, "polling_freq"),
+	RId = list_to_binary(ResourceId),
+	%fetch old suggestion
+	case erlastic_search:search(?INDEX, "suggestion", "resource_id:"++ ResourceId) of
+		{error, _} -> erlang:display("ERROR");
+		{ok, Response} ->
+			case lib_json:get_field(Response, "hits.hits[0]._source.resource_id") of
+				RId ->
+					SuggId = lib_json:get_field(Response, "hits.hits[0]._id"),
+					Json = lib_json:get_field(Response, "hits.hits[0]._source"), 
+					UpdatedJson = lib_json:replace_fields(Json, [{"suggest.payload.manufacturer",Manufacturer},{"suggest.payload.model",Model},{"suggest.payload.tags",Tags},{"suggest.payload.pollng_feq",Polling_freq}]),
+					WeightJson = update_score(UpdatedJson),
+					%change input (in case model changed)
+					FinalJson = lib_json:replace_field(WeightJson, "suggest.input",Model),
+					case erlastic_search:index_doc_with_id(?INDEX, "suggestion", SuggId, FinalJson) of 
+						{error, _Reason} -> erlang:display("Suggestion not saved ");
+						{ok, _} -> 	ok
+					end;
+				_ -> 
+					erlang:display("No suggestion exists for that resource")
+			end
+	end,
+	ok.
+
+
+%% @doc
+%% Updates the suggestion to reflect the changes that has been done in a stream.
+%% @end
+-spec update_stream(Stream::json(), StreamId::string()) -> ok.
+update_stream(Stream, StreamId) ->
+	%fetch old values so that we can replace them
+	case erlastic_search:get_doc(?INDEX, "stream", StreamId) of
+		{error, _Reason} -> erlang:display("Stream not found");
+		{ok, OldStreamJson} ->
+			{_, OldStream} = get_stream_info(lib_json:get_field(OldStreamJson, "_source")),
+			{_, NewStream} = get_stream_info(Stream),
+			ResourceId = lib_json:get_field(OldStreamJson, "_source.resource_id"),
+			case ResourceId of
+				undefined ->
+					ok;
+				_ ->
+					%fetch old suggestion
+					case erlastic_search:search(?INDEX, "suggestion", "resource_id:" ++ binary_to_list(ResourceId)) of
+						{error, _Reason2} -> erlang:diplay("Suggestion not found :S");
+						{ok, OldSuggestion} -> 
+							StreamList = lib_json:get_field(OldSuggestion, "hits.hits[0]._source.suggest.payload.streams"),
+							case StreamList of
+								undefined ->
+									ok;
+								_ ->
+									case string:str(StreamList, [OldStream]) of
+										0 -> erlang:display("Invalid position. Not matched properly");
+										Pos ->
+											SuggId = lib_json:get_field(OldSuggestion, "hits.hits[0]._id"),
+											Suggestion = lib_json:get_field(OldSuggestion, "hits.hits[0]._source"),
+											UpdatedSuggestion = lib_json:replace_field(Suggestion, lists:concat(["suggest.payload.streams[", Pos-1, "]"]), NewStream),
+											FinalSuggestion = update_score( UpdatedSuggestion),
+											case erlastic_search:index_doc_with_id(?INDEX, "suggestion", SuggId, FinalSuggestion) of 
+												{error, _Reason} -> erlang:display("Suggestion not updated ");
+												{ok, _} -> 	ok
+											end
+									end
+							end
+					end
+			end
+	end,
+	ok.
+
+
+
+%% @doc
+%% Updates the weight of the suggestion after the new information has been added to it
+%% It takes into account both resource and stream.
+%% @end
+-spec update_score(Suggestion::json()) -> json().
+update_score(Suggestion) ->
+	Payload = lib_json:get_field(Suggestion, "suggest.payload"),
+	ResourceWeight = scoring:calc(Payload, resource),
+	Streams = lib_json:get_field(Payload, "streams"),
+	case Streams of
+		undefined ->
+			StreamWeight = 0;
+		_ -> 
+			Fun = fun(Stream, Acc) -> 
+					scoring:calc(Stream,stream)+Acc
+			end,
+			StreamWeight = lists:foldr(Fun, 0, Streams)
+	end,
+	Sum = ResourceWeight + StreamWeight,
+	lib_json:replace_field(Suggestion, "suggest.weight", Sum).
+
+
 
 
 %% @doc
@@ -186,32 +392,18 @@ get_stream_info(Stream) ->
 	Min_val  = lib_json:get_field(Stream, "min_val"),
 	Max_val  = lib_json:get_field(Stream, "max_val"),
 	Tags  = lib_json:get_field(Stream, "tags"),
-	Type  = lib_json:get_field(Stream, "Type"),
-	Weight = scoring:calc([Name, Description, Min_val, Max_val, Tags, Type]),
-	Result ="{
-		\"name\":\"" ++ undefined_to_string(Name)++"\",
-		\"description\":\"" ++ undefined_to_string(Description)++"\",
-		\"min_value\":\"" ++ undefined_to_string(Min_val)++"\",
-		\"max_value\":\"" ++ undefined_to_string(Max_val)++"\",
-		\"tags\":\"" ++ undefined_to_string(Tags)++"\",
-		\"type\":\"" ++ undefined_to_string(Type)++"\"
-		}",
+	Type  = lib_json:get_field(Stream, "type"),
+	Accuracy  = lib_json:get_field(Stream, "accuracy"),
+	Weight = scoring:calc([Name, Description, Min_val, Max_val, Tags, Type, Accuracy]),
+	Result = lib_json:set_attrs([{name, Name},
+				{description, Description},
+				{min_value, Min_val},
+				{max_value, Max_val},
+				{tags, Tags},
+				{type, Type},
+				{accuracy, Accuracy}
+				]),
 	{Weight, Result}.
-
-
-%% @doc
-%% Returns an empty string if it was "undefined", else it returns the string itself.
-%% @end
--spec undefined_to_string(Text::attr()) -> string().
-undefined_to_string(Text) ->
-	case Text of
-		undefined ->
-			"";
-		_ ->
-			lib_json:to_string(Text)
-	end.
-
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Should be moved to own module later
@@ -223,7 +415,7 @@ get_timestamp() ->
 	TS = {_MSec,_Sec,Micro} = os:timestamp(),
 	{{Year,Month,Day},{Hour,Minute,Second}} = calendar:now_to_universal_time(TS),
 	Mstr = element(Month,{"Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"}),
-	io_lib:format("~2w ~s ~4w ~2w:~2..0w:~2..0w.~6..0w", [Day,Mstr,Year,Hour,Minute,Second,Micro]).
+	binary:list_to_bin(io_lib:format("~2w ~s ~4w ~2w:~2..0w:~2..0w.~6..0w", [Day,Mstr,Year,Hour,Minute,Second,Micro])).
 
 
 

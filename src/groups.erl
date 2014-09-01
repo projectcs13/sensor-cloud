@@ -122,7 +122,7 @@ put_handler(ReqData, State) ->
 put_group(ReqData, State) ->
 	GroupId = proplists:get_value(group, wrq:path_info(ReqData)),
 	{ReqBody,_,_} = api_help:json_handler(ReqData,State),
-	Update = api_help:create_update(ReqBody),
+	Update = lib_json:set_attr(doc, ReqBody),
 	case api_help:update_doc(?INDEX, ?GROUP, GroupId, Update) of 
 		{error,Reason} -> {{error,Reason}, ReqData, State};
 		{ok,List} -> {List,ReqData,State}

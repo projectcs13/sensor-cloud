@@ -47,18 +47,27 @@ init([]) ->
     {ok, App} = application:get_application(?MODULE),
     {ok, Dispatch} = file:consult(filename:join([priv_dir(App),
                                                  "dispatch.conf"])),
-    Port = case os:getenv("WEBMACHINE_PORT") of
-            false -> 8000;
-            AnyPort -> AnyPort
-          end,
+    Port = case application:get_env(engine, webmachine_port) of
+	       undefined -> 8000; %Default port for webmachine
+	       {ok, AnyPort} -> AnyPort
+           end,
+    LogDir = case application:get_env(engine, webmachine_log_dir) of
+		 undefined -> "priv/log";
+		 {ok, AnyDir} -> AnyDir
+	     end,
+    		 
     WebConfig = [
                  {ip, Ip},
                  {port, Port},
-                 {log_dir, "priv/log"},
+                 {log_dir, LogDir},
                  {dispatch, Dispatch}],
     Web = {webmachine_mochiweb,
            {webmachine_mochiweb, start, [WebConfig]},
            permanent, 5000, worker, [mochiweb_socket_server]},
+	polling_system:start_link(),
+    virtual_stream_process_supervisor:start_link(),
+    virtual_stream_process_supervisor:start_processes(),
+	triggers:start_all_triggers_in_es(),
     Processes = [Web],
     {ok, { {one_for_one, 10, 10}, Processes} }.
 

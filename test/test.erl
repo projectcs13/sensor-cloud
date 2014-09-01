@@ -8,7 +8,8 @@
 -author('Tommy Mattsson').
 -export([run/0, run/1]).
 
--define(RESOURCE_URL, "http://localhost:8000/resources/").
+-define(WEBMACHINE_URL, api_help:get_webmachine_url()).
+-define(RESOURCE_URL, ?WEBMACHINE_URL++"/resources/").
 %% @doc
 %% Function: run/0
 %% Purpose: Wrapper function for testing in order to be able to return a 
@@ -17,19 +18,6 @@
 %% Returns: ok | no_return()
 %% @end
 run() ->
-	post_request(?RESOURCE_URL, "application/json", 
-							"{
-								\"suggestion\" : {           
-									\"properties\" : {      
-										\"resource_id\" : { \"type\" : \"string\" },
-										\"suggest\" : { \"type\" : \"completion\",
-											\"index_analyzer\" : \"simple\",      
-											\"search_analyzer\" : \"simple\",
-											\"payloads\" : true
-										}
-									}
-							    }
-			}"),
 	run("ebin").
 
 

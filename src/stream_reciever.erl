@@ -22,33 +22,33 @@
 
 main(Argv) ->
     {ok, Connection} =
-        amqp_connection:start(#amqp_params_network{host = "localhost", port = 5672}),
+        amqp_connection:start(#amqp_params_network{}),
     {ok, Channel} = amqp_connection:open_channel(Connection),
+	
+	StreamId = lists:nth(1, Argv),
+	Exchange = list_to_binary("vstreams." ++ StreamId),
+	
 
-    amqp_channel:call(Channel, #'exchange.declare'{exchange = <<"topic_logs">>,
+    amqp_channel:call(Channel, #'exchange.declare'{exchange = Exchange,
                                                    type = <<"fanout">>}),
 
     #'queue.declare_ok'{queue = Queue} =
         amqp_channel:call(Channel, #'queue.declare'{exclusive = true}),
 
-    [amqp_channel:call(Channel, #'queue.bind'{exchange = <<"topic_logs">>,
-                                              routing_key = list_to_binary(BindingKey),
-                                              queue = Queue})
-     || BindingKey <- Argv],
-
-    io:format(" [*] Waiting for logs. To exit press CTRL+C~n"),
+    amqp_channel:call(Channel, #'queue.bind'{exchange = Exchange, queue = Queue}),
 
     amqp_channel:subscribe(Channel, #'basic.consume'{queue = Queue,
                                                      no_ack = true}, self()),
     receive
         #'basic.consume_ok'{} -> ok
     end,
+	io:format("Waiting for messages from the exchange: ~p~n", [binary_to_list(Exchange)]),
     loop(Channel).
 
 loop(Channel) ->
     receive
-        {#'basic.deliver'{routing_key = RoutingKey}, #amqp_msg{payload = Body}} ->
-            io:format(" [x] ~p:~p~n", [RoutingKey, Body]),
+        {#'basic.deliver'{}, #amqp_msg{payload = Body}} ->
+            io:format(" [x] Message:~p~n", [Body]),
             loop(Channel)
     end.
 
